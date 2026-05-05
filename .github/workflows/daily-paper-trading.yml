@@ -130,9 +130,14 @@ jobs:
       - name: Detect fundamentals cache state
         id: cache-state
         run: |
+          # Count actual parquet files. The cache restore can hit but
+          # restore an empty / partial archive (rare race), so we count
+          # the artifact that the runner actually consumes — parquet
+          # files. Fewer than 500 means a meaningful chunk of the SEC
+          # filer universe is missing, treat as cold.
           n_files=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
           echo "n_parquet=$n_files" >> "$GITHUB_OUTPUT"
-          if [ "$n_files" -lt 1000 ]; then
+          if [ "$n_files" -lt 500 ]; then
             echo "needs_prefetch=true" >> "$GITHUB_OUTPUT"
           else
             echo "needs_prefetch=false" >> "$GITHUB_OUTPUT"
@@ -145,6 +150,20 @@ jobs:
         run: |
           echo "::warning::cold cache — prefetching all SEC active filers (this takes 30-60 min)"
           python -m scripts.prefetch_full_us_market 2>&1 | tee data/cron_logs/prefetch.log
+
+      - name: Verify prefetch produced a usable cache
+        if: steps.cache-state.outputs.needs_prefetch == 'true'
+        run: |
+          # Same count we used to gate the prefetch — but now we
+          # require the post-prefetch cache to be substantial. If
+          # SEC blocked us or the script bailed early, we'd see
+          # < 500 files even though prefetch "ran".
+          n_after=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
+          echo "after prefetch: $n_after parquet files"
+          if [ "$n_after" -lt 500 ]; then
+            echo "::error::prefetch failed — only $n_after parquet files in fundamentals_cache (expected ~6000-8000). Check the prefetch.log artifact for the SEC error."
+            exit 1
+          fi
 
       # ---- The actual trading run ---------------------------------------
       - name: Run paper-trading scanner

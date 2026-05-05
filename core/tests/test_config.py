@@ -10,13 +10,39 @@ from core import config
 from core.exceptions import ConfigError
 
 
-def test_missing_env_file_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """When .env is absent, get_settings() should raise ConfigError."""
+def test_missing_env_file_loads_with_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When .env is absent, get_settings() should still succeed.
+
+    Earlier behavior was to fail fast on a missing .env, which broke
+    every fresh deployment (CI, GHA, fresh clone). Now the file is
+    optional and env vars / defaults take over. The defaults must be
+    safe enough to load without any pre-configuration.
+    """
     fake_env = tmp_path / ".env"
     monkeypatch.setattr(config, "ENV_FILE", fake_env)
+    # Clear API-key env vars in case CI has them set.
+    for key in (
+        "GEMINI_API_KEY",
+        "FMP_API_KEY",
+        "FINNHUB_API_KEY",
+        "ALPHA_VANTAGE_KEY",
+        "MARKETAUX_API_KEY",
+        "SEC_USER_AGENT",
+    ):
+        monkeypatch.delenv(key, raising=False)
     config.reset_settings_cache()
-    with pytest.raises(ConfigError, match="No .env file"):
-        config.get_settings()
+    monkeypatch.setattr(
+        config.Settings,
+        "model_config",
+        {**config.Settings.model_config, "env_file": fake_env},
+    )
+
+    s = config.get_settings()
+    # The default sec_user_agent must always be present so SEC fetches
+    # have a valid identifier even on a brand-new deployment.
+    assert s.sec_user_agent
 
 
 def test_settings_load_with_empty_env(

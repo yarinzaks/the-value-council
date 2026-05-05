@@ -96,19 +96,16 @@ def get_settings() -> Settings:
     with a single human-readable message listing every missing or
     invalid key at once.
 
-    Raises:
-        ConfigError: When ``.env`` is missing, or required keys are
-            missing or invalid.
-    """
-    if not ENV_FILE.exists():
-        raise ConfigError(
-            f"No .env file found at {ENV_FILE}.\n"
-            f"Fix:\n"
-            f"  1. cp {PROJECT_ROOT}/.env.example {ENV_FILE}\n"
-            f"  2. Fill in your API keys\n"
-            f"  3. Re-run."
-        )
+    The .env file is OPTIONAL — environment variables alone are enough
+    on machines that set them externally (CI, GitHub Actions, launchd
+    plists). If a .env exists, Pydantic Settings reads it; if not,
+    we fall back to the env / defaults. This is a deliberate change
+    from the older "fail fast on missing .env" behavior, which broke
+    every fresh deployment that hadn't set up a local .env yet.
 
+    Raises:
+        ConfigError: When required keys are missing or invalid.
+    """
     try:
         return Settings()  # type: ignore[call-arg]
     except ValidationError as exc:
