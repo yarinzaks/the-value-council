@@ -1,0 +1,9 @@
+# Value Council — daily paper-trading runner.
+#
+# Install:  crontab -e  (and paste the line below, adjusting the path)
+# Verify:   crontab -l
+# Logs:     data/cron_logs/daily.log
+#
+# Time format: minute hour dom month dow command
+# Run weekdays (Mon-Fri = 1-5) at 09:35 local time, ~5 min after US market open.
+35 9 * * 1-5 cd /Users/yarinzaks/Documents/The-Value-Council && .venv/bin/python -m scripts.run_daily_paper_trading >> data/cron_logs/daily.log 2>&1

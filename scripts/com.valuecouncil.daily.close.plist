@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Market-CLOSE update — fires Mon-Fri at 23:00 Israel time = 16:00 ET.
+  Mark-to-market only: refresh prices for every open position, write
+  fresh portfolio.json + a daily snapshot. No trades executed.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.daily.close</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/Documents/The-Value-Council/.venv/bin/python</string>
+    <string>-m</string>
+    <string>scripts.run_daily_paper_trading</string>
+    <string>--mode</string>
+    <string>close</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VALUE_COUNCIL_DATA_DIR</key>
+    <string>/Users/yarinzaks/Library/Application Support/value-council</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- Mon-Fri at 23:00 Israel local = 16:00 ET (US market close). -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.close.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.close.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

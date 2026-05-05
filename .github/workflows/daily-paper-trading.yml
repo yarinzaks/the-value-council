@@ -1,0 +1,127 @@
+name: Daily Paper Trading
+
+# What this does
+# --------------
+# Runs the paper-trading scanner Mon-Fri on a US-market schedule.
+# Two scheduled triggers per weekday:
+#
+#   - 13:35 UTC -> 09:35 EDT (16:35 IL) -> "open" mode -> full scan + trades
+#   - 20:00 UTC -> 16:00 EDT (23:00 IL) -> "close" mode -> mark-to-market only
+#
+# Note on DST: GitHub Actions cron always uses UTC. The schedule above
+# is correct during US Eastern Daylight Time (mid-March to early Nov).
+# During EST, runs fire 1 hour earlier in ET. We accept this rather than
+# doubling cron entries because the scanner is idempotent.
+#
+# One-time setup (humans, read this once)
+# ---------------------------------------
+# 1. Push the repo to GitHub.
+# 2. The workflow needs no secrets - yfinance and SEC EDGAR are open.
+# 3. Enable Actions: repo Settings -> Actions -> Allow all actions.
+# 4. The post-run commit needs `contents: write`; the default
+#    GITHUB_TOKEN has it. The permissions block below makes it explicit.
+# 5. First scheduled run shows up in repo Actions tab within ~24 hours.
+
+on:
+  schedule:
+    - cron: '35 13 * * 1-5'
+    - cron: '0 20 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: true
+        type: choice
+        default: 'open'
+        options:
+          - open
+          - close
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-paper-trading-${{ github.event.schedule || inputs.mode }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      # All interpolations from triggering events flow through env vars
+      # so we never expand them inside a shell command (best practice
+      # for GitHub Actions injection safety).
+      TRIGGER_SCHEDULE: ${{ github.event.schedule }}
+      TRIGGER_INPUT_MODE: ${{ inputs.mode }}
+      TRIGGER_NAME: ${{ github.event_name }}
+      TARGET_REF: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Decide run mode
+        id: mode
+        run: |
+          if [ "$TRIGGER_NAME" = "workflow_dispatch" ]; then
+            echo "mode=$TRIGGER_INPUT_MODE" >> "$GITHUB_OUTPUT"
+          elif [ "$TRIGGER_SCHEDULE" = "0 20 * * 1-5" ]; then
+            echo "mode=close" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=open" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure data directory (in-repo)
+        run: |
+          mkdir -p data/portfolios data/decisions data/snapshots data/cache data/cron_logs
+          echo "VALUE_COUNCIL_DATA_DIR=$GITHUB_WORKSPACE/data" >> "$GITHUB_ENV"
+
+      - name: Run paper-trading scanner
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          python -m scripts.run_daily_paper_trading --mode "$MODE" 2>&1 | tee "data/cron_logs/daily.${MODE}.log"
+
+      - name: Commit updated state back to the repo
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          git config user.name  "council-bot"
+          git config user.email "council-bot@users.noreply.github.com"
+          git add data/portfolios data/decisions data/snapshots data/cron_logs
+          if git diff --cached --quiet; then
+            echo "no data changes - nothing to commit"
+            exit 0
+          fi
+          # Build the commit message via a here-doc so no GH expansions
+          # land inside the shell command line.
+          STAMP="$(date -u +%Y-%m-%dT%H:%MZ)"
+          git commit -m "auto: paper-trading run ${MODE} ${STAMP}"
+          git pull --rebase origin "$TARGET_REF" || true
+          git push origin "HEAD:${TARGET_REF}"
+
+      - name: Upload run logs as artifact
+        if: always()
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          RUN_ID: ${{ github.run_id }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-trading-logs-${{ steps.mode.outputs.mode }}-${{ github.run_id }}
+          path: data/cron_logs/daily.*.log
+          retention-days: 30

@@ -1,0 +1,120 @@
+"""Unit tests for Graham ranking."""
+
+from __future__ import annotations
+
+from datetime import date
+
+import pytest
+
+from agents.graham.ranking import (
+    GrahamScore,
+    score_candidates,
+    select_top_n,
+)
+from core.backtest.point_in_time import FilingMetadata, PointInTimeFinancials
+
+
+def _fin(
+    ticker: str,
+    *,
+    current_assets: float,
+    total_liabilities: float,
+    shares: float = 100.0,
+    total_debt: float = 0.0,
+    total_equity: float | None = None,
+    net_income: float = 1.0,
+) -> PointInTimeFinancials:
+    if total_equity is None:
+        total_equity = current_assets - total_liabilities + 100.0
+    return PointInTimeFinancials(
+        ticker=ticker,
+        as_of=date(2024, 6, 30),
+        source_filing=FilingMetadata(
+            ticker=ticker,
+            cik="1",
+            form_type="10-K",
+            filing_date=date(2024, 2, 15),
+            period_of_report=date(2023, 12, 31),
+            accession_number=f"a-{ticker}",
+        ),
+        current_assets=current_assets,
+        total_liabilities=total_liabilities,
+        total_equity=total_equity,
+        shares_outstanding=shares,
+        total_debt=total_debt,
+        long_term_debt=total_debt,
+        net_income=net_income,
+    )
+
+
+class TestScoreCandidates:
+    def test_orders_by_pncav_ascending(self) -> None:
+        # All have NCAV=3.0/share (CA=400, TL=100, shares=100), prices vary
+        a = _fin("A", current_assets=400, total_liabilities=100)
+        b = _fin("B", current_assets=400, total_liabilities=100)
+        c = _fin("C", current_assets=400, total_liabilities=100)
+        candidates = [
+            (a, 100.0, 1.0),  # P/NCAV = 0.33
+            (b, 200.0, 2.0),  # P/NCAV = 0.67
+            (c, 50.0, 0.5),  # P/NCAV = 0.17
+        ]
+        scored = score_candidates(candidates)
+        assert [s.ticker for s in scored] == ["C", "A", "B"]
+
+    def test_breaks_tie_by_lower_de(self) -> None:
+        a = _fin("A", current_assets=400, total_liabilities=100, total_debt=10)
+        b = _fin("B", current_assets=400, total_liabilities=100, total_debt=200)
+        candidates = [(a, 100.0, 1.0), (b, 100.0, 1.0)]
+        scored = score_candidates(candidates)
+        assert scored[0].ticker == "A"
+
+    def test_drops_negative_ncav(self) -> None:
+        a = _fin("A", current_assets=100, total_liabilities=200)  # NCAV negative
+        b = _fin("B", current_assets=400, total_liabilities=100)
+        candidates = [(a, 100.0, 1.0), (b, 100.0, 1.0)]
+        scored = score_candidates(candidates)
+        assert [s.ticker for s in scored] == ["B"]
+
+    def test_empty_input(self) -> None:
+        assert score_candidates([]) == []
+
+    def test_score_fields_correct(self) -> None:
+        a = _fin("A", current_assets=400, total_liabilities=100, shares=100)
+        scored = score_candidates([(a, 100.0, 1.0)])
+        assert len(scored) == 1
+        s = scored[0]
+        assert s.ticker == "A"
+        assert s.ncav_per_share == pytest.approx(3.0)
+        assert s.p_ncav == pytest.approx(1 / 3)
+
+
+class TestSelectTopN:
+    def _scores(self, n: int) -> list[GrahamScore]:
+        return [
+            GrahamScore(
+                ticker=f"T{i:03d}",
+                price=1.0,
+                market_cap=1.0,
+                ncav_per_share=3.0,
+                p_ncav=0.1 + 0.001 * i,
+                debt_to_equity=0.0,
+                net_income=10.0,
+            )
+            for i in range(n)
+        ]
+
+    def test_returns_first_n(self) -> None:
+        top = select_top_n(self._scores(50), 30)
+        assert len(top) == 30
+
+    def test_returns_all_when_fewer(self) -> None:
+        top = select_top_n(self._scores(20), 30)
+        assert len(top) == 20
+
+    def test_zero_n_raises(self) -> None:
+        with pytest.raises(ValueError):
+            select_top_n([], 0)
+
+    def test_negative_n_raises(self) -> None:
+        with pytest.raises(ValueError):
+            select_top_n([], -1)

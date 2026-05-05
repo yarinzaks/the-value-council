@@ -1,0 +1,129 @@
+"use client";
+
+import Link from "next/link";
+import { useUI } from "./Providers";
+import { Money, PctCell } from "./Cards";
+import { Term } from "./Term";
+import type { LivePosition } from "@/lib/types";
+
+const TERM_PATTERN = /\b(P\/E|P\/B|P\/CF|P\/NCAV|D\/E|EY|ROC|NCAV|EBIT|EV|yield)\b/g;
+const TERM_TO_KEY: Record<string, string> = {
+  "P/E": "pe",
+  "P/B": "pb",
+  "P/CF": "pcf",
+  "P/NCAV": "p_ncav",
+  "D/E": "de_ratio",
+  EY: "ey",
+  ROC: "roc",
+  NCAV: "ncav",
+  yield: "dividend_yield",
+  EBIT: "ey",
+  EV: "ey",
+};
+
+function decorate(text: string): JSX.Element {
+  if (!text) return <>{text}</>;
+  const parts: (string | JSX.Element)[] = [];
+  let last = 0;
+  for (const match of text.matchAll(TERM_PATTERN)) {
+    const idx = match.index ?? 0;
+    if (idx > last) parts.push(text.slice(last, idx));
+    const key = TERM_TO_KEY[match[0]];
+    if (key) {
+      parts.push(
+        <Term key={`${idx}-${match[0]}`} k={key}>
+          {match[0]}
+        </Term>,
+      );
+    } else {
+      parts.push(match[0]);
+    }
+    last = idx + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
+export function LivePositionsTable({
+  positions,
+  agentSlug,
+  companyNames = {},
+}: {
+  positions: LivePosition[];
+  agentSlug: string;
+  companyNames?: Record<string, string>;
+}) {
+  const { locale, t } = useUI();
+  if (positions.length === 0) {
+    return (
+      <p className="text-sm text-council-500">{t("no_open_positions")}</p>
+    );
+  }
+  const sorted = [...positions].sort((a, b) => b.weight_pct - a.weight_pct);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+            <th className="py-2 pr-3">{t("col_ticker")}</th>
+            <th className="py-2 pr-3">{t("company_name")}</th>
+            <th className="py-2 pr-3 text-right">{t("col_shares")}</th>
+            <th className="py-2 pr-3 text-right">{t("col_entry")}</th>
+            <th className="py-2 pr-3 text-right">{t("col_current")}</th>
+            <th className="py-2 pr-3 text-right">{t("col_value")}</th>
+            <th className="py-2 pr-3 text-right">{t("col_pnl_usd")}</th>
+            <th className="py-2 pr-3 text-right">{t("col_pnl_pct")}</th>
+            <th className="py-2 pl-3 text-right">{t("col_weight")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((p) => {
+            const value = p.shares * p.current_price;
+            const name = companyNames[p.ticker.toUpperCase()] ?? "";
+            return (
+              <tr
+                key={p.ticker}
+                className="border-b border-council-100 dark:border-council-800 last:border-b-0 hover:bg-council-50 dark:hover:bg-council-800/30 cursor-pointer"
+              >
+                <td className="py-2 pr-3 font-mono font-medium tabular">
+                  <Link
+                    href={`/agents/${agentSlug}/positions/${p.ticker}`}
+                    className="block hover:underline"
+                  >
+                    {p.ticker}
+                  </Link>
+                </td>
+                <td className="py-2 pr-3 text-xs text-council-700 dark:text-council-300">
+                  <Link href={`/agents/${agentSlug}/positions/${p.ticker}`} className="block">
+                    {name || "—"}
+                  </Link>
+                </td>
+                <td className="py-2 pr-3 text-right tabular">{p.shares.toFixed(0)}</td>
+                <td className="py-2 pr-3 text-right">
+                  <Money value={p.entry_price} digits={2} />
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  <Money value={p.current_price} digits={2} />
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  <Money value={value} />
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  <Money value={p.pnl_usd} signed digits={2} />
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  <PctCell value={p.pnl_pct} />
+                </td>
+                <td className="py-2 pl-3 text-right tabular text-council-500">
+                  {p.weight_pct.toFixed(1)}%
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export { decorate as decorateTerms };

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job — runs the Value Council dashboard as a background
+  service on http://localhost:3000.
+
+  The job uses RunAtLoad+KeepAlive so the dashboard:
+    1. Starts automatically when you log into macOS.
+    2. Is restarted by launchd if the process crashes or is killed.
+
+  The Next.js production server requires a prior `npm run build` —
+  this is run once at install time, not per-launch.
+
+  Logs land in data/cron_logs/dashboard.{out,err}.log.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.dashboard</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council/dashboard</string>
+
+  <!-- Use absolute path to npx so launchd doesn't have to consult $PATH. -->
+  <!-- The wrapper script lives outside ~/Documents so launchd's TCC
+       sandbox lets it run; the script then cds in and invokes node.
+       If the user has granted Full Disk Access to /usr/local/bin/node,
+       node can read the JS files inside ~/Documents. Otherwise launchd
+       silently fails with EPERM. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/.local/bin/run-council-dashboard.sh</string>
+  </array>
+
+  <!-- Run on login + auto-restart if it crashes. -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Don't restart faster than every 10 seconds — avoid tight crash loops. -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council/data/cron_logs/dashboard.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council/data/cron_logs/dashboard.err.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+</dict>
+</plist>

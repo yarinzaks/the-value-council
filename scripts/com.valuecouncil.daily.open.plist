@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Market-OPEN scan — fires Mon-Fri at 16:35 Israel time = 09:35 ET.
+  Full strategy run: discover candidates, execute BUYs and rotation
+  SELLs, refresh watchlist. See scripts/run_daily_paper_trading.py
+  for the open-mode behavior.
+
+  Install:
+    cp scripts/com.valuecouncil.daily.open.plist  ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.valuecouncil.daily.open.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.daily.open</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/Documents/The-Value-Council/.venv/bin/python</string>
+    <string>-m</string>
+    <string>scripts.run_daily_paper_trading</string>
+    <string>--mode</string>
+    <string>open</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VALUE_COUNCIL_DATA_DIR</key>
+    <string>/Users/yarinzaks/Library/Application Support/value-council</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- Mon-Fri at 16:35 Israel local time (= 09:35 US Eastern, 5 min
+       after market open). -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.open.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.open.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

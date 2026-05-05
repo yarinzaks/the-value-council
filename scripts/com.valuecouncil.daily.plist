@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job — runs the daily paper-trading scanner Mon-Fri at 09:35
+  local time.
+
+  Hard-learned lesson (May 2026):
+  Earlier versions of this plist wrote logs and read data via paths
+  under /Users/yarinzaks/Documents/.../data/. macOS TCC silently denies
+  launchd-spawned processes access to ~/Documents, AND a stray
+  ``mkdir -p data/...`` call inside the runner replaced our symlink
+  with an empty real directory — so the daily runs APPEARED to succeed
+  but produced zero trades for several days.
+
+  The fix has three layers:
+    1. core/paths.py resolves all data paths to
+       ~/Library/Application Support/value-council/ on macOS.
+    2. This plist ALSO exports VALUE_COUNCIL_DATA_DIR — belt and
+       suspenders, so even if core.paths' default ever changes, the
+       env var pins the location.
+    3. StandardOut / StandardError are absolute paths to ~/Library —
+       never via the project symlink.
+
+  Install:
+    cp scripts/com.valuecouncil.daily.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.valuecouncil.daily.plist
+
+  Verify:
+    launchctl print gui/$(id -u)/com.valuecouncil.daily | grep last
+    tail -f "$HOME/Library/Application Support/value-council/cron_logs/daily.log"
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.daily</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/Documents/The-Value-Council/.venv/bin/python</string>
+    <string>-m</string>
+    <string>scripts.run_daily_paper_trading</string>
+  </array>
+
+  <!-- Belt-and-suspenders pin of the data directory. core/paths.py
+       reads this env var first; if it's set we never even consult the
+       macOS-specific default. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VALUE_COUNCIL_DATA_DIR</key>
+    <string>/Users/yarinzaks/Library/Application Support/value-council</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- Mon-Fri at 09:35 local time. -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>35</integer></dict>
+  </array>
+
+  <!-- Absolute paths to the canonical data root — NOT via the symlink. -->
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
