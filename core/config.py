@@ -41,14 +41,26 @@ class Settings(BaseSettings):
     )
 
     # --- Required keys -------------------------------------------------------
-    gemini_api_key: SecretStr
-    fmp_api_key: SecretStr
-    finnhub_api_key: SecretStr
-    alpha_vantage_key: SecretStr
-    marketaux_api_key: SecretStr
-    sec_user_agent: str
+    # SEC EDGAR's only hard requirement: a User-Agent that identifies who
+    # is making requests. Per https://www.sec.gov/os/accessing-edgar-data
+    # this must include a name and a contact email. We default to a
+    # generic one so the runner works out of the box on machines that
+    # haven't set the env var (e.g. fresh GitHub Actions runners). For
+    # production use, set ``SEC_USER_AGENT`` in your environment with a
+    # real contact email.
+    sec_user_agent: str = "The-Value-Council research@example.com"
 
     # --- Optional keys -------------------------------------------------------
+    # Vestigial from when this project planned to use multiple data
+    # vendors. The live trading runner uses none of these — only
+    # SEC EDGAR (free, no key) and yfinance (free, no key) are required.
+    # They stay here so individual playbook scripts that DO use them can
+    # opt in via .env without forcing the daily runner to require them.
+    gemini_api_key: SecretStr | None = None
+    fmp_api_key: SecretStr | None = None
+    finnhub_api_key: SecretStr | None = None
+    alpha_vantage_key: SecretStr | None = None
+    marketaux_api_key: SecretStr | None = None
     tase_client_id: SecretStr | None = None
     tase_client_secret: SecretStr | None = None
 

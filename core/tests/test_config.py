@@ -19,14 +19,19 @@ def test_missing_env_file_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         config.get_settings()
 
 
-def test_missing_keys_listed_in_error(
+def test_settings_load_with_empty_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An empty .env should list every missing key in the error message."""
+    """An empty .env must load cleanly — every API key is optional now.
+
+    The trading runner only requires SEC_USER_AGENT (which has a sane
+    default), so a fresh deployment without any secrets must succeed.
+    Previously every key was required; that blocked GitHub Actions
+    runs without a full set of secrets.
+    """
     fake_env = tmp_path / ".env"
-    fake_env.write_text("")  # exists but blank
+    fake_env.write_text("")
     monkeypatch.setattr(config, "ENV_FILE", fake_env)
-    # Also clear environment vars that might leak from CI
     for key in [
         "GEMINI_API_KEY",
         "FMP_API_KEY",
@@ -37,24 +42,18 @@ def test_missing_keys_listed_in_error(
     ]:
         monkeypatch.delenv(key, raising=False)
     config.reset_settings_cache()
-
-    # Force pydantic-settings to read from the temp env file by patching the
-    # model_config.
     monkeypatch.setattr(
         config.Settings,
         "model_config",
         {**config.Settings.model_config, "env_file": fake_env},
     )
 
-    with pytest.raises(ConfigError) as exc_info:
-        config.get_settings()
-    msg = str(exc_info.value)
-    for key in (
-        "GEMINI_API_KEY",
-        "FMP_API_KEY",
-        "FINNHUB_API_KEY",
-        "ALPHA_VANTAGE_KEY",
-        "MARKETAUX_API_KEY",
-        "SEC_USER_AGENT",
-    ):
-        assert key in msg, f"missing key {key} not mentioned"
+    s = config.get_settings()
+    # SEC_USER_AGENT has a default — must always resolve.
+    assert s.sec_user_agent
+    # API keys are now optional; with no env, they should be None.
+    assert s.gemini_api_key is None
+    assert s.fmp_api_key is None
+    assert s.finnhub_api_key is None
+    assert s.alpha_vantage_key is None
+    assert s.marketaux_api_key is None

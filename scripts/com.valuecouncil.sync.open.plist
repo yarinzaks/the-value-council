@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pull GitHub-generated state down to the local Mac data directory,
+  shortly AFTER the GHA market-open run finishes.
+
+  Schedule: Mon-Fri 17:00 IL local. The GHA open job typically takes
+  10-25 minutes (universe scan + price fetch on a cold runner). It
+  starts at 16:35 IL → finishes around 16:50-17:00 IL. We give it a
+  cushion and pull at 17:00.
+
+  When the Mac is off at 17:00, this just doesn't run. The next time
+  it does fire (either the close-side sync or the next morning's
+  open-side sync), it picks up every commit since the last
+  successful pull in one shot — no catch-up logic needed.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.sync.open</string>
+
+  <!-- The wrapper script lives outside ~/Documents so launchd's TCC
+       sandbox is happy to exec it. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/.local/bin/value-council-sync.sh</string>
+    <string>open</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/yarinzaks</string>
+  </dict>
+
+  <!-- Mon-Fri at 17:00 Israel local time (≈ 25 min after GHA open
+       run is triggered, which gives it generous time to finish even
+       on a cold Ubuntu runner). -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/sync.open.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/sync.open.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
