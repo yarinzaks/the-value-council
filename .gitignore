@@ -216,3 +216,29 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# -----------------------------------------------------------------
+# Value Council — data tree
+# -----------------------------------------------------------------
+# Local convention: ~/Library/Application Support/value-council/ is
+# the canonical data root on Macs. The repo's data/ tree is what
+# GitHub Actions writes into and commits back.
+#
+# Cache subtrees are intentionally never committed: they are large
+# (~2GB), they are regenerable from public APIs, and committing them
+# would inflate the repo to no benefit.
+data/cache/
+data/fundamentals_cache/
+
+# Local-only artifacts
+.DS_Store
+.venv/
+.env
+
+# Dashboard build artifacts
+dashboard/.next/
+dashboard/node_modules/
+
+# Lessons / scratch notes
+LESSONS.md
+.claude/
