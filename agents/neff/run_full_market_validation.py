@@ -87,7 +87,7 @@ def main() -> None:
     )
     strategy = JohnNeff(
         edgar_cache=cache,
-        portfolio_size=25,  # Neff: 60-80; for $10K paper: 20-30
+        portfolio_size=30,  # user spec: top 30 by Neff total score
         min_market_cap=500_000_000.0,
         decision_logger=decision_logger,
     )
