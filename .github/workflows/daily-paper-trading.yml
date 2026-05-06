@@ -94,7 +94,11 @@ jobs:
             exit 1
           fi
           tar -xzf /tmp/fundamentals_cache.tar.gz -C data/
-          n=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
+          # Defensive: strip any macOS AppleDouble (._*) sidecar files
+          # the tarball may carry. These crash pyarrow when it tries
+          # to read them as parquet, killing the universe load.
+          find data/fundamentals_cache -name '._*' -delete 2>/dev/null || true
+          n=$(find data/fundamentals_cache -name '*.parquet' -not -name '._*' 2>/dev/null | wc -l)
           echo "::notice::extracted $n parquet files from release"
           if [ "$n" -lt 500 ]; then
             echo "::error::release contained too few parquet files ($n). Refresh workflow may have published a corrupt asset."

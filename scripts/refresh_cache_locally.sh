@@ -52,7 +52,11 @@ if [ "$n_files" -lt 500 ]; then
   exit 1
 fi
 echo "→ packaging $n_files parquet files into $TMP_TARBALL …"
-( cd "$DATA_DIR" && tar -czf "$TMP_TARBALL" fundamentals_cache/ )
+# COPYFILE_DISABLE=1 stops macOS tar from emitting sidecar ._* files
+# (AppleDouble resource forks). They serialize as bytes that look like
+# parquet to glob() but crash pyarrow on read. Belt + suspenders: also
+# pass --exclude='._*' for tar implementations that ignore the env var.
+( cd "$DATA_DIR" && COPYFILE_DISABLE=1 tar --exclude='._*' -czf "$TMP_TARBALL" fundamentals_cache/ )
 size_mb=$(du -m "$TMP_TARBALL" | cut -f1)
 echo "  → $size_mb MB"
 

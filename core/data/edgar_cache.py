@@ -107,7 +107,16 @@ class EdgarCache:
         return self.path_for(ticker).exists()
 
     def tickers(self) -> list[str]:
-        return sorted(p.stem.upper() for p in self.cache_dir.glob("*.parquet"))
+        # Filter out macOS AppleDouble companion files (``._FOO.parquet``).
+        # If the cache tarball was created on macOS without
+        # ``COPYFILE_DISABLE=1``, every real ``FOO.parquet`` gets a
+        # sibling ``._FOO.parquet`` of resource-fork bytes — pyarrow
+        # crashes when it tries to parse one.
+        return sorted(
+            p.stem.upper()
+            for p in self.cache_dir.glob("*.parquet")
+            if not p.name.startswith("._")
+        )
 
     # ------------------------------------------------------------------
     # Persistence
@@ -232,7 +241,10 @@ class EdgarCache:
     # Stats
     # ------------------------------------------------------------------
     def stats(self) -> CacheStats:
-        files = list(self.cache_dir.glob("*.parquet"))
+        files = [
+            p for p in self.cache_dir.glob("*.parquet")
+            if not p.name.startswith("._")
+        ]
         total_facts = 0
         total_size = 0
         for f in files:
