@@ -56,6 +56,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             " close = mark-to-market + snapshot only."
         ),
     )
+    p.add_argument(
+        "--market",
+        choices=("US", "TASE", "both"),
+        default="US",
+        help=(
+            "US    = scan US stocks via SEC EDGAR (default)."
+            " TASE  = scan Israeli stocks (placeholder — scanner not built yet)."
+            " both  = run both back-to-back; useful on Mon-Thu when US and TASE overlap."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -132,16 +142,28 @@ def print_report(results: list[AgentRunResult]) -> None:
     print("=" * 72)
 
 
+def _markets_to_run(market_arg: str) -> list[str]:
+    if market_arg == "both":
+        return ["US", "TASE"]
+    return [market_arg]
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    runner = DailyRunner()
-    if args.mode == "close":
-        results = runner.run_mark_to_market(as_of=args.as_of)
-    else:
-        results = runner.run(as_of=args.as_of)
-    print(f"\n[mode={args.mode}]")
-    print_report(results)
-    return 0 if all(r.error is None for r in results) else 1
+    all_results: list[AgentRunResult] = []
+    any_error = False
+    for market in _markets_to_run(args.market):
+        runner = DailyRunner(market=market)
+        if args.mode == "close":
+            results = runner.run_mark_to_market(as_of=args.as_of)
+        else:
+            results = runner.run(as_of=args.as_of)
+        print(f"\n[mode={args.mode}, market={market}]")
+        print_report(results)
+        all_results.extend(results)
+        if any(r.error for r in results):
+            any_error = True
+    return 0 if not any_error else 1
 
 
 if __name__ == "__main__":

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TASE (Tel Aviv) market-CLOSE update — Sun-Thu at 17:30 IL.
+  Placeholder — see com.valuecouncil.daily.tase.open.plist for status.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.daily.tase.close</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/Documents/The-Value-Council/.venv/bin/python</string>
+    <string>-m</string>
+    <string>scripts.run_daily_paper_trading</string>
+    <string>--mode</string>
+    <string>close</string>
+    <string>--market</string>
+    <string>TASE</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VALUE_COUNCIL_DATA_DIR</key>
+    <string>/Users/yarinzaks/Library/Application Support/value-council</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- Sun-Thu at 17:30 Israel local time. -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.tase.close.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.tase.close.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

@@ -1,27 +1,39 @@
 name: Daily Paper Trading
 
-# Runs the paper-trading scanner Mon-Fri on a US-market schedule.
-# Two scheduled triggers per weekday:
+# Runs the paper-trading scanner on a multi-market schedule.
 #
-#   - 13:35 UTC -> 09:35 EDT (16:35 IL) -> "open" mode -> full scan + trades
-#   - 20:00 UTC -> 16:00 EDT (23:00 IL) -> "close" mode -> mark-to-market only
+# US market — Mon-Fri:
+#   - 13:35 UTC -> 09:35 ET (16:35 IL) -> open  -> full scan + trades
+#   - 20:00 UTC -> 16:00 ET (23:00 IL) -> close -> mark-to-market only
 #
-# How fundamentals are loaded
-# ---------------------------
-# We download the EDGAR XBRL parquet cache from a GitHub release
-# (tag: cache-latest). The Refresh EDGAR cache workflow rebuilds and
-# republishes that release every Monday — a separate, slow workflow
-# that this fast daily one depends on but doesn't pay for.
+# TASE (Tel Aviv) — Sun-Thu:
+#   - 06:00 UTC -> 09:00 IL -> open  -> placeholder (Israeli scanner WIP)
+#   - 14:30 UTC -> 17:30 IL -> close -> placeholder (Israeli scanner WIP)
 #
-# If cache-latest is missing or the download fails, the daily run
-# fails fast with a clear pointer to the refresh workflow. We do NOT
-# silently fall back to a cold prefetch — that would burn 30-60 min
-# of every run and likely 403 from SEC.
+# A few schedule notes:
+#   - Sun is a TASE trading day but NOT a US one (cron 0-4 = Sun-Thu).
+#   - Fri is a US trading day but NOT a TASE one (cron 1-5 = Mon-Fri).
+#   - On Mon-Thu, both markets fire — 4 runs/day total.
+#   - The TASE runs currently produce zero trades on purpose. The
+#     schedule and --market plumbing exist so when the Israeli scanner
+#     lands, it slots in without changing infra.
+#
+# Cache:
+# - data/fundamentals_cache: downloaded from cache-latest release
+#   (US-only — refreshed weekly by Refresh EDGAR cache workflow).
+# - data/cache (price + universe-index): actions/cache, run-id keyed.
 
 on:
   schedule:
+    # TASE open  (Sun-Thu 06:00 UTC = 09:00 IL)
+    - cron: '0 6 * * 0-4'
+    # TASE close (Sun-Thu 14:30 UTC = 17:30 IL)
+    - cron: '30 14 * * 0-4'
+    # US open    (Mon-Fri 13:35 UTC = 09:35 ET = 16:35 IL)
     - cron: '35 13 * * 1-5'
+    # US close   (Mon-Fri 20:00 UTC = 16:00 ET = 23:00 IL)
     - cron: '0 20 * * 1-5'
+
   workflow_dispatch:
     inputs:
       mode:
@@ -32,12 +44,23 @@ on:
         options:
           - open
           - close
+      market:
+        description: 'Market to scan'
+        required: true
+        type: choice
+        default: 'US'
+        options:
+          - US
+          - TASE
+          - both
 
 permissions:
   contents: write
 
 concurrency:
-  group: daily-paper-trading-${{ github.event.schedule || inputs.mode }}
+  # Each (market, mode) pair has its own queue so US and TASE runs
+  # don't block each other on the Mon-Thu overlap days.
+  group: daily-paper-trading-${{ github.event.schedule || format('manual-{0}-{1}', inputs.market, inputs.mode) }}
   cancel-in-progress: false
 
 jobs:
@@ -48,6 +71,7 @@ jobs:
     env:
       TRIGGER_SCHEDULE: ${{ github.event.schedule }}
       TRIGGER_INPUT_MODE: ${{ inputs.mode }}
+      TRIGGER_INPUT_MARKET: ${{ inputs.market }}
       TRIGGER_NAME: ${{ github.event_name }}
       TARGET_REF: ${{ github.ref_name }}
       SEC_USER_AGENT: 'value-council research@yarinzaks.dev'
@@ -71,32 +95,51 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
 
-      - name: Decide run mode
-        id: mode
+      - name: Decide run mode + market
+        id: dispatch
         run: |
-          if [ "$TRIGGER_NAME" = "workflow_dispatch" ]; then
-            echo "mode=$TRIGGER_INPUT_MODE" >> "$GITHUB_OUTPUT"
-          elif [ "$TRIGGER_SCHEDULE" = "0 20 * * 1-5" ]; then
-            echo "mode=close" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=open" >> "$GITHUB_OUTPUT"
-          fi
+          # Map cron expression -> (mode, market). Each cron has a
+          # unique pair, so the dispatch is deterministic.
+          case "$TRIGGER_NAME:$TRIGGER_SCHEDULE" in
+            workflow_dispatch:*)
+              echo "mode=$TRIGGER_INPUT_MODE" >> "$GITHUB_OUTPUT"
+              echo "market=$TRIGGER_INPUT_MARKET" >> "$GITHUB_OUTPUT"
+              ;;
+            *":0 6 * * 0-4")
+              echo "mode=open" >> "$GITHUB_OUTPUT"
+              echo "market=TASE" >> "$GITHUB_OUTPUT"
+              ;;
+            *":30 14 * * 0-4")
+              echo "mode=close" >> "$GITHUB_OUTPUT"
+              echo "market=TASE" >> "$GITHUB_OUTPUT"
+              ;;
+            *":35 13 * * 1-5")
+              echo "mode=open" >> "$GITHUB_OUTPUT"
+              echo "market=US" >> "$GITHUB_OUTPUT"
+              ;;
+            *":0 20 * * 1-5")
+              echo "mode=close" >> "$GITHUB_OUTPUT"
+              echo "market=US" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::unrecognized trigger: $TRIGGER_NAME / $TRIGGER_SCHEDULE"
+              exit 1
+              ;;
+          esac
 
       - name: Prepare data directories
         run: mkdir -p data/portfolios data/decisions data/snapshots data/cache data/cron_logs data/fundamentals_cache
 
-      # Download the EDGAR cache from the cache-latest release.
-      # The release is built+pushed by the Refresh EDGAR cache workflow.
-      - name: Download EDGAR cache from release
+      - name: Download EDGAR cache from release (US runs only)
+        # TASE runs don't need the EDGAR cache — the Israeli scanner
+        # uses Maya, not SEC. Skip the download to save ~30 sec.
+        if: steps.dispatch.outputs.market != 'TASE'
         run: |
           if ! gh release download cache-latest --pattern 'fundamentals_cache.tar.gz' --dir /tmp; then
-            echo "::error::cache-latest release missing. Run the 'Refresh EDGAR cache' workflow first (Actions tab > Refresh EDGAR cache > Run workflow)."
+            echo "::error::cache-latest release missing. Run the 'Refresh EDGAR cache' workflow first."
             exit 1
           fi
           tar -xzf /tmp/fundamentals_cache.tar.gz -C data/
-          # Defensive: strip any macOS AppleDouble (._*) sidecar files
-          # the tarball may carry. These crash pyarrow when it tries
-          # to read them as parquet, killing the universe load.
           find data/fundamentals_cache -name '._*' -delete 2>/dev/null || true
           n=$(find data/fundamentals_cache -name '*.parquet' -not -name '._*' 2>/dev/null | wc -l)
           echo "::notice::extracted $n parquet files from release"
@@ -106,25 +149,27 @@ jobs:
           fi
 
       - name: Restore price + universe-index cache
-        # Keep using actions/cache here — it works fine for this small
-        # subdirectory (~50MB price SQLite + small JSON indices). Each
-        # run saves under a unique key; restore-keys grabs the latest.
         uses: actions/cache@v4
         with:
           path: data/cache
-          key: prices-v2-${{ github.run_id }}
+          key: prices-v2-${{ steps.dispatch.outputs.market }}-${{ github.run_id }}
           restore-keys: |
+            prices-v2-${{ steps.dispatch.outputs.market }}-
             prices-v2-
 
       - name: Run paper-trading scanner
         env:
-          MODE: ${{ steps.mode.outputs.mode }}
+          MODE: ${{ steps.dispatch.outputs.mode }}
+          MARKET: ${{ steps.dispatch.outputs.market }}
         run: |
-          python -m scripts.run_daily_paper_trading --mode "$MODE" 2>&1 | tee "data/cron_logs/daily.${MODE}.log"
+          python -m scripts.run_daily_paper_trading \
+            --mode "$MODE" --market "$MARKET" \
+            2>&1 | tee "data/cron_logs/daily.${MARKET}.${MODE}.log"
 
-      - name: Verify run produced real trading state
+      - name: Verify run produced real trading state (US only)
+        if: steps.dispatch.outputs.market != 'TASE'
         env:
-          MODE: ${{ steps.mode.outputs.mode }}
+          MODE: ${{ steps.dispatch.outputs.mode }}
         run: |
           python <<'PY'
           import json, os, sys
@@ -145,7 +190,8 @@ jobs:
 
       - name: Commit updated state back to the repo
         env:
-          MODE: ${{ steps.mode.outputs.mode }}
+          MODE: ${{ steps.dispatch.outputs.mode }}
+          MARKET: ${{ steps.dispatch.outputs.market }}
         run: |
           git config user.name  "council-bot"
           git config user.email "council-bot@users.noreply.github.com"
@@ -155,7 +201,7 @@ jobs:
             exit 0
           fi
           STAMP=$(date -u +%Y-%m-%dT%H:%MZ)
-          git commit -m "auto: paper-trading run ${MODE} ${STAMP}"
+          git commit -m "auto: paper-trading run ${MARKET} ${MODE} ${STAMP}"
           git pull --rebase origin "$TARGET_REF" || true
           git push origin "HEAD:${TARGET_REF}"
 
@@ -163,6 +209,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: paper-trading-logs-${{ steps.mode.outputs.mode }}-${{ github.run_id }}
+          name: paper-trading-logs-${{ steps.dispatch.outputs.market }}-${{ steps.dispatch.outputs.mode }}-${{ github.run_id }}
           path: data/cron_logs/daily.*.log
           retention-days: 30

@@ -1,0 +1,50 @@
+"""John Neff Total-Return / PE agent."""
+
+from agents.neff.filters import (
+    DEFAULT_MAX_DE,
+    DEFAULT_MAX_GROWTH_PCT,
+    DEFAULT_MIN_GROWTH_PCT,
+    DEFAULT_MIN_MARKET_CAP_USD,
+    DEFAULT_MIN_ROE_PCT,
+    DEFAULT_PE_MAX_FRAC_OF_MARKET,
+    DEFAULT_PE_MIN_FRAC_OF_MARKET,
+    DEFAULT_SALES_GROWTH_FLOOR_FRAC,
+    DEFAULT_TR_PE_MARKET_MULTIPLE,
+    DEFAULT_YIELD_PCT_OVER_MARKET,
+    apply_quality_gates,
+    debt_to_equity,
+    dividend_yield,
+    passes_quality_gates,
+    pe_ratio,
+    roe,
+    total_return_to_pe,
+    trailing_growth_pct,
+)
+from agents.neff.ranking import NeffScore, score_candidates, select_top_n
+from agents.neff.total_return import JohnNeff, NeffSelection
+
+__all__ = [
+    "DEFAULT_MAX_DE",
+    "DEFAULT_MAX_GROWTH_PCT",
+    "DEFAULT_MIN_GROWTH_PCT",
+    "DEFAULT_MIN_MARKET_CAP_USD",
+    "DEFAULT_MIN_ROE_PCT",
+    "DEFAULT_PE_MAX_FRAC_OF_MARKET",
+    "DEFAULT_PE_MIN_FRAC_OF_MARKET",
+    "DEFAULT_SALES_GROWTH_FLOOR_FRAC",
+    "DEFAULT_TR_PE_MARKET_MULTIPLE",
+    "DEFAULT_YIELD_PCT_OVER_MARKET",
+    "JohnNeff",
+    "NeffScore",
+    "NeffSelection",
+    "apply_quality_gates",
+    "debt_to_equity",
+    "dividend_yield",
+    "passes_quality_gates",
+    "pe_ratio",
+    "roe",
+    "score_candidates",
+    "select_top_n",
+    "total_return_to_pe",
+    "trailing_growth_pct",
+]

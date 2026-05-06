@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TASE (Tel Aviv) market-OPEN scan — Sun-Thu at 09:00 IL.
+
+  Status: PLACEHOLDER. The Israeli scanner isn't built yet
+  (see core/backtest/tase_universe.py for the scaffold + status).
+  This job exists today so:
+    1. The schedule is in place — when the scanner lands, it just
+       starts producing trades without any infra changes.
+    2. The Mon-Thu overlap with US runs is exercised, surfacing
+       any path/cron conflicts BEFORE real money signals depend
+       on the timing.
+
+  When the runner sees ``--market TASE``, it logs a notice and
+  returns empty results; no portfolio churn, no errors.
+
+  launchctl uses BSD Sunday=0..Saturday=6 numbering for Weekday.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.daily.tase.open</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/yarinzaks/Documents/The-Value-Council</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/Documents/The-Value-Council/.venv/bin/python</string>
+    <string>-m</string>
+    <string>scripts.run_daily_paper_trading</string>
+    <string>--mode</string>
+    <string>open</string>
+    <string>--market</string>
+    <string>TASE</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VALUE_COUNCIL_DATA_DIR</key>
+    <string>/Users/yarinzaks/Library/Application Support/value-council</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- Sun-Thu at 09:00 Israel local time. Sunday is launchctl's
+       Weekday=0 (some BSDs use 7 — both are accepted by launchd). -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.tase.open.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/daily.tase.open.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

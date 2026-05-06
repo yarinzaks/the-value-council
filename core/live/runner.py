@@ -134,6 +134,11 @@ class DailyRunner:
     """Run one day of paper-trading across all agents.
 
     Args:
+        market: Which market to scan. ``"US"`` (default) uses
+            :class:`FullMarketUniverse` (SEC EDGAR). ``"TASE"`` is
+            currently a placeholder — the Israeli scanner isn't built
+            yet, so a TASE run logs a notice and returns empty results
+            without erroring (so the daily schedule can fire safely).
         adapters: Live adapters to run. Default = the four built-in agents.
         portfolio_dir: Where to persist portfolio JSON.
         cost_bps: Per-trade cost (default 10 bps).
@@ -143,6 +148,7 @@ class DailyRunner:
     def __init__(
         self,
         *,
+        market: str = "US",
         adapters: list[AgentAdapter] | None = None,
         portfolio_dir: Path = DEFAULT_PORTFOLIO_DIR,
         cost_bps: float = DEFAULT_COST_BPS,
@@ -153,6 +159,11 @@ class DailyRunner:
         pit_loader: PointInTimeLoader | None = None,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
+        if market not in ("US", "TASE"):
+            raise ValueError(
+                f"unknown market {market!r}; expected 'US' or 'TASE'"
+            )
+        self.market = market
         self.cache = cache or EdgarCache()
         self.decision_logger = decision_logger or DecisionLogger()
         self.adapters = adapters or build_default_adapters(
@@ -175,9 +186,29 @@ class DailyRunner:
             self.pit_loader = pit_loader
 
     # ------------------------------------------------------------------
+    def _tase_placeholder(
+        self, mode_label: str, as_of: date | None
+    ) -> list[AgentRunResult]:
+        """Return empty results for a TASE run.
+
+        The Israeli scanner isn't built yet (see
+        ``core/backtest/tase_universe.py`` for status). We emit a clear
+        notice so cron logs are honest about why nothing happened, then
+        return zero results. This keeps the schedule safe to run
+        unattended on Sun-Thu — no exceptions, no spurious commits.
+        """
+        eff = as_of or date.today()
+        logger.info(
+            f"{eff}: TASE {mode_label} scan — Israeli scanner not yet built; "
+            f"returning empty results (placeholder)."
+        )
+        return []
+
     def run_mark_to_market(
         self, *, as_of: date | None = None
     ) -> list[AgentRunResult]:
+        if self.market == "TASE":
+            return self._tase_placeholder("close", as_of)
         """Close-of-day mode: refresh prices on every open position,
         update NAV / P&L / weights, write a fresh portfolio.json AND a
         snapshot. No new BUYs or SELLs executed.
@@ -247,6 +278,8 @@ class DailyRunner:
 
     # ------------------------------------------------------------------
     def run(self, *, as_of: date | None = None) -> list[AgentRunResult]:
+        if self.market == "TASE":
+            return self._tase_placeholder("open", as_of)
         as_of = as_of or date.today()
         logger.info(f"daily run for {as_of}")
         self.universe._ensure_loaded()  # noqa: SLF001 — public API surface
