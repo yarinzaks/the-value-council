@@ -208,6 +208,8 @@ class TestSelectTopN:
                 total_return_pe=1.0 + i / 10,
                 debt_to_equity=0.5,
                 net_income=1e8,
+                industry_sic2=73,
+                industry_peer_count=10,
                 pass_pe_window=True,
                 pass_growth_window=True,
                 pass_yield_premium=True,

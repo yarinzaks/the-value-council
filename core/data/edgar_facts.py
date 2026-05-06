@@ -47,6 +47,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 COMPANY_FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
+SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 
 # SEC's stated rate limit is 10 req/s. We self-throttle to 8 req/s
 # (125ms between calls) to stay well under and absorb burst noise.
@@ -257,6 +258,37 @@ class EdgarFactsClient:
             return []
 
         return self._parse_facts(payload)
+
+    # ------------------------------------------------------------------
+    # Company submissions (for SIC + metadata)
+    # ------------------------------------------------------------------
+    def get_sic_for_ticker(self, ticker: str) -> int | None:
+        """Return the SIC industry code for ``ticker``, or ``None``.
+
+        Uses the SEC submissions endpoint (``data.sec.gov``) which is
+        cloud-IP friendly. SIC codes are 4 digits; the first 2 digits
+        are the "major industry group" (e.g. 60 = depository institutions,
+        73 = business services, 28 = chemicals).
+
+        Returns None if the ticker is unknown or SEC returns no SIC.
+        """
+        ticker_u = ticker.upper()
+        cik = self.cik_for(ticker_u)
+        if cik is None:
+            return None
+        url = SUBMISSIONS_URL.format(cik=cik)
+        try:
+            payload = self._get_json(url)
+        except EdgarFactsError as exc:
+            logger.debug(f"submissions failed for {ticker_u} (CIK {cik}): {exc}")
+            return None
+        sic = payload.get("sic")
+        if not sic:
+            return None
+        try:
+            return int(sic)
+        except (TypeError, ValueError):
+            return None
 
     def _parse_facts(self, payload: dict[str, Any]) -> list[XbrlFact]:
         """Flatten the SEC Company Facts JSON into :class:`XbrlFact` rows."""
