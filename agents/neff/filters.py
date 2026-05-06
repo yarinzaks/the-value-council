@@ -35,7 +35,14 @@ logger = get_logger("agents.neff.filters")
 # ---- Defaults --------------------------------------------------------------
 DEFAULT_MIN_GROWTH_PCT: float = 7.0
 DEFAULT_MAX_GROWTH_PCT: float = 20.0
-DEFAULT_MIN_ROE_PCT: float = 15.0
+#: Absolute ROE sanity floor. Per the playbook the real bar is "above
+#: industry average" (criterion 7) and 15% is "strictly preferred" but
+#: not required. The industry-relative comparison happens in
+#: ``ranking.py``; this floor is a low backstop that catches industries
+#: where every constituent has near-zero ROE (e.g. pre-revenue biotech).
+DEFAULT_MIN_ROE_PCT: float = 5.0
+#: Documentation only — Neff's "strictly preferred" bar.
+PREFERRED_ROE_PCT: float = 15.0
 DEFAULT_TR_PE_MARKET_MULTIPLE: float = 2.0
 DEFAULT_PE_MAX_FRAC_OF_MARKET: float = 0.60
 DEFAULT_PE_MIN_FRAC_OF_MARKET: float = 0.40
