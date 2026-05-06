@@ -89,7 +89,13 @@ class LivePortfolio:
     cash: float = DEFAULT_INITIAL_CASH
     positions: list[Position] = field(default_factory=list)
     watchlist: list[WatchEntry] = field(default_factory=list)
+    # ``last_updated`` is the most recent of any kind of run (open or
+    # close) — kept for backward compat. The split fields below let
+    # the dashboard show "last open scan @ time" vs "last close mark
+    # @ time" separately.
     last_updated: str = ""
+    last_open_run: str = ""
+    last_close_run: str = ""
     initial_cash: float = DEFAULT_INITIAL_CASH
     cumulative_costs: float = 0.0
 
@@ -287,6 +293,8 @@ class LivePortfolio:
             "positions": [_round_position(p) for p in self.positions],
             "watchlist": [asdict(w) for w in self.watchlist],
             "last_updated": self.last_updated,
+            "last_open_run": self.last_open_run,
+            "last_close_run": self.last_close_run,
         }
 
     @classmethod
@@ -330,6 +338,8 @@ class LivePortfolio:
             positions=positions,
             watchlist=watchlist,
             last_updated=str(data.get("last_updated", "")),
+            last_open_run=str(data.get("last_open_run", "")),
+            last_close_run=str(data.get("last_close_run", "")),
             initial_cash=float(data.get("initial_cash", DEFAULT_INITIAL_CASH)),
             cumulative_costs=float(data.get("cumulative_costs", 0.0)),
         )

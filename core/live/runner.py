@@ -242,7 +242,9 @@ class DailyRunner:
                         )
                         fresh[t] = None
                 portfolio.mark_to_market(fresh)
-                portfolio.last_updated = now_iso()
+                stamp = now_iso()
+                portfolio.last_updated = stamp
+                portfolio.last_close_run = stamp
                 portfolio.save(directory=self.portfolio_dir)
                 # Snapshot — no trades, just refreshed valuation.
                 try:
@@ -437,7 +439,9 @@ class DailyRunner:
         ]
         portfolio.set_watchlist(watch_entries)
 
-        portfolio.last_updated = now_iso()
+        stamp = now_iso()
+        portfolio.last_updated = stamp
+        portfolio.last_open_run = stamp
         portfolio.save(directory=self.portfolio_dir)
 
         # Persist a daily snapshot for History tab + Today's-activity.

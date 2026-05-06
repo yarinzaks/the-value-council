@@ -129,6 +129,7 @@ export default async function AgentDrillPage({
               positions={live.positions}
               agentSlug={slug}
               companyNames={companyNames}
+              priceMarkedAt={live.last_updated}
             />
           </Card>
 

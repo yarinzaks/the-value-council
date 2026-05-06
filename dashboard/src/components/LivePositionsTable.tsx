@@ -5,6 +5,7 @@ import { useUI } from "./Providers";
 import { Money, PctCell } from "./Cards";
 import { Term } from "./Term";
 import type { LivePosition } from "@/lib/types";
+import { formatTimeOfDay } from "@/lib/timestamps";
 
 const TERM_PATTERN = /\b(P\/E|P\/B|P\/CF|P\/NCAV|D\/E|EY|ROC|NCAV|EBIT|EV|yield)\b/g;
 const TERM_TO_KEY: Record<string, string> = {
@@ -48,10 +49,14 @@ export function LivePositionsTable({
   positions,
   agentSlug,
   companyNames = {},
+  priceMarkedAt = "",
 }: {
   positions: LivePosition[];
   agentSlug: string;
   companyNames?: Record<string, string>;
+  /** When the portfolio's prices were last marked. Shows as "מחיר
+   *  מעודכן: HH:MM" / "Price updated: HH:MM" under each row. */
+  priceMarkedAt?: string;
 }) {
   const { locale, t } = useUI();
   if (positions.length === 0) {
@@ -60,6 +65,7 @@ export function LivePositionsTable({
     );
   }
   const sorted = [...positions].sort((a, b) => b.weight_pct - a.weight_pct);
+  const priceHm = formatTimeOfDay(priceMarkedAt);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -103,7 +109,14 @@ export function LivePositionsTable({
                   <Money value={p.entry_price} digits={2} />
                 </td>
                 <td className="py-2 pr-3 text-right">
-                  <Money value={p.current_price} digits={2} />
+                  <span className="block">
+                    <Money value={p.current_price} digits={2} />
+                  </span>
+                  {priceHm && (
+                    <span className="block text-[10px] text-council-400 mt-0.5">
+                      {t("price_updated")}: {priceHm}
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 pr-3 text-right">
                   <Money value={value} />

@@ -16,7 +16,25 @@ const NAV = [
   { href: "/glossary", key: "nav_glossary" },
 ] as const;
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  lastSyncLabel = "",
+  stale = false,
+  nextUsLabel = "",
+  nextTaseLabel = "",
+}: {
+  children: React.ReactNode;
+  /** Pre-formatted bilingual relative timestamp ("today 16:35"). Empty
+   *  if no sync has ever occurred. */
+  lastSyncLabel?: string;
+  /** True when most recent sync is older than 24h. Renders the
+   *  red warning banner. */
+  stale?: boolean;
+  /** Pre-formatted "next US update" label ("today 23:00", "tomorrow ..."). */
+  nextUsLabel?: string;
+  /** Pre-formatted "next TASE update" label. */
+  nextTaseLabel?: string;
+}) {
   const { t, locale, setLocale, theme, setTheme } = useUI();
   const pathname = usePathname();
   const isRtl = locale === "he";
@@ -51,6 +69,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="flex items-center gap-2">
+            {/* Last-sync timestamp — hidden on small screens to keep
+                the toggle area uncluttered. */}
+            {lastSyncLabel && (
+              <span
+                className="hidden lg:inline-block text-xs text-council-500 mr-2"
+                title={lastSyncLabel}
+              >
+                {t("last_sync")}: {lastSyncLabel}
+              </span>
+            )}
             <button
               onClick={() => setLocale(locale === "en" ? "he" : "en")}
               className="px-3 py-1.5 rounded-md text-xs border border-council-200 dark:border-council-700 hover:bg-council-50 dark:hover:bg-council-800"
@@ -89,6 +117,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
+
+      {/* Stale-data warning — only visible when most recent sync is
+          older than 24h. Red banner under the header. */}
+      {stale && (
+        <div className="bg-loss/10 border-b border-loss/30 text-loss">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 text-center text-xs font-medium">
+            {t("stale_warning")}
+          </div>
+        </div>
+      )}
+
       {/* Schedule banner — informs the user when the agents scan and
           where prices come from. Bilingual via the i18n dictionary. */}
       <div className="bg-council-50 dark:bg-council-900/60 border-b border-council-200 dark:border-council-800 text-xs text-council-600 dark:text-council-400">
@@ -96,11 +135,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {t("schedule_banner")}
         </div>
       </div>
+
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
       <footer className="border-t border-council-200 dark:border-council-800 py-4 text-center text-xs text-council-500">
-        {t("footer")}
+        <div className="mb-1">{t("footer")}</div>
+        {(nextUsLabel || nextTaseLabel) && (
+          <div className="text-[11px] text-council-400 dark:text-council-500">
+            {t("next_us_update")}: {t("next_label")} {nextUsLabel}
+            {" | "}
+            {t("next_tase_update")}: {t("next_label")} {nextTaseLabel}
+          </div>
+        )}
       </footer>
     </div>
   );
