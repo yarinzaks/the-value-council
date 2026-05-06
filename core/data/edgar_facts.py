@@ -173,8 +173,30 @@ class EdgarFactsClient:
     def _ensure_cik_map(self) -> None:
         if self._cik_map is not None:
             return
-        logger.info("loading SEC company-tickers map")
-        data = self._get_json(COMPANY_TICKERS_URL)
+        # Try a bundled local file FIRST. SEC's www.sec.gov endpoint
+        # 403's many cloud IP ranges (notably GitHub Actions runners)
+        # — the same blocking that broke our cold-cache prefetch
+        # attempts. data.sec.gov is permissive for the per-ticker XBRL
+        # endpoint, but the ticker-mapping file lives only on
+        # www.sec.gov. So we ship a recent copy in the repo and fall
+        # back to the network only if it's missing or unparseable.
+        import json as _json
+
+        data: dict | None = None
+        for local_path in self._candidate_tickers_paths():
+            if local_path.exists():
+                try:
+                    data = _json.loads(local_path.read_text())
+                    logger.info(f"loaded company_tickers from local {local_path}")
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        f"local company_tickers file unreadable ({local_path}): {exc}"
+                    )
+                    data = None
+        if data is None:
+            logger.info("loading SEC company-tickers map from www.sec.gov")
+            data = self._get_json(COMPANY_TICKERS_URL)
         # data is a dict with integer-string keys; values are
         # {"cik_str": int, "ticker": str, "title": str}
         cik_map: dict[str, int] = {}
@@ -189,6 +211,24 @@ class EdgarFactsClient:
                 continue
         self._cik_map = cik_map
         logger.info(f"loaded {len(cik_map)} ticker→CIK mappings")
+
+    @staticmethod
+    def _candidate_tickers_paths() -> list:
+        """Where to look for a bundled ``company_tickers.json`` copy.
+
+        Order: project-bundled first (always present in a fresh
+        checkout), then the live data root (where a successful network
+        fetch would persist a copy for next time).
+        """
+        from pathlib import Path
+
+        from core.paths import DATA_ROOT
+
+        project_root = Path(__file__).resolve().parent.parent.parent
+        return [
+            project_root / "data_bundled" / "company_tickers.json",
+            DATA_ROOT / "cache" / "company_tickers.json",
+        ]
 
     # ------------------------------------------------------------------
     # Company Facts

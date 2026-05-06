@@ -1,0 +1,152 @@
+name: Refresh EDGAR cache
+
+# What this does
+# --------------
+# Once a week (Monday 06:00 UTC) — and on demand via workflow_dispatch
+# — re-pulls every active SEC filer's XBRL facts and republishes the
+# packaged result as a release asset under tag cache-latest. The
+# Daily Paper Trading workflow downloads that asset on every run.
+#
+# Why this is split from the daily workflow
+# -----------------------------------------
+# The prefetch is slow (30-60 min) and SEC EDGAR rate-limits at
+# 10 req/s. Doing it inline on every daily run wastes time and is
+# unnecessary — value-investing fundamentals only update on quarterly
+# 10-Q filings. Weekly refresh is more than enough for the agents to
+# react to new earnings within a week of release.
+#
+# Why GitHub Releases (vs actions/cache)
+# --------------------------------------
+# actions/cache has documented quirks: silent partial restores,
+# eviction at 10GB, key-vs-restore-key confusion. Release assets are
+# explicit, versioned, debuggable. Public-repo download bandwidth is
+# unlimited and free.
+#
+# Failure modes
+# -------------
+# If SEC blocks GHA's IP for a single run, this workflow fails — but
+# the daily workflow keeps running on the LAST successful release
+# asset. So one bad refresh doesn't break daily trading. The release
+# asset is only updated on a successful refresh.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Monday 06:00 UTC (= 09:00 IL, 02:00 ET)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cache-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      SEC_USER_AGENT: 'value-council research@yarinzaks.dev'
+      VALUE_COUNCIL_DATA_DIR: ${{ github.workspace }}/data
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Prepare data directories
+        run: mkdir -p data/fundamentals_cache data/cache data/cron_logs
+
+      - name: Restore previous cache (incremental refresh)
+        run: |
+          if gh release download cache-latest --pattern 'fundamentals_cache.tar.gz' --dir /tmp 2>/dev/null; then
+            echo "previous cache found — extracting for incremental refresh"
+            tar -xzf /tmp/fundamentals_cache.tar.gz -C data/
+            n=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
+            echo "::notice::starting from $n cached tickers"
+          else
+            echo "no previous cache — building from cold"
+          fi
+
+      - name: Refresh fundamentals from SEC
+        timeout-minutes: 75
+        run: |
+          python -m scripts.prefetch_full_us_market 2>&1 | tee data/cron_logs/prefetch.log
+
+      - name: Verify cache is substantial
+        id: verify
+        run: |
+          n=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
+          echo "n_files=$n" >> "$GITHUB_OUTPUT"
+          echo "::notice::cache contains $n parquet files"
+          if [ "$n" -lt 500 ]; then
+            echo "::error::cache too small (only $n files) — refresh failed (likely SEC block). NOT updating release asset."
+            exit 1
+          fi
+
+      - name: Refresh bundled company_tickers.json
+        run: |
+          curl -sL \
+            -H "User-Agent: $SEC_USER_AGENT" \
+            -H "Accept: application/json" \
+            "https://www.sec.gov/files/company_tickers.json" \
+            -o data_bundled/company_tickers.json || \
+            echo "(www.sec.gov fetch failed — keeping prior bundled copy)"
+          ls -la data_bundled/company_tickers.json
+
+      - name: Package cache
+        id: package
+        run: |
+          cd data
+          tar -czf /tmp/fundamentals_cache.tar.gz fundamentals_cache/
+          ls -lh /tmp/fundamentals_cache.tar.gz
+          size_mb=$(du -m /tmp/fundamentals_cache.tar.gz | cut -f1)
+          echo "size_mb=$size_mb" >> "$GITHUB_OUTPUT"
+
+      - name: Publish as cache-latest release
+        env:
+          N_FILES: ${{ steps.verify.outputs.n_files }}
+          SIZE_MB: ${{ steps.package.outputs.size_mb }}
+        run: |
+          STAMP=$(date -u +%Y-%m-%dT%H:%MZ)
+          # Delete prior release+tag so the asset URL stays stable as
+          # cache-latest. --cleanup-tag also removes the underlying tag.
+          gh release delete cache-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create cache-latest /tmp/fundamentals_cache.tar.gz \
+            --title "EDGAR cache — $STAMP" \
+            --notes "Automated weekly refresh. ${N_FILES} parquet files (${SIZE_MB} MB compressed)."
+          echo "::notice::published cache-latest with ${N_FILES} files"
+
+      - name: Commit refreshed company_tickers bundle (if changed)
+        run: |
+          git config user.name  "council-bot"
+          git config user.email "council-bot@users.noreply.github.com"
+          git add data_bundled/company_tickers.json
+          if git diff --cached --quiet; then
+            echo "no change to data_bundled/company_tickers.json"
+            exit 0
+          fi
+          STAMP_DATE=$(date -u +%Y-%m-%d)
+          git commit -m "auto: refresh company_tickers.json bundle (${STAMP_DATE})"
+          git pull --rebase origin main || true
+          git push origin HEAD:main
+
+      - name: Upload prefetch log as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-refresh-log-${{ github.run_id }}
+          path: data/cron_logs/prefetch.log
+          retention-days: 30

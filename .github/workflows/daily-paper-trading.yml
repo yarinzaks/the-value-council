@@ -1,28 +1,22 @@
 name: Daily Paper Trading
 
-# What this does
-# --------------
 # Runs the paper-trading scanner Mon-Fri on a US-market schedule.
 # Two scheduled triggers per weekday:
 #
 #   - 13:35 UTC -> 09:35 EDT (16:35 IL) -> "open" mode -> full scan + trades
 #   - 20:00 UTC -> 16:00 EDT (23:00 IL) -> "close" mode -> mark-to-market only
 #
-# Caches
-# ------
-# The runner needs ~584MB of SEC EDGAR XBRL fact data (the
-# fundamentals_cache) and a price history SQLite (the price cache).
-# Without them the universe comes back empty and no trading happens.
+# How fundamentals are loaded
+# ---------------------------
+# We download the EDGAR XBRL parquet cache from a GitHub release
+# (tag: cache-latest). The Refresh EDGAR cache workflow rebuilds and
+# republishes that release every Monday — a separate, slow workflow
+# that this fast daily one depends on but doesn't pay for.
 #
-# We use actions/cache to persist both:
-#   * fundamentals_cache  — keyed on a content version (rarely changes).
-#                           Cold-cache rebuild takes ~30-60 min as we
-#                           prefetch every active filer from SEC.
-#   * cache               — keyed on the run-id. Each run saves a
-#                           fresh snapshot; restore-keys falls back
-#                           to the most recent prior run.
-#
-# Each run takes ~5-10 min on warm caches, ~45-75 min on cold.
+# If cache-latest is missing or the download fails, the daily run
+# fails fast with a clear pointer to the refresh workflow. We do NOT
+# silently fall back to a cold prefetch — that would burn 30-60 min
+# of every run and likely 403 from SEC.
 
 on:
   schedule:
@@ -49,17 +43,16 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
 
     env:
       TRIGGER_SCHEDULE: ${{ github.event.schedule }}
       TRIGGER_INPUT_MODE: ${{ inputs.mode }}
       TRIGGER_NAME: ${{ github.event_name }}
       TARGET_REF: ${{ github.ref_name }}
-      # SEC requires a User-Agent identifying the requester. The default
-      # in core.config falls back to a generic value, but on GHA we set
-      # it explicitly so the entry in SEC's logs is honest.
-      SEC_USER_AGENT: 'value-council-bot github-actions@yarinzaks.dev'
+      SEC_USER_AGENT: 'value-council research@yarinzaks.dev'
+      VALUE_COUNCIL_DATA_DIR: ${{ github.workspace }}/data
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -89,90 +82,42 @@ jobs:
             echo "mode=open" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Configure data directory (in-repo)
+      - name: Prepare data directories
+        run: mkdir -p data/portfolios data/decisions data/snapshots data/cache data/cron_logs data/fundamentals_cache
+
+      # Download the EDGAR cache from the cache-latest release.
+      # The release is built+pushed by the Refresh EDGAR cache workflow.
+      - name: Download EDGAR cache from release
         run: |
-          mkdir -p data/portfolios data/decisions data/snapshots data/cache data/cron_logs data/fundamentals_cache
-          echo "VALUE_COUNCIL_DATA_DIR=$GITHUB_WORKSPACE/data" >> "$GITHUB_ENV"
-
-      # ---- Caches --------------------------------------------------------
-      #
-      # actions/cache only writes back to GitHub's cache store on a
-      # cache MISS (key doesn't already match). To make sure each run
-      # saves any new tickers/prices, we use a unique key per run with
-      # a stable restore-keys prefix. Old caches age out via LRU at the
-      # 10GB-per-repo limit. This is the standard pattern documented at
-      # https://github.com/actions/cache/blob/main/tips-and-workarounds.md#update-a-cache.
-      - name: Restore fundamentals cache (SEC XBRL parquet)
-        uses: actions/cache@v4
-        id: fundamentals-cache
-        with:
-          path: data/fundamentals_cache
-          key: fundamentals-v1-${{ github.run_id }}
-          restore-keys: |
-            fundamentals-v1-
-
-      - name: Restore price + universe cache
-        uses: actions/cache@v4
-        id: price-cache
-        with:
-          path: data/cache
-          key: prices-v1-${{ github.run_id }}
-          restore-keys: |
-            prices-v1-
-
-      # ---- Cold-cache prefetch (only fires when fundamentals are absent) -
-      #
-      # First-ever run does this. Any run after a prior successful save
-      # restores the cache and skips this entirely. Whether to run is
-      # determined by checking the file count under fundamentals_cache:
-      # the prefetch script itself is idempotent and resumable, but
-      # spinning it up for nothing wastes ~30s of import time.
-      - name: Detect fundamentals cache state
-        id: cache-state
-        run: |
-          # Count actual parquet files. The cache restore can hit but
-          # restore an empty / partial archive (rare race), so we count
-          # the artifact that the runner actually consumes — parquet
-          # files. Fewer than 500 means a meaningful chunk of the SEC
-          # filer universe is missing, treat as cold.
-          n_files=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
-          echo "n_parquet=$n_files" >> "$GITHUB_OUTPUT"
-          if [ "$n_files" -lt 500 ]; then
-            echo "needs_prefetch=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "needs_prefetch=false" >> "$GITHUB_OUTPUT"
+          if ! gh release download cache-latest --pattern 'fundamentals_cache.tar.gz' --dir /tmp; then
+            echo "::error::cache-latest release missing. Run the 'Refresh EDGAR cache' workflow first (Actions tab > Refresh EDGAR cache > Run workflow)."
+            exit 1
           fi
-          echo "fundamentals_cache currently has $n_files parquet files"
-
-      - name: Prefetch fundamentals from SEC (cold cache only)
-        if: steps.cache-state.outputs.needs_prefetch == 'true'
-        timeout-minutes: 75
-        run: |
-          echo "::warning::cold cache — prefetching all SEC active filers (this takes 30-60 min)"
-          python -m scripts.prefetch_full_us_market 2>&1 | tee data/cron_logs/prefetch.log
-
-      - name: Verify prefetch produced a usable cache
-        if: steps.cache-state.outputs.needs_prefetch == 'true'
-        run: |
-          # Same count we used to gate the prefetch — but now we
-          # require the post-prefetch cache to be substantial. If
-          # SEC blocked us or the script bailed early, we'd see
-          # < 500 files even though prefetch "ran".
-          n_after=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
-          echo "after prefetch: $n_after parquet files"
-          if [ "$n_after" -lt 500 ]; then
-            echo "::error::prefetch failed — only $n_after parquet files in fundamentals_cache (expected ~6000-8000). Check the prefetch.log artifact for the SEC error."
+          tar -xzf /tmp/fundamentals_cache.tar.gz -C data/
+          n=$(find data/fundamentals_cache -name '*.parquet' 2>/dev/null | wc -l)
+          echo "::notice::extracted $n parquet files from release"
+          if [ "$n" -lt 500 ]; then
+            echo "::error::release contained too few parquet files ($n). Refresh workflow may have published a corrupt asset."
             exit 1
           fi
 
-      # ---- The actual trading run ---------------------------------------
+      - name: Restore price + universe-index cache
+        # Keep using actions/cache here — it works fine for this small
+        # subdirectory (~50MB price SQLite + small JSON indices). Each
+        # run saves under a unique key; restore-keys grabs the latest.
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: prices-v2-${{ github.run_id }}
+          restore-keys: |
+            prices-v2-
+
       - name: Run paper-trading scanner
         env:
           MODE: ${{ steps.mode.outputs.mode }}
         run: |
           python -m scripts.run_daily_paper_trading --mode "$MODE" 2>&1 | tee "data/cron_logs/daily.${MODE}.log"
 
-      # ---- Sanity check the run actually traded -------------------------
       - name: Verify run produced real trading state
         env:
           MODE: ${{ steps.mode.outputs.mode }}
@@ -185,10 +130,9 @@ jobs:
           all_seed = True
           for f in sorted(portfolios.glob("*.json")):
               d = json.loads(f.read_text())
-              has_positions = len(d.get("positions", [])) > 0
-              if has_positions:
+              if d.get("positions"):
                   all_seed = False
-              print(f"  {d['agent']}: nav=${d['total_nav']:.2f} positions={len(d['positions'])}")
+              print(f"  {d['agent']}: nav=${d['total_nav']:.2f} positions={len(d.get('positions', []))}")
           if mode == "open" and all_seed:
               print("::error::all portfolios came back at $10K seed — universe likely empty (cache corrupt?)")
               sys.exit(1)
@@ -206,7 +150,7 @@ jobs:
             echo "no data changes — nothing to commit"
             exit 0
           fi
-          STAMP="$(date -u +%Y-%m-%dT%H:%MZ)"
+          STAMP=$(date -u +%Y-%m-%dT%H:%MZ)
           git commit -m "auto: paper-trading run ${MODE} ${STAMP}"
           git pull --rebase origin "$TARGET_REF" || true
           git push origin "HEAD:${TARGET_REF}"
