@@ -184,27 +184,38 @@ def dreman_watch_why(score: Any) -> tuple[str, str]:
 # Hybrid agents (Neff, Buffett, Lynch, Marks, Klarman, Fisher)
 # --------------------------------------------------------------------------
 def neff_why(score: Any) -> tuple[str, str]:
-    """``NeffScore`` → bilingual rationale."""
+    """``NeffScore`` → bilingual rationale.
+
+    Soft-scoring version: lead with the composite total_score (max 70)
+    that drives ranking, with TR/PE as a supporting metric and the
+    signature inputs (P/E, growth, yield) for context.
+    """
+    total = getattr(score, "total_score", None)
+    score_str = f"{total:.0f}/70" if total is not None else "—"
     en = (
-        f"P/E {fmt_ratio(score.pe)}, EPS growth {score.eps_growth_pct:.1f}%, "
-        f"yield {score.dividend_yield_pct:.1f}%. "
-        f"Total-Return/PE {score.total_return_pe:.2f}."
+        f"Neff score {score_str}: P/E {fmt_ratio(score.pe)}, "
+        f"EPS growth {score.eps_growth_pct:.1f}%, "
+        f"yield {score.dividend_yield_pct:.1f}%, "
+        f"TR/PE {score.total_return_pe:.2f}."
     )
     he = (
-        f"P/E {fmt_ratio(score.pe)}, צמיחת EPS {score.eps_growth_pct:.1f}%, "
-        f"תשואה {score.dividend_yield_pct:.1f}%. "
-        f"תשואה/PE {score.total_return_pe:.2f}."
+        f"ניקוד נף {score_str}: P/E {fmt_ratio(score.pe)}, "
+        f"צמיחת EPS {score.eps_growth_pct:.1f}%, "
+        f"תשואה {score.dividend_yield_pct:.1f}%, "
+        f"TR/PE {score.total_return_pe:.2f}."
     )
     return en, he
 
 
 def neff_watch_why(score: Any) -> tuple[str, str]:
+    total = getattr(score, "total_score", None)
+    score_str = f"{total:.0f}/70" if total is not None else "—"
     en = (
-        f"TR/PE {score.total_return_pe:.2f}; just below the cohort cut. "
+        f"Neff score {score_str}; just below the cohort cut. "
         f"Watching for ranking to improve."
     )
     he = (
-        f"TR/PE {score.total_return_pe:.2f}; מעט מתחת לקבוצת הקנייה. "
+        f"ניקוד נף {score_str}; מעט מתחת לקבוצת הקנייה. "
         f"מעקב לשיפור בדירוג."
     )
     return en, he
