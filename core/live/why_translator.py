@@ -180,9 +180,193 @@ def dreman_watch_why(score: Any) -> tuple[str, str]:
     return en, he
 
 
+# --------------------------------------------------------------------------
+# Hybrid agents (Neff, Buffett, Lynch, Marks, Klarman, Fisher)
+# --------------------------------------------------------------------------
+def neff_why(score: Any) -> tuple[str, str]:
+    """``NeffScore`` → bilingual rationale."""
+    en = (
+        f"P/E {fmt_ratio(score.pe)}, EPS growth {score.eps_growth_pct:.1f}%, "
+        f"yield {score.dividend_yield_pct:.1f}%. "
+        f"Total-Return/PE {score.total_return_pe:.2f}."
+    )
+    he = (
+        f"P/E {fmt_ratio(score.pe)}, צמיחת EPS {score.eps_growth_pct:.1f}%, "
+        f"תשואה {score.dividend_yield_pct:.1f}%. "
+        f"תשואה/PE {score.total_return_pe:.2f}."
+    )
+    return en, he
+
+
+def neff_watch_why(score: Any) -> tuple[str, str]:
+    en = (
+        f"TR/PE {score.total_return_pe:.2f}; just below the cohort cut. "
+        f"Watching for ranking to improve."
+    )
+    he = (
+        f"TR/PE {score.total_return_pe:.2f}; מעט מתחת לקבוצת הקנייה. "
+        f"מעקב לשיפור בדירוג."
+    )
+    return en, he
+
+
+def buffett_why(score: Any) -> tuple[str, str]:
+    """``BuffettScore`` → bilingual rationale."""
+    en = (
+        f"MoS {score.margin_of_safety_pct:.1f}% (intrinsic "
+        f"${fmt_ratio(score.intrinsic_value_per_share)}). "
+        f"5y ROE {score.avg_roe_5yr_pct:.1f}%, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}."
+    )
+    he = (
+        f"מרווח ביטחון {score.margin_of_safety_pct:.1f}% (שווי פנימי "
+        f"${fmt_ratio(score.intrinsic_value_per_share)}). "
+        f"ROE 5 שנתי {score.avg_roe_5yr_pct:.1f}%, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}."
+    )
+    return en, he
+
+
+def buffett_watch_why(score: Any) -> tuple[str, str]:
+    en = (
+        f"Quality passes (5y ROE {score.avg_roe_5yr_pct:.1f}%, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}); waiting for price to fall "
+        f"into 15%+ MoS zone."
+    )
+    he = (
+        f"איכות עוברת (ROE 5 שנתי {score.avg_roe_5yr_pct:.1f}%, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}); ממתין לירידת מחיר לאזור "
+        f"מרווח ביטחון 15%+."
+    )
+    return en, he
+
+
+def lynch_why(score: Any) -> tuple[str, str]:
+    """``LynchScore`` → bilingual rationale."""
+    en = (
+        f"{score.lynch_category}: PEG {score.peg:.2f}, 5y EPS CAGR "
+        f"{score.growth_rate_5yr_pct:.1f}%, P/E "
+        f"{fmt_ratio(score.pe)}."
+    )
+    he = (
+        f"{score.lynch_category}: PEG {score.peg:.2f}, צמיחת EPS 5 שנתית "
+        f"{score.growth_rate_5yr_pct:.1f}%, P/E "
+        f"{fmt_ratio(score.pe)}."
+    )
+    return en, he
+
+
+def lynch_watch_why(score: Any) -> tuple[str, str]:
+    en = (
+        f"{score.lynch_category}: PEG {score.peg:.2f}; just outside the buy "
+        f"zone for this category."
+    )
+    he = (
+        f"{score.lynch_category}: PEG {score.peg:.2f}; מחוץ לאזור הקנייה "
+        f"של הקטגוריה."
+    )
+    return en, he
+
+
+def marks_why(score: Any) -> tuple[str, str]:
+    """``MarksScore`` → bilingual rationale (cycle-aware)."""
+    en = (
+        f"Posture {score.posture_at_score}: earnings yield "
+        f"{score.earnings_yield_pct:.1f}%, FCF yield "
+        f"{score.fcf_yield_pct:.1f}%, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}. "
+        f"Cycle-adjusted score {score.total_score:.1f}."
+    )
+    he = (
+        f"מיצוב {score.posture_at_score}: תשואת רווח "
+        f"{score.earnings_yield_pct:.1f}%, תשואת FCF "
+        f"{score.fcf_yield_pct:.1f}%, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}. "
+        f"ניקוד מותאם מחזור {score.total_score:.1f}."
+    )
+    return en, he
+
+
+def marks_watch_why(score: Any) -> tuple[str, str]:
+    en = (
+        f"Score {score.total_score:.1f}; below the {score.posture_at_score} "
+        f"posture's deployment threshold."
+    )
+    he = (
+        f"ניקוד {score.total_score:.1f}; מתחת לסף הפריסה של מיצוב "
+        f"{score.posture_at_score}."
+    )
+    return en, he
+
+
+def klarman_why(score: Any) -> tuple[str, str]:
+    """``KlarmanScore`` → bilingual rationale."""
+    en = (
+        f"MoS {score.margin_of_safety_pct:.1f}% to conservative DCF "
+        f"(intrinsic ${fmt_ratio(score.intrinsic_value_per_share)}). "
+        f"5y avg FCF ${score.avg_fcf_usd / 1e6:.0f}M, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}."
+    )
+    he = (
+        f"מרווח ביטחון {score.margin_of_safety_pct:.1f}% מ-DCF שמרני "
+        f"(שווי פנימי ${fmt_ratio(score.intrinsic_value_per_share)}). "
+        f"FCF ממוצע 5 שנתי ${score.avg_fcf_usd / 1e6:.0f}מ׳, D/E "
+        f"{fmt_ratio(score.debt_to_equity)}."
+    )
+    return en, he
+
+
+def klarman_watch_why(score: Any) -> tuple[str, str]:
+    en = (
+        f"Conservative DCF MoS {score.margin_of_safety_pct:.1f}%; just "
+        f"below 30% floor — watching for further price decline."
+    )
+    he = (
+        f"מרווח ביטחון לפי DCF שמרני {score.margin_of_safety_pct:.1f}%; "
+        f"מתחת לסף 30% — מעקב לירידת מחיר נוספת."
+    )
+    return en, he
+
+
+def fisher_why(score: Any) -> tuple[str, str]:
+    """``FisherScore`` → bilingual rationale (tier + 5-pt quant)."""
+    qs = score.quality_score
+    margin = qs.operating_margin_pct
+    margin_str = f"{margin:.1f}%" if margin is not None else "—"
+    rev_g = qs.revenue_cagr_5yr_pct
+    rev_g_str = f"{rev_g:.1f}%" if rev_g is not None else "—"
+    en = (
+        f"Tier {score.tier} ({score.quality_points}/5 points): "
+        f"P/E {fmt_ratio(score.pe)}, op margin {margin_str}, "
+        f"5y revenue CAGR {rev_g_str}."
+    )
+    he = (
+        f"קבוצה {score.tier} ({score.quality_points}/5 נקודות): "
+        f"P/E {fmt_ratio(score.pe)}, מרווח תפעולי {margin_str}, "
+        f"צמיחת הכנסות 5 שנתית {rev_g_str}."
+    )
+    return en, he
+
+
+def fisher_watch_why(score: Any) -> tuple[str, str]:
+    en = (
+        f"Tier {score.tier} ({score.quality_points}/5); below the "
+        f"current portfolio cut by P/E ranking."
+    )
+    he = (
+        f"קבוצה {score.tier} ({score.quality_points}/5); מתחת לחתך "
+        f"התיק הנוכחי בדירוג P/E."
+    )
+    return en, he
+
+
 __all__ = [
+    "buffett_watch_why",
+    "buffett_why",
     "dreman_watch_why",
     "dreman_why",
+    "fisher_watch_why",
+    "fisher_why",
     "fmt_pct",
     "fmt_ratio",
     "graham_defensive_why",
@@ -190,6 +374,14 @@ __all__ = [
     "graham_watch_why",
     "greenblatt_watch_why",
     "greenblatt_why",
+    "klarman_watch_why",
+    "klarman_why",
+    "lynch_watch_why",
+    "lynch_why",
+    "marks_watch_why",
+    "marks_why",
+    "neff_watch_why",
+    "neff_why",
     "schloss_watch_why",
     "schloss_why",
 ]
