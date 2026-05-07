@@ -28,9 +28,15 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Iterable
 
+from agents.buffett import WarrenBuffett
 from agents.dreman.contrarian import DavidDreman
+from agents.fisher import PhilipFisher
 from agents.graham.net_net import BenjaminGraham
 from agents.greenblatt.magic_formula import MagicFormula
+from agents.klarman import SethKlarman
+from agents.lynch import PeterLynch
+from agents.marks import HowardMarks
+from agents.neff.total_return import JohnNeff
 from agents.schloss.deep_value import WalterSchloss
 from core.backtest.data_loader import PriceDataLoader
 from core.backtest.decision_logger import DecisionLogger, make_decision
@@ -44,11 +50,17 @@ from core.data.fundamentals_fetcher import (
 )
 from core.live.agent_adapter import (
     AgentAdapter,
+    BuffettLive,
     DremanLive,
+    FisherLive,
     GrahamLive,
     GreenblattLive,
+    KlarmanLive,
     LiveTarget,
     LiveWatch,
+    LynchLive,
+    MarksLive,
+    NeffLive,
     ScanResult,
     SchlossLive,
 )
@@ -84,9 +96,24 @@ class AgentRunResult:
 
 
 def build_default_adapters(
-    *, decision_logger: DecisionLogger
+    *,
+    decision_logger: DecisionLogger,
+    edgar_cache: EdgarCache | None = None,
 ) -> list[AgentAdapter]:
-    """Construct the four currently-operational live adapters."""
+    """Construct the live adapters for all 10 council members.
+
+    The 4 original quant agents (Greenblatt, Schloss, Graham, Dreman)
+    don't need ``edgar_cache`` (they read fundamentals via the runner's
+    ``FundamentalsLookup``). The 6 hybrid agents (Neff, Buffett, Lynch,
+    Marks, Klarman, Fisher) DO need it for trailing growth / FCF /
+    margin-trend lookups, so we pass the runner's cache through.
+
+    LLM analyzers are intentionally ``None`` for live mode here — same
+    rationale as backtest: lookahead bias + free-tier quota burn. The
+    quant pipelines drive selection identically; if/when the LLM-quota
+    story changes, the analyzers can be wired in by the caller.
+    """
+    cache = edgar_cache or EdgarCache()
     return [
         GreenblattLive(
             MagicFormula(
@@ -117,6 +144,58 @@ def build_default_adapters(
                 decision_logger=decision_logger,
             )
         ),
+        NeffLive(
+            JohnNeff(
+                edgar_cache=cache,
+                portfolio_size=25,
+                min_market_cap=500_000_000.0,
+                decision_logger=decision_logger,
+            )
+        ),
+        BuffettLive(
+            WarrenBuffett(
+                edgar_cache=cache,
+                portfolio_size=8,
+                min_market_cap=5_000_000_000.0,
+                moat_analyzer=None,
+                decision_logger=decision_logger,
+            )
+        ),
+        LynchLive(
+            PeterLynch(
+                edgar_cache=cache,
+                portfolio_size=30,
+                min_market_cap=300_000_000.0,
+                category_classifier=None,
+                decision_logger=decision_logger,
+            )
+        ),
+        MarksLive(
+            HowardMarks(
+                edgar_cache=cache,
+                min_market_cap=500_000_000.0,
+                second_level_analyzer=None,
+                decision_logger=decision_logger,
+            )
+        ),
+        KlarmanLive(
+            SethKlarman(
+                edgar_cache=cache,
+                min_market_cap=500_000_000.0,
+                max_portfolio_size=20,
+                downside_analyzer=None,
+                decision_logger=decision_logger,
+            )
+        ),
+        FisherLive(
+            PhilipFisher(
+                edgar_cache=cache,
+                min_market_cap=1_000_000_000.0,
+                max_portfolio_size=15,
+                scuttlebutt_analyzer=None,
+                decision_logger=decision_logger,
+            )
+        ),
     ]
 
 
@@ -139,7 +218,10 @@ class DailyRunner:
             currently a placeholder — the Israeli scanner isn't built
             yet, so a TASE run logs a notice and returns empty results
             without erroring (so the daily schedule can fire safely).
-        adapters: Live adapters to run. Default = the four built-in agents.
+        adapters: Live adapters to run. Default = the 10 built-in
+            agents (4 quant + 6 hybrid). Each hybrid agent runs its
+            quant-only path; LLM analyzers are not invoked in live mode
+            here (see ``build_default_adapters`` docstring).
         portfolio_dir: Where to persist portfolio JSON.
         cost_bps: Per-trade cost (default 10 bps).
         initial_cash: Seed cash for first run (default $10,000).
@@ -167,7 +249,8 @@ class DailyRunner:
         self.cache = cache or EdgarCache()
         self.decision_logger = decision_logger or DecisionLogger()
         self.adapters = adapters or build_default_adapters(
-            decision_logger=self.decision_logger
+            decision_logger=self.decision_logger,
+            edgar_cache=self.cache,
         )
         self.portfolio_dir = portfolio_dir
         self.cost_bps = cost_bps

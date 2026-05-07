@@ -22,13 +22,25 @@ from typing import Any, Callable, Iterable
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import FundamentalsLookup, PriceLookup, Strategy
 from core.live.why_translator import (
+    buffett_watch_why,
+    buffett_why,
     dreman_watch_why,
     dreman_why,
+    fisher_watch_why,
+    fisher_why,
     graham_defensive_why,
     graham_net_net_why,
     graham_watch_why,
     greenblatt_watch_why,
     greenblatt_why,
+    klarman_watch_why,
+    klarman_why,
+    lynch_watch_why,
+    lynch_why,
+    marks_watch_why,
+    marks_why,
+    neff_watch_why,
+    neff_why,
     schloss_watch_why,
     schloss_why,
 )
@@ -324,13 +336,141 @@ class DremanLive(AgentAdapter):
         return watch
 
 
+# --------------------------------------------------------------------------
+# Hybrid agents (Neff, Buffett, Lynch, Marks, Klarman, Fisher)
+#
+# All six follow the same shape — pull ordered ``top_scores`` from the
+# strategy's last ``selection_history`` entry, format bilingual whys via
+# the per-agent formatters in :mod:`why_translator`. Watchlist is empty
+# by default; the strategies don't currently surface their full ranking
+# beyond the buy list. (Same pattern as ``GrahamLive`` — adding watchlists
+# is a follow-up that requires an ``all_scores`` field on each Selection.)
+# --------------------------------------------------------------------------
+def _hybrid_collect_targets(
+    strategy: Strategy,
+    weights: dict[str, float],
+    why: Callable[[Any], tuple[str, str]],
+) -> list[LiveTarget]:
+    """Shared ``_collect_targets`` body for the hybrid adapters."""
+    sel = strategy.selection_history[-1]
+    ordered = [s for s in sel.top_scores if s.ticker in weights]
+    out: list[LiveTarget] = []
+    for i, s in enumerate(ordered, start=1):
+        en, he = why(s)
+        out.append(
+            LiveTarget(
+                ticker=s.ticker,
+                weight=weights[s.ticker],
+                rank=i,
+                why_en=en,
+                why_he=he,
+                score=s,
+            )
+        )
+    return out
+
+
+class NeffLive(AgentAdapter):
+    name = "john_neff"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = "Total-Return/PE rank enters Neff buy list"
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        return _hybrid_collect_targets(self.strategy, weights, neff_why)
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        return []  # see module note on watchlists for hybrid agents
+
+
+class BuffettLive(AgentAdapter):
+    name = "warren_buffett"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = "Margin of safety widens to 15%+ at Owner-Earnings DCF"
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        return _hybrid_collect_targets(self.strategy, weights, buffett_why)
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        return []
+
+
+class LynchLive(AgentAdapter):
+    name = "peter_lynch"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = "PEG drops into category buy zone"
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        return _hybrid_collect_targets(self.strategy, weights, lynch_why)
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        return []
+
+
+class MarksLive(AgentAdapter):
+    name = "howard_marks"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = (
+            "Cycle-adjusted score crosses posture-specific threshold"
+        )
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        return _hybrid_collect_targets(self.strategy, weights, marks_why)
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        return []
+
+
+class KlarmanLive(AgentAdapter):
+    name = "seth_klarman"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = "Conservative DCF margin of safety reaches 30%+"
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        return _hybrid_collect_targets(self.strategy, weights, klarman_why)
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        return []
+
+
+class FisherLive(AgentAdapter):
+    name = "philip_fisher"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = (
+            "5-point quant score reaches Tier A (5/5) or Tier B (4/5)"
+        )
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        return _hybrid_collect_targets(self.strategy, weights, fisher_why)
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        return []
+
+
 __all__ = [
     "AgentAdapter",
+    "BuffettLive",
     "DremanLive",
+    "FisherLive",
     "GrahamLive",
     "GreenblattLive",
+    "KlarmanLive",
     "LiveTarget",
     "LiveWatch",
+    "LynchLive",
+    "MarksLive",
+    "NeffLive",
     "ScanResult",
     "SchlossLive",
 ]
