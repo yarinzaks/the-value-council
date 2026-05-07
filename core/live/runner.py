@@ -147,7 +147,7 @@ def build_default_adapters(
         NeffLive(
             JohnNeff(
                 edgar_cache=cache,
-                portfolio_size=25,
+                portfolio_size=30,  # soft-scoring: top-30 by total_score
                 min_market_cap=500_000_000.0,
                 decision_logger=decision_logger,
             )
