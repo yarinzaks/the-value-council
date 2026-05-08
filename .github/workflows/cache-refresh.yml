@@ -37,6 +37,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # See daily-paper-trading.yml for the rationale — Node 20 → 24
+  # opt-in ahead of the 2026-06-02 forced default.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 concurrency:
   group: cache-refresh
   cancel-in-progress: false

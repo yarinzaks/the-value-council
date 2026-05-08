@@ -57,6 +57,13 @@ on:
 permissions:
   contents: write
 
+env:
+  # Opt into Node.js 24 for JavaScript actions ahead of GitHub's
+  # 2026-06-02 forced default. Suppresses the Node 20 deprecation
+  # warning and lets us validate Node 24 compatibility now rather
+  # than on the day of the cutover.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 concurrency:
   # Each (market, mode) pair has its own queue so US and TASE runs
   # don't block each other on the Mon-Thu overlap days.
@@ -66,7 +73,11 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 60 min absorbs normal yfinance variance (typical run 14-26 min,
+    # tail ~30 min when the price API is slow). The bottleneck is
+    # the per-ticker yfinance fetch loop in core.live.runner; batching
+    # is the proper fix and is tracked separately.
+    timeout-minutes: 60
 
     env:
       TRIGGER_SCHEDULE: ${{ github.event.schedule }}
