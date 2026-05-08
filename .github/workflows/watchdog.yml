@@ -1,0 +1,131 @@
+name: Schedule Watchdog
+
+# Why this exists
+# ---------------
+# GitHub Actions documents schedule events as best-effort: during high-load
+# periods scheduled cron runs can be delayed by 10-30+ minutes or skipped
+# entirely. Our paper-trading runs are time-sensitive (they fetch live
+# prices), so a missed run leaves the portfolios un-marked-to-market for
+# the day. This watchdog runs shortly after each US schedule and dispatches
+# a make-up workflow_dispatch run if the scheduled one didn't fire (or
+# failed). Self-healing.
+#
+# What it does NOT do
+# -------------------
+# - Doesn't keep the repo "alive" — that 60-day inactivity rule is a
+#   different mechanism and isn't relevant here (we commit ~daily).
+# - Doesn't cover TASE schedules. The Israeli scanner is still WIP and
+#   produces zero trades, so a missed TASE run is harmless. Add a TASE
+#   branch here when the scanner ships.
+# - Doesn't dispatch back-to-back. The daily-paper-trading.yml workflow
+#   has a concurrency group keyed on (market, mode), so duplicate
+#   dispatches queue rather than racing.
+
+on:
+  schedule:
+    # 25 min after US open schedule (13:35 UTC + 25). Long enough to give
+    # GitHub's scheduler its typical drift window, short enough to still
+    # catch the open before the market gets too far in.
+    - cron: '0 14 * * 1-5'
+    # 30 min after US close schedule (20:00 UTC + 30). Same logic.
+    - cron: '30 20 * * 1-5'
+
+  workflow_dispatch:
+
+permissions:
+  # Needed to dispatch other workflows via gh workflow run.
+  actions: write
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Determine which mode to audit
+        id: mode
+        env:
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          # The two schedules below align 1-to-1 with US open / close in
+          # daily-paper-trading.yml. workflow_dispatch is a manual trigger
+          # — pick a mode by wall-clock to keep the same behavior.
+          case "$EVENT_SCHEDULE" in
+            "0 14 * * 1-5")
+              echo "mode=open" >> "$GITHUB_OUTPUT"
+              ;;
+            "30 20 * * 1-5")
+              echo "mode=close" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              hour=$(date -u +%H)
+              if [ "$hour" -ge 18 ]; then
+                echo "mode=close" >> "$GITHUB_OUTPUT"
+              else
+                echo "mode=open" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+          esac
+
+      - name: Inspect most recent scheduled run
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Filter on event=schedule so the watchdog evaluates the actual
+          # cron health, not its own past dispatches.
+          response=$(gh api \
+            "repos/${GH_REPO}/actions/workflows/daily-paper-trading.yml/runs?event=schedule&per_page=1")
+
+          count=$(echo "$response" | jq '.workflow_runs | length')
+          if [ "$count" = "0" ]; then
+            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
+            echo "reason=no scheduled runs in history" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          created_at=$(echo "$response" | jq -r '.workflow_runs[0].created_at')
+          conclusion=$(echo "$response" | jq -r '.workflow_runs[0].conclusion')
+          status=$(echo "$response"     | jq -r '.workflow_runs[0].status')
+
+          age_seconds=$(( $(date -u +%s) - $(date -u -d "$created_at" +%s) ))
+          age_minutes=$(( age_seconds / 60 ))
+
+          echo "latest scheduled run: $created_at" \
+               "(${age_minutes} min ago, status=${status}, conclusion=${conclusion})"
+
+          # Healthy = recent (≤ 90 min) AND either still running or
+          # completed successfully. Anything else is a make-up trigger.
+          if [ "$age_minutes" -gt 90 ]; then
+            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
+            echo "reason=last scheduled run is ${age_minutes}m old (>90)" >> "$GITHUB_OUTPUT"
+          elif [ "$status" = "completed" ] && [ "$conclusion" != "success" ]; then
+            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
+            echo "reason=last scheduled run conclusion=${conclusion}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_dispatch=false" >> "$GITHUB_OUTPUT"
+            echo "reason=last scheduled run is healthy" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dispatch make-up run
+        if: steps.check.outputs.should_dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODE: ${{ steps.mode.outputs.mode }}
+          REASON: ${{ steps.check.outputs.reason }}
+          REF: ${{ github.ref_name }}
+        run: |
+          echo "::warning::dispatching make-up run (mode=${MODE}): ${REASON}"
+          gh workflow run daily-paper-trading.yml \
+            --ref "$REF" \
+            --field "mode=${MODE}" \
+            --field "market=US"
+
+      - name: Report healthy
+        if: steps.check.outputs.should_dispatch != 'true'
+        env:
+          REASON: ${{ steps.check.outputs.reason }}
+        run: |
+          echo "::notice::watchdog healthy: ${REASON}"
