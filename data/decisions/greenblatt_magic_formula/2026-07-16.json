@@ -1,0 +1,1717 @@
+[
+  {
+    "ticker": "MA",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #5",
+      "ROC rank #8",
+      "combined rank #13"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.278329,
+      "return_on_capital": 6.097773,
+      "ey_rank": 5,
+      "roc_rank": 8,
+      "combined_rank": 13,
+      "market_cap": 60209413564.7113,
+      "enterprise_value": 67894413564.7113,
+      "invested_capital": 3099000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.935,
+    "entry_price": 545.1699829101562,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 13: EY=0.278, ROC=6.098"
+  },
+  {
+    "ticker": "FISV",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #18",
+      "ROC rank #51",
+      "combined rank #69"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.198803,
+      "return_on_capital": 1.511954,
+      "ey_rank": 18,
+      "roc_rank": 51,
+      "combined_rank": 69,
+      "market_cap": 26835135715.361145,
+      "enterprise_value": 29265135715.361145,
+      "invested_capital": 3848000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.655,
+    "entry_price": 50.18000030517578,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 69: EY=0.199, ROC=1.512"
+  },
+  {
+    "ticker": "PGY",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #30",
+      "ROC rank #56",
+      "combined rank #86"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.17784,
+      "return_on_capital": 1.416856,
+      "ey_rank": 30,
+      "roc_rank": 56,
+      "combined_rank": 86,
+      "market_cap": 1397515946.7531395,
+      "enterprise_value": 1483503946.7531395,
+      "invested_capital": 186206000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.5700000000000001,
+    "entry_price": 17.84000015258789,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 86: EY=0.178, ROC=1.417"
+  },
+  {
+    "ticker": "WNC",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #3",
+      "ROC rank #98",
+      "combined rank #101"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.337125,
+      "return_on_capital": 0.909409,
+      "ey_rank": 3,
+      "roc_rank": 98,
+      "combined_rank": 101,
+      "market_cap": 501209655.1253319,
+      "enterprise_value": 912138655.1253319,
+      "invested_capital": 338137000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.495,
+    "entry_price": 12.395000457763672,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 101: EY=0.337, ROC=0.909"
+  },
+  {
+    "ticker": "BCRX",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #52",
+      "ROC rank #49",
+      "combined rank #101"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.152898,
+      "return_on_capital": 1.570922,
+      "ey_rank": 52,
+      "roc_rank": 49,
+      "combined_rank": 101,
+      "market_cap": 2319905735.0,
+      "enterprise_value": 2230169735.0,
+      "invested_capital": 217063000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.495,
+    "entry_price": 9.25,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 101: EY=0.153, ROC=1.571"
+  },
+  {
+    "ticker": "IRWD",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #82",
+      "ROC rank #22",
+      "combined rank #104"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.120848,
+      "return_on_capital": 2.78506,
+      "ey_rank": 82,
+      "roc_rank": 22,
+      "combined_rank": 104,
+      "market_cap": 634296866.3454981,
+      "enterprise_value": 815091866.3454981,
+      "invested_capital": 35368000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.48,
+    "entry_price": 3.890000104904175,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 104: EY=0.121, ROC=2.785"
+  },
+  {
+    "ticker": "ADT",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #107",
+      "ROC rank #6",
+      "combined rank #113"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.104522,
+      "return_on_capital": 7.436853,
+      "ey_rank": 107,
+      "roc_rank": 6,
+      "combined_rank": 113,
+      "market_cap": 5224166880.625,
+      "enterprise_value": 12522779880.625,
+      "invested_capital": 176002000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.43500000000000005,
+    "entry_price": 6.875,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 113: EY=0.105, ROC=7.437"
+  },
+  {
+    "ticker": "NVAX",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #2",
+      "ROC rank #121",
+      "combined rank #123"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.409387,
+      "return_on_capital": 0.804074,
+      "ey_rank": 2,
+      "roc_rank": 121,
+      "combined_rank": 123,
+      "market_cap": 1346665641.3646173,
+      "enterprise_value": 1106031641.3646173,
+      "invested_capital": 563126000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.385,
+    "entry_price": 8.265000343322754,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 123: EY=0.409, ROC=0.804"
+  },
+  {
+    "ticker": "RILYL",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #8",
+      "ROC rank #118",
+      "combined rank #126"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.272306,
+      "return_on_capital": 0.822212,
+      "ey_rank": 8,
+      "roc_rank": 118,
+      "combined_rank": 126,
+      "market_cap": 503009851.66991806,
+      "enterprise_value": 277558851.66991806,
+      "invested_capital": 91924000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.37,
+    "entry_price": 14.3100004196167,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 126: EY=0.272, ROC=0.822"
+  },
+  {
+    "ticker": "DFIN",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #119",
+      "ROC rank #7",
+      "combined rank #126"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.098693,
+      "return_on_capital": 6.985149,
+      "ey_rank": 119,
+      "roc_rank": 7,
+      "combined_rank": 126,
+      "market_cap": 1288685125.3535042,
+      "enterprise_value": 1429685125.3535042,
+      "invested_capital": 20200000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.37,
+    "entry_price": 50.29999923706055,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 126: EY=0.099, ROC=6.985"
+  },
+  {
+    "ticker": "GIS",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #108",
+      "ROC rank #20",
+      "combined rank #128"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.104011,
+      "return_on_capital": 2.833873,
+      "ey_rank": 108,
+      "roc_rank": 20,
+      "combined_rank": 128,
+      "market_cap": 20859050121.1644,
+      "enterprise_value": 28635350121.1644,
+      "invested_capital": 1051000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.36,
+    "entry_price": 38.45500183105469,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 128: EY=0.104, ROC=2.834"
+  },
+  {
+    "ticker": "VRTS",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #70",
+      "ROC rank #59",
+      "combined rank #129"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.129913,
+      "return_on_capital": 1.356974,
+      "ey_rank": 70,
+      "roc_rank": 59,
+      "combined_rank": 129,
+      "market_cap": 1130236360.5355835,
+      "enterprise_value": 1298412360.5355835,
+      "invested_capital": 124306000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.355,
+    "entry_price": 168.80499267578125,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 129: EY=0.130, ROC=1.357"
+  },
+  {
+    "ticker": "KBR",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #86",
+      "ROC rank #48",
+      "combined rank #134"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.118154,
+      "return_on_capital": 1.578093,
+      "ey_rank": 86,
+      "roc_rank": 48,
+      "combined_rank": 134,
+      "market_cap": 4537605202.40041,
+      "enterprise_value": 6584605202.40041,
+      "invested_capital": 493000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.32999999999999996,
+    "entry_price": 35.880001068115234,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 134: EY=0.118, ROC=1.578"
+  },
+  {
+    "ticker": "CRMD",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #4",
+      "ROC rank #135",
+      "combined rank #139"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.287435,
+      "return_on_capital": 0.755461,
+      "ey_rank": 4,
+      "roc_rank": 135,
+      "combined_rank": 139,
+      "market_cap": 667185300.6291342,
+      "enterprise_value": 522348300.6291342,
+      "invested_capital": 198741000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.30500000000000005,
+    "entry_price": 8.4399995803833,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 139: EY=0.287, ROC=0.755"
+  },
+  {
+    "ticker": "IT",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #130",
+      "ROC rank #9",
+      "combined rank #139"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.094614,
+      "return_on_capital": 4.921177,
+      "ey_rank": 130,
+      "roc_rank": 9,
+      "combined_rank": 139,
+      "market_cap": 9586876136.518341,
+      "enterprise_value": 10841029136.518341,
+      "invested_capital": 208428000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.30500000000000005,
+    "entry_price": 136.0800018310547,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 139: EY=0.095, ROC=4.921"
+  },
+  {
+    "ticker": "RIGL",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #39",
+      "ROC rank #105",
+      "combined rank #144"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.164191,
+      "return_on_capital": 0.890089,
+      "ey_rank": 39,
+      "roc_rank": 105,
+      "combined_rank": 144,
+      "market_cap": 752225876.1502075,
+      "enterprise_value": 764145876.1502075,
+      "invested_capital": 140959000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.28,
+    "entry_price": 40.720001220703125,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 144: EY=0.164, ROC=0.890"
+  },
+  {
+    "ticker": "LDOS",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #53",
+      "ROC rank #91",
+      "combined rank #144"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.152825,
+      "return_on_capital": 0.947865,
+      "ey_rank": 53,
+      "roc_rank": 91,
+      "combined_rank": 144,
+      "market_cap": 13577101883.848083,
+      "enterprise_value": 13800101883.848083,
+      "invested_capital": 2225000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.28,
+    "entry_price": 107.41999816894531,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 144: EY=0.153, ROC=0.948"
+  },
+  {
+    "ticker": "WHR",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #87",
+      "ROC rank #58",
+      "combined rank #145"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.117045,
+      "return_on_capital": 1.385124,
+      "ey_rank": 87,
+      "roc_rank": 58,
+      "combined_rank": 145,
+      "market_cap": 2245629104.5286713,
+      "enterprise_value": 7159629104.528671,
+      "invested_capital": 605000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.275,
+    "entry_price": 39.73249816894531,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 145: EY=0.117, ROC=1.385"
+  },
+  {
+    "ticker": "HLF",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #37",
+      "ROC rank #111",
+      "combined rank #148"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.165725,
+      "return_on_capital": 0.830026,
+      "ey_rank": 37,
+      "roc_rank": 111,
+      "combined_rank": 148,
+      "market_cap": 1283800325.1861668,
+      "enterprise_value": 2902400325.186167,
+      "invested_capital": 579500000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.26,
+    "entry_price": 12.420000076293945,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 148: EY=0.166, ROC=0.830"
+  },
+  {
+    "ticker": "VNT",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #110",
+      "ROC rank #44",
+      "combined rank #154"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.103747,
+      "return_on_capital": 1.6875,
+      "ey_rank": 110,
+      "roc_rank": 44,
+      "combined_rank": 154,
+      "market_cap": 4311181837.463379,
+      "enterprise_value": 5413181837.463379,
+      "invested_capital": 332800000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.22999999999999998,
+    "entry_price": 30.446199417114258,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 154: EY=0.104, ROC=1.688"
+  },
+  {
+    "ticker": "CPAY",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #156",
+      "ROC rank #2",
+      "combined rank #158"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.085863,
+      "return_on_capital": 14.35922,
+      "ey_rank": 156,
+      "roc_rank": 2,
+      "combined_rank": 158,
+      "market_cap": 25157514094.378418,
+      "enterprise_value": 23224356094.378418,
+      "invested_capital": 138873000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.20999999999999996,
+    "entry_price": 369.69000244140625,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 158: EY=0.086, ROC=14.359"
+  },
+  {
+    "ticker": "SOLV",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #85",
+      "ROC rank #81",
+      "combined rank #166"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.119349,
+      "return_on_capital": 1.064422,
+      "ey_rank": 85,
+      "roc_rank": 81,
+      "combined_rank": 166,
+      "market_cap": 14117126293.36277,
+      "enterprise_value": 18274126293.36277,
+      "invested_capital": 2049000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.17000000000000004,
+    "entry_price": 81.37000274658203,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 166: EY=0.119, ROC=1.064"
+  },
+  {
+    "ticker": "RILYT",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #54",
+      "ROC rank #119",
+      "combined rank #173"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.152645,
+      "return_on_capital": 0.822212,
+      "ey_rank": 54,
+      "roc_rank": 119,
+      "combined_rank": 173,
+      "market_cap": 720594106.0,
+      "enterprise_value": 495143106.0,
+      "invested_capital": 91924000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.135,
+    "entry_price": 20.5,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 173: EY=0.153, ROC=0.822"
+  },
+  {
+    "ticker": "DLX",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #140",
+      "ROC rank #33",
+      "combined rank #173"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.090876,
+      "return_on_capital": 2.088426,
+      "ey_rank": 140,
+      "roc_rank": 33,
+      "combined_rank": 173,
+      "market_cap": 1181135308.1944542,
+      "enterprise_value": 2557335308.194454,
+      "invested_capital": 111280000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.135,
+    "entry_price": 26.200000762939453,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 173: EY=0.091, ROC=2.088"
+  },
+  {
+    "ticker": "COLL",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #23",
+      "ROC rank #153",
+      "combined rank #176"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.189083,
+      "return_on_capital": 0.682,
+      "ey_rank": 23,
+      "roc_rank": 153,
+      "combined_rank": 176,
+      "market_cap": 1169788298.0851555,
+      "enterprise_value": 950036298.0851555,
+      "invested_capital": 263396000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.12,
+    "entry_price": 36.84000015258789,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 176: EY=0.189, ROC=0.682"
+  },
+  {
+    "ticker": "CCSI",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #75",
+      "ROC rank #104",
+      "combined rank #179"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.126847,
+      "return_on_capital": 0.891679,
+      "ey_rank": 75,
+      "roc_rank": 104,
+      "combined_rank": 179,
+      "market_cap": 707773720.1791191,
+      "enterprise_value": 1184410720.179119,
+      "invested_capital": 168490000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.10499999999999998,
+    "entry_price": 37.5099983215332,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 179: EY=0.127, ROC=0.892"
+  },
+  {
+    "ticker": "AMG",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #141",
+      "ROC rank #39",
+      "combined rank #180"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.090649,
+      "return_on_capital": 1.874937,
+      "ey_rank": 141,
+      "roc_rank": 39,
+      "combined_rank": 180,
+      "market_cap": 10116581153.356934,
+      "enterprise_value": 12221881153.356934,
+      "invested_capital": 590900000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.09999999999999998,
+    "entry_price": 379.114990234375,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 180: EY=0.091, ROC=1.875"
+  },
+  {
+    "ticker": "FHI",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #80",
+      "ROC rank #102",
+      "combined rank #182"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.121404,
+      "return_on_capital": 0.894503,
+      "ey_rank": 80,
+      "roc_rank": 102,
+      "combined_rank": 182,
+      "market_cap": 4467007445.6214905,
+      "enterprise_value": 4232834445.6214905,
+      "invested_capital": 574489000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.08999999999999997,
+    "entry_price": 59.47999954223633,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 182: EY=0.121, ROC=0.895"
+  },
+  {
+    "ticker": "BBWI",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #42",
+      "ROC rank #143",
+      "combined rank #185"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.1608,
+      "return_on_capital": 0.724116,
+      "ey_rank": 42,
+      "roc_rank": 143,
+      "combined_rank": 185,
+      "market_cap": 4343494314.56706,
+      "enterprise_value": 7002494314.56706,
+      "invested_capital": 1555000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.07499999999999996,
+    "entry_price": 21.594999313354492,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 185: EY=0.161, ROC=0.724"
+  },
+  {
+    "ticker": "CTSH",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #31",
+      "ROC rank #158",
+      "combined rank #189"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.176714,
+      "return_on_capital": 0.665554,
+      "ey_rank": 31,
+      "roc_rank": 158,
+      "combined_rank": 189,
+      "market_cap": 20535922088.0278,
+      "enterprise_value": 19177922088.0278,
+      "invested_capital": 5092000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.05500000000000005,
+    "entry_price": 42.939998626708984,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 189: EY=0.177, ROC=0.666"
+  },
+  {
+    "ticker": "EEFT",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #34",
+      "ROC rank #156",
+      "combined rank #190"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.17066,
+      "return_on_capital": 0.669954,
+      "ey_rank": 34,
+      "roc_rank": 156,
+      "combined_rank": 190,
+      "market_cap": 3107123009.0,
+      "enterprise_value": 3104423009.0,
+      "invested_capital": 790800000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.050000000000000044,
+    "entry_price": 79.0,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 190: EY=0.171, ROC=0.670"
+  },
+  {
+    "ticker": "AOS",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #43",
+      "ROC rank #152",
+      "combined rank #195"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.160175,
+      "return_on_capital": 0.68471,
+      "ey_rank": 43,
+      "roc_rank": 152,
+      "combined_rank": 195,
+      "market_cap": 4610575686.330704,
+      "enterprise_value": 4548775686.330704,
+      "invested_capital": 1064100000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.025000000000000022,
+    "entry_price": 60.880001068115234,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 195: EY=0.160, ROC=0.685"
+  },
+  {
+    "ticker": "NUTX",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #13",
+      "ROC rank #185",
+      "combined rank #198"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.254749,
+      "return_on_capital": 0.579676,
+      "ey_rank": 13,
+      "roc_rank": 185,
+      "combined_rank": 198,
+      "market_cap": 1238345525.2845764,
+      "enterprise_value": 1081945525.2845764,
+      "invested_capital": 475481000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.010000000000000009,
+    "entry_price": 177.7100067138672,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 198: EY=0.255, ROC=0.580"
+  },
+  {
+    "ticker": "HPK",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #190",
+      "ROC rank #10",
+      "combined rank #200"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.078986,
+      "return_on_capital": 4.593177,
+      "ey_rank": 190,
+      "roc_rank": 10,
+      "combined_rank": 200,
+      "market_cap": 928100247.3690147,
+      "enterprise_value": 1898832247.3690147,
+      "invested_capital": 32653000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 7.34499979019165,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 200: EY=0.079, ROC=4.593"
+  },
+  {
+    "ticker": "RILYG",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #84",
+      "ROC rank #117",
+      "combined rank #201"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.119679,
+      "return_on_capital": 0.822212,
+      "ey_rank": 84,
+      "roc_rank": 117,
+      "combined_rank": 201,
+      "market_cap": 856979692.6601639,
+      "enterprise_value": 631528692.6601639,
+      "invested_capital": 91924000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 24.3799991607666,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 201: EY=0.120, ROC=0.822"
+  },
+  {
+    "ticker": "LNWO",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #88",
+      "ROC rank #116",
+      "combined rank #204"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.115945,
+      "return_on_capital": 0.824879,
+      "ey_rank": 88,
+      "roc_rank": 116,
+      "combined_rank": 204,
+      "market_cap": 6057716528.7369,
+      "enterprise_value": 5890716528.7369,
+      "invested_capital": 828000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 78.5199966430664,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 204: EY=0.116, ROC=0.825"
+  },
+  {
+    "ticker": "LAD",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #19",
+      "ROC rank #188",
+      "combined rank #207"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.191254,
+      "return_on_capital": 0.575081,
+      "ey_rank": 19,
+      "roc_rank": 188,
+      "combined_rank": 207,
+      "market_cap": 8005906675.0,
+      "enterprise_value": 8338106675.0,
+      "invested_capital": 2773000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 342.5,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 207: EY=0.191, ROC=0.575"
+  },
+  {
+    "ticker": "CRTO",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #12",
+      "ROC rank #196",
+      "combined rank #208"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.255034,
+      "return_on_capital": 0.55317,
+      "ey_rank": 12,
+      "roc_rank": 196,
+      "combined_rank": 208,
+      "market_cap": 1135291411.0436783,
+      "enterprise_value": 795051411.0436783,
+      "invested_capital": 366551000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 22.770000457763672,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 208: EY=0.255, ROC=0.553"
+  },
+  {
+    "ticker": "CRAI",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #209",
+      "ROC rank #4",
+      "combined rank #213"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.07494,
+      "return_on_capital": 8.470804,
+      "ey_rank": 209,
+      "roc_rank": 4,
+      "combined_rank": 213,
+      "market_cap": 1127413601.0615997,
+      "enterprise_value": 1109203601.0615997,
+      "invested_capital": 9813000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 171.6999969482422,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 213: EY=0.075, ROC=8.471"
+  },
+  {
+    "ticker": "ANF",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #25",
+      "ROC rank #189",
+      "combined rank #214"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.185065,
+      "return_on_capital": 0.573753,
+      "ey_rank": 25,
+      "roc_rank": 189,
+      "combined_rank": 214,
+      "market_cap": 4537371773.0,
+      "enterprise_value": 3777831773.0,
+      "invested_capital": 1218543000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 101.0,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 214: EY=0.185, ROC=0.574"
+  },
+  {
+    "ticker": "LAWIL",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #99",
+      "ROC rank #115",
+      "combined rank #214"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.108181,
+      "return_on_capital": 0.824879,
+      "ey_rank": 99,
+      "roc_rank": 115,
+      "combined_rank": 214,
+      "market_cap": 6480491724.0,
+      "enterprise_value": 6313491724.0,
+      "invested_capital": 828000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 84.0,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 214: EY=0.108, ROC=0.825"
+  },
+  {
+    "ticker": "SFM",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #122",
+      "ROC rank #95",
+      "combined rank #217"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.09689,
+      "return_on_capital": 0.929995,
+      "ey_rank": 122,
+      "roc_rank": 95,
+      "combined_rank": 217,
+      "market_cap": 6886106943.430603,
+      "enterprise_value": 7081824943.430603,
+      "invested_capital": 737808000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 72.80999755859375,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 217: EY=0.097, ROC=0.930"
+  },
+  {
+    "ticker": "CWK",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #146",
+      "ROC rank #74",
+      "combined rank #220"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.088342,
+      "return_on_capital": 1.177772,
+      "ey_rank": 146,
+      "roc_rank": 74,
+      "combined_rank": 220,
+      "market_cap": 3281436059.1319284,
+      "enterprise_value": 5122136059.131928,
+      "invested_capital": 384200000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 14.154999732971191,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 220: EY=0.088, ROC=1.178"
+  },
+  {
+    "ticker": "BKE",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #73",
+      "ROC rank #148",
+      "combined rank #221"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.127987,
+      "return_on_capital": 0.699761,
+      "ey_rank": 73,
+      "roc_rank": 148,
+      "combined_rank": 221,
+      "market_cap": 2263704628.0906754,
+      "enterprise_value": 2042735628.0906754,
+      "invested_capital": 373619000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 43.939998626708984,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 221: EY=0.128, ROC=0.700"
+  },
+  {
+    "ticker": "PTCT",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #57",
+      "ROC rank #167",
+      "combined rank #224"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.148807,
+      "return_on_capital": 0.637034,
+      "ey_rank": 57,
+      "roc_rank": 167,
+      "combined_rank": 224,
+      "market_cap": 6525132117.465057,
+      "enterprise_value": 5825896117.465057,
+      "invested_capital": 1360892000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 78.83000183105469,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 224: EY=0.149, ROC=0.637"
+  },
+  {
+    "ticker": "NGVT",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #41",
+      "ROC rank #184",
+      "combined rank #225"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.162038,
+      "return_on_capital": 0.580721,
+      "ey_rank": 41,
+      "roc_rank": 184,
+      "combined_rank": 225,
+      "market_cap": 2662066820.8902283,
+      "enterprise_value": 2583966820.8902283,
+      "invested_capital": 721000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 75.43000030517578,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 225: EY=0.162, ROC=0.581"
+  },
+  {
+    "ticker": "CON",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #168",
+      "ROC rank #57",
+      "combined rank #225"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.082824,
+      "return_on_capital": 1.409546,
+      "ey_rank": 168,
+      "roc_rank": 57,
+      "combined_rank": 225,
+      "market_cap": 4112452837.2035275,
+      "enterprise_value": 4032553837.2035275,
+      "invested_capital": 236950000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 31.969999313354492,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 225: EY=0.083, ROC=1.410"
+  },
+  {
+    "ticker": "COKE",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #9",
+      "ROC rank #222",
+      "combined rank #231"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.256802,
+      "return_on_capital": 0.499656,
+      "ey_rank": 9,
+      "roc_rank": 222,
+      "combined_rank": 231,
+      "market_cap": 1297815132.7984467,
+      "enterprise_value": 3701906132.7984467,
+      "invested_capital": 1902622000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 181.72999572753906,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 231: EY=0.257, ROC=0.500"
+  },
+  {
+    "ticker": "AVAH",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #186",
+      "ROC rank #45",
+      "combined rank #231"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.079497,
+      "return_on_capital": 1.682508,
+      "ey_rank": 186,
+      "roc_rank": 45,
+      "combined_rank": 231,
+      "market_cap": 2132686067.4087982,
+      "enterprise_value": 3226078067.408798,
+      "invested_capital": 152429000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 9.805000305175781,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 231: EY=0.079, ROC=1.683"
+  },
+  {
+    "ticker": "PRTH",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #132",
+      "ROC rank #108",
+      "combined rank #240"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.094144,
+      "return_on_capital": 0.864656,
+      "ey_rank": 132,
+      "roc_rank": 108,
+      "combined_rank": 240,
+      "market_cap": 538146257.8010626,
+      "enterprise_value": 1500312257.8010626,
+      "invested_capital": 163354000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 6.539999961853027,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 240: EY=0.094, ROC=0.865"
+  },
+  {
+    "ticker": "NATL",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #162",
+      "ROC rank #78",
+      "combined rank #240"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.084571,
+      "return_on_capital": 1.09633,
+      "ey_rank": 162,
+      "roc_rank": 78,
+      "combined_rank": 240,
+      "market_cap": 3436043724.782707,
+      "enterprise_value": 5652043724.782707,
+      "invested_capital": 436000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 46.709999084472656,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 240: EY=0.085, ROC=1.096"
+  },
+  {
+    "ticker": "G",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #64",
+      "ROC rank #177",
+      "combined rank #241"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.137375,
+      "return_on_capital": 0.602898,
+      "ey_rank": 64,
+      "roc_rank": 177,
+      "combined_rank": 241,
+      "market_cap": 5148571535.732946,
+      "enterprise_value": 5461009535.732946,
+      "invested_capital": 1244335000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 30.309999465942383,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 241: EY=0.137, ROC=0.603"
+  },
+  {
+    "ticker": "LULU",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #28",
+      "ROC rank #221",
+      "combined rank #249"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.180286,
+      "return_on_capital": 0.501401,
+      "ey_rank": 28,
+      "roc_rank": 221,
+      "combined_rank": 249,
+      "market_cap": 13143018441.010094,
+      "enterprise_value": 12261698441.010094,
+      "invested_capital": 4408873000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 118.95999908447266,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 249: EY=0.180, ROC=0.501"
+  },
+  {
+    "ticker": "HURN",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #219",
+      "ROC rank #34",
+      "combined rank #253"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.073437,
+      "return_on_capital": 2.01494,
+      "ey_rank": 219,
+      "roc_rank": 34,
+      "combined_rank": 253,
+      "market_cap": 1966443717.1553345,
+      "enterprise_value": 2431600717.1553345,
+      "invested_capital": 88623000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 116.19999694824219,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 253: EY=0.073, ROC=2.015"
+  },
+  {
+    "ticker": "VRRM",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #58",
+      "ROC rank #202",
+      "combined rank #260"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.148384,
+      "return_on_capital": 0.542904,
+      "ey_rank": 58,
+      "roc_rank": 202,
+      "combined_rank": 260,
+      "market_cap": 650856452.5700026,
+      "enterprise_value": 1606741452.5700026,
+      "invested_capital": 439146000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 4.300000190734863,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 260: EY=0.148, ROC=0.543"
+  },
+  {
+    "ticker": "WH",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #257",
+      "ROC rank #3",
+      "combined rank #260"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.067982,
+      "return_on_capital": 12.5625,
+      "ey_rank": 257,
+      "roc_rank": 3,
+      "combined_rank": 260,
+      "market_cap": 5977339120.560822,
+      "enterprise_value": 5913339120.560822,
+      "invested_capital": 32000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 79.54000091552734,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 260: EY=0.068, ROC=12.562"
+  },
+  {
+    "ticker": "MORN",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #236",
+      "ROC rank #25",
+      "combined rank #261"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.071016,
+      "return_on_capital": 2.43121,
+      "ey_rank": 236,
+      "roc_rank": 25,
+      "combined_rank": 261,
+      "market_cap": 6817115195.52002,
+      "enterprise_value": 7415215195.52002,
+      "invested_capital": 216600000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 172.22000122070312,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 261: EY=0.071, ROC=2.431"
+  },
+  {
+    "ticker": "CDW",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #187",
+      "ROC rank #76",
+      "combined rank #263"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.079346,
+      "return_on_capital": 1.145031,
+      "ey_rank": 187,
+      "roc_rank": 76,
+      "combined_rank": 263,
+      "market_cap": 16862041980.822876,
+      "enterprise_value": 20865641980.822876,
+      "invested_capital": 1445900000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 130.72000122070312,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 263: EY=0.079, ROC=1.145"
+  },
+  {
+    "ticker": "TMUSI",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #24",
+      "ROC rank #240",
+      "combined rank #264"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.185676,
+      "return_on_capital": 0.477333,
+      "ey_rank": 24,
+      "roc_rank": 240,
+      "combined_rank": 264,
+      "market_cap": 22896708473.0091,
+      "enterprise_value": 98445708473.0091,
+      "invested_capital": 38294000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 20.780000686645508,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 264: EY=0.186, ROC=0.477"
+  },
+  {
+    "ticker": "TMUSL",
+    "decision": "WATCH",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "EY rank #27",
+      "ROC rank #241",
+      "combined rank #268"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "earnings_yield": 0.181174,
+      "return_on_capital": 0.477333,
+      "ey_rank": 27,
+      "roc_rank": 241,
+      "combined_rank": 268,
+      "market_cap": 25342842997.0,
+      "enterprise_value": 100891842997.0,
+      "invested_capital": 38294000000.0
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 23.0,
+    "target_price": null,
+    "exit_trigger": "annual rotation OR rank slips out of top-N",
+    "rationale": "Magic Formula rank 268: EY=0.181, ROC=0.477"
+  },
+  {
+    "ticker": "EEFT",
+    "decision": "SELL",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "rotated out of target portfolio"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 74.81,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $74.81, exit $79.00 (+5.60%)"
+  },
+  {
+    "ticker": "WNC",
+    "decision": "BUY",
+    "agent": "greenblatt_magic_formula",
+    "timestamp": "2026-07-16T00:00:00+00:00",
+    "criteria_met": [
+      "rank #4",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 12.395000457763672,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "EY 33.7%, ROC 90.9%. Magic Formula combined rank #101."
+  }
+]
