@@ -1,0 +1,456 @@
+[
+  {
+    "ticker": "ASGN",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=7.34 (\u2264 15.0)",
+      "P/B=0.44 (\u2264 1.5)",
+      "current ratio=2.16 (\u2265 2.0)",
+      "D/E=0.65 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 7.3385,
+      "pb": 0.4368,
+      "current_ratio": 2.1593,
+      "graham_number": 3.2055,
+      "debt_to_equity": 0.6482,
+      "net_income": 113500000.0,
+      "market_cap": 788003996.84906,
+      "price": 19.079999923706055
+    },
+    "market_conditions": {},
+    "confidence": 0.8575329637864562,
+    "entry_price": 19.079999923706055,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 7.34, P/B 0.44, CR 2.16, Graham # 3.21"
+  },
+  {
+    "ticker": "EFOR",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=8.85 (\u2264 15.0)",
+      "P/B=0.53 (\u2264 1.5)",
+      "current ratio=2.16 (\u2265 2.0)",
+      "D/E=0.65 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 8.8538,
+      "pb": 0.527,
+      "current_ratio": 2.1593,
+      "graham_number": 4.6661,
+      "debt_to_equity": 0.6482,
+      "net_income": 113500000.0,
+      "market_cap": 950726018.9056396,
+      "price": 23.020000457763672
+    },
+    "market_conditions": {},
+    "confidence": 0.7926193132979357,
+    "entry_price": 23.020000457763672,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 8.85, P/B 0.53, CR 2.16, Graham # 4.67"
+  },
+  {
+    "ticker": "TASK",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=5.55 (\u2264 15.0)",
+      "P/B=0.92 (\u2264 1.5)",
+      "current ratio=3.12 (\u2265 2.0)",
+      "D/E=0.37 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 5.5545,
+      "pb": 0.9168,
+      "current_ratio": 3.1192,
+      "graham_number": 5.0923,
+      "debt_to_equity": 0.3663,
+      "net_income": 102275000.0,
+      "market_cap": 550059641.8797846,
+      "price": 6.110000133514404
+    },
+    "market_conditions": {},
+    "confidence": 0.7736750099457972,
+    "entry_price": 6.110000133514404,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 5.55, P/B 0.92, CR 3.12, Graham # 5.09"
+  },
+  {
+    "ticker": "CRMD",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=3.63 (\u2264 15.0)",
+      "P/B=1.45 (\u2264 1.5)",
+      "current ratio=2.11 (\u2265 2.0)",
+      "D/E=0.00 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 3.6324,
+      "pb": 1.4452,
+      "current_ratio": 2.1062,
+      "graham_number": 5.2496,
+      "debt_to_equity": 0.0,
+      "net_income": 163055000.0,
+      "market_cap": 585763414.887867,
+      "price": 7.409999847412109
+    },
+    "market_conditions": {},
+    "confidence": 0.76668446726527,
+    "entry_price": 7.409999847412109,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 3.63, P/B 1.45, CR 2.11, Graham # 5.25"
+  },
+  {
+    "ticker": "SEB",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=9.10 (\u2264 15.0)",
+      "P/B=0.86 (\u2264 1.5)",
+      "current ratio=2.40 (\u2265 2.0)",
+      "D/E=0.19 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 9.0988,
+      "pb": 0.8602,
+      "current_ratio": 2.404,
+      "graham_number": 7.8269,
+      "debt_to_equity": 0.1875,
+      "net_income": 230350000.0,
+      "market_cap": 4483424360.542969,
+      "price": 4680.990234375
+    },
+    "market_conditions": {},
+    "confidence": 0.6521363546260793,
+    "entry_price": 4680.990234375,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 9.10, P/B 0.86, CR 2.40, Graham # 7.83"
+  },
+  {
+    "ticker": "HOG",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=9.08 (\u2264 15.0)",
+      "P/B=0.90 (\u2264 1.5)",
+      "current ratio=2.10 (\u2265 2.0)",
+      "D/E=0.53 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 9.0827,
+      "pb": 0.8992,
+      "current_ratio": 2.1014,
+      "graham_number": 8.1676,
+      "debt_to_equity": 0.5252,
+      "net_income": 338738000.0,
+      "market_cap": 2824226715.75,
+      "price": 25.25
+    },
+    "market_conditions": {},
+    "confidence": 0.636995845235214,
+    "entry_price": 25.25,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 9.08, P/B 0.90, CR 2.10, Graham # 8.17"
+  },
+  {
+    "ticker": "INVA",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=6.60 (\u2264 15.0)",
+      "P/B=1.37 (\u2264 1.5)",
+      "current ratio=14.64 (\u2265 2.0)",
+      "D/E=0.22 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 6.597,
+      "pb": 1.3749,
+      "current_ratio": 14.6393,
+      "graham_number": 9.0704,
+      "debt_to_equity": 0.2197,
+      "net_income": 4435000.0,
+      "market_cap": 1612583307.3282242,
+      "price": 21.770000457763672
+    },
+    "market_conditions": {},
+    "confidence": 0.5968701095705973,
+    "entry_price": 21.770000457763672,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 6.60, P/B 1.37, CR 14.64, Graham # 9.07"
+  },
+  {
+    "ticker": "VRTS",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=8.52 (\u2264 15.0)",
+      "P/B=1.22 (\u2264 1.5)",
+      "current ratio=2.64 (\u2265 2.0)",
+      "D/E=0.42 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 8.5228,
+      "pb": 1.22,
+      "current_ratio": 2.641,
+      "graham_number": 10.3982,
+      "debt_to_equity": 0.4175,
+      "net_income": 208131000.0,
+      "market_cap": 1139576632.5669098,
+      "price": 170.1999969482422
+    },
+    "market_conditions": {},
+    "confidence": 0.5378577970519267,
+    "entry_price": 170.1999969482422,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 8.52, P/B 1.22, CR 2.64, Graham # 10.40"
+  },
+  {
+    "ticker": "BIO",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=11.95 (\u2264 15.0)",
+      "P/B=1.24 (\u2264 1.5)",
+      "current ratio=5.62 (\u2265 2.0)",
+      "D/E=0.16 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 11.9519,
+      "pb": 1.2356,
+      "current_ratio": 5.6213,
+      "graham_number": 14.7676,
+      "debt_to_equity": 0.1612,
+      "net_income": 759900000.0,
+      "market_cap": 9209580393.366577,
+      "price": 332.8599853515625
+    },
+    "market_conditions": {},
+    "confidence": 0.34366187360538114,
+    "entry_price": 332.8599853515625,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 11.95, P/B 1.24, CR 5.62, Graham # 14.77"
+  },
+  {
+    "ticker": "JBI",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=14.33 (\u2264 15.0)",
+      "P/B=1.32 (\u2264 1.5)",
+      "current ratio=3.54 (\u2265 2.0)",
+      "D/E=0.94 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 14.3289,
+      "pb": 1.3207,
+      "current_ratio": 3.5356,
+      "graham_number": 18.9238,
+      "debt_to_equity": 0.9411,
+      "net_income": 53800000.0,
+      "market_cap": 756082764.9315848,
+      "price": 5.445000171661377
+    },
+    "market_conditions": {},
+    "confidence": 0.15894261143692368,
+    "entry_price": 5.445000171661377,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 14.33, P/B 1.32, CR 3.54, Graham # 18.92"
+  },
+  {
+    "ticker": "SSRM",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=13.45 (\u2264 15.0)",
+      "P/B=1.44 (\u2264 1.5)",
+      "current ratio=2.08 (\u2265 2.0)",
+      "D/E=0.06 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 13.4486,
+      "pb": 1.4422,
+      "current_ratio": 2.0815,
+      "graham_number": 19.3951,
+      "debt_to_equity": 0.0649,
+      "net_income": 395754000.0,
+      "market_cap": 5058757725.521793,
+      "price": 24.8799991607666
+    },
+    "market_conditions": {},
+    "confidence": 0.13799752144956834,
+    "entry_price": 24.8799991607666,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 13.45, P/B 1.44, CR 2.08, Graham # 19.40"
+  },
+  {
+    "ticker": "EPAM",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=14.69 (\u2264 15.0)",
+      "P/B=1.45 (\u2264 1.5)",
+      "current ratio=2.59 (\u2265 2.0)",
+      "D/E=0.01 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 14.686,
+      "pb": 1.453,
+      "current_ratio": 2.5937,
+      "graham_number": 21.339,
+      "debt_to_equity": 0.0068,
+      "net_income": 377678000.0,
+      "market_cap": 5343073672.787659,
+      "price": 98.69000244140625
+    },
+    "market_conditions": {},
+    "confidence": 0.0515985509156186,
+    "entry_price": 98.69000244140625,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 14.69, P/B 1.45, CR 2.59, Graham # 21.34"
+  },
+  {
+    "ticker": "CTSH",
+    "decision": "SELL",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "rotated out of target portfolio"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 43.985,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $43.98, exit $50.22 (+14.16%)"
+  },
+  {
+    "ticker": "DUOL",
+    "decision": "SELL",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "rotated out of target portfolio"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 121.78,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $121.78, exit $136.50 (+12.09%)"
+  },
+  {
+    "ticker": "CRMD",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "rank #4",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 7.409999847412109,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "P/E 3.63, P/B 1.45, current ratio 2.11. Graham Defensive Investor (Intelligent Investor Ch.14)."
+  },
+  {
+    "ticker": "SSRM",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-07-28T00:00:00+00:00",
+    "criteria_met": [
+      "rank #11",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 24.8799991607666,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "P/E 13.45, P/B 1.44, current ratio 2.08. Graham Defensive Investor (Intelligent Investor Ch.14)."
+  }
+]
