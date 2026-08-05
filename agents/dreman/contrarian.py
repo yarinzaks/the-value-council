@@ -29,6 +29,7 @@ from core.backtest.strategy_runner import (
     PriceLookup,
     Strategy,
 )
+from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
 
 from .diversification import (
@@ -45,6 +46,7 @@ from .filters import (
     apply_quality_gates,
 )
 from .ranking import DremanScore, score_candidates
+from .strength import assess_strength, is_deteriorating
 
 logger = get_logger("agents.dreman.contrarian")
 
@@ -85,6 +87,7 @@ class DavidDreman(Strategy):
         quintile: float = DEFAULT_QUINTILE,
         max_de: float = DEFAULT_MAX_DE,
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+        edgar_cache: EdgarCache | None = None,
         min_industries: int = DEFAULT_MIN_INDUSTRIES,
         max_industry_weight_pct: float = DEFAULT_MAX_INDUSTRY_WEIGHT_PCT,
         decision_logger: DecisionLogger | None = None,
@@ -113,6 +116,7 @@ class DavidDreman(Strategy):
         self.quintile = quintile
         self.max_de = max_de
         self.min_market_cap = min_market_cap
+        self.edgar_cache = edgar_cache
         self.min_industries = min_industries
         self.max_industry_weight_pct = max_industry_weight_pct
         self.decision_logger = decision_logger
@@ -150,6 +154,28 @@ class DavidDreman(Strategy):
             max_de=self.max_de,
             min_market_cap=self.min_market_cap,
         )
+
+        # Stage 1b: the financial-strength battery, playbook 4.2 —
+        # "distinguish overreaction-driven cheapness from outright
+        # deteriorating businesses". Nothing downstream of the quintile
+        # screen could tell those apart; only tests 4 and 6 of Dreman's
+        # six were implemented, both as gates above.
+        if self.edgar_cache is not None:
+            kept: list[tuple[PointInTimeFinancials, float, float]] = []
+            weak = 0
+            for fin, mcap, price in survivors:
+                a = assess_strength(fin, self.edgar_cache, as_of)
+                if is_deteriorating(a):
+                    weak += 1
+                    logger.debug(f"{fin.ticker}: deteriorating — {a.reason}")
+                    continue
+                kept.append((fin, mcap, price))
+            if weak:
+                logger.info(
+                    f"{as_of}: strength battery dropped {weak} of "
+                    f"{len(survivors)} as deteriorating"
+                )
+            survivors = kept
 
         # Stage 2: population-aware quintile screen + ranking.
         scores = score_candidates(

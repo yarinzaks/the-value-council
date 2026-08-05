@@ -153,6 +153,10 @@ def build_default_adapters(
             DavidDreman(
                 portfolio_size=25,
                 min_market_cap=500_000_000.0,
+                # Playbook 4.2's strength battery reads multi-year
+                # margin and earnings trends; without the cache it
+                # cannot run and the agent buys on cheapness alone.
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
