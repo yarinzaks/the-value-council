@@ -80,6 +80,22 @@ CREATE TABLE IF NOT EXISTS prices (
 );
 CREATE INDEX IF NOT EXISTS idx_prices_ticker ON prices(ticker);
 CREATE INDEX IF NOT EXISTS idx_prices_date ON prices(trade_date);
+
+-- Cash dividends by ex-date. Separate from prices because the live
+-- portfolio has to receive them as cash: marking a position at the
+-- close means the ex-date price drop lands in NAV while the payment
+-- never does, so the recorded return is price return, not total
+-- return. That penalty is proportional to yield, which makes it
+-- doctrine-correlated — Neff, Dreman and Graham lose roughly their
+-- portfolio yield a year against Buffett and Fisher, for no reason
+-- either investor would recognise.
+CREATE TABLE IF NOT EXISTS dividends (
+    ticker      TEXT NOT NULL,
+    ex_date     TEXT NOT NULL,   -- ISO YYYY-MM-DD
+    amount      REAL NOT NULL,   -- cash per share, in the quote currency
+    PRIMARY KEY (ticker, ex_date)
+);
+CREATE INDEX IF NOT EXISTS idx_dividends_ticker ON dividends(ticker);
 """
 
 
@@ -142,6 +158,53 @@ class PriceDataLoader:
         df = df.set_index("trade_date")
         df.index.name = "date"
         return df
+
+    def _write_dividends(self, ticker: str, df: pd.DataFrame) -> int:
+        """Persist any non-zero Dividends column rows from a fetch."""
+        if df.empty or "Dividends" not in df.columns:
+            return 0
+        ticker = ticker.upper()
+        rows = []
+        for idx, value in df["Dividends"].items():
+            amount = _f(value)
+            if amount is None or amount <= 0:
+                continue
+            d = idx.date() if isinstance(idx, pd.Timestamp) else idx
+            rows.append((ticker, d.isoformat(), amount))
+        if not rows:
+            return 0
+        with self._connect() as conn:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO dividends (ticker, ex_date, amount)
+                VALUES (?, ?, ?)
+                """,
+                rows,
+            )
+        return len(rows)
+
+    def dividends_between(
+        self,
+        ticker: str,
+        start: date | datetime | str,
+        end: date | datetime | str,
+    ) -> list[tuple[date, float]]:
+        """Cash dividends with ex-date in ``(start, end]``, oldest first.
+
+        The lower bound is exclusive so a caller can pass the last date
+        it already settled without paying the same dividend twice.
+        """
+        start_d, end_d = _to_date(start), _to_date(end)
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT ex_date, amount FROM dividends
+                WHERE ticker = ? AND ex_date > ? AND ex_date <= ?
+                ORDER BY ex_date
+                """,
+                (ticker.upper(), start_d.isoformat(), end_d.isoformat()),
+            ).fetchall()
+        return [(_to_date(r[0]), float(r[1])) for r in rows]
 
     def _write_cache(self, ticker: str, df: pd.DataFrame) -> int:
         if df.empty:
@@ -223,7 +286,8 @@ class PriceDataLoader:
         df = self._fetch_yfinance(ticker, start_d, end_d)
         if not df.empty:
             n = self._write_cache(ticker, df)
-            logger.debug(f"cached {n} rows for {ticker}")
+            d = self._write_dividends(ticker, df)
+            logger.debug(f"cached {n} rows for {ticker} ({d} dividends)")
         return self._read_cached(ticker, start_d, end_d)
 
     def get_adj_close(
@@ -347,7 +411,10 @@ class PriceDataLoader:
                 end=end_excl.isoformat(),
                 progress=False,
                 auto_adjust=False,
-                actions=False,
+                # actions=True adds a Dividends column. It used to be
+                # False, so cash dividends were invisible to the whole
+                # system and NAV tracked price return only.
+                actions=True,
                 threads=False,
             )
         except Exception as exc:  # noqa: BLE001 — yfinance throws broad types

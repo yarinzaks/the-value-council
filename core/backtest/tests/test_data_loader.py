@@ -243,3 +243,94 @@ class TestGetPriceOnForceRefresh:
         price = loader.get_price_on("AAPL", date(2026, 1, 19), force_refresh=True)
 
         assert price == pytest.approx(99.25)
+
+
+class TestDividends:
+    """actions=False meant cash dividends were invisible to the whole
+    system, so NAV tracked price return only."""
+
+    @staticmethod
+    def _frame() -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "Open": [100.0, 101.0, 99.0],
+                "High": [101.0, 102.0, 100.0],
+                "Low": [99.0, 100.0, 98.0],
+                "Close": [100.0, 101.0, 99.0],
+                "Adj Close": [100.0, 101.0, 99.0],
+                "Volume": [1000, 1100, 1200],
+                "Dividends": [0.0, 0.55, 0.0],
+            },
+            index=pd.DatetimeIndex(["2026-08-03", "2026-08-04", "2026-08-05"]),
+        )
+
+    def _loaded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> PriceDataLoader:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        monkeypatch.setattr(
+            loader, "_fetch_yfinance", lambda ticker, start, end: self._frame()
+        )
+        loader.get_history("KO", date(2026, 8, 3), date(2026, 8, 5))
+        return loader
+
+    def test_a_dividend_is_persisted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = self._loaded(tmp_path, monkeypatch)
+
+        paid = loader.dividends_between("KO", date(2026, 8, 1), date(2026, 8, 5))
+
+        assert paid == [(date(2026, 8, 4), pytest.approx(0.55))]
+
+    def test_zero_rows_are_not_stored(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Every trading day carries a Dividends column; only the ex-date
+        # is non-zero.
+        loader = self._loaded(tmp_path, monkeypatch)
+
+        assert loader.dividends_between("KO", date(2026, 8, 1), date(2026, 8, 3)) == []
+
+    def test_the_lower_bound_is_exclusive(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # So a caller can pass the last date it settled without paying
+        # the same dividend twice.
+        loader = self._loaded(tmp_path, monkeypatch)
+
+        assert loader.dividends_between("KO", date(2026, 8, 4), date(2026, 8, 5)) == []
+
+    def test_the_upper_bound_is_inclusive(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = self._loaded(tmp_path, monkeypatch)
+
+        paid = loader.dividends_between("KO", date(2026, 8, 3), date(2026, 8, 4))
+
+        assert len(paid) == 1
+
+    def test_refetching_does_not_duplicate(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = self._loaded(tmp_path, monkeypatch)
+        loader.get_history(
+            "KO", date(2026, 8, 3), date(2026, 8, 5), force_refresh=True
+        )
+
+        paid = loader.dividends_between("KO", date(2026, 8, 1), date(2026, 8, 5))
+
+        assert len(paid) == 1
+
+    def test_a_frame_without_the_column_is_tolerated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        frame = self._frame().drop(columns=["Dividends"])
+        monkeypatch.setattr(
+            loader, "_fetch_yfinance", lambda ticker, start, end: frame
+        )
+
+        loader.get_history("KO", date(2026, 8, 3), date(2026, 8, 5))
+
+        assert loader.dividends_between("KO", date(2026, 8, 1), date(2026, 8, 5)) == []

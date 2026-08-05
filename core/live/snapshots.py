@@ -60,6 +60,10 @@ class DailySnapshot:
     buys: list[str]
     sells: list[str]
     trade_count: int
+    #: Cash dividends received to date. NAV already includes this; the
+    #: field lets a reader separate income from price appreciation, so
+    #: "total return" is auditable rather than inferred.
+    dividends_received_usd: float = 0.0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -86,6 +90,7 @@ def make_snapshot(
         buys=buys,
         sells=sells,
         trade_count=len(buys) + len(sells),
+        dividends_received_usd=round(portfolio.cumulative_dividends, 2),
     )
 
 

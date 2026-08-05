@@ -538,3 +538,162 @@ class TestRebalanceBand:
         assert result.portfolio.positions[0].weight_pct == pytest.approx(
             50.0, abs=1.0
         )
+
+
+# ---------------------------------------------------------------------------
+# Dividends
+# ---------------------------------------------------------------------------
+class _StubPriceLoaderWithDividends(_StubPriceLoader):
+    def __init__(
+        self,
+        prices: dict[str, float | None],
+        dividends: dict[str, list[tuple[date, float]]] | None = None,
+    ) -> None:
+        super().__init__(prices)
+        self._dividends = dividends or {}
+        self.dividend_queries: list[tuple[str, date, date]] = []
+
+    def dividends_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
+        from core.backtest.data_loader import _to_date
+
+        s, e = _to_date(start), _to_date(end)
+        self.dividend_queries.append((ticker, s, e))
+        return [(d, a) for d, a in self._dividends.get(ticker, []) if s < d <= e]
+
+
+class TestDividends:
+    """Marking at the close puts the ex-date price drop into NAV while
+    the payment never arrives, so the recorded return was price return.
+    The penalty is proportional to yield — doctrine-correlated, and so
+    it silently favoured the low-yield agents."""
+
+    def _held(self, runner: DailyRunner, *, entry_date: str = "2026-07-01") -> None:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DIV",
+                shares=100.0,
+                entry_price=50.0,
+                entry_date=entry_date,
+                current_price=50.0,
+                why_en="",
+                why_he="",
+            )
+        )
+        p.cash = 1_000.0
+        p.last_open_run = "2026-08-01T14:00:00+00:00"
+        p.save(directory=runner.portfolio_dir)
+
+    def _run(self, runner: DailyRunner, loader) -> object:  # type: ignore[no-untyped-def]
+        runner.price_loader = loader
+        adapter = _StubAdapter("stub_agent", [_target("DIV", weight=0.9)])
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DIV"],
+            {"DIV": 50.0},
+            {"DIV": None},
+        )
+
+    def test_a_dividend_becomes_cash(self, runner: DailyRunner) -> None:
+        self._held(runner)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+
+        result = self._run(runner, loader)
+
+        # 100 shares x $1.00.
+        assert result.portfolio.cumulative_dividends == pytest.approx(100.0)
+
+    def test_the_same_dividend_is_not_paid_twice(
+        self, runner: DailyRunner
+    ) -> None:
+        self._held(runner)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+        self._run(runner, loader)
+        second = runner._run_one(
+            _StubAdapter("stub_agent", [_target("DIV", weight=0.9)]),  # type: ignore[arg-type]
+            AS_OF,
+            ["DIV"],
+            {"DIV": 50.0},
+            {"DIV": None},
+            force=True,  # bypass the idempotency guard to isolate this
+        )
+
+        assert second.portfolio.cumulative_dividends == pytest.approx(100.0)
+
+    def test_a_dividend_before_purchase_is_not_collected(
+        self, runner: DailyRunner
+    ) -> None:
+        self._held(runner, entry_date="2026-08-05")
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 2), 1.00)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.cumulative_dividends == 0.0
+
+    def test_dividends_are_settled_before_the_sell(
+        self, runner: DailyRunner
+    ) -> None:
+        # A name leaving the target list still collects income whose
+        # ex-date has already passed. Settling after the sell forfeits it.
+        self._held(runner)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0, "OTHER": 10.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+        runner.price_loader = loader
+        adapter = _StubAdapter("stub_agent", [_target("OTHER", weight=0.9)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DIV", "OTHER"],
+            {"DIV": 50.0, "OTHER": 10.0},
+            {"DIV": None, "OTHER": None},
+        )
+
+        assert not result.portfolio.has("DIV")  # it was sold
+        assert result.portfolio.cumulative_dividends == pytest.approx(100.0)
+
+    def test_dividends_reach_the_snapshot(self, runner: DailyRunner) -> None:
+        from core.live.snapshots import make_snapshot
+
+        self._held(runner)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+        result = self._run(runner, loader)
+
+        snap = make_snapshot(result.portfolio, as_of=AS_OF, trades=[])
+
+        assert snap.dividends_received_usd == pytest.approx(100.0)
+
+    def test_a_freshly_seeded_book_does_not_harvest_history(
+        self, runner: DailyRunner
+    ) -> None:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DIV",
+                shares=100.0,
+                entry_price=50.0,
+                entry_date="2020-01-01",
+                current_price=50.0,
+                why_en="",
+                why_he="",
+            )
+        )
+        p.cash = 1_000.0  # no last_open_run, no last_dividend_date
+        p.save(directory=runner.portfolio_dir)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2021, 5, 4), 5.00)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.cumulative_dividends == 0.0

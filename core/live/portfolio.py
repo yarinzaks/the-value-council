@@ -103,6 +103,14 @@ class LivePortfolio:
     last_close_run: str = ""
     initial_cash: float = DEFAULT_INITIAL_CASH
     cumulative_costs: float = 0.0
+    #: Cash dividends received to date. NAV already contains this money
+    #: — the field exists so the dashboard can separate income from
+    #: price appreciation, and so a total-return figure is auditable
+    #: rather than inferred.
+    cumulative_dividends: float = 0.0
+    #: Latest ex-date already settled. The watermark that stops a
+    #: dividend being paid twice when a date is re-run.
+    last_dividend_date: str = ""
 
     # ------------------------------------------------------------------
     # Derived metrics (computed against current_price on positions)
@@ -202,6 +210,29 @@ class LivePortfolio:
             cost_paid=cost,
             realized_pnl_usd=(price - pos.entry_price) * sold,
         )
+
+    def credit_dividend(
+        self, ticker: str, *, amount_per_share: float, ex_date: str
+    ) -> float:
+        """Pay a cash dividend on the current holding of ``ticker``.
+
+        Returns the cash credited, 0.0 when the position is not held.
+        The caller is responsible for not replaying an ex-date — see
+        ``last_dividend_date``.
+        """
+        if amount_per_share <= 0:
+            raise LivePortfolioError(
+                f"non-positive dividend for {ticker}: {amount_per_share}"
+            )
+        idx = self._index_of(ticker)
+        if idx is None:
+            return 0.0
+        cash = self.positions[idx].shares * amount_per_share
+        self.cash += cash
+        self.cumulative_dividends += cash
+        if ex_date > self.last_dividend_date:
+            self.last_dividend_date = ex_date
+        return cash
 
     def buy(
         self,
@@ -325,6 +356,8 @@ class LivePortfolio:
             "cumulative_return_pct": round(self.cumulative_return_pct, 4),
             "initial_cash": round(self.initial_cash, 2),
             "cumulative_costs": round(self.cumulative_costs, 4),
+            "cumulative_dividends": round(self.cumulative_dividends, 4),
+            "last_dividend_date": self.last_dividend_date,
             "positions": [_round_position(p) for p in self.positions],
             "watchlist": [asdict(w) for w in self.watchlist],
             "last_updated": self.last_updated,
@@ -377,6 +410,8 @@ class LivePortfolio:
             last_close_run=str(data.get("last_close_run", "")),
             initial_cash=float(data.get("initial_cash", DEFAULT_INITIAL_CASH)),
             cumulative_costs=float(data.get("cumulative_costs", 0.0)),
+            cumulative_dividends=float(data.get("cumulative_dividends", 0.0)),
+            last_dividend_date=str(data.get("last_dividend_date", "")),
         )
 
     @classmethod

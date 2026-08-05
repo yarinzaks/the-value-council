@@ -481,6 +481,12 @@ class DailyRunner:
         target_tickers = {t.ticker for t in scan.targets}
         trades: list[TradeRecord] = []
 
+        # ---- DIVIDENDS: pay income before any trading ------------------
+        # Before the diff, so a name sold today still collects a dividend
+        # whose ex-date has already passed. Ordering matters: after the
+        # sell it would be silently forfeited.
+        self._settle_dividends(portfolio, as_of)
+
         # ---- SELLs: positions that left the target list ---------------
         # Skip if no targets — that's a "no-trade" signal (e.g. universe
         # produced no candidates) and we'd otherwise liquidate everything.
@@ -602,6 +608,63 @@ class DailyRunner:
             trades=trades,
             universe_size=scan.universe_size,
         )
+
+    # ------------------------------------------------------------------
+    def _settle_dividends(self, portfolio: LivePortfolio, as_of: date) -> float:
+        """Credit cash for every unpaid dividend on the current holdings.
+
+        Marking a position at the close means the ex-date price drop
+        lands in NAV while the payment never does, so the recorded
+        return was price return rather than total return. The penalty
+        is proportional to yield, which makes it doctrine-correlated:
+        Neff, Dreman and Graham were losing roughly their portfolio
+        yield a year against Buffett and Fisher for no reason either
+        investor would recognise.
+
+        Two watermarks stop a dividend being paid twice. The portfolio's
+        ``last_dividend_date`` bounds the whole book, and each position's
+        own ``entry_date`` bounds it individually — a name bought
+        yesterday must not collect on an ex-date from before it was
+        owned.
+        """
+        if not portfolio.positions:
+            return 0.0
+
+        floor = portfolio.last_dividend_date[:10] or portfolio.last_open_run[:10]
+        if not floor:
+            # First run for this book: settle from today only, so a
+            # freshly seeded portfolio does not harvest history.
+            floor = as_of.isoformat()
+
+        total = 0.0
+        for pos in list(portfolio.positions):
+            since = max(floor, pos.entry_date[:10])
+            try:
+                payments = self.price_loader.dividends_between(
+                    pos.ticker, since, as_of
+                )
+            except Exception as exc:
+                logger.warning(f"{as_of}: dividend lookup {pos.ticker} failed: {exc}")
+                continue
+            for ex_date, amount in payments:
+                try:
+                    cash = portfolio.credit_dividend(
+                        pos.ticker,
+                        amount_per_share=amount,
+                        ex_date=ex_date.isoformat(),
+                    )
+                except LivePortfolioError as exc:
+                    logger.warning(f"{as_of}: dividend {pos.ticker} failed: {exc}")
+                    continue
+                if cash:
+                    total += cash
+                    logger.info(
+                        f"{as_of}: {portfolio.agent} received ${cash:,.2f} "
+                        f"from {pos.ticker} (ex {ex_date}, ${amount:.4f}/sh)"
+                    )
+        if total:
+            portfolio.last_dividend_date = as_of.isoformat()
+        return total
 
     # ------------------------------------------------------------------
     def _rebalance(
