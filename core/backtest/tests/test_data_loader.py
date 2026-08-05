@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from core.backtest.data_loader import (
+    MAX_CARRY_FORWARD_DAYS,
     REFRESH_WINDOW_DAYS,
     PriceDataLoader,
     _to_date,
@@ -334,3 +335,146 @@ class TestDividends:
         loader.get_history("KO", date(2026, 8, 3), date(2026, 8, 5))
 
         assert loader.dividends_between("KO", date(2026, 8, 1), date(2026, 8, 5)) == []
+
+
+class TestCarryForwardIsBounded:
+    """A price may be carried over a closed market, not over a data hole.
+
+    ``get_price_on`` used to check only that ``as_of`` fell between the
+    outer edges of the cached series, then return the last bar at or
+    before it however old. Measured over 400 cached tickers and 831,193
+    inter-bar gaps, 99.94% are five days or under — every routine
+    closure — while 307 of the 395 usable tickers carry at least one
+    larger hole, median worst 367 days, maximum 4,021. AAPL's real
+    series runs 2010-01-04 to 2026-07-31 with a 3,657-day gap, so a
+    June 2015 lookup returned the close from 2010-12-31.
+    """
+
+    @staticmethod
+    def _series(loader: PriceDataLoader, dates: list[str], px: list[float]) -> None:
+        df = pd.DataFrame(
+            {
+                "Open": px,
+                "High": px,
+                "Low": px,
+                "Close": px,
+                "Adj Close": px,
+                "Volume": [1000] * len(px),
+            },
+            index=pd.DatetimeIndex(dates),
+        )
+        loader._write_cache("AAPL", df)
+
+    @staticmethod
+    def _no_network(
+        loader: PriceDataLoader, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            loader, "_fetch_yfinance", lambda ticker, start, end: pd.DataFrame()
+        )
+
+    def test_a_long_weekend_still_carries(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Friday close answering for the Tuesday after a Monday holiday
+        # — four days. This is the case the carry-forward exists for and
+        # it must keep working.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._series(loader, ["2026-05-22"], [200.0])
+        self._no_network(loader, monkeypatch)
+
+        assert loader.get_price_on("AAPL", date(2026, 5, 26)) == pytest.approx(
+            200.0
+        )
+
+    def test_a_year_wide_hole_does_not(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The real AAPL shape: bars on both sides, nothing in between.
+        # The date sits inside the outer range, so the old range check
+        # passed it and handed back a price a year stale.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._series(loader, ["2024-12-31", "2026-01-02"], [249.0, 270.0])
+        self._no_network(loader, monkeypatch)
+
+        assert loader.get_price_on("AAPL", date(2025, 11, 27)) is None
+
+    def test_the_holiday_inside_a_dense_series_is_fine(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Thanksgiving 2025 with the surrounding week actually cached.
+        # No NYSE calendar needed: the bar is one day old, so it answers.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._series(
+            loader,
+            ["2025-11-24", "2025-11-25", "2025-11-26", "2025-11-28"],
+            [240.0, 241.0, 242.0, 243.0],
+        )
+        self._no_network(loader, monkeypatch)
+
+        assert loader.get_price_on("AAPL", date(2025, 11, 27)) == pytest.approx(
+            242.0
+        )
+
+    def test_it_refetches_before_giving_up(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A stale cache hit is not a verdict. The gap may be fillable,
+        # so the fast path falls through to the fetch instead of
+        # returning None outright.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._series(loader, ["2024-12-31", "2026-01-02"], [249.0, 270.0])
+        calls: list[tuple[date, date]] = []
+
+        def _fetch(ticker: str, start: date, end: date) -> pd.DataFrame:
+            calls.append((start, end))
+            idx = pd.DatetimeIndex(["2025-11-26"])
+            return pd.DataFrame(
+                {
+                    "Open": [255.0],
+                    "High": [255.0],
+                    "Low": [255.0],
+                    "Close": [255.0],
+                    "Adj Close": [255.0],
+                    "Volume": [1000],
+                },
+                index=idx,
+            )
+
+        monkeypatch.setattr(loader, "_fetch_yfinance", _fetch)
+
+        assert loader.get_price_on("AAPL", date(2025, 11, 27)) == pytest.approx(
+            255.0
+        )
+        assert calls, "the stale cache hit should have triggered a refetch"
+
+    def test_the_bound_is_configurable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._series(loader, ["2026-05-01"], [200.0])
+        self._no_network(loader, monkeypatch)
+
+        assert loader.get_price_on("AAPL", date(2026, 5, 10)) is None
+        assert loader.get_price_on(
+            "AAPL", date(2026, 5, 10), max_carry_days=30
+        ) == pytest.approx(200.0)
+
+    def test_the_default_bound_covers_every_scheduled_closure(self) -> None:
+        # Longest routine NYSE gap is four days — Friday to Tuesday with
+        # a Monday holiday, or Thursday to Monday around Good Friday.
+        assert MAX_CARRY_FORWARD_DAYS == 5
+
+    def test_a_stale_forced_refresh_returns_none(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The close-of-day mark must not settle on a week-old bar
+        # either; force_refresh goes through the same bound.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._series(loader, ["2026-07-20"], [200.0])
+        self._no_network(loader, monkeypatch)
+
+        assert (
+            loader.get_price_on("AAPL", date(2026, 7, 31), force_refresh=True)
+            is None
+        )

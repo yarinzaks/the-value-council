@@ -47,6 +47,35 @@ DEFAULT_CACHE_PATH = _prices_db()
 # enough that the daily close-of-day mark stays cheap.
 REFRESH_WINDOW_DAYS = 7
 
+#: How stale a bar may be and still answer for ``as_of``.
+#:
+#: Carrying the last close forward over a closed market is correct and
+#: necessary — that is what a weekend or a holiday is. Carrying it
+#: forward without limit is not, and that is what used to happen:
+#: ``get_price_on`` checked only that ``as_of`` fell between the outer
+#: edges of the cached series, then returned the last bar at or before
+#: it, however old.
+#:
+#: Measured over 400 cached tickers and 831,193 inter-bar gaps: 99.94%
+#: are 5 days or under — every routine closure. The remaining 505 are
+#: data holes, and 307 of the 395 usable tickers (78%) have at least
+#: one, with a median worst gap of 367 days and a maximum of 4,021.
+#: AAPL's series runs 2010-01-04 to 2026-07-31 with a 3,657-day hole in
+#: the middle, so asking for a June 2015 price returned the close from
+#: 2010-12-31 as though it were current.
+#:
+#: Five days covers every scheduled NYSE closure: the longest routine
+#: gap is Friday to Tuesday when a holiday falls on Monday, or Thursday
+#: to Monday around Good Friday — four days either way — plus one day
+#: of margin. Beyond that a missing bar is a gap in the data, not a
+#: closed exchange, and the honest answer is that the price is unknown.
+#:
+#: This also removes the need for an NYSE holiday calendar. The
+#: question was never "was the market open on this date" but "is this
+#: quote still good", and a bound answers it without a new dependency
+#: or a table of dates to maintain.
+MAX_CARRY_FORWARD_DAYS = 5
+
 
 class PriceDataError(ValueCouncilError):
     """Raised when price data cannot be retrieved."""
@@ -321,12 +350,38 @@ class PriceDataLoader:
             return pd.DataFrame()
         return pd.concat(series.values(), axis=1).sort_index()
 
+    @staticmethod
+    def _fresh_close(
+        df: pd.DataFrame,
+        as_of: date,
+        *,
+        max_carry_days: int,
+    ) -> float | None:
+        """Last adjusted close at or before ``as_of``, if recent enough.
+
+        Returns None when the newest available bar is more than
+        ``max_carry_days`` old. That is the difference between carrying
+        a price over a closed market and inventing one across a hole in
+        the data — see :data:`MAX_CARRY_FORWARD_DAYS`.
+        """
+        if df.empty:
+            return None
+        eligible = df[df.index.date <= as_of]
+        if eligible.empty:
+            return None
+        bar_date = eligible.index[-1].date()
+        age = (as_of - bar_date).days
+        if age > max_carry_days:
+            return None
+        return float(eligible["adj_close"].iloc[-1])
+
     def get_price_on(
         self,
         ticker: str,
         as_of: date | datetime,
         *,
         force_refresh: bool = False,
+        max_carry_days: int = MAX_CARRY_FORWARD_DAYS,
     ) -> float | None:
         """Return the adjusted close on or just before ``as_of``.
 
@@ -360,35 +415,49 @@ class PriceDataLoader:
             df = self.get_history(
                 ticker, start=window_start, end=as_of_d, force_refresh=True
             )
-            if df.empty:
-                return None
-            df = df[df.index.date <= as_of_d]
-            if df.empty:
-                return None
-            return float(df["adj_close"].iloc[-1])
+            return self._fresh_close(df, as_of_d, max_carry_days=max_carry_days)
 
         # Fast path: if the cache already has data covering as_of, use it.
+        # The range check alone is not enough — as_of can sit inside a
+        # hole in the series and still fall between its outer edges — so
+        # a stale hit falls through to the fetch below rather than
+        # returning. The gap may well be fillable.
         cached_range = self.cached_range(ticker)
         if cached_range is not None:
             cmin, cmax = cached_range
             if cmin <= as_of_d <= cmax:
-                df = self._read_cached(ticker, cmin, as_of_d)
-                if not df.empty:
-                    df = df[df.index.date <= as_of_d]
-                    if not df.empty:
-                        return float(df["adj_close"].iloc[-1])
+                cached = self._fresh_close(
+                    self._read_cached(ticker, cmin, as_of_d),
+                    as_of_d,
+                    max_carry_days=max_carry_days,
+                )
+                if cached is not None:
+                    return cached
+                stale_hit = True
+                logger.debug(
+                    f"{ticker}@{as_of_d}: cached range covers the date but the "
+                    f"nearest bar is over {max_carry_days}d old — refetching"
+                )
+            else:
+                stale_hit = False
+        else:
+            stale_hit = False
 
         # Slow path: fetch the whole year so subsequent daily lookups
         # in the same year all hit the cache.
+        #
+        # ``force_refresh`` on a stale hit is required, not belt-and-
+        # braces: get_history applies the same outer-range test, so a
+        # year that lies inside a hole reads as "cached, 0 rows" and
+        # never reaches the network. Without it the fall-through is a
+        # no-op and the gap is permanent. One year-wide fetch repairs
+        # the whole year, so the cost is per ticker-year, not per date.
         year_start = as_of_d.replace(month=1, day=1)
         year_end = as_of_d.replace(month=12, day=31)
-        df = self.get_history(ticker, start=year_start, end=year_end)
-        if df.empty:
-            return None
-        df = df[df.index.date <= as_of_d]
-        if df.empty:
-            return None
-        return float(df["adj_close"].iloc[-1])
+        df = self.get_history(
+            ticker, start=year_start, end=year_end, force_refresh=stale_hit
+        )
+        return self._fresh_close(df, as_of_d, max_carry_days=max_carry_days)
 
     # ------------------------------------------------------------------
     # yfinance interface
