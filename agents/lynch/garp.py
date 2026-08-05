@@ -59,6 +59,76 @@ logger = get_logger("agents.lynch.garp")
 DEFAULT_PORTFOLIO_SIZE: int = 30
 
 
+def _category_weights(top: list[LynchScore]) -> dict[str, float]:
+    """Size each position by its Lynch category.
+
+    The six categories exist because Lynch sizes and holds them
+    differently — a fast grower is where the tenbagger lives, a
+    turnaround is a binary bet, a slow grower is a bond substitute he
+    would rather not own. :func:`agents.lynch.ranking._position_size_for`
+    already encodes his per-category caps (3% slow grower and
+    turnaround, 4% cyclical and asset play, 5% stalwart and fast
+    grower) and stamps them onto every score.
+
+    This used to be ``1.0 / len(top)``. The category was classified,
+    logged, written into the memo and shown on the dashboard, and then
+    every name got the same weight regardless — so the whole taxonomy
+    was decoration. On the live book that is 29 holdings at 3.45% each,
+    a turnaround carrying the same capital as a stalwart.
+
+    The caps set relative size, are normalised to fully invested, and
+    are then enforced as caps — because normalising a small book pushes
+    names above the very limit that was meant to bound them. Ten names
+    normalise to 7-12% against caps of 3-5%. Excess is redistributed to
+    names with headroom.
+
+    At Lynch's own target of 30-50 positions (§6.1) the caps multiply
+    out to 90-150% of NAV, so a properly sized book absorbs everything
+    and the clip never binds. It binds only on a thin book, and there
+    the remainder stays in cash. That is a deliberate departure from
+    Lynch, who ran Magellan near-fully invested: when four names pass
+    the screen, honouring a 5% cap means 20% invested, and the
+    alternative is 25% positions in a strategy whose own limit is 5%.
+    A screen that returns four names has failed, and concentrating into
+    its output is not the fix.
+    """
+    if not top:
+        return {}
+    raw = {s.ticker: max(s.suggested_position_size_pct, 0.0) for s in top}
+    total = sum(raw.values())
+    if total <= 0:
+        equal = 1.0 / len(top)
+        return {s.ticker: equal for s in top}
+
+    weights = {t: v / total for t, v in raw.items()}
+    caps = {s.ticker: s.suggested_position_size_pct / 100.0 for s in top}
+
+    # Clip to caps and redistribute, repeating because redistribution
+    # can push another name over its own cap. Bounded by the number of
+    # positions: each pass fixes at least one, or there is nothing left
+    # to fix.
+    for _ in range(len(top)):
+        over = {t for t, w in weights.items() if w > caps[t] + 1e-12}
+        if not over:
+            break
+        excess = sum(weights[t] - caps[t] for t in over)
+        for t in over:
+            weights[t] = caps[t]
+        headroom = {
+            t: caps[t] - weights[t] for t in weights if t not in over
+        }
+        room = sum(v for v in headroom.values() if v > 0)
+        if room <= 0:
+            # Every name is at its cap. The book cannot absorb the rest
+            # without breaking a cap, so the remainder stays in cash —
+            # the one case where Lynch's own limits force it.
+            break
+        for t, h in headroom.items():
+            if h > 0:
+                weights[t] += excess * (h / room)
+    return weights
+
+
 @dataclass
 class LynchSelection:
     """Audit record per rebalance."""
@@ -175,8 +245,7 @@ class PeterLynch(Strategy):
             )
             return {}
 
-        weight = 1.0 / len(top)
-        weights = {s.ticker: weight for s in top}
+        weights = _category_weights(top)
         self._record(
             as_of,
             len(universe),
