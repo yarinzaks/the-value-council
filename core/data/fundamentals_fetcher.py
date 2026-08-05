@@ -162,6 +162,14 @@ _FLOW_CONCEPTS: frozenset[str] = frozenset(
     ]
 )
 
+# Inclusive (min, max) day window that counts as "a year" for a flow
+# concept. Fiscal years are 52 or 53 weeks (364/371 days) and 10-K
+# periods drift a few days either side, so a strict 365 would reject
+# most filers. The window has to stay well clear of a nine-month
+# year-to-date period (~273 days), which is the figure this filter
+# exists to keep out.
+ANNUAL_DURATION_DAYS: tuple[int, int] = (330, 400)
+
 
 class FundamentalsError(ValueCouncilError):
     """Raised when fundamentals cannot be assembled."""
@@ -231,6 +239,11 @@ class FundamentalsFetcher:
         if not self.cache.has_ticker(ticker) and self.config.populate_cache_on_miss:
             self.ensure_cached(ticker)
         prefer_annual = field in _STOCK_CONCEPTS  # balance sheet stocks
+        # Flow concepts must come from a full-year period. Without this,
+        # the highest period_end wins and a 10-Q's year-to-date figure
+        # beats the last 10-K's annual one, so revenue, EBIT and net
+        # income silently arrive as three- or nine-month numbers.
+        duration_days = ANNUAL_DURATION_DAYS if field in _FLOW_CONCEPTS else None
         for namespace, concept in CONCEPT_MAP[field]:
             fact = self.cache.latest_value_at(
                 ticker,
@@ -239,6 +252,7 @@ class FundamentalsFetcher:
                 namespace=namespace,
                 forms=("10-K", "10-Q"),
                 prefer_annual=prefer_annual,
+                duration_days=duration_days,
             )
             if fact is not None:
                 return fact

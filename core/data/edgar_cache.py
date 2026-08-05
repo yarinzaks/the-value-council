@@ -196,6 +196,7 @@ class EdgarCache:
         namespace: str = "us-gaap",
         forms: tuple[str, ...] | None = ("10-K", "10-Q"),
         prefer_annual: bool = False,
+        duration_days: tuple[int, int] | None = None,
     ) -> XbrlFact | None:
         """Return the most recent reported value for ``concept`` known
         on ``as_of``.
@@ -215,6 +216,15 @@ class EdgarCache:
             prefer_annual: When True, prefer 10-K facts even if a
                 later 10-Q exists. Useful for snapshot metrics like
                 annual revenue or shares outstanding at year-end.
+            duration_days: Inclusive ``(min, max)`` window on the fact's
+                reporting period, in days. Required for flow concepts —
+                revenue, earnings, cash flow — because a 10-Q's
+                year-to-date figure carries a *later* ``period_end``
+                than the last 10-K's annual figure and would otherwise
+                win the sort, handing a three- or nine-month number to
+                a caller that asked for a year. Instant facts
+                (balance-sheet items, which carry no ``period_start``)
+                never satisfy a window, so pass ``None`` for those.
         """
         df = self.load_dataframe(ticker)
         if df.empty:
@@ -229,6 +239,14 @@ class EdgarCache:
         sub = df[mask]
         if sub.empty:
             return None
+        if duration_days is not None:
+            lo, hi = duration_days
+            # NaT period_start yields NaN days, and between() drops it —
+            # which is what we want for instant facts.
+            span = (sub["period_end"] - sub["period_start"]).dt.days
+            sub = sub[span.between(lo, hi)]
+            if sub.empty:
+                return None
         if prefer_annual:
             annual = sub[sub["form"] == "10-K"]
             if not annual.empty:

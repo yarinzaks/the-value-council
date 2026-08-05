@@ -208,3 +208,112 @@ class TestCachedEdgarAdapter:
             )
         )
         assert adapter.list_filings("UNKNOWN", form_types=("10-K",)) == []
+
+
+class TestFlowConceptDuration:
+    """Flow fields must come from a full-year period.
+
+    Measured on 300 cached tickers: without the window, roughly a
+    quarter of the universe resolved revenue, EBIT, net income and
+    operating cash flow to a year-to-date figure, with a median value
+    of 0.48x the true annual number.
+    """
+
+    @staticmethod
+    def _cache_with_annual_and_ytd(tmp_path: Path) -> EdgarCache:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=1_000.0,
+                    period_start=date(2025, 1, 1),
+                    period_end=date(2025, 12, 31),
+                    filed=date(2026, 2, 15),
+                    form="10-K",
+                    fiscal_year=2025,
+                    fiscal_period="FY",
+                    accession_number="acc-fy",
+                ),
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=560.0,
+                    period_start=date(2026, 1, 1),
+                    period_end=date(2026, 9, 30),
+                    filed=date(2026, 10, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q3",
+                    accession_number="acc-q3",
+                ),
+                # A balance-sheet instant, to prove stock fields still work.
+                XbrlFact(
+                    concept="Assets",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=8_000.0,
+                    period_start=None,
+                    period_end=date(2026, 9, 30),
+                    filed=date(2026, 10, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q3",
+                    accession_number="acc-q3",
+                ),
+            ],
+        )
+        return cache
+
+    def test_revenue_resolves_to_the_annual_figure(self, tmp_path: Path) -> None:
+        fetcher = FundamentalsFetcher(
+            cache=self._cache_with_annual_and_ytd(tmp_path), client=None
+        )
+
+        fact = fetcher.get_field("ACME", "revenue", date(2026, 12, 1))
+
+        assert fact is not None
+        assert fact.value == 1_000.0
+
+    def test_stock_fields_still_use_the_latest_instant(
+        self, tmp_path: Path
+    ) -> None:
+        # The window must not be applied to balance-sheet concepts, which
+        # carry no period_start and would otherwise all resolve to None.
+        fetcher = FundamentalsFetcher(
+            cache=self._cache_with_annual_and_ytd(tmp_path), client=None
+        )
+
+        fact = fetcher.get_field("ACME", "total_assets", date(2026, 12, 1))
+
+        assert fact is not None
+        assert fact.value == 8_000.0
+
+    def test_quarter_only_filer_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "NEWCO",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=120.0,
+                    period_start=date(2026, 1, 1),
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-q1",
+                )
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        # A quarter is not a year. Better no number than a wrong one.
+        assert fetcher.get_field("NEWCO", "revenue", date(2026, 6, 1)) is None
