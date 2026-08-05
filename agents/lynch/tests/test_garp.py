@@ -10,6 +10,7 @@ import pytest
 from agents.lynch.category_classifier import LynchMemo
 from agents.lynch.garp import PeterLynch, _category_weights
 from agents.lynch.ranking import LynchScore
+from core.backtest.strategy_runner import HeldPosition
 from core.data.edgar_cache import EdgarCache
 
 from .conftest import make_pit
@@ -296,3 +297,61 @@ class TestCategoryDrivesPositionSize:
 
     def test_an_empty_book_is_empty(self) -> None:
         assert _category_weights([]) == {}
+
+
+class TestAWinnerKeepsItsSlot:
+    """``select`` used to recompute the top-N from scratch every call.
+
+    ``held`` was in the signature and never read, so a position that
+    rose — higher P/E, higher PEG, worse rank — fell out and was sold.
+    Success was the sell trigger.
+    """
+
+    def test_a_held_winner_survives_a_full_slate_of_cheaper_rivals(
+        self, fast_grower_cache: EdgarCache
+    ) -> None:
+        f = make_pit(
+            "FASTY", eps_diluted=5.96, shares=100_000_000, dividends_paid=0.0
+        )
+        s = PeterLynch(edgar_cache=fast_grower_cache, portfolio_size=1)
+        held = {
+            "FASTY": HeldPosition(
+                ticker="FASTY",
+                shares=10.0,
+                entry_price=30.0,
+                entry_date=date(2023, 1, 5),
+                current_price=60.0,
+            )
+        }
+
+        out = s.select(
+            as_of=date(2024, 6, 30),
+            universe=["FASTY"],
+            prices=_StaticPriceLookup({"FASTY": 60.0}),  # type: ignore[arg-type]
+            fundamentals=_StaticFundamentalsLookup({"FASTY": f}),  # type: ignore[arg-type]
+            held=held,
+        )
+
+        assert "FASTY" in out
+        assert s.last_exits
+        assert s.last_exits[0].retained
+
+    def test_without_holdings_the_behaviour_is_unchanged(
+        self, fast_grower_cache: EdgarCache
+    ) -> None:
+        # Backward compatibility: no held mapping means the slate is
+        # exactly the top-N it always was.
+        f = make_pit(
+            "FASTY", eps_diluted=5.96, shares=100_000_000, dividends_paid=0.0
+        )
+        s = PeterLynch(edgar_cache=fast_grower_cache)
+
+        out = s.select(
+            as_of=date(2024, 6, 30),
+            universe=["FASTY"],
+            prices=_StaticPriceLookup({"FASTY": 60.0}),  # type: ignore[arg-type]
+            fundamentals=_StaticFundamentalsLookup({"FASTY": f}),  # type: ignore[arg-type]
+        )
+
+        assert "FASTY" in out
+        assert s.last_exits == []

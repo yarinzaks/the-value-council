@@ -45,12 +45,13 @@ from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
 
 from .category_classifier import CategoryClassifier, LynchMemo
+from .exits import ExitDecision, retained
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
     apply_quality_gates,
 )
-from .ranking import LynchScore, score_candidates, select_top_n
+from .ranking import LynchScore, score_candidates
 
 logger = get_logger("agents.lynch.garp")
 
@@ -188,6 +189,7 @@ class PeterLynch(Strategy):
         self.decision_logger = decision_logger
         self.selection_history: list[LynchSelection] = []
         self.last_memos: list[LynchMemo] = []
+        self.last_exits: list[ExitDecision] = []
 
     def select(
         self,
@@ -228,7 +230,24 @@ class PeterLynch(Strategy):
             as_of=as_of,
             edgar_cache=self.edgar_cache,
         )
-        top = select_top_n(scores, n=self.portfolio_size)
+        # Stage 2b: what we already own keeps its slot unless the story
+        # broke. Without this the top-N is recomputed from scratch every
+        # rebalance and anything that went up — higher P/E, higher PEG,
+        # worse rank — is sold for having worked. See :mod:`.exits`.
+        keep, exit_decisions = retained(scores, held)
+        self.last_exits = exit_decisions
+        kept_tickers = {s.ticker for s in keep}
+        room = max(0, self.portfolio_size - len(keep))
+        newcomers = [s for s in scores if s.ticker not in kept_tickers][:room]
+        top = keep + newcomers
+        top.sort(
+            key=lambda s: s.pegy if s.lynch_category == "Slow Grower" else s.peg
+        )
+        if held:
+            logger.info(
+                f"{as_of}: kept {len(keep)} of {len(held)} held, "
+                f"{len(newcomers)} new"
+            )
 
         # Stage 3 (live only): LLM category re-classification + veto.
         memos: list[LynchMemo] = []
