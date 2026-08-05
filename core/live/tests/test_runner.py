@@ -26,8 +26,14 @@ class _StubAdapter:
     def __init__(self, name: str, targets: list[LiveTarget]) -> None:
         self.name = name
         self._targets = targets
+        self.last_held: object = None
 
-    def run_scan(self, as_of, universe, prices, fundamentals) -> ScanResult:  # type: ignore[no-untyped-def]
+    def run_scan(  # type: ignore[no-untyped-def]
+        self, as_of, universe, prices, fundamentals, *, held=None
+    ) -> ScanResult:
+        # Record what the runner handed us so tests can assert the
+        # strategy actually sees its own book.
+        self.last_held = held
         return ScanResult(
             targets=self._targets, watchlist=[], universe_size=len(universe)
         )
@@ -697,3 +703,96 @@ class TestDividends:
         result = self._run(runner, loader)
 
         assert result.portfolio.cumulative_dividends == 0.0
+
+
+# ---------------------------------------------------------------------------
+# What the strategy is allowed to see
+# ---------------------------------------------------------------------------
+class TestHeldPositionsAreVisible:
+    """Without this a strategy cannot express an exit rule at all, so
+    every agent inherited the same one — 'sold because you left today's
+    top N'. Greenblatt's twelve-month hold, Fisher's decades and
+    Schloss's fifty-percent rule were all unimplementable."""
+
+    def test_the_strategy_receives_its_holdings(
+        self, runner: DailyRunner
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "OWNED", entry_price=40.0, current_price=60.0
+        )
+        runner.price_loader = _StubPriceLoader({"OWNED": 60.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("OWNED")])
+
+        runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["OWNED"],
+            {"OWNED": 60.0},
+            {"OWNED": None},
+        )
+
+        held = adapter.last_held
+        assert held is not None
+        assert set(held) == {"OWNED"}
+        pos = held["OWNED"]
+        assert pos.shares == pytest.approx(10.0)
+        assert pos.entry_price == pytest.approx(40.0)
+        assert pos.entry_date == date(2026, 7, 1)
+        assert pos.current_price == pytest.approx(60.0)
+
+    def test_an_empty_book_is_an_empty_mapping(
+        self, runner: DailyRunner
+    ) -> None:
+        # Not None — "I own nothing" is different from "I was not told".
+        runner.price_loader = _StubPriceLoader({"NEW": 10.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW")])
+
+        runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW"],
+            {"NEW": 10.0},
+            {"NEW": None},
+        )
+
+        assert adapter.last_held == {}
+
+    def test_days_held_and_return_are_derivable(self) -> None:
+        from core.backtest.strategy_runner import HeldPosition
+
+        pos = HeldPosition(
+            ticker="X",
+            shares=10.0,
+            entry_price=40.0,
+            entry_date=date(2026, 7, 1),
+            current_price=60.0,
+        )
+
+        assert pos.days_held_at(date(2026, 8, 5)) == 35
+        assert pos.return_pct == pytest.approx(50.0)
+
+    def test_return_is_none_on_an_unusable_basis(self) -> None:
+        from core.backtest.strategy_runner import HeldPosition
+
+        pos = HeldPosition(
+            ticker="X",
+            shares=10.0,
+            entry_price=0.0,
+            entry_date=date(2026, 7, 1),
+            current_price=60.0,
+        )
+
+        assert pos.return_pct is None
+
+    def test_a_same_day_purchase_is_zero_days_held(self) -> None:
+        from core.backtest.strategy_runner import HeldPosition
+
+        pos = HeldPosition(
+            ticker="X",
+            shares=1.0,
+            entry_price=10.0,
+            entry_date=AS_OF,
+            current_price=10.0,
+        )
+
+        assert pos.days_held_at(AS_OF) == 0

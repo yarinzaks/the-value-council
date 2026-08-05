@@ -21,6 +21,7 @@ framework.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -29,6 +30,7 @@ from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
+    HeldPosition,
     PriceLookup,
     Strategy,
 )
@@ -115,6 +117,8 @@ class HowardMarks(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         logger.info(
             f"{as_of}: starting Marks cycle-value scan over {len(universe)} candidates"
@@ -266,7 +270,7 @@ class HowardMarks(Strategy):
                         "posture": temperature.posture,
                     },
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     f"{as_of} {s.ticker}: second-level analyzer failed ({exc}); "
                     "keeping quant-only verdict"
@@ -387,7 +391,7 @@ class HowardMarks(Strategy):
                         ),
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"decision log failed for {s.ticker}: {exc}")
 
     # ------------------------------------------------------------------

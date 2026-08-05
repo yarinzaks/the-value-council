@@ -24,9 +24,8 @@ move daily), so trade churn stays low.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
-from typing import Iterable
 
 from agents.buffett import WarrenBuffett
 from agents.dreman.contrarian import DavidDreman
@@ -38,10 +37,11 @@ from agents.lynch import PeterLynch
 from agents.marks import HowardMarks
 from agents.neff.total_return import JohnNeff
 from agents.schloss.deep_value import WalterSchloss
-from core.backtest.data_loader import PriceDataLoader
+from core.backtest.data_loader import PriceDataLoader, _to_date
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.full_market_universe import FullMarketUniverse
 from core.backtest.point_in_time import PointInTimeFinancials, PointInTimeLoader
+from core.backtest.strategy_runner import HeldPosition
 from core.data.edgar_cache import EdgarCache
 from core.data.fundamentals_fetcher import (
     CachedEdgarAdapter,
@@ -61,7 +61,6 @@ from core.live.agent_adapter import (
     LynchLive,
     MarksLive,
     NeffLive,
-    ScanResult,
     SchlossLive,
 )
 from core.live.portfolio import (
@@ -74,7 +73,6 @@ from core.live.portfolio import (
     TradeRecord,
     WatchEntry,
     now_iso,
-    today_iso,
 )
 from core.live.snapshots import make_snapshot, save_snapshot
 from core.logger import get_logger
@@ -213,6 +211,33 @@ def build_default_adapters(
     ]
 
 
+def _held_positions(
+    portfolio: LivePortfolio, prices: dict[str, float | None]
+) -> dict[str, HeldPosition]:
+    """Project the portfolio into what a strategy is allowed to see.
+
+    Narrow on purpose: entry price, entry date, size and current mark.
+    A doctrine needs those to express an exit; it has no business
+    reaching into cash or weights, which the runner owns.
+    """
+    out: dict[str, HeldPosition] = {}
+    for pos in portfolio.positions:
+        mark = prices.get(pos.ticker)
+        try:
+            entry = _to_date(pos.entry_date)
+        except (TypeError, ValueError):
+            logger.debug(f"unparseable entry_date on {pos.ticker}: {pos.entry_date!r}")
+            continue
+        out[pos.ticker] = HeldPosition(
+            ticker=pos.ticker,
+            shares=pos.shares,
+            entry_price=pos.entry_price,
+            entry_date=entry,
+            current_price=mark if mark is not None else pos.current_price,
+        )
+    return out
+
+
 class _DictLookup:
     """Trivial wrapper exposing .get(ticker) for the Strategy protocol."""
 
@@ -341,7 +366,7 @@ class DailyRunner:
                         fresh[t] = self.price_loader.get_price_on(
                             t, as_of, force_refresh=True
                         )
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         logger.warning(
                             f"close-of-day price for {t} @ {as_of} failed: {exc}"
                         )
@@ -355,7 +380,7 @@ class DailyRunner:
                 try:
                     snap = make_snapshot(portfolio, as_of=as_of, trades=[])
                     save_snapshot(snap)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.warning(
                         f"{as_of}: close snapshot for {adapter.name} failed: {exc}"
                     )
@@ -369,7 +394,7 @@ class DailyRunner:
                         universe_size=0,
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error(f"{as_of}: {adapter.name} close failed: {exc}")
                 portfolio = LivePortfolio.load_or_seed(
                     adapter.name,
@@ -391,7 +416,7 @@ class DailyRunner:
             return self._tase_placeholder("open", as_of)
         as_of = as_of or date.today()
         logger.info(f"daily run for {as_of}")
-        self.universe._ensure_loaded()  # noqa: SLF001 — public API surface
+        self.universe._ensure_loaded()
         members = self.universe.constituents_at(as_of)
         logger.info(f"{as_of}: universe = {len(members)} tickers")
 
@@ -416,7 +441,7 @@ class DailyRunner:
                 result = self._run_one(
                     adapter, as_of, members, prices, fundamentals, force=force
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error(f"{as_of}: {adapter.name} failed: {exc}")
                 portfolio = LivePortfolio.load_or_seed(
                     adapter.name,
@@ -472,11 +497,16 @@ class DailyRunner:
                 )
         portfolio.mark_to_market(held_prices)
 
+        # The agent sees what it owns. Without this every doctrine
+        # inherited the same exit rule — "sold because you left today's
+        # top N" — and eight investors whose real-world turnover
+        # differed by an order of magnitude traded identically.
         scan = adapter.run_scan(
             as_of,
             members,
             _DictLookup(prices),
             _DictLookup(fundamentals),
+            held=_held_positions(portfolio, held_prices),
         )
         target_tickers = {t.ticker for t in scan.targets}
         trades: list[TradeRecord] = []
@@ -526,7 +556,7 @@ class DailyRunner:
             if portfolio.has(target.ticker):
                 # Refresh the why string on the existing position so the
                 # dashboard always shows the *current* rationale.
-                idx = portfolio._index_of(target.ticker)  # noqa: SLF001
+                idx = portfolio._index_of(target.ticker)
                 if idx is not None:
                     portfolio.positions[idx].why_en = target.why_en
                     portfolio.positions[idx].why_he = target.why_he
@@ -597,7 +627,7 @@ class DailyRunner:
         try:
             snap = make_snapshot(portfolio, as_of=as_of, trades=trades)
             save_snapshot(snap)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"{as_of}: snapshot save for {adapter.name} failed: {exc}")
 
         return AgentRunResult(
@@ -766,7 +796,7 @@ class DailyRunner:
         for t in tickers:
             try:
                 out[t] = self.price_loader.get_price_on(t, as_of)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"price fetch {t} @ {as_of} failed: {exc}")
                 out[t] = None
         return out
@@ -778,7 +808,7 @@ class DailyRunner:
         for t in tickers:
             try:
                 out[t] = self.pit_loader.get_financials(t, as_of)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"fundamentals {t} @ {as_of} failed: {exc}")
                 out[t] = None
         return out
@@ -800,7 +830,7 @@ class DailyRunner:
                     entry_price=price,
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"decision log BUY {target.ticker} failed: {exc}")
 
     def _log_sell(
@@ -825,7 +855,7 @@ class DailyRunner:
                     entry_price=pos.entry_price,
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"decision log SELL {pos.ticker} failed: {exc}")
 
 

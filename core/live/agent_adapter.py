@@ -15,31 +15,29 @@ heavy work happens in :meth:`run_scan`.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Callable, Iterable
+from typing import Any
 
-from core.backtest.point_in_time import PointInTimeFinancials
-from core.backtest.strategy_runner import FundamentalsLookup, PriceLookup, Strategy
+from core.backtest.strategy_runner import (
+    FundamentalsLookup,
+    HeldPosition,
+    PriceLookup,
+    Strategy,
+)
 from core.live.why_translator import (
-    buffett_watch_why,
     buffett_why,
     dreman_watch_why,
     dreman_why,
-    fisher_watch_why,
     fisher_why,
     graham_defensive_why,
     graham_net_net_why,
-    graham_watch_why,
     greenblatt_watch_why,
     greenblatt_why,
-    klarman_watch_why,
     klarman_why,
-    lynch_watch_why,
     lynch_why,
-    marks_watch_why,
     marks_why,
-    neff_watch_why,
     neff_why,
     schloss_watch_why,
     schloss_why,
@@ -107,8 +105,12 @@ class AgentAdapter:
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> ScanResult:
-        weights = self.strategy.select(as_of, universe, prices, fundamentals)
+        weights = self.strategy.select(
+            as_of, universe, prices, fundamentals, held=held
+        )
         # Derive ordered targets from the strategy's last selection_history.
         targets = self._collect_targets(weights)
         watchlist = self._collect_watchlist(targets)
