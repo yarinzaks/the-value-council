@@ -299,6 +299,76 @@ class FundamentalsFetcher:
                 best = fact
         return best
 
+    def _debt_component(
+        self, ticker: str, concept: str, as_of: date | datetime
+    ) -> float | None:
+        fact = self.cache.latest_value_at(
+            ticker,
+            concept,
+            as_of,
+            namespace="us-gaap",
+            forms=("10-K", "10-Q"),
+            prefer_annual=True,
+            units=("USD",),
+        )
+        if fact is None:
+            return None
+        as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
+        if fact.period_end < as_of_d - timedelta(days=MAX_FACT_AGE_DAYS):
+            return None
+        return fact.value
+
+    def _compute_total_debt(
+        self, ticker: str, as_of: date | datetime
+    ) -> tuple[float | None, str]:
+        """Interest-bearing debt, summed from what filers actually tag.
+
+        ``DebtCurrentAndNoncurrent`` — the rolled-up concept the field
+        used to map to — is tagged by 0 of 400 sampled tickers, so
+        total_debt always fell through to long_term_debt, which resolves
+        to ``LongTermDebtNoncurrent``. That silently dropped both the
+        current maturities of long-term debt and every short-term
+        borrowing, understating leverage for exactly the companies a
+        leverage gate exists to catch.
+
+        Returns ``(value, source)``; ``source`` names the branch taken so
+        an absent figure is distinguishable from a genuine zero in the
+        logs. US GAAP defines ``LongTermDebt`` as including current
+        maturities, so it is never added to the split components —
+        that is the double-count guard.
+
+        Finance leases are deliberately excluded. They are debt-like, but
+        ASC 842 capitalised them in 2019 and including them would make
+        leverage incomparable across the history these agents screen on.
+        """
+        ltd_noncurrent = self._debt_component(ticker, "LongTermDebtNoncurrent", as_of)
+        ltd_current = self._debt_component(ticker, "LongTermDebtCurrent", as_of)
+        ltd_rollup = self._debt_component(ticker, "LongTermDebt", as_of)
+        short_term = self._debt_component(ticker, "ShortTermBorrowings", as_of)
+
+        if ltd_noncurrent is not None and ltd_current is not None:
+            long_term: float | None = ltd_noncurrent + ltd_current
+            source = "split"
+        elif ltd_rollup is not None:
+            long_term = ltd_rollup  # already includes current maturities
+            source = "rollup"
+        elif ltd_noncurrent is not None:
+            long_term = ltd_noncurrent
+            source = "noncurrent_only"
+        elif ltd_current is not None:
+            long_term = ltd_current
+            source = "current_only"
+        else:
+            long_term = None
+            source = "absent"
+
+        if long_term is None and short_term is None:
+            return None, "absent"
+        total = (long_term or 0.0) + (short_term or 0.0)
+        if short_term is not None:
+            source = f"{source}+short_term"
+        return total, source
+
     def get_all_fields(
         self,
         ticker: str,
@@ -321,10 +391,13 @@ class FundamentalsFetcher:
             if latest_filing is None or fact.filed > latest_filing.filed:
                 latest_filing = fact
 
-        # Synthesize total_debt from long_term + (assume short-term=0)
-        # if it's missing — most companies don't tag the rolled-up concept.
-        if values.get("total_debt") is None and values.get("long_term_debt") is not None:
-            values["total_debt"] = values["long_term_debt"]
+        # total_debt is composed, not looked up. See _compute_total_debt.
+        debt, debt_source = self._compute_total_debt(ticker, as_of)
+        values["total_debt"] = debt
+        if debt is None:
+            logger.debug(f"{ticker}: no debt concepts tagged at {as_of}")
+        else:
+            logger.debug(f"{ticker}: total_debt={debt:,.0f} via {debt_source}")
 
         if latest_filing is None:
             return values, None

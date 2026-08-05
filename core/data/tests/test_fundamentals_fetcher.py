@@ -584,3 +584,130 @@ class TestUnitFilter:
     def test_expected_units_covers_every_mapped_field(self) -> None:
         for field in CONCEPT_MAP:
             assert expected_units(field), field
+
+
+class TestTotalDebt:
+    """total_debt mapped to DebtCurrentAndNoncurrent, which 0 of 400
+    sampled tickers tag, so it always fell through to long_term_debt —
+    LongTermDebtNoncurrent — dropping current maturities and every
+    short-term borrowing. Measured: 42% of companies understated."""
+
+    @staticmethod
+    def _instant(concept: str, value: float) -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace="us-gaap",
+            unit="USD",
+            value=value,
+            period_start=None,
+            period_end=date(2026, 3, 31),
+            filed=date(2026, 4, 30),
+            form="10-Q",
+            fiscal_year=2026,
+            fiscal_period="Q1",
+            accession_number=f"acc-{concept}",
+        )
+
+    def _fetcher(self, tmp_path: Path, *facts: XbrlFact) -> FundamentalsFetcher:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("ACME", list(facts))
+        return FundamentalsFetcher(cache=cache, client=None)
+
+    AS_OF = date(2026, 8, 4)
+
+    def test_split_components_are_summed(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 950.0
+        assert source == "split"
+
+    def test_rollup_is_not_added_to_its_own_components(
+        self, tmp_path: Path
+    ) -> None:
+        # US GAAP defines LongTermDebt as including current maturities.
+        # Adding it to the split would double-count the whole balance.
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+            self._instant("LongTermDebt", 950.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 950.0
+        assert source == "split"
+
+    def test_rollup_used_when_the_split_is_unavailable(
+        self, tmp_path: Path
+    ) -> None:
+        f = self._fetcher(tmp_path, self._instant("LongTermDebt", 1_200.0))
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 1_200.0
+        assert source == "rollup"
+
+    def test_short_term_borrowings_are_added(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+            self._instant("ShortTermBorrowings", 300.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 1_250.0
+        assert source == "split+short_term"
+
+    def test_short_term_only_filer_is_no_longer_debt_free(
+        self, tmp_path: Path
+    ) -> None:
+        # 15 of 300 sampled tickers looked debt-free purely because
+        # their only borrowing was short-term.
+        f = self._fetcher(tmp_path, self._instant("ShortTermBorrowings", 500.0))
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 500.0
+        assert source == "absent+short_term"
+
+    def test_no_debt_concept_yields_none_not_zero(self, tmp_path: Path) -> None:
+        f = self._fetcher(tmp_path, self._instant("Assets", 5_000.0))
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total is None
+        assert source == "absent"
+
+    def test_get_all_fields_uses_the_composed_figure(
+        self, tmp_path: Path
+    ) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+            self._instant("ShortTermBorrowings", 300.0),
+        )
+        values, _ = f.get_all_fields("ACME", self.AS_OF)
+        assert values["total_debt"] == 1_250.0
+
+    def test_stale_debt_facts_are_ignored(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "DORMANT",
+            [
+                XbrlFact(
+                    concept="LongTermDebt",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=900.0,
+                    period_start=None,
+                    period_end=date(2012, 12, 31),
+                    filed=date(2013, 2, 15),
+                    form="10-K",
+                    fiscal_year=2012,
+                    fiscal_period="FY",
+                    accession_number="acc-old",
+                )
+            ],
+        )
+        f = FundamentalsFetcher(cache=cache, client=None)
+        total, source = f._compute_total_debt("DORMANT", self.AS_OF)
+        assert total is None
+        assert source == "absent"
