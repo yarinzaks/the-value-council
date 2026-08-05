@@ -20,6 +20,8 @@ Conservative DCF defaults (vs Buffett's owner-earnings DCF):
   * Free cash flow ≈ OCF − capex; 5-year average to smooth.
   * Growth: trailing CAGR capped at **5%** (vs Buffett's 8%) — Klarman
     uses pessimistic, not optimistic, growth assumptions.
+  * Decline: projected as measured, down to **-20%/yr**; steeper than
+    that and the company is refused rather than valued (see below).
   * Discount rate: **8%** (vs Buffett's 5%) — higher hurdle.
   * Terminal multiple: **10×** (vs Buffett's 13×) — punitive on
     long-tail assumptions.
@@ -27,6 +29,61 @@ Conservative DCF defaults (vs Buffett's owner-earnings DCF):
 
 The conservatism is deliberate. Klarman demands a 30-40% margin of
 safety AT a conservative intrinsic value — not at a generous one.
+
+Why decline is not floored at zero
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The applied growth rate used to be ``max(0.0, min(raw, cap))``. The cap
+is conservative — it refuses to credit growth. The floor is the exact
+opposite: it refuses to *charge* for shrinkage, and it lands on the one
+population that most needs charging. A business whose free cash flow
+has compounded downward for five years was projected flat forever, then
+handed a 10x terminal multiple on that invented flat figure.
+
+Measured over an evenly-spread sample of 1,101 tickers from the live
+universe, 239 were DCF-valuable and **109 of them (46%) had shrinking
+FCF** — every one valued as flat. Against a projection that charges the
+decline, the floored intrinsic value came out **1.95x too high**. In a
+module whose entire subject is margin of safety, the arithmetic was
+manufacturing the margin.
+
+So a measured decline is now projected as measured. Two cases are
+refused instead, both because a number would be false precision rather
+than a pessimistic estimate:
+
+* **FCF already negative in the latest year.** ``trailing_growth_pct``
+  reports this as the -100% sentinel. There is no positive base to
+  compound; a DCF here is a category error, not a low valuation. 25 of
+  the 239 (10.5%).
+* **Decline steeper than 20%/yr.** Over the 10-year horizon that leaves
+  terminal FCF under 11% of base, so the answer is set by an
+  extrapolation nobody can defend. Another 25 (10.5%).
+
+Both fall out of one threshold, since the sentinel is below it.
+
+The 59 names between -20% and 0 — Best Buy, CVS, Avery Dennison,
+Cardinal Health — keep a valuation, now one that charges them for the
+decline. That is the population the fix is for.
+
+Refusal routes correctly: Klarman's own yardstick for a business in
+decline is NAV or liquidation value, which per §4.1 lives in the LLM
+downside memo, not here. Returning ``None`` sends it there.
+
+Known remaining conservatism gap: ``base_fcf`` is still the 5-year
+average, which for a declining business sits above the current
+run-rate. Normalising over a cycle is Klarman's own preference, so it
+is left as-is; the growth term now works against it rather than with it.
+
+Known limitation of the FCF measure itself, and it is not fixed here:
+``OCF - capex`` cannot separate maintenance capex from growth capex, so
+a company mid-way through a large expansion reads as one in decline.
+Texas Instruments is the clearest case in the current data — a -19.8%
+FCF CAGR that is a fab-construction programme, not a shrinking
+business. This change makes the projection honest about what the
+measure says; it does not make the measure right. Splitting the two, as
+:mod:`agents.buffett.owner_earnings` does via the Greenwald method, is a
+separate change to the FCF definition and would move every name here.
+Read a steep decline as a flag to check capex, not as a verdict.
 """
 
 from __future__ import annotations
@@ -47,6 +104,19 @@ DEFAULT_TERMINAL_MULTIPLE: float = 10.0
 DEFAULT_MAX_GROWTH_PCT: float = 5.0
 DEFAULT_FCF_AVG_YEARS: int = 5
 DEFAULT_GROWTH_LOOKBACK_YEARS: int = 5
+
+#: Steepest decline still worth projecting. Below this the DCF is
+#: refused, not clamped — clamping would raise the intrinsic value,
+#: which is the failure being fixed. At -20% over the 10-year horizon
+#: terminal FCF is 0.8**10 ≈ 11% of base, so the terminal multiple is
+#: doing all the work on a figure that is pure extrapolation.
+#:
+#: The -100% sentinel from :func:`trailing_growth_pct` — latest-year
+#: FCF at or below zero — is below this threshold too, so one rule
+#: refuses both. That is intended: neither is a valuation problem the
+#: DCF can answer, and Klarman's answer to an unvaluable business is to
+#: pass rather than to estimate anyway.
+DEFAULT_MIN_GROWTH_PCT: float = -20.0
 
 #: Minimum margin of safety to qualify, per playbook §4.2:
 #:   * 30% for large/mid-cap public equities (well-understood)
@@ -243,6 +313,7 @@ def intrinsic_value(
     terminal_multiple: float = DEFAULT_TERMINAL_MULTIPLE,
     years: int = DEFAULT_DCF_YEARS,
     max_growth_pct: float = DEFAULT_MAX_GROWTH_PCT,
+    min_growth_pct: float = DEFAULT_MIN_GROWTH_PCT,
     history_years: int = DEFAULT_FCF_AVG_YEARS,
     growth_lookback_years: int = DEFAULT_GROWTH_LOOKBACK_YEARS,
 ) -> IntrinsicValueResult | None:
@@ -252,7 +323,14 @@ def intrinsic_value(
     Returns ``None`` when:
       * fewer than 3 years of FCF history
       * average FCF ≤ 0
+      * trailing FCF CAGR below ``min_growth_pct`` — including the
+        -100% sentinel that means latest-year FCF was not positive
     The caller treats None as "cannot value — reject".
+
+    A decline shallower than ``min_growth_pct`` is projected as
+    measured. It is deliberately not floored at zero: see the module
+    docstring for what that floor was doing to the 46% of valuable
+    companies whose free cash flow is shrinking.
     """
     records = historical_fcf(cache, ticker, as_of, years=history_years)
     if len(records) < 3:
@@ -270,12 +348,31 @@ def intrinsic_value(
     if raw_g is None:
         applied_g = 0.0
         notes = ("growth rate undefined; assumed 0%",)
+    elif raw_g < min_growth_pct:
+        # Refuse rather than clamp. Clamping up to the floor would
+        # raise the intrinsic value, which is the failure this guard
+        # exists to prevent — and neither case below is a business a
+        # cash-flow model can price.
+        why = (
+            "latest-year FCF was not positive"
+            if raw_g <= -99.0
+            else f"trailing FCF CAGR {raw_g:.1f}%"
+        )
+        logger.debug(
+            f"{ticker}@{as_of}: {why}; steeper than the {min_growth_pct}% "
+            f"floor — no DCF (route to NAV/liquidation)"
+        )
+        return None
     else:
-        applied_g = max(0.0, min(raw_g, max_growth_pct))
+        applied_g = min(raw_g, max_growth_pct)
         notes = ()
         if raw_g > max_growth_pct:
             notes = (
                 f"trailing CAGR {raw_g:.1f}% capped at {max_growth_pct}%",
+            )
+        elif raw_g < 0.0:
+            notes = (
+                f"FCF shrinking {abs(raw_g):.1f}%/yr; projected as measured",
             )
 
     iv = _dcf_present_value(
@@ -313,6 +410,7 @@ __all__ = [
     "DEFAULT_FCF_AVG_YEARS",
     "DEFAULT_GROWTH_LOOKBACK_YEARS",
     "DEFAULT_MAX_GROWTH_PCT",
+    "DEFAULT_MIN_GROWTH_PCT",
     "DEFAULT_MIN_MARGIN_OF_SAFETY_PCT",
     "DEFAULT_TERMINAL_MULTIPLE",
     "FreeCashFlowRecord",
