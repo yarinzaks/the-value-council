@@ -87,8 +87,24 @@ jobs:
 
       - name: Refresh fundamentals from SEC
         timeout-minutes: 75
+        # `shell: bash` for pipefail — without it the step's exit code
+        # comes from tee and a failed prefetch reports success.
+        shell: bash
+        env:
+          # ISO week number picks the shard, so the four shards rotate
+          # across consecutive Mondays and the whole universe is
+          # revisited monthly. A manual dispatch lands on whatever shard
+          # the current week selects, which is the right default: it
+          # refreshes a real slice rather than repeating one.
+          SHARDS: '4'
         run: |
-          python -m scripts.prefetch_full_us_market 2>&1 | tee data/cron_logs/prefetch.log
+          # 10# forces base 10 — %V zero-pads, and bash reads a leading
+          # zero as octal, so weeks 08 and 09 would abort the step.
+          SHARD=$(( 10#$(date -u +%V) % SHARDS ))
+          echo "::notice::refreshing shard ${SHARD} of ${SHARDS}"
+          python -m scripts.prefetch_full_us_market \
+            --shards "$SHARDS" --shard "$SHARD" \
+            2>&1 | tee data/cron_logs/prefetch.log
 
       - name: Verify cache is substantial
         id: verify
@@ -126,12 +142,21 @@ jobs:
           SIZE_MB: ${{ steps.package.outputs.size_mb }}
         run: |
           STAMP=$(date -u +%Y-%m-%dT%H:%MZ)
-          # Delete prior release+tag so the asset URL stays stable as
-          # cache-latest. --cleanup-tag also removes the underlying tag.
-          gh release delete cache-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create cache-latest /tmp/fundamentals_cache.tar.gz \
-            --title "EDGAR cache — $STAMP" \
-            --notes "Automated weekly refresh. ${N_FILES} parquet files (${SIZE_MB} MB compressed)."
+          NOTES="Automated weekly refresh. ${N_FILES} parquet files (${SIZE_MB} MB compressed)."
+
+          # Upload over the existing asset rather than deleting the
+          # release first. The old order left a window — however brief —
+          # in which cache-latest did not exist, and the daily trading
+          # job downloads that asset unconditionally on every run: a
+          # refresh overlapping a scan would have failed the scan.
+          if gh release view cache-latest >/dev/null 2>&1; then
+            gh release upload cache-latest /tmp/fundamentals_cache.tar.gz --clobber
+            gh release edit cache-latest --title "EDGAR cache — $STAMP" --notes "$NOTES"
+          else
+            gh release create cache-latest /tmp/fundamentals_cache.tar.gz \
+              --title "EDGAR cache — $STAMP" \
+              --notes "$NOTES"
+          fi
           echo "::notice::published cache-latest with ${N_FILES} files"
 
       - name: Commit refreshed company_tickers bundle (if changed)
