@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import ClassVar
 
 import pandas as pd
 import pytest
@@ -255,3 +256,119 @@ class TestEndToEnd:
         assert len(result.trades) == 0
         # Final NAV should be unchanged (all cash, ZeroCost)
         assert result.nav_series.iloc[-1] == pytest.approx(10_000.0)
+
+
+# ---------------------------------------------------------------------------
+# Holding period, end to end through select()
+# ---------------------------------------------------------------------------
+class _Lookup:
+    """Minimal stand-in for PriceLookup / FundamentalsLookup."""
+
+    def __init__(self, data: dict) -> None:
+        self._data = data
+
+    def get(self, ticker: str):  # type: ignore[no-untyped-def]
+        return self._data.get(ticker)
+
+
+def _pit(ticker: str, *, ebit: float, shares: float = 1_000_000.0):  # type: ignore[no-untyped-def]
+    """A candidate that clears the Magic Formula filters cleanly.
+
+    The filing date is deliberately old: Greenblatt excludes anything
+    that reported within the last seven days, so a fresh filing date
+    would make every fixture vanish before it could be ranked.
+    """
+    from core.backtest.point_in_time import PointInTimeFinancials
+
+    return PointInTimeFinancials(
+        ticker=ticker,
+        as_of=date(2026, 8, 5),
+        source_filing=FilingMetadata(
+            ticker=ticker,
+            cik="1",
+            form_type="10-K",
+            filing_date=date(2026, 5, 1),
+            period_of_report=date(2026, 3, 31),
+            accession_number=f"acc-{ticker}",
+        ),
+        operating_income=ebit,
+        net_income=ebit * 0.7,
+        revenue=ebit * 5,
+        total_assets=5_000_000.0,
+        total_liabilities=1_000_000.0,
+        total_equity=4_000_000.0,
+        current_assets=2_000_000.0,
+        current_liabilities=1_000_000.0,
+        cash_and_equivalents=500_000.0,
+        ppe_net=1_500_000.0,
+        total_debt=0.0,
+        long_term_debt=0.0,
+        shares_outstanding=shares,
+        eps_diluted=ebit * 0.7 / shares,
+        eps_basic=ebit * 0.7 / shares,
+        sic_code="3571",
+    )
+
+
+class TestHoldingPeriodEndToEnd:
+    """The rule has to survive the whole select() path, not just the
+    helper — the runner sold anything that left today's top N, so the
+    live book turned over 28% in three trading days."""
+
+    AS_OF = date(2026, 8, 5)
+    UNIVERSE: ClassVar[list[str]] = ["AAA", "BBB", "CCC"]
+
+    def _inputs(self):  # type: ignore[no-untyped-def]
+        prices = _Lookup({"AAA": 10.0, "BBB": 10.0, "CCC": 10.0})
+        fundamentals = _Lookup(
+            {
+                "AAA": _pit("AAA", ebit=900_000.0),
+                "BBB": _pit("BBB", ebit=600_000.0),
+                "CCC": _pit("CCC", ebit=50_000.0),  # worst rank
+            }
+        )
+        return prices, fundamentals
+
+    def _held(self, days_ago: int):  # type: ignore[no-untyped-def]
+        from datetime import timedelta
+
+        from core.backtest.strategy_runner import HeldPosition
+
+        return {
+            "CCC": HeldPosition(
+                ticker="CCC",
+                shares=10.0,
+                entry_price=9.0,
+                entry_date=self.AS_OF - timedelta(days=days_ago),
+                current_price=10.0,
+            )
+        }
+
+    def test_worst_ranked_is_excluded_without_a_book(self) -> None:
+        prices, fundamentals = self._inputs()
+        strategy = MagicFormula(portfolio_size=2, min_market_cap=1.0)
+
+        weights = strategy.select(self.AS_OF, self.UNIVERSE, prices, fundamentals)
+
+        assert set(weights) == {"AAA", "BBB"}
+
+    def test_a_young_holding_survives_falling_out_of_the_ranking(self) -> None:
+        prices, fundamentals = self._inputs()
+        strategy = MagicFormula(portfolio_size=2, min_market_cap=1.0)
+
+        weights = strategy.select(
+            self.AS_OF, self.UNIVERSE, prices, fundamentals, held=self._held(30)
+        )
+
+        assert "CCC" in weights
+        assert sum(weights.values()) == pytest.approx(1.0)
+
+    def test_a_matured_holding_loses_its_protection(self) -> None:
+        prices, fundamentals = self._inputs()
+        strategy = MagicFormula(portfolio_size=2, min_market_cap=1.0)
+
+        weights = strategy.select(
+            self.AS_OF, self.UNIVERSE, prices, fundamentals, held=self._held(400)
+        )
+
+        assert "CCC" not in weights
