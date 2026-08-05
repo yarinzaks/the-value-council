@@ -110,3 +110,93 @@ class TestSelectTopN:
     def test_negative_n_raises(self) -> None:
         with pytest.raises(ValueError):
             select_top_n([], n=-3)
+
+
+class TestFranchiseFirstOrdering:
+    """Sorting on margin of safety alone bought the *cheapest* survivor
+    of a quality floor rather than the *best* business available at a
+    fair price — the opposite of the position Buffett spent the 1980s
+    arguing for."""
+
+    def test_the_stronger_franchise_outranks_the_bigger_discount(self) -> None:
+        from agents.buffett.moat import FranchiseAssessment
+        from agents.buffett.ranking import BuffettScore
+
+        def _score(ticker: str, mos: float, frac: float, worst: float):  # type: ignore[no-untyped-def]
+            return BuffettScore(
+                ticker=ticker,
+                price=10.0,
+                market_cap=1e9,
+                intrinsic_value_usd=1.5e9,
+                intrinsic_value_per_share=15.0,
+                margin_of_safety_pct=mos,
+                avg_owner_earnings_usd=1e8,
+                growth_rate_pct=5.0,
+                discount_rate_pct=5.0,
+                avg_roe_5yr_pct=20.0,
+                debt_to_equity=0.2,
+                net_income=1e8,
+                franchise=FranchiseAssessment(
+                    ticker=ticker,
+                    qualifies=True,
+                    years_observed=10,
+                    years_above=int(frac * 10),
+                    median_roe_pct=20.0,
+                    worst_roe_pct=worst,
+                    reason="",
+                ),
+            )
+
+        cheap_but_ordinary = _score("CHEAP", mos=60.0, frac=0.8, worst=15.5)
+        dear_but_wonderful = _score("WONDER", mos=20.0, frac=1.0, worst=24.0)
+
+        ordered = sorted(
+            [cheap_but_ordinary, dear_but_wonderful],
+            key=lambda s: (
+                -(s.franchise.fraction_above if s.franchise else 0.0),
+                -(s.franchise.worst_roe_pct if s.franchise else -1e9),
+                -s.margin_of_safety_pct,
+            ),
+        )
+
+        assert [s.ticker for s in ordered] == ["WONDER", "CHEAP"]
+
+    def test_price_still_separates_equals(self) -> None:
+        from agents.buffett.moat import FranchiseAssessment
+        from agents.buffett.ranking import BuffettScore
+
+        def _score(ticker: str, mos: float):  # type: ignore[no-untyped-def]
+            return BuffettScore(
+                ticker=ticker,
+                price=10.0,
+                market_cap=1e9,
+                intrinsic_value_usd=1.5e9,
+                intrinsic_value_per_share=15.0,
+                margin_of_safety_pct=mos,
+                avg_owner_earnings_usd=1e8,
+                growth_rate_pct=5.0,
+                discount_rate_pct=5.0,
+                avg_roe_5yr_pct=20.0,
+                debt_to_equity=0.2,
+                net_income=1e8,
+                franchise=FranchiseAssessment(
+                    ticker=ticker,
+                    qualifies=True,
+                    years_observed=10,
+                    years_above=10,
+                    median_roe_pct=20.0,
+                    worst_roe_pct=22.0,
+                    reason="",
+                ),
+            )
+
+        ordered = sorted(
+            [_score("A", 20.0), _score("B", 45.0)],
+            key=lambda s: (
+                -(s.franchise.fraction_above if s.franchise else 0.0),
+                -(s.franchise.worst_roe_pct if s.franchise else -1e9),
+                -s.margin_of_safety_pct,
+            ),
+        )
+
+        assert [s.ticker for s in ordered] == ["B", "A"]
