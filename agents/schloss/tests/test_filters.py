@@ -30,6 +30,9 @@ def _fin(
     long_term_debt: float | None = 200_000_000.0,
     net_income: float | None = 50_000_000.0,
     filing_date: date = date(2018, 6, 15),
+    total_assets: float | None = 1_000_000_000.0,
+    total_liabilities: float | None = 200_000_000.0,
+    current_liabilities: float | None = 200_000_000.0,
 ) -> PointInTimeFinancials:
     return PointInTimeFinancials(
         ticker=ticker,
@@ -47,6 +50,9 @@ def _fin(
         total_debt=total_debt,
         long_term_debt=long_term_debt,
         net_income=net_income,
+        total_assets=total_assets,
+        total_liabilities=total_liabilities,
+        current_liabilities=current_liabilities,
     )
 
 
@@ -101,10 +107,35 @@ class TestDebtToEquity:
         de = debt_to_equity(_fin(total_debt=None, long_term_debt=300_000_000))
         assert de == pytest.approx(0.3)
 
-    def test_missing_debt_treated_as_zero(self) -> None:
+    def test_missing_debt_on_a_tagged_balance_sheet_is_zero(self) -> None:
+        # A filer that tagged assets, liabilities and current liabilities
+        # but no debt concept has told us its liabilities are not
+        # borrowings. XBRL does not require tagging a zero.
         assert debt_to_equity(
-            _fin(total_debt=None, long_term_debt=None)
+            _fin(
+                total_debt=None,
+                long_term_debt=None,
+                total_assets=1_000_000_000.0,
+                total_liabilities=200_000_000.0,
+                current_liabilities=200_000_000.0,
+            )
         ) == pytest.approx(0.0)
+
+    def test_missing_debt_on_a_sparse_balance_sheet_is_none(self) -> None:
+        # "Little or no debt" is one of Schloss's sixteen rules. It was
+        # being satisfied by absence of data.
+        assert (
+            debt_to_equity(
+                _fin(
+                    total_debt=None,
+                    long_term_debt=None,
+                    total_assets=None,
+                    total_liabilities=None,
+                    current_liabilities=None,
+                )
+            )
+            is None
+        )
 
     def test_negative_equity_returns_none(self) -> None:
         assert debt_to_equity(_fin(total_equity=-1)) is None
