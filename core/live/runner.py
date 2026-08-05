@@ -445,10 +445,18 @@ class DailyRunner:
             for pos in list(portfolio.positions):
                 if pos.ticker in target_tickers:
                     continue
-                price = held_prices.get(pos.ticker) or pos.current_price
+                # No fallback to pos.current_price. mark_to_market keeps the
+                # last known mark when a price is missing, which is right for
+                # valuing a position but wrong for executing a sale: a
+                # delisted or halted holding would book fabricated proceeds
+                # at a price that no longer trades, and a realized P&L of
+                # exactly zero. Absent a fresh price we hold and retry
+                # tomorrow.
+                price = held_prices.get(pos.ticker)
                 if price is None or price <= 0:
                     logger.warning(
-                        f"{as_of}: cannot sell {pos.ticker} — no price; skipping"
+                        f"{as_of}: cannot sell {pos.ticker} — no fresh price; "
+                        f"holding position"
                     )
                     continue
                 try:
