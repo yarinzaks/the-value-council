@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 
 from core.backtest.point_in_time import (
+    _PAYLOAD_VERSION,
+    _VERSION_KEY,
     EdgarAdapter,
     FilingMetadata,
     PointInTimeLoader,
@@ -203,3 +205,54 @@ class TestFilingMetadataDataclass:
         d = f.to_dict()
         f2 = FilingMetadata.from_dict(d)
         assert f2 == f
+
+
+class TestPayloadVersioning:
+    """An accession is immutable, so nothing invalidates a cached payload
+    on its own. When parse_financials starts producing a new field, old
+    rows keep being served without it — which is how sic_code stayed
+    None even after it was populated upstream."""
+
+    def test_stored_payload_carries_the_version(self, tmp_path: Path) -> None:
+        loader = PointInTimeLoader(cache_path=tmp_path / "pit.sqlite")
+        loader._store_financials("acc-1", {"revenue": 100.0})
+
+        round_tripped = loader._cached_financials("acc-1")
+
+        assert round_tripped is not None
+        assert round_tripped["revenue"] == 100.0
+        assert round_tripped[_VERSION_KEY] == _PAYLOAD_VERSION
+
+    def test_unversioned_payload_is_a_miss(self, tmp_path: Path) -> None:
+        import json
+        import sqlite3
+
+        path = tmp_path / "pit.sqlite"
+        loader = PointInTimeLoader(cache_path=path)
+        loader._store_financials("acc-1", {"revenue": 100.0})
+        # Simulate a row written before versioning existed.
+        with sqlite3.connect(path) as conn:
+            conn.execute(
+                "UPDATE financials SET payload_json = ? WHERE accession_number = ?",
+                (json.dumps({"revenue": 100.0, "sic_code": None}), "acc-1"),
+            )
+
+        assert loader._cached_financials("acc-1") is None
+
+    def test_stale_version_is_a_miss(self, tmp_path: Path) -> None:
+        import json
+        import sqlite3
+
+        path = tmp_path / "pit.sqlite"
+        loader = PointInTimeLoader(cache_path=path)
+        loader._store_financials("acc-1", {"revenue": 100.0})
+        with sqlite3.connect(path) as conn:
+            conn.execute(
+                "UPDATE financials SET payload_json = ? WHERE accession_number = ?",
+                (
+                    json.dumps({"revenue": 100.0, _VERSION_KEY: _PAYLOAD_VERSION - 1}),
+                    "acc-1",
+                ),
+            )
+
+        assert loader._cached_financials("acc-1") is None

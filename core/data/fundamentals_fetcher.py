@@ -42,6 +42,7 @@ from core.backtest.point_in_time import (
     EdgarAdapter,
     FilingMetadata,
 )
+from core.data.sic_codes import sic_for
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
@@ -466,9 +467,12 @@ class CachedEdgarAdapter(EdgarAdapter):
         # We use the filing date as the as_of and let the field-fetcher
         # do the heavy lifting (which respects the filing date for PIT).
         values, _ = self.fetcher.get_all_fields(filing.ticker, filing.filing_date)
-        # We can't extract SIC code from XBRL alone — leave None and
-        # let the caller decide whether to enrich it externally.
-        return {**values, "sic_code": None}
+        # SIC is not in XBRL, so this used to return None unconditionally.
+        # The consequence was that Greenblatt's mandatory financials and
+        # utilities exclusion never fired once, and no agent could route
+        # by business type. The SEC's own code is already bundled at
+        # data_bundled/company_sic.json for all 8,290 cached tickers.
+        return {**values, "sic_code": sic_for(filing.ticker)}
 
 
 __all__ = [

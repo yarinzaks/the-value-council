@@ -331,6 +331,16 @@ CREATE TABLE IF NOT EXISTS financials (
 );
 """
 
+# Stamped into every stored payload. Bump whenever parse_financials
+# starts producing a field it did not before, otherwise the cache keeps
+# serving payloads that silently lack it — an accession is immutable, so
+# nothing else would ever invalidate the row. A mismatch is treated as a
+# miss and the filing is re-parsed on next access.
+#
+# 2: sic_code populated from the bundled SEC map (was always None).
+_PAYLOAD_VERSION = 2
+_VERSION_KEY = "_payload_version"
+
 
 class PointInTimeLoader:
     """Looks up the financial data publicly known on a given date."""
@@ -412,15 +422,21 @@ class PointInTimeLoader:
             ).fetchone()
         if not row:
             return None
-        return json.loads(row[0])
+        payload = json.loads(row[0])
+        if payload.get(_VERSION_KEY) != _PAYLOAD_VERSION:
+            # Written before parse_financials produced its current field
+            # set. Treat as a miss so the filing is re-parsed.
+            return None
+        return payload
 
     def _store_financials(
         self, accession: str, payload: dict[str, float | None]
     ) -> None:
+        stamped = {**payload, _VERSION_KEY: _PAYLOAD_VERSION}
         with self._connect() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO financials (accession_number, payload_json) VALUES (?, ?)",
-                (accession, json.dumps(payload)),
+                (accession, json.dumps(stamped)),
             )
 
     # ------------------------------------------------------------------

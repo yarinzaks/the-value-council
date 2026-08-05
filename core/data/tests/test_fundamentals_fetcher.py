@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from core.backtest.point_in_time import FilingMetadata
 from core.data.edgar_cache import EdgarCache
 from core.data.edgar_facts import XbrlFact
 from core.data.fundamentals_fetcher import (
@@ -17,6 +18,7 @@ from core.data.fundamentals_fetcher import (
     FundamentalsFetcher,
     expected_units,
 )
+from core.data.sic_codes import sic_for
 
 
 def _fact(
@@ -711,3 +713,94 @@ class TestTotalDebt:
         total, source = f._compute_total_debt("DORMANT", self.AS_OF)
         assert total is None
         assert source == "absent"
+
+
+class TestSicCodePopulation:
+    """sic_code was hard-coded None, so Greenblatt's mandatory
+    financials-and-utilities exclusion never fired once. Measured across
+    the 8,290 cached tickers: 8,170 have a bundled SIC code and 2,623 of
+    those (32%) fall in the excluded ranges."""
+
+    def test_parse_financials_populates_sic(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "AAPL",
+            [
+                XbrlFact(
+                    concept="Assets",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=1_000.0,
+                    period_start=None,
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-1",
+                )
+            ],
+        )
+        adapter = CachedEdgarAdapter(
+            fetcher=FundamentalsFetcher(cache=cache, client=None)
+        )
+        filing = FilingMetadata(
+            ticker="AAPL",
+            cik="320193",
+            form_type="10-Q",
+            filing_date=date(2026, 4, 30),
+            period_of_report=date(2026, 3, 31),
+            accession_number="acc-1",
+        )
+
+        payload = adapter.parse_financials(filing)
+
+        assert payload["sic_code"] == sic_for("AAPL")
+        assert payload["sic_code"] is not None
+
+    def test_unknown_ticker_still_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ZZZQQ",
+            [
+                XbrlFact(
+                    concept="Assets",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=1.0,
+                    period_start=None,
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-z",
+                )
+            ],
+        )
+        adapter = CachedEdgarAdapter(
+            fetcher=FundamentalsFetcher(cache=cache, client=None)
+        )
+        filing = FilingMetadata(
+            ticker="ZZZQQ",
+            cik="0",
+            form_type="10-Q",
+            filing_date=date(2026, 4, 30),
+            period_of_report=date(2026, 3, 31),
+            accession_number="acc-z",
+        )
+
+        assert adapter.parse_financials(filing)["sic_code"] is None
+
+    def test_a_bank_is_now_excluded_by_greenblatt(self) -> None:
+        # The rule existed and was correct; it was simply never fed.
+        from agents.greenblatt.filters import is_excluded_sector
+
+        bank_sic = sic_for("JPM")
+        assert bank_sic is not None
+        assert is_excluded_sector(str(bank_sic))
+
+    def test_an_operating_company_is_not_excluded(self) -> None:
+        from agents.greenblatt.filters import is_excluded_sector
+
+        assert not is_excluded_sector(str(sic_for("AAPL")))
