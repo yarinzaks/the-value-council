@@ -27,7 +27,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Iterable, Iterator
 
@@ -40,6 +40,12 @@ logger = get_logger("core.backtest.data_loader")
 
 from core.paths import PROJECT_ROOT, prices_db as _prices_db
 DEFAULT_CACHE_PATH = _prices_db()
+
+# Calendar days re-fetched by ``get_price_on(..., force_refresh=True)``.
+# Wide enough to still contain a trading bar when ``as_of`` falls on a
+# holiday next to a weekend (the longest such gap is four days), narrow
+# enough that the daily close-of-day mark stays cheap.
+REFRESH_WINDOW_DAYS = 7
 
 
 class PriceDataError(ValueCouncilError):
@@ -251,7 +257,13 @@ class PriceDataLoader:
             return pd.DataFrame()
         return pd.concat(series.values(), axis=1).sort_index()
 
-    def get_price_on(self, ticker: str, as_of: date | datetime) -> float | None:
+    def get_price_on(
+        self,
+        ticker: str,
+        as_of: date | datetime,
+        *,
+        force_refresh: bool = False,
+    ) -> float | None:
         """Return the adjusted close on or just before ``as_of``.
 
         Optimized for daily NAV walks during backtests:
@@ -263,9 +275,33 @@ class PriceDataLoader:
         2. On true cache miss, fetch the entire calendar year so
            subsequent daily lookups in the same year are free.
 
+        Args:
+            force_refresh: Re-fetch ``as_of``'s bar even when the cache
+                already covers it. Required by the close-of-day mark:
+                the morning run caches an intraday quote under today's
+                date, and the fast path would otherwise hand that same
+                intraday number back at 16:30 ET, making the whole NAV
+                history a series of intraday prices labelled as closes.
+                Only a short window is re-fetched — a full-year refresh
+                would be wasteful and slow for a once-a-day correction.
+
         Returns None if no data is available.
         """
         as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
+
+        if force_refresh:
+            # INSERT OR REPLACE in _write_cache means the settled close
+            # overwrites the intraday row for the same trade_date.
+            window_start = as_of_d - timedelta(days=REFRESH_WINDOW_DAYS)
+            df = self.get_history(
+                ticker, start=window_start, end=as_of_d, force_refresh=True
+            )
+            if df.empty:
+                return None
+            df = df[df.index.date <= as_of_d]
+            if df.empty:
+                return None
+            return float(df["adj_close"].iloc[-1])
 
         # Fast path: if the cache already has data covering as_of, use it.
         cached_range = self.cached_range(ticker)

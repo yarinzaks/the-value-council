@@ -34,14 +34,20 @@ class _StubAdapter:
 
 
 class _StubPriceLoader:
-    """Returns whatever the test dictates, including None."""
+    """Returns whatever the test dictates, including None.
+
+    Records ``force_refresh`` so tests can assert the close-of-day mark
+    asks for a settled close rather than re-reading the morning quote.
+    """
 
     def __init__(self, prices: dict[str, float | None]) -> None:
         self._prices = prices
-        self.calls: list[tuple[str, date]] = []
+        self.calls: list[tuple[str, date, bool]] = []
 
-    def get_price_on(self, ticker: str, as_of: date) -> float | None:
-        self.calls.append((ticker, as_of))
+    def get_price_on(
+        self, ticker: str, as_of: date, *, force_refresh: bool = False
+    ) -> float | None:
+        self.calls.append((ticker, as_of, force_refresh))
         return self._prices.get(ticker)
 
 
@@ -233,3 +239,36 @@ class TestNoTradeSignal:
 
         # scripts/verify_run_state.py gates the daily job on this field.
         assert result.portfolio.last_open_run != ""
+
+
+# ---------------------------------------------------------------------------
+# Close-of-day mark
+# ---------------------------------------------------------------------------
+class TestMarkToMarket:
+    def test_close_mark_demands_a_settled_close(self, runner: DailyRunner) -> None:
+        # Without force_refresh, get_price_on's fast path returns the
+        # intraday quote the morning run cached under the same date, and
+        # the NAV series becomes intraday prices labelled as closes.
+        _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=60.0
+        )
+        loader = _StubPriceLoader({"HOLD": 63.0})
+        runner.price_loader = loader  # type: ignore[assignment]
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        runner.run_mark_to_market(as_of=AS_OF)
+
+        assert loader.calls == [("HOLD", AS_OF, True)]
+
+    def test_close_mark_applies_the_fresh_price(self, runner: DailyRunner) -> None:
+        _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=60.0
+        )
+        runner.price_loader = _StubPriceLoader({"HOLD": 63.0})  # type: ignore[assignment]
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        pos = results[0].portfolio.positions[0]
+        assert pos.current_price == pytest.approx(63.0)
+        assert results[0].portfolio.last_close_run != ""

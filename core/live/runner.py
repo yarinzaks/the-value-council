@@ -313,12 +313,18 @@ class DailyRunner:
                     directory=self.portfolio_dir,
                     initial_cash=self.initial_cash,
                 )
-                # Fetch fresh prices for every held ticker.
+                # Fetch fresh prices for every held ticker. force_refresh
+                # is required: the morning run cached an intraday quote
+                # under today's date, and without it get_price_on's fast
+                # path returns that same number, so the close-of-day mark
+                # silently records the 09:35 ET price as the close.
                 tickers = [p.ticker for p in portfolio.positions]
                 fresh: dict[str, float | None] = {}
                 for t in tickers:
                     try:
-                        fresh[t] = self.price_loader.get_price_on(t, as_of)
+                        fresh[t] = self.price_loader.get_price_on(
+                            t, as_of, force_refresh=True
+                        )
                     except Exception as exc:  # noqa: BLE001
                         logger.warning(
                             f"close-of-day price for {t} @ {as_of} failed: {exc}"

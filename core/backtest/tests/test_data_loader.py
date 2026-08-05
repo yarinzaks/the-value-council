@@ -7,13 +7,17 @@ file. Live yfinance fetches are tested separately with the
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from core.backtest.data_loader import PriceDataLoader, _to_date
+from core.backtest.data_loader import (
+    REFRESH_WINDOW_DAYS,
+    PriceDataLoader,
+    _to_date,
+)
 
 
 class TestCacheRoundTrip:
@@ -121,3 +125,121 @@ class TestGetPriceOn:
         # Querying mid-month should get the Jan 15 close (latest <= Jan 20)
         price = loader.get_price_on("AAPL", date(2020, 1, 20))
         assert price == pytest.approx(101.5)
+
+
+class TestGetPriceOnForceRefresh:
+    """The close-of-day mark must re-read the settled close.
+
+    The morning run caches an intraday quote under today's date. Without
+    force_refresh the fast path hands that same number back at 16:30 ET,
+    so the entire NAV history becomes intraday prices labelled as closes.
+    """
+
+    @staticmethod
+    def _bar(day: str, price: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "Open": [price],
+                "High": [price],
+                "Low": [price],
+                "Close": [price],
+                "Adj Close": [price],
+                "Volume": [1000],
+            },
+            index=pd.DatetimeIndex([day]),
+        )
+
+    def test_default_returns_the_cached_intraday_bar(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        loader._write_cache("AAPL", self._bar("2026-08-05", 100.0))
+        monkeypatch.setattr(
+            loader,
+            "_fetch_yfinance",
+            lambda ticker, start, end: self._bar("2026-08-05", 107.5),
+        )
+
+        assert loader.get_price_on("AAPL", date(2026, 8, 5)) == pytest.approx(100.0)
+
+    def test_force_refresh_returns_the_settled_close(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        loader._write_cache("AAPL", self._bar("2026-08-05", 100.0))
+        monkeypatch.setattr(
+            loader,
+            "_fetch_yfinance",
+            lambda ticker, start, end: self._bar("2026-08-05", 107.5),
+        )
+
+        price = loader.get_price_on("AAPL", date(2026, 8, 5), force_refresh=True)
+
+        assert price == pytest.approx(107.5)
+
+    def test_force_refresh_overwrites_the_cached_row(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The corrected close must persist, so a later cached read agrees.
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        loader._write_cache("AAPL", self._bar("2026-08-05", 100.0))
+        monkeypatch.setattr(
+            loader,
+            "_fetch_yfinance",
+            lambda ticker, start, end: self._bar("2026-08-05", 107.5),
+        )
+        loader.get_price_on("AAPL", date(2026, 8, 5), force_refresh=True)
+
+        monkeypatch.setattr(
+            loader,
+            "_fetch_yfinance",
+            lambda ticker, start, end: pd.DataFrame(),
+        )
+        assert loader.get_price_on("AAPL", date(2026, 8, 5)) == pytest.approx(107.5)
+
+    def test_force_refresh_fetches_a_short_window_not_a_year(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        seen: list[tuple[date, date]] = []
+
+        def _spy(ticker: str, start: date, end: date) -> pd.DataFrame:
+            seen.append((start, end))
+            return self._bar("2026-08-05", 107.5)
+
+        monkeypatch.setattr(loader, "_fetch_yfinance", _spy)
+        loader.get_price_on("AAPL", date(2026, 8, 5), force_refresh=True)
+
+        assert seen == [
+            (date(2026, 8, 5) - timedelta(days=REFRESH_WINDOW_DAYS), date(2026, 8, 5))
+        ]
+
+    def test_force_refresh_with_no_data_returns_none(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        monkeypatch.setattr(
+            loader,
+            "_fetch_yfinance",
+            lambda ticker, start, end: pd.DataFrame(),
+        )
+
+        assert (
+            loader.get_price_on("DEAD", date(2026, 8, 5), force_refresh=True) is None
+        )
+
+    def test_force_refresh_falls_back_to_the_prior_bar_on_a_holiday(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 2026-01-19 is MLK Day. The refresh window must still contain the
+        # Friday bar so the mark does not come back None.
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        monkeypatch.setattr(
+            loader,
+            "_fetch_yfinance",
+            lambda ticker, start, end: self._bar("2026-01-16", 99.25),
+        )
+
+        price = loader.get_price_on("AAPL", date(2026, 1, 19), force_refresh=True)
+
+        assert price == pytest.approx(99.25)
