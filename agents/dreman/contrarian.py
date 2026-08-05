@@ -31,6 +31,12 @@ from core.backtest.strategy_runner import (
 )
 from core.logger import get_logger
 
+from .diversification import (
+    DEFAULT_MAX_INDUSTRY_WEIGHT_PCT,
+    DEFAULT_MIN_INDUSTRIES,
+    DiversificationReport,
+    diversify,
+)
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
@@ -38,7 +44,7 @@ from .filters import (
     DEFAULT_QUINTILE,
     apply_quality_gates,
 )
-from .ranking import DremanScore, score_candidates, select_top_n
+from .ranking import DremanScore, score_candidates
 
 logger = get_logger("agents.dreman.contrarian")
 
@@ -79,6 +85,8 @@ class DavidDreman(Strategy):
         quintile: float = DEFAULT_QUINTILE,
         max_de: float = DEFAULT_MAX_DE,
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+        min_industries: int = DEFAULT_MIN_INDUSTRIES,
+        max_industry_weight_pct: float = DEFAULT_MAX_INDUSTRY_WEIGHT_PCT,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -93,13 +101,23 @@ class DavidDreman(Strategy):
             raise ValueError(f"max_de must be positive; got {max_de}")
         if min_market_cap <= 0:
             raise ValueError(f"min_market_cap must be positive; got {min_market_cap}")
+        if min_industries <= 0:
+            raise ValueError(f"min_industries must be positive; got {min_industries}")
+        if not 0.0 < max_industry_weight_pct <= 100.0:
+            raise ValueError(
+                "max_industry_weight_pct must be in (0, 100]; "
+                f"got {max_industry_weight_pct}"
+            )
         self.portfolio_size = portfolio_size
         self.min_qualifying_metrics = min_qualifying_metrics
         self.quintile = quintile
         self.max_de = max_de
         self.min_market_cap = min_market_cap
+        self.min_industries = min_industries
+        self.max_industry_weight_pct = max_industry_weight_pct
         self.decision_logger = decision_logger
         self.selection_history: list[DremanSelection] = []
+        self.last_diversification: DiversificationReport | None = None
 
     def select(
         self,
@@ -139,7 +157,17 @@ class DavidDreman(Strategy):
             min_qualifying_metrics=self.min_qualifying_metrics,
             quintile=self.quintile,
         )
-        top = select_top_n(scores, n=self.portfolio_size)
+        # Rule 18: 20-30 names across 15+ industries, none above 15% of
+        # the book. Taking the top N by rank alone produced 25 holdings
+        # in 11 industries with insurance at 28.5% and financials at
+        # half the book — the cheapest quintile is where damaged
+        # businesses cluster, and they cluster by industry.
+        top, self.last_diversification = diversify(
+            scores,
+            portfolio_size=self.portfolio_size,
+            min_industries=self.min_industries,
+            max_industry_weight_pct=self.max_industry_weight_pct,
+        )
 
         if not top:
             logger.warning(
