@@ -80,16 +80,12 @@ indent-style = "space"
 # -----------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "7.0"
+# Discover every tests/ package under core/ and agents/. The previous
+# explicit list silently omitted buffett, lynch, marks, klarman and
+# fisher — 322 passing tests that guarded nothing because they never ran.
 testpaths = [
-    "core/tests",
-    "core/backtest/tests",
-    "core/data/tests",
-    "agents/greenblatt/tests",
-    "agents/schloss/tests",
-    "agents/graham/tests",
-    "agents/dreman/tests",
-    "agents/neff/tests",
-    "core/live/tests",
+    "core",
+    "agents",
 ]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -116,3 +112,8 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 ignore_missing_imports = true
 disallow_untyped_defs = true
+# agents/ has no __init__.py, so mypy resolves agents/dreman/contrarian.py
+# as both "dreman.contrarian" and "agents.dreman.contrarian" and aborts
+# before checking anything. These two make the declared layout analysable.
+namespace_packages = true
+explicit_package_bases = true

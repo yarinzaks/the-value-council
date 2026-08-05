@@ -1,0 +1,82 @@
+name: CI
+
+# The repository's quality gate. Until this existed, nothing ran the test
+# suite: the three other workflows trade, refresh the cache and watch the
+# schedule, but none of them checks the code they execute. A broken commit
+# reached the next morning's paper-trading run unchallenged.
+#
+# pytest is blocking. ruff and mypy report but do not fail the build yet —
+# the codebase currently carries 411 ruff violations and 240 mypy errors,
+# most of them noise, and turning either into a gate today would block every
+# unrelated commit. They are here to make the numbers visible so they can be
+# ratcheted down deliberately.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      # No SEC_USER_AGENT and no VALUE_COUNCIL_DATA_DIR: the default suite is
+      # marked "not integration", so nothing here may touch a live API or the
+      # on-disk fundamentals cache. If a test starts needing either, that test
+      # wants an @pytest.mark.integration, not a secret in this workflow.
+      - name: Run test suite
+        run: pytest
+
+  lint:
+    name: Lint and types (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: ruff
+        continue-on-error: true
+        run: ruff check core agents scripts
+
+      - name: mypy
+        continue-on-error: true
+        run: mypy core agents
