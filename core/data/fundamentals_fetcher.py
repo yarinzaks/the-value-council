@@ -35,7 +35,7 @@ adapter, we fall back to that source for missing fields.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from core.backtest.point_in_time import (
@@ -170,6 +170,14 @@ _FLOW_CONCEPTS: frozenset[str] = frozenset(
 # exists to keep out.
 ANNUAL_DURATION_DAYS: tuple[int, int] = (330, 400)
 
+# How old a fact's period_end may be before it stops counting as current.
+# The binding case is an annual figure late in the reporting cycle: a
+# FY2025 10-K stays the newest annual fact until the FY2026 one is filed,
+# which for a late filer is ~15 months after FY2025's period_end. 550
+# days (~18 months) clears that with room to spare while still rejecting
+# a concept a company abandoned years ago.
+MAX_FACT_AGE_DAYS: int = 550
+
 
 class FundamentalsError(ValueCouncilError):
     """Raised when fundamentals cannot be assembled."""
@@ -244,6 +252,17 @@ class FundamentalsFetcher:
         # beats the last 10-K's annual one, so revenue, EBIT and net
         # income silently arrive as three- or nine-month numbers.
         duration_days = ANNUAL_DURATION_DAYS if field in _FLOW_CONCEPTS else None
+        as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
+        cutoff = as_of_d - timedelta(days=MAX_FACT_AGE_DAYS)
+
+        # Evaluate the WHOLE chain and keep the freshest survivor. The
+        # chain is ordered by preference, but preference is not recency:
+        # returning the first hit meant a concept a company stopped
+        # tagging years ago outranked one it still tags today, so a
+        # current net income could sit beside a decade-old revenue in
+        # the same ratio. The age bound is the backstop for the case
+        # where every concept in the chain went dark.
+        best: XbrlFact | None = None
         for namespace, concept in CONCEPT_MAP[field]:
             fact = self.cache.latest_value_at(
                 ticker,
@@ -254,9 +273,11 @@ class FundamentalsFetcher:
                 prefer_annual=prefer_annual,
                 duration_days=duration_days,
             )
-            if fact is not None:
-                return fact
-        return None
+            if fact is None or fact.period_end < cutoff:
+                continue
+            if best is None or fact.period_end > best.period_end:
+                best = fact
+        return best
 
     def get_all_fields(
         self,

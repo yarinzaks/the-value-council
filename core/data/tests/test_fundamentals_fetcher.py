@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -11,6 +11,7 @@ from core.data.edgar_cache import EdgarCache
 from core.data.edgar_facts import XbrlFact
 from core.data.fundamentals_fetcher import (
     CONCEPT_MAP,
+    MAX_FACT_AGE_DAYS,
     CachedEdgarAdapter,
     FundamentalsError,
     FundamentalsFetcher,
@@ -317,3 +318,171 @@ class TestFlowConceptDuration:
 
         # A quarter is not a year. Better no number than a wrong one.
         assert fetcher.get_field("NEWCO", "revenue", date(2026, 6, 1)) is None
+
+
+class TestChainRecency:
+    """The concept chain is ordered by preference, not by recency.
+
+    Returning the first hit meant a concept a company stopped tagging
+    years ago outranked one it still tags today. Measured on 300 cached
+    tickers: the oldest fact still being served was 5,577 days old.
+    """
+
+    @staticmethod
+    def _annual(
+        concept: str,
+        *,
+        value: float,
+        fy: int,
+        accession: str,
+    ) -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace="us-gaap",
+            unit="USD",
+            value=value,
+            period_start=date(fy, 1, 1),
+            period_end=date(fy, 12, 31),
+            filed=date(fy + 1, 2, 15),
+            form="10-K",
+            fiscal_year=fy,
+            fiscal_period="FY",
+            accession_number=accession,
+        )
+
+    def test_freshest_concept_wins_over_chain_order(
+        self, tmp_path: Path
+    ) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                # First in the chain, but the company stopped tagging it.
+                self._annual(
+                    "RevenueFromContractWithCustomerExcludingAssessedTax",
+                    value=400.0,
+                    fy=2016,
+                    accession="acc-old",
+                ),
+                # Later in the chain, and current.
+                self._annual("Revenues", value=1_800.0, fy=2025, accession="acc-new"),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "revenue", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.value == 1_800.0
+        assert fact.period_end == date(2025, 12, 31)
+
+    def test_chain_order_still_wins_when_both_are_current(
+        self, tmp_path: Path
+    ) -> None:
+        # Same period_end: preference order must decide, unchanged.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                self._annual(
+                    "RevenueFromContractWithCustomerExcludingAssessedTax",
+                    value=1_000.0,
+                    fy=2025,
+                    accession="acc-preferred",
+                ),
+                self._annual("Revenues", value=1_050.0, fy=2025, accession="acc-alt"),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "revenue", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.value == 1_000.0
+
+    def test_every_concept_stale_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "DORMANT",
+            [
+                self._annual("Revenues", value=90.0, fy=2011, accession="acc-2011"),
+                self._annual(
+                    "SalesRevenueNet", value=95.0, fy=2012, accession="acc-2012"
+                ),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        assert fetcher.get_field("DORMANT", "revenue", date(2026, 8, 4)) is None
+
+    def test_age_bound_boundary(self, tmp_path: Path) -> None:
+        as_of = date(2026, 8, 4)
+        cutoff = as_of - timedelta(days=MAX_FACT_AGE_DAYS)
+
+        inside = EdgarCache(cache_dir=tmp_path / "inside")
+        inside.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=500.0,
+                    period_start=cutoff - timedelta(days=365),
+                    period_end=cutoff,
+                    filed=cutoff + timedelta(days=45),
+                    form="10-K",
+                    fiscal_year=cutoff.year,
+                    fiscal_period="FY",
+                    accession_number="acc-edge",
+                )
+            ],
+        )
+        assert (
+            FundamentalsFetcher(cache=inside, client=None).get_field(
+                "ACME", "revenue", as_of
+            )
+            is not None
+        )
+
+        outside = EdgarCache(cache_dir=tmp_path / "outside")
+        outside.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=500.0,
+                    period_start=cutoff - timedelta(days=366),
+                    period_end=cutoff - timedelta(days=1),
+                    filed=cutoff + timedelta(days=44),
+                    form="10-K",
+                    fiscal_year=cutoff.year,
+                    fiscal_period="FY",
+                    accession_number="acc-past",
+                )
+            ],
+        )
+        assert (
+            FundamentalsFetcher(cache=outside, client=None).get_field(
+                "ACME", "revenue", as_of
+            )
+            is None
+        )
+
+    def test_late_filer_keeps_its_annual_figure(self, tmp_path: Path) -> None:
+        # FY2025 ends 2025-12-31 and stays the newest annual fact until
+        # the FY2026 10-K lands. A 15-month-old period_end is normal, not
+        # stale, and must survive.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "SLOWCO",
+            [self._annual("Revenues", value=770.0, fy=2025, accession="acc-fy25")],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("SLOWCO", "revenue", date(2027, 3, 20))
+
+        assert fact is not None
+        assert fact.value == 770.0
