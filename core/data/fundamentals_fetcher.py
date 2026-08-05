@@ -178,6 +178,25 @@ ANNUAL_DURATION_DAYS: tuple[int, int] = (330, 400)
 # a concept a company abandoned years ago.
 MAX_FACT_AGE_DAYS: int = 550
 
+# The XBRL unit each field must be reported in. Everything downstream
+# divides these into a USD share price, so a foreign private issuer's
+# home-currency figures have to be rejected rather than silently mixed:
+# an Enbridge-class filer reporting CAD lands about 25% cheaper on every
+# multiple than it really is, which is exactly the error a value screen
+# converts into a buy. Translating instead of rejecting would need a
+# point-in-time FX series, which this project does not have.
+_PER_SHARE_FIELDS: frozenset[str] = frozenset(["eps_basic", "eps_diluted"])
+_SHARE_COUNT_FIELDS: frozenset[str] = frozenset(["shares_outstanding"])
+
+
+def expected_units(field: str) -> tuple[str, ...]:
+    """XBRL units acceptable for ``field``."""
+    if field in _SHARE_COUNT_FIELDS:
+        return ("shares",)
+    if field in _PER_SHARE_FIELDS:
+        return ("USD/shares",)
+    return ("USD",)
+
 
 class FundamentalsError(ValueCouncilError):
     """Raised when fundamentals cannot be assembled."""
@@ -272,6 +291,7 @@ class FundamentalsFetcher:
                 forms=("10-K", "10-Q"),
                 prefer_annual=prefer_annual,
                 duration_days=duration_days,
+                units=expected_units(field),
             )
             if fact is None or fact.period_end < cutoff:
                 continue

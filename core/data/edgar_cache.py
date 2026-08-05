@@ -197,6 +197,7 @@ class EdgarCache:
         forms: tuple[str, ...] | None = ("10-K", "10-Q"),
         prefer_annual: bool = False,
         duration_days: tuple[int, int] | None = None,
+        units: tuple[str, ...] | None = None,
     ) -> XbrlFact | None:
         """Return the most recent reported value for ``concept`` known
         on ``as_of``.
@@ -225,6 +226,12 @@ class EdgarCache:
                 a caller that asked for a year. Instant facts
                 (balance-sheet items, which carry no ``period_start``)
                 never satisfy a window, so pass ``None`` for those.
+            units: Restrict to these XBRL units. A foreign private issuer
+                files in its own currency, and those figures are otherwise
+                divided straight into a USD share price — an Enbridge-class
+                filer reporting CAD lands ~25% cheaper on every multiple
+                than it is. There is no point-in-time FX series here, so
+                the only honest answer is to reject rather than translate.
         """
         df = self.load_dataframe(ticker)
         if df.empty:
@@ -235,6 +242,8 @@ class EdgarCache:
         mask = (df["concept"] == concept) & (df["namespace"] == namespace)
         if forms is not None:
             mask &= df["form"].isin(forms)
+        if units is not None:
+            mask &= df["unit"].isin(units)
         mask &= df["filed"].dt.date <= as_of_d
         sub = df[mask]
         if sub.empty:

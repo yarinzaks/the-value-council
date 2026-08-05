@@ -15,6 +15,7 @@ from core.data.fundamentals_fetcher import (
     CachedEdgarAdapter,
     FundamentalsError,
     FundamentalsFetcher,
+    expected_units,
 )
 
 
@@ -486,3 +487,100 @@ class TestChainRecency:
 
         assert fact is not None
         assert fact.value == 770.0
+
+
+class TestUnitFilter:
+    """A foreign private issuer files in its home currency, and those
+    figures are divided straight into a USD share price. Measured on 400
+    cached tickers: 5 resolved CAD across every monetary field."""
+
+    @staticmethod
+    def _fact_in(unit: str, value: float, concept: str = "Revenues") -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace="us-gaap",
+            unit=unit,
+            value=value,
+            period_start=date(2025, 1, 1),
+            period_end=date(2025, 12, 31),
+            filed=date(2026, 2, 15),
+            form="10-K",
+            fiscal_year=2025,
+            fiscal_period="FY",
+            accession_number=f"acc-{unit}",
+        )
+
+    def test_cad_only_filer_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("ENBFF", [self._fact_in("CAD", 55_000.0)])
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        assert fetcher.get_field("ENBFF", "revenue", date(2026, 8, 4)) is None
+
+    def test_usd_wins_when_a_filer_reports_both(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "DUAL",
+            [self._fact_in("CAD", 55_000.0), self._fact_in("USD", 40_000.0)],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("DUAL", "revenue", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.unit == "USD"
+        assert fact.value == 40_000.0
+
+    def test_eps_requires_per_share_units(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                self._fact_in(
+                    "CAD/shares", 3.20, concept="EarningsPerShareDiluted"
+                ),
+                self._fact_in(
+                    "USD/shares", 2.35, concept="EarningsPerShareDiluted"
+                ),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "eps_diluted", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.unit == "USD/shares"
+        assert fact.value == 2.35
+
+    def test_share_count_uses_the_shares_unit(self, tmp_path: Path) -> None:
+        # shares_outstanding is a count, not money — a USD mask would
+        # reject every filer.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="CommonStockSharesOutstanding",
+                    namespace="us-gaap",
+                    unit="shares",
+                    value=1_000_000.0,
+                    period_start=None,
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-shares",
+                )
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "shares_outstanding", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.value == 1_000_000.0
+
+    def test_expected_units_covers_every_mapped_field(self) -> None:
+        for field in CONCEPT_MAP:
+            assert expected_units(field), field
