@@ -3,10 +3,20 @@
   Pull GitHub-generated state down to the local Mac data directory,
   shortly AFTER the GHA market-open run finishes.
 
-  Schedule: Mon-Fri 17:00 IL local. The GHA open job typically takes
-  10-25 minutes (universe scan + price fetch on a cold runner). It
-  starts at 16:35 IL → finishes around 16:50-17:00 IL. We give it a
-  cushion and pull at 17:00.
+  Schedule: Mon-Fri, hourly 17:00-21:00 IL local.
+
+  It used to fire once, at 17:00, on the assumption that the GHA open
+  job starts at 16:35 IL and finishes by 17:00. That assumption is
+  wrong often enough to matter: GitHub documents scheduled triggers as
+  best-effort with 10-30 minute delays, the scan itself ranges from 14
+  to 60 minutes, and the watchdog can dispatch a make-up run hours
+  later. On 2026-08-05 the run committed at 19:12 IL and the 17:00
+  sync had already logged "no new commits" — so the dashboard sat on
+  the previous evening's data for a full day.
+
+  Firing repeatedly removes the guess. Every attempt after the one
+  that succeeds is a no-op costing a shallow fetch, because the script
+  compares SHAs before doing any work.
 
   When the Mac is off at 17:00, this just doesn't run. The next time
   it does fire (either the close-side sync or the next morning's
@@ -35,16 +45,35 @@
     <string>/Users/yarinzaks</string>
   </dict>
 
-  <!-- Mon-Fri at 17:00 Israel local time (≈ 25 min after GHA open
-       run is triggered, which gives it generous time to finish even
-       on a cold Ubuntu runner). -->
+  <!-- Hourly 17:00-21:00 IL, Mon-Fri. The first fire that finds new
+       commits does the work; the rest cost one shallow fetch each. -->
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
     <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
     <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
     <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
     <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
   </array>
 
   <key>StandardOutPath</key>
