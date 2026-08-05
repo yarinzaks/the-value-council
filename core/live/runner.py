@@ -81,6 +81,17 @@ from core.logger import get_logger
 
 logger = get_logger("core.live.runner")
 
+#: Smallest notional worth executing. Below this the transaction cost
+#: dominates and the position is noise in the weight table.
+MIN_TRADE_USD: float = 1.0
+
+#: How far a position may drift from its target weight before the
+#: rebalance pass corrects it, as a fraction of the target. 0.25 means a
+#: 3.7% target is left alone between 2.8% and 4.6%. Positions were
+#: previously never resized after entry at all, so every sizing doctrine
+#: was expressed once and then abandoned to price drift.
+DEFAULT_REBALANCE_BAND: float = 0.25
+
 
 @dataclass
 class AgentRunResult:
@@ -238,6 +249,7 @@ class DailyRunner:
         portfolio_dir: Path = DEFAULT_PORTFOLIO_DIR,
         cost_bps: float = DEFAULT_COST_BPS,
         initial_cash: float = DEFAULT_INITIAL_CASH,
+        rebalance_band: float = DEFAULT_REBALANCE_BAND,
         cache: EdgarCache | None = None,
         price_loader: PriceDataLoader | None = None,
         universe: FullMarketUniverse | None = None,
@@ -258,6 +270,7 @@ class DailyRunner:
         self.portfolio_dir = portfolio_dir
         self.cost_bps = cost_bps
         self.initial_cash = initial_cash
+        self.rebalance_band = rebalance_band
         self.price_loader = price_loader or PriceDataLoader()
         self.universe = universe or FullMarketUniverse(cache=self.cache)
         if pit_loader is None:
@@ -521,10 +534,14 @@ class DailyRunner:
             target_dollars = nav_after_sells * target.weight
             if target_dollars > portfolio.cash:
                 target_dollars = portfolio.cash * 0.99  # leave a sliver for cost
-            if target_dollars < price:
+            # Was `target_dollars < price` — a $50 slot in a $500 stock
+            # bought nothing and the cash sat idle. Fractional shares
+            # make any positive target executable; the floor now only
+            # rejects amounts too small to be worth a trade.
+            if target_dollars < MIN_TRADE_USD:
                 logger.info(
-                    f"{as_of}: skipping {target.ticker} — "
-                    f"target ${target_dollars:.2f} < price ${price:.2f}"
+                    f"{as_of}: skipping {target.ticker} — target "
+                    f"${target_dollars:.2f} below ${MIN_TRADE_USD:.2f} floor"
                 )
                 continue
             try:
@@ -541,6 +558,11 @@ class DailyRunner:
                 self._log_buy(adapter.name, target, price, as_of)
             except LivePortfolioError as exc:
                 logger.warning(f"{as_of}: buy of {target.ticker} failed: {exc}")
+
+        # ---- REBALANCE: pull drifted holdings back toward target ------
+        trades.extend(
+            self._rebalance(portfolio, scan.targets, prices, as_of, adapter.name)
+        )
 
         # Re-mark after trades and refresh weights.
         portfolio.mark_to_market(held_prices)
@@ -580,6 +602,96 @@ class DailyRunner:
             trades=trades,
             universe_size=scan.universe_size,
         )
+
+    # ------------------------------------------------------------------
+    def _rebalance(
+        self,
+        portfolio: LivePortfolio,
+        targets: list[LiveTarget],
+        prices: dict[str, float | None],
+        as_of: date,
+        agent: str,
+    ) -> list[TradeRecord]:
+        """Pull holdings that drifted outside the band back to target.
+
+        Positions were sized once at entry and never touched again, so a
+        name that doubled became twice its intended weight and every
+        sizing doctrine decayed into "whatever the market did since we
+        bought". Rebalancing is not a doctrine choice — an agent that
+        states equal weights means to hold equal weights.
+
+        Only names still in the target list are considered; anything
+        that left is handled by the exit path. Trims are executed before
+        adds so the cash from a trim is available to fund an add in the
+        same pass.
+        """
+        if not targets:
+            return []
+
+        band = self.rebalance_band
+        nav = portfolio.total_nav
+        if nav <= 0:
+            return []
+
+        trims: list[tuple[str, float, float]] = []  # (ticker, price, shares)
+        adds: list[tuple[str, float, float]] = []  # (ticker, price, dollars)
+
+        for target in targets:
+            idx = portfolio._index_of(target.ticker)
+            if idx is None:
+                continue
+            price = prices.get(target.ticker)
+            if price is None or price <= 0:
+                continue
+            pos = portfolio.positions[idx]
+            want = nav * target.weight
+            have = pos.shares * price
+            if want <= 0:
+                continue
+            drift = (have - want) / want
+            if abs(drift) <= band:
+                continue
+            delta = abs(have - want)
+            if delta < MIN_TRADE_USD:
+                continue
+            if drift > 0:
+                trims.append((target.ticker, price, delta / price))
+            else:
+                adds.append((target.ticker, price, delta))
+
+        out: list[TradeRecord] = []
+        for ticker, price, shares in trims:
+            try:
+                out.append(
+                    portfolio.sell(
+                        ticker, price=price, shares=shares, cost_bps=self.cost_bps
+                    )
+                )
+                logger.info(f"{as_of}: {agent} trimmed {ticker} back to target")
+            except LivePortfolioError as exc:
+                logger.warning(f"{as_of}: trim of {ticker} failed: {exc}")
+
+        for ticker, price, dollars in adds:
+            spend = min(dollars, portfolio.cash * 0.99)
+            if spend < MIN_TRADE_USD:
+                continue
+            try:
+                out.append(
+                    portfolio.buy(
+                        ticker,
+                        target_dollars=spend,
+                        price=price,
+                        entry_date=as_of.isoformat(),
+                        why_en="",
+                        why_he="",
+                        cost_bps=self.cost_bps,
+                    )
+                )
+                logger.info(f"{as_of}: {agent} added to {ticker} back to target")
+            except LivePortfolioError as exc:
+                logger.warning(f"{as_of}: add to {ticker} failed: {exc}")
+
+        return out
 
     # ------------------------------------------------------------------
     # Helpers

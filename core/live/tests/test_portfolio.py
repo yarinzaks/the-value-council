@@ -50,12 +50,15 @@ class TestBuy:
             entry_date="2026-04-29",
             why_en="value", why_he="ערך",
         )
-        # 5000 / (1 + 0.001) = 4995.00 max notional. /200 = 24 shares.
-        assert trade.shares == 24
-        assert trade.gross_value == 24 * 200.0
-        assert trade.cost_paid == pytest.approx(24 * 200.0 * DEFAULT_COST_BPS)
-        # Cash debited by gross + cost
-        assert p.cash == pytest.approx(10_000 - 24 * 200.0 - 24 * 200.0 * DEFAULT_COST_BPS)
+        # 5000 / (1 + 0.001) = 4995.005 max notional, / 200 = 24.975025
+        # shares. Whole-share rounding used to buy 24 and strand $195.
+        assert trade.shares == pytest.approx(24.975025)
+        assert trade.gross_value == pytest.approx(24.975025 * 200.0)
+        assert trade.cost_paid == pytest.approx(
+            24.975025 * 200.0 * DEFAULT_COST_BPS
+        )
+        # The whole $5,000 target is deployed, to within rounding.
+        assert p.cash == pytest.approx(5_000.0, abs=0.01)
         assert p.cumulative_costs == pytest.approx(trade.cost_paid)
         assert len(p.positions) == 1
 
@@ -83,21 +86,38 @@ class TestBuy:
         with pytest.raises(LivePortfolioError):
             p.buy("X", target_dollars=200, price=1, entry_date="x", why_en="", why_he="")
 
-    def test_buy_rejects_when_price_too_high(self) -> None:
+    def test_a_target_below_one_share_still_buys(self) -> None:
+        # This used to raise: a $50 target on a $100 stock bought nothing
+        # and the money sat idle. Fractional shares make it a half share.
+        p = LivePortfolio(agent="test", cash=10_000)
+        trade = p.buy(
+            "X", target_dollars=50, price=100, entry_date="x", why_en="", why_he=""
+        )
+        assert trade.shares == pytest.approx(0.4995, abs=1e-4)
+
+    def test_a_target_that_rounds_to_zero_shares_is_rejected(self) -> None:
         p = LivePortfolio(agent="test", cash=10_000)
         with pytest.raises(LivePortfolioError):
-            p.buy("X", target_dollars=50, price=100, entry_date="x", why_en="", why_he="")
+            p.buy(
+                "X",
+                target_dollars=1e-9,
+                price=100,
+                entry_date="x",
+                why_en="",
+                why_he="",
+            )
 
     def test_buy_merges_into_existing_position(self) -> None:
         p = LivePortfolio(agent="test", cash=10_000)
         p.buy("AAPL", target_dollars=2_000, price=100, entry_date="2026-04-29", why_en="", why_he="")
         p.buy("AAPL", target_dollars=2_000, price=120, entry_date="2026-04-30", why_en="", why_he="")
         assert len(p.positions) == 1
-        # Avg entry: (19*100 + 16*120) / (19 + 16) ~= 109.14
-        # 2000/(1.001)/100 = 19, 2000/(1.001)/120 = 16
-        avg = (19 * 100 + 16 * 120) / 35
-        assert p.positions[0].entry_price == pytest.approx(avg, rel=1e-3)
-        assert p.positions[0].shares == 35
+        # Two fractional lots: 2000/1.001/100 = 19.980020 shares at 100,
+        # then 2000/1.001/120 = 16.650017 at 120.
+        lot1, lot2 = 2_000 / 1.001 / 100, 2_000 / 1.001 / 120
+        avg = (lot1 * 100 + lot2 * 120) / (lot1 + lot2)
+        assert p.positions[0].entry_price == pytest.approx(avg, rel=1e-6)
+        assert p.positions[0].shares == pytest.approx(lot1 + lot2, rel=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -108,12 +128,13 @@ class TestSell:
         p = LivePortfolio(agent="test", cash=10_000)
         p.buy("AAPL", target_dollars=2_000, price=100, entry_date="2026-04-29", why_en="", why_he="")
         cash_before_sell = p.cash
-        # Sell at 110 — gain of 10/share × 19 sh = 190 gross gain
+        # Sell at 110 — gain of 10/share on 19.980020 shares.
+        shares = 2_000 / 1.001 / 100
         trade = p.sell("AAPL", price=110.0)
-        assert trade.shares == 19
-        assert trade.realized_pnl_usd == pytest.approx(19 * (110 - 100))
-        # Cash should be cash_before_sell + 19*110 - cost
-        gross = 19 * 110.0
+        assert trade.shares == pytest.approx(shares, rel=1e-6)
+        assert trade.realized_pnl_usd == pytest.approx(shares * (110 - 100))
+        # Cash should be cash_before_sell + proceeds - cost
+        gross = shares * 110.0
         assert p.cash == pytest.approx(cash_before_sell + gross - gross * DEFAULT_COST_BPS)
         assert len(p.positions) == 0
 
@@ -136,11 +157,12 @@ class TestMarkToMarket:
     def test_total_nav_with_positions(self) -> None:
         p = LivePortfolio(agent="test", cash=10_000)
         p.buy("AAPL", target_dollars=2_000, price=100, entry_date="d", why_en="", why_he="")
-        # 19 shares * 100 = 1900 (cost 1.90), cash = 10000 - 1901.90 = 8098.10
-        # Mark up to 120: invested = 19*120 = 2280; nav = 2280 + 8098.10
+        # 19.980020 shares at 100 = 1998.00 (cost 2.00); the full $2,000
+        # target is deployed. Mark up to 120.
+        shares = 2_000 / 1.001 / 100
         p.mark_to_market({"AAPL": 120.0})
-        assert p.invested == pytest.approx(2280.0)
-        assert p.total_nav == pytest.approx(p.cash + 2280.0)
+        assert p.invested == pytest.approx(shares * 120.0, rel=1e-6)
+        assert p.total_nav == pytest.approx(p.cash + shares * 120.0)
 
     def test_pnl_pct_computed(self) -> None:
         p = LivePortfolio(agent="test", cash=10_000)

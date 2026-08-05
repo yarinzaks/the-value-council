@@ -28,6 +28,11 @@ logger = get_logger("core.live.portfolio")
 DEFAULT_INITIAL_CASH: float = 10_000.0
 DEFAULT_COST_BPS: float = 0.001  # 0.1% per trade
 
+#: Decimal places share counts are rounded to. Matches what ``to_dict``
+#: already persists, so a round-trip through JSON is lossless. Six
+#: places on a $10,000 book is sub-cent precision.
+SHARE_PRECISION: int = 6
+
 from core.paths import portfolios_dir as _portfolios_dir
 
 # Resolved via the single ``core.paths`` module so that env-var
@@ -150,31 +155,52 @@ class LivePortfolio:
         ticker: str,
         *,
         price: float,
+        shares: float | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
     ) -> "TradeRecord":
-        """Liquidate the entire position in ``ticker`` at ``price``.
+        """Sell ``shares`` of ``ticker`` at ``price``; all of it by default.
 
-        Returns a TradeRecord; raises LivePortfolioError if no such
-        position exists.
+        A partial sale keeps the position open at its original entry
+        price — trimming does not change the cost basis of what remains,
+        so the reported P&L on the residual stays honest. Selling the
+        whole line, or more than is held, closes it.
+
+        Raises LivePortfolioError if no such position exists.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive sell price for {ticker}: {price}")
         idx = self._index_of(ticker)
         if idx is None:
             raise LivePortfolioError(f"{ticker} not in portfolio")
-        pos = self.positions.pop(idx)
-        gross = pos.shares * price
+
+        pos = self.positions[idx]
+        if shares is None:
+            sold = pos.shares
+        else:
+            if shares <= 0:
+                raise LivePortfolioError(
+                    f"non-positive sell quantity for {ticker}: {shares}"
+                )
+            sold = round(min(shares, pos.shares), SHARE_PRECISION)
+
+        remaining = round(pos.shares - sold, SHARE_PRECISION)
+        if remaining <= 0:
+            self.positions.pop(idx)
+        else:
+            pos.shares = remaining
+
+        gross = sold * price
         cost = gross * cost_bps
         self.cash += gross - cost
         self.cumulative_costs += cost
         return TradeRecord(
             ticker=ticker,
             side="SELL",
-            shares=pos.shares,
+            shares=sold,
             price=price,
             gross_value=gross,
             cost_paid=cost,
-            realized_pnl_usd=(price - pos.entry_price) * pos.shares,
+            realized_pnl_usd=(price - pos.entry_price) * sold,
         )
 
     def buy(
@@ -190,9 +216,17 @@ class LivePortfolio:
     ) -> "TradeRecord":
         """Buy ``ticker`` for at most ``target_dollars`` notional.
 
-        Sizes whole shares only (paper-trades round down) and leaves
-        residual cash. Costs are taken on top of notional so target
-        dollars is the limit including fees.
+        Sizes fractional shares. Whole-share rounding used to discard
+        the remainder of every position, and on a $10,000 book spread
+        across 27 names the residue compounded into roughly a fifth of
+        the portfolio sitting in cash against a design target of zero —
+        an accounting artifact large enough to dominate the return
+        difference between two agents. Every real broker has offered
+        fractional shares for years; the constraint was ours, not the
+        market's.
+
+        Costs are taken on top of notional, so ``target_dollars`` is the
+        limit including fees.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive buy price for {ticker}: {price}")
@@ -207,12 +241,13 @@ class LivePortfolio:
             )
         # Solve: notional + notional*cost_bps <= target_dollars  →  notional max.
         max_notional = target_dollars / (1.0 + cost_bps)
-        shares_int = int(max_notional // price)
-        if shares_int <= 0:
+        shares_bought = round(max_notional / price, SHARE_PRECISION)
+        if shares_bought <= 0:
             raise LivePortfolioError(
-                f"price ${price:.2f} too high for ${target_dollars:.2f} target on {ticker}"
+                f"${target_dollars:.2f} target on {ticker} at ${price:.2f} "
+                f"rounds to zero shares"
             )
-        gross = shares_int * price
+        gross = shares_bought * price
         cost = gross * cost_bps
         spend = gross + cost
         if spend > self.cash + 1e-9:
@@ -225,7 +260,7 @@ class LivePortfolio:
         existing = self._index_of(ticker)
         if existing is not None:
             old = self.positions[existing]
-            new_shares = old.shares + shares_int
+            new_shares = old.shares + shares_bought
             new_basis = old.cost_basis + gross
             self.positions[existing] = Position(
                 ticker=ticker,
@@ -240,7 +275,7 @@ class LivePortfolio:
             self.positions.append(
                 Position(
                     ticker=ticker,
-                    shares=shares_int,
+                    shares=shares_bought,
                     entry_price=price,
                     entry_date=entry_date,
                     current_price=price,
@@ -251,7 +286,7 @@ class LivePortfolio:
         return TradeRecord(
             ticker=ticker,
             side="BUY",
-            shares=shares_int,
+            shares=shares_bought,
             price=price,
             gross_value=gross,
             cost_paid=cost,

@@ -394,3 +394,147 @@ class TestExecutionLabels:
         assert len(exits) == 1
         assert exits[0]["ticker"] == "GONE"
         assert "left today's target list" in exits[0]["criteria_met"]
+
+
+# ---------------------------------------------------------------------------
+# Position sizing
+# ---------------------------------------------------------------------------
+class TestFractionalSizing:
+    """Whole-share rounding discarded the remainder of every position.
+    On a $10,000 book across 27 names that residue compounded into
+    roughly a fifth of the portfolio sitting in cash against a design
+    target of zero."""
+
+    def test_equal_weight_book_deploys_its_cash(self, runner: DailyRunner) -> None:
+        n = 27
+        weight = 1.0 / n
+        # Deliberately awkward prices — the whole-share remainder is
+        # worst when the price does not divide the slot.
+        prices = {f"T{i:02d}": 37.0 + i * 11.3 for i in range(n)}
+        targets = [
+            _target(t, weight=weight, rank=i + 1)
+            for i, t in enumerate(sorted(prices))
+        ]
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", targets)
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        p = result.portfolio
+        assert len(p.positions) == n
+        cash_pct = p.cash / p.total_nav * 100.0
+        assert cash_pct < 1.0, f"{cash_pct:.2f}% left idle"
+        for pos in p.positions:
+            assert pos.weight_pct == pytest.approx(100.0 / n, abs=0.10)
+
+    def test_a_slot_smaller_than_one_share_still_fills(
+        self, runner: DailyRunner
+    ) -> None:
+        # $10,000 / 30 = $333 per slot. A $2,000 share used to buy zero.
+        runner.price_loader = _StubPriceLoader({"PRICEY": 2_000.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("PRICEY", weight=1 / 30)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["PRICEY"],
+            {"PRICEY": 2_000.0},
+            {"PRICEY": None},
+        )
+
+        assert result.portfolio.has("PRICEY")
+        assert result.portfolio.positions[0].shares < 1.0
+
+
+class TestRebalanceBand:
+    """Positions were sized once at entry and never touched again, so a
+    name that doubled became twice its intended weight."""
+
+    def _drifted(
+        self, runner: DailyRunner, *, entry: float, now: float
+    ) -> DailyRunner:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFT",
+                shares=50.0,
+                entry_price=entry,
+                entry_date="2026-07-01",
+                current_price=now,
+                why_en="",
+                why_he="",
+            )
+        )
+        p.cash = 5_000.0
+        p.save(directory=runner.portfolio_dir)
+        return runner
+
+    def _run(self, runner: DailyRunner, price: float):
+        adapter = _StubAdapter("stub_agent", [_target("DRIFT", weight=0.5)])
+        runner.price_loader = _StubPriceLoader({"DRIFT": price})  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DRIFT"],
+            {"DRIFT": price},
+            {"DRIFT": None},
+        )
+
+    def test_a_position_inside_the_band_is_left_alone(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at 110 = $5,500 against $5,000 cash: NAV 10,500,
+        # target 5,250, drift +4.8% — well inside the 25% band.
+        self._drifted(runner, entry=100.0, now=110.0)
+
+        result = self._run(runner, 110.0)
+
+        assert result.trades == []
+
+    def test_a_position_outside_the_band_is_trimmed(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at 300 = $15,000 against $5,000 cash: NAV 20,000,
+        # target 10,000, drift +50%.
+        self._drifted(runner, entry=100.0, now=300.0)
+
+        result = self._run(runner, 300.0)
+
+        sells = [t for t in result.trades if t.side == "SELL"]
+        assert len(sells) == 1
+        assert sells[0].ticker == "DRIFT"
+        # The line is trimmed, not closed.
+        assert result.portfolio.has("DRIFT")
+        pos = result.portfolio.positions[0]
+        assert pos.weight_pct == pytest.approx(50.0, abs=1.0)
+
+    def test_a_trim_keeps_the_original_cost_basis(
+        self, runner: DailyRunner
+    ) -> None:
+        # Trimming must not restate what the remaining shares cost.
+        self._drifted(runner, entry=100.0, now=300.0)
+
+        result = self._run(runner, 300.0)
+
+        assert result.portfolio.positions[0].entry_price == pytest.approx(100.0)
+
+    def test_an_underweight_position_is_topped_up(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at 20 = $1,000 against $5,000 cash: NAV 6,000,
+        # target 3,000, drift -67%.
+        self._drifted(runner, entry=100.0, now=20.0)
+
+        result = self._run(runner, 20.0)
+
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert len(buys) == 1
+        assert result.portfolio.positions[0].weight_pct == pytest.approx(
+            50.0, abs=1.0
+        )
