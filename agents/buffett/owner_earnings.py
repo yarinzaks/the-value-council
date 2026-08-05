@@ -63,17 +63,54 @@ _CAPEX_CONCEPTS: tuple[str, ...] = (
     "PaymentsToAcquirePropertyPlantAndEquipment",
     "PaymentsToAcquireProductiveAssets",
 )
+_NET_INCOME_CONCEPTS: tuple[str, ...] = ("NetIncomeLoss", "ProfitLoss")
+_DA_CONCEPTS: tuple[str, ...] = (
+    "DepreciationDepletionAndAmortization",
+    "DepreciationAndAmortization",
+    "DepreciationAmortizationAndAccretionNet",
+    "Depreciation",
+)
+_PPE_CONCEPTS: tuple[str, ...] = ("PropertyPlantAndEquipmentNet",)
+_REVENUE_CONCEPTS: tuple[str, ...] = (
+    "RevenueFromContractWithCustomerExcludingAssessedTax",
+    "Revenues",
+    "SalesRevenueNet",
+)
 
 
 @dataclass(frozen=True)
 class OwnerEarningsRecord:
-    """One fiscal year's Owner Earnings."""
+    """One fiscal year's Owner Earnings.
+
+    ``basis`` records how the figure was derived, because the two
+    methods are not the same number and a reader should not have to
+    guess which one they are looking at:
+
+    * ``"greenwald"`` — Buffett's definition. Net income plus D&A less
+      *maintenance* capex, with the maintenance/growth split estimated
+      by Greenwald's method (growth capex is the PP&E intensity of the
+      business applied to the year's revenue growth).
+    * ``"free_cash_flow"`` — the fallback when the split cannot be
+      computed. Operating cash flow less *all* capex, which is free
+      cash flow, not owner earnings.
+
+    The distinction is not pedantic. For a growing business the two
+    diverge by exactly the growth capex, and that is the amount Buffett
+    is arguing should *not* be charged against the owner: money spent
+    widening the moat is not money the owner has lost.
+    """
 
     fiscal_year: int
     period_end: date
     ocf: float
     capex: float  # always recorded as a POSITIVE number (cash outflow)
     owner_earnings: float
+    basis: str = "free_cash_flow"
+    net_income: float | None = None
+    depreciation_amortization: float | None = None
+    maintenance_capex: float | None = None
+    #: OCF - capex, always populated, so a caller can compare.
+    free_cash_flow: float | None = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +144,35 @@ def _annual_value(
         if fact is not None:
             return float(fact.value), int(fact.fiscal_year), fact.period_end
     return None
+
+
+def maintenance_capex(
+    *,
+    capex: float,
+    ppe_net: float | None,
+    revenue: float | None,
+    prior_revenue: float | None,
+) -> float | None:
+    """Greenwald's split of capital spending into upkeep and growth.
+
+    The business's PP&E intensity — plant per dollar of sales — is the
+    capital it takes to support a dollar of revenue. Multiply that by
+    the year's revenue growth and you have the capital that went into
+    *growing*; the remainder was spent standing still.
+
+    Returns ``None`` when an input is missing. Growth capex is clamped
+    to ``[0, capex]``: a revenue decline does not mean the company
+    harvested capital back, and growth capex cannot exceed what was
+    actually spent.
+    """
+    if ppe_net is None or revenue is None or prior_revenue is None:
+        return None
+    if revenue <= 0 or prior_revenue <= 0 or ppe_net < 0:
+        return None
+    intensity = ppe_net / revenue
+    growth = intensity * (revenue - prior_revenue)
+    growth = max(0.0, min(growth, capex))
+    return capex - growth
 
 
 def historical_owner_earnings(
@@ -152,7 +218,46 @@ def historical_owner_earnings(
         # Capex is reported as a positive cash outflow in most filings,
         # but some companies report it as negative. Take abs().
         capex_pos = abs(capex_value)
-        oe = ocf_value - capex_pos
+        fcf = ocf_value - capex_pos
+
+        # Buffett's definition, where the inputs allow it: net income
+        # plus D&A less *maintenance* capex. Growth capex is deliberately
+        # not charged — money spent widening the moat is not money the
+        # owner has lost.
+        ni = _annual_value(cache, ticker, _NET_INCOME_CONCEPTS, lookup)
+        da = _annual_value(cache, ticker, _DA_CONCEPTS, lookup)
+        ppe = _annual_value(cache, ticker, _PPE_CONCEPTS, lookup)
+        rev = _annual_value(cache, ticker, _REVENUE_CONCEPTS, lookup)
+        prior_rev = _annual_value(
+            cache, ticker, _REVENUE_CONCEPTS, lookup - timedelta(days=365)
+        )
+
+        maint = None
+        if all(x is not None for x in (ppe, rev, prior_rev)):
+            maint = maintenance_capex(
+                capex=capex_pos,
+                ppe_net=ppe[0],  # type: ignore[index]
+                revenue=rev[0],  # type: ignore[index]
+                prior_revenue=prior_rev[0],  # type: ignore[index]
+            )
+
+        # Every leg must come from the same fiscal year, or the sum is
+        # arithmetic on unrelated periods.
+        same_year = (
+            ni is not None
+            and da is not None
+            and maint is not None
+            and ni[1] == ocf_year
+            and da[1] == ocf_year
+        )
+        if same_year:
+            oe = ni[0] + da[0] - maint  # type: ignore[index,operator]
+            basis = "greenwald"
+        else:
+            oe = fcf
+            basis = "free_cash_flow"
+            maint = None
+
         records.append(
             OwnerEarningsRecord(
                 fiscal_year=ocf_year,
@@ -160,6 +265,11 @@ def historical_owner_earnings(
                 ocf=ocf_value,
                 capex=capex_pos,
                 owner_earnings=oe,
+                basis=basis,
+                net_income=ni[0] if ni is not None else None,
+                depreciation_amortization=da[0] if da is not None else None,
+                maintenance_capex=maint,
+                free_cash_flow=fcf,
             )
         )
         if len(records) >= years:
