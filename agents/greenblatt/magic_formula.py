@@ -109,8 +109,14 @@ class MagicFormula(Strategy):
     ) -> dict[str, float]:
         """Choose target weights for ``as_of``.
 
-        The runner provides the survivorship-bias-free universe and the
-        point-in-time fundamentals lookup. We do all the rest.
+        The runner provides the universe and the point-in-time
+        fundamentals lookup. We do all the rest.
+
+        Which universe arrives matters for how the result should be
+        read: the S&P 500 backtests pass a survivorship-bias-free one,
+        the live runner passes :class:`FullMarketUniverse`, which is
+        not. Selection here is identical either way — the difference
+        lands in the historical return, not in the picks.
         """
         logger.info(
             f"{as_of}: starting Magic Formula selection over {len(universe)} candidates"

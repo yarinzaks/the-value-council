@@ -1,7 +1,6 @@
 """US Full Market Universe — every SEC active filer at as_of.
 
-Survivorship-bias-free by construction: a ticker is "in the universe
-at date X" iff:
+Membership: a ticker is "in the universe at date X" iff
 
 1. It has at least one ``10-K`` or ``10-Q`` filing whose
    ``filing_date <= X`` in the local EDGAR cache.
@@ -15,10 +14,38 @@ at date X" iff:
    filers that file 10-K forms but don't report standard income
    statement / balance sheet data.
 
-All of this is computed PIT — when we query for date X, we never
-look at filings filed AFTER X. A company that delisted in 2015 and
-disappeared from the active filer list still appears in the universe
-for any date in 2010-2015 where its filings were current.
+Every one of those tests is point-in-time: when we query for date X we
+never read a filing filed after X, so nothing here knows the future.
+
+.. warning::
+
+   **This universe is NOT survivorship-bias-free**, and it used to say
+   it was. The three rules above are honest about *when* a cached
+   company was reporting, but they cannot speak for a company that is
+   not cached at all — and the roster comes from the SEC's
+   ``company_tickers.json``, which lists only issuers **currently**
+   registered on the day the prefetch ran.
+
+   Measured on the live index (6,601 tickers, filings 2009-04-15 →
+   2026-04-28): of TWTR, ATVI, SIVB, FRC, CERN, XLNX, ANTM, MXIM, ALXN
+   and TIF — ten large caps that were acquired or failed while filing
+   10-Ks — **zero** appear in ``company_tickers.json`` and **zero**
+   have a single cached fact. ``constituents_at(date(2013, 1, 1))``
+   therefore returns a 2026 roster wearing a 2013 date. Rule 2 can
+   retire a cached company that stopped filing; nothing can resurrect
+   one that was never downloaded.
+
+   The consequence is directional and one-sided: names that left the
+   market are exactly the ones that failed, so any backtest run over
+   this universe **overstates** returns. Treat its historical results
+   as an upper bound, not an estimate. :mod:`core.backtest.universe`
+   (S&P 500) has no such gap — it walks the index change log backward
+   and does resurrect removed members — so a claim verified there does
+   not carry over to here.
+
+   Closing it means capturing ``company_tickers.json`` over time, or
+   sourcing delisted CIKs from EDGAR full-text search, and back-filling
+   their facts. Neither is done.
 
 The market-cap filter is **NOT** applied here — it requires a price
 (from the price loader) and shares outstanding (from the cache) at
