@@ -169,6 +169,10 @@ jobs:
             prices-v2-
 
       - name: Run paper-trading scanner
+        # `shell: bash` is load-bearing, not style. The default shell runs
+        # `bash -e` without pipefail, so `python ... | tee` reported tee's
+        # exit code and a scanner that died mid-run looked successful.
+        shell: bash
         env:
           MODE: ${{ steps.dispatch.outputs.mode }}
           MARKET: ${{ steps.dispatch.outputs.market }}
@@ -181,23 +185,7 @@ jobs:
         if: steps.dispatch.outputs.market != 'TASE'
         env:
           MODE: ${{ steps.dispatch.outputs.mode }}
-        run: |
-          python <<'PY'
-          import json, os, sys
-          from pathlib import Path
-          mode = os.environ["MODE"]
-          portfolios = Path("data/portfolios")
-          all_seed = True
-          for f in sorted(portfolios.glob("*.json")):
-              d = json.loads(f.read_text())
-              if d.get("positions"):
-                  all_seed = False
-              print(f"  {d['agent']}: nav=${d['total_nav']:.2f} positions={len(d.get('positions', []))}")
-          if mode == "open" and all_seed:
-              print("::error::all portfolios came back at $10K seed — universe likely empty (cache corrupt?)")
-              sys.exit(1)
-          print(f"sanity check passed (mode={mode})")
-          PY
+        run: python -m scripts.verify_run_state --mode "$MODE"
 
       - name: Commit updated state back to the repo
         env:
