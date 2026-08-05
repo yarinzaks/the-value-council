@@ -36,6 +36,7 @@ from datetime import date, timedelta
 
 from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
+from core.screener.business_type import cash_flow_valuation_is_meaningful
 
 logger = get_logger("agents.klarman.valuation")
 
@@ -123,7 +124,18 @@ def historical_fcf(
     *,
     years: int = DEFAULT_FCF_AVG_YEARS,
 ) -> list[FreeCashFlowRecord]:
-    """Pull the last ``years`` annual FCF records, oldest first."""
+    """Pull the last ``years`` annual FCF records, oldest first.
+
+    Returns empty for a financial. ``OCF - capex`` tracks deposit and
+    premium inflows there rather than cash the business generated, so a
+    DCF built on it values other people's money. Klarman's own answer to
+    an unvaluable business is to pass, not to estimate anyway.
+    See :mod:`core.screener.business_type`.
+    """
+    if not cash_flow_valuation_is_meaningful(None, ticker):
+        logger.debug(f"{ticker}: financial — FCF history not computed")
+        return []
+
     records: list[FreeCashFlowRecord] = []
     seen_years: set[int] = set()
 

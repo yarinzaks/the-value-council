@@ -35,6 +35,7 @@ from datetime import date, timedelta
 
 from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
+from core.screener.business_type import cash_flow_valuation_is_meaningful
 
 logger = get_logger("agents.buffett.owner_earnings")
 
@@ -121,7 +122,16 @@ def historical_owner_earnings(
     either OCF or capex is missing are skipped — but if the candidate
     has fewer than ``years`` complete records, the caller should
     treat the result as insufficient history.
+
+    Returns empty for a financial. ``OCF - capex`` measures deposit and
+    premium inflows there, not owner earnings — Buffett's own float is
+    a liability, and capitalising it as earnings is precisely backwards.
+    See :mod:`core.screener.business_type`.
     """
+    if not cash_flow_valuation_is_meaningful(None, ticker):
+        logger.debug(f"{ticker}: financial — owner earnings not computed")
+        return []
+
     records: list[OwnerEarningsRecord] = []
     seen_years: set[int] = set()
 

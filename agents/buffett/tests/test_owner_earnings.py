@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-
-import pytest
+from pathlib import Path
 
 from agents.buffett.owner_earnings import (
     DEFAULT_DISCOUNT_RATE_PCT,
@@ -17,6 +16,7 @@ from agents.buffett.owner_earnings import (
     trailing_growth_pct,
 )
 from core.data.edgar_cache import EdgarCache
+from core.data.edgar_facts import XbrlFact
 
 
 class TestHistoricalOwnerEarnings:
@@ -148,3 +148,52 @@ class TestMarginOfSafetyPct:
 
     def test_zero_iv_none(self) -> None:
         assert margin_of_safety_pct(0, 100) is None
+
+
+def _fact(concept: str, value: float, fy: int) -> XbrlFact:
+    return XbrlFact(
+        concept=concept,
+        namespace="us-gaap",
+        unit="USD",
+        value=value,
+        period_start=date(fy, 1, 1),
+        period_end=date(fy, 12, 31),
+        filed=date(fy + 1, 2, 15),
+        form="10-K",
+        fiscal_year=fy,
+        fiscal_period="FY",
+        accession_number=f"acc-{concept}-{fy}",
+    )
+
+
+class TestFinancialsAreRefused:
+    """OCF - capex measures deposit and premium inflows for a financial.
+    Buffett's own float is a liability; capitalising it as owner
+    earnings is precisely backwards."""
+
+    def test_a_bank_yields_no_history(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "JPM",
+            [
+                _fact("NetCashProvidedByUsedInOperatingActivities", 50_000.0, 2025),
+                _fact("PaymentsToAcquirePropertyPlantAndEquipment", 2_000.0, 2025),
+            ],
+        )
+
+        assert historical_owner_earnings(cache, "JPM", date(2026, 8, 4)) == []
+
+    def test_an_operating_company_is_unaffected(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "AAPL",
+            [
+                _fact("NetCashProvidedByUsedInOperatingActivities", 50_000.0, 2025),
+                _fact("PaymentsToAcquirePropertyPlantAndEquipment", 2_000.0, 2025),
+            ],
+        )
+
+        records = historical_owner_earnings(cache, "AAPL", date(2026, 8, 4))
+
+        assert len(records) == 1
+        assert records[0].owner_earnings == 48_000.0
