@@ -261,3 +261,127 @@ def test_partially_passing_stock_qualifies(tmp_path: Path) -> None:
     assert cand_score.score_persistence == PERSISTENCE_NEUTRAL_SCORE
     # Sanity: total_score doesn't exceed the theoretical max.
     assert cand_score.total_score <= MAX_TOTAL_SCORE
+
+
+# ---------------------------------------------------------------------------
+# Hard gates
+# ---------------------------------------------------------------------------
+_GATE_TICKERS = [f"PEER{i}" for i in range(1, 6)] + ["NOPAY", "PRICEY"]
+
+
+@pytest.fixture
+def gate_cache(tmp_path: Path) -> EdgarCache:
+    """Trailing growth facts for the hard-gate fixtures."""
+    cache = EdgarCache(cache_dir=tmp_path / "gate-cache")
+    for t in _GATE_TICKERS:
+        cache.save_facts(
+            t,
+            [
+                _fact(
+                    concept="Revenues",
+                    value=1_000_000_000,
+                    period_end=date(2019, 12, 31),
+                    filed=date(2020, 2, 15),
+                    accession=f"{t}-2019",
+                ),
+                _fact(
+                    concept="Revenues",
+                    value=1_575_000_000,
+                    period_end=date(2023, 12, 31),
+                    filed=date(2024, 2, 15),
+                    accession=f"{t}-2023",
+                ),
+                _fact(
+                    concept="EarningsPerShareDiluted",
+                    value=1.0,
+                    period_end=date(2019, 12, 31),
+                    filed=date(2020, 2, 15),
+                    accession=f"{t}-2019e",
+                ),
+                _fact(
+                    concept="EarningsPerShareDiluted",
+                    value=1.575,
+                    period_end=date(2023, 12, 31),
+                    filed=date(2024, 2, 15),
+                    accession=f"{t}-2023e",
+                ),
+            ],
+        )
+    return cache
+
+
+class TestHardGates:
+    """The soft-scoring refactor dissolved all seven criteria into one
+    35/70 threshold, so no individual criterion could reject any more. A
+    candidate strong on growth and ROE carried a zero yield and a
+    market-multiple P/E through on the strength of the others — which is
+    how the live book ended up with three zero-dividend holdings and a
+    name bought at a P/E of 39.6."""
+
+    AS_OF = date(2024, 6, 30)
+
+    @staticmethod
+    def _with(entry: tuple) -> list[tuple]:
+        """Five cheap dividend-paying peers at P/E 10, plus the entry."""
+        out = [
+            (_fin(f"PEER{i}", eps=1.0, dividends=-10_000_000), 1_000_000_000.0, 10.0)
+            for i in range(1, 6)
+        ]
+        out.append(entry)
+        return out
+
+    def test_a_non_payer_is_rejected(self, gate_cache: EdgarCache) -> None:
+        # Neff called the dividend a free part of total return. A stock
+        # paying none is not a Neff stock, however it scores elsewhere.
+        entry = (_fin("NOPAY", eps=2.0, dividends=0.0), 1_000_000_000.0, 10.0)
+
+        scores = score_candidates(
+            self._with(entry), as_of=self.AS_OF, edgar_cache=gate_cache
+        )
+
+        assert "NOPAY" not in {s.ticker for s in scores}
+
+    def test_the_dividend_gate_can_be_disabled(self, gate_cache: EdgarCache) -> None:
+        entry = (_fin("NOPAY", eps=2.0, dividends=0.0), 1_000_000_000.0, 10.0)
+
+        scores = score_candidates(
+            self._with(entry),
+            as_of=self.AS_OF,
+            edgar_cache=gate_cache,
+            min_total_score=0.0,
+            require_dividend=False,
+        )
+
+        assert "NOPAY" in {s.ticker for s in scores}
+
+    def test_a_high_pe_name_is_rejected(self, gate_cache: EdgarCache) -> None:
+        # The live book held one at 39.6 against a market median near 10.
+        entry = (_fin("PRICEY", eps=1.0, dividends=-40_000_000), 4_000_000_000.0, 40.0)
+
+        scores = score_candidates(
+            self._with(entry), as_of=self.AS_OF, edgar_cache=gate_cache
+        )
+
+        assert "PRICEY" not in {s.ticker for s in scores}
+
+    def test_the_pe_ceiling_is_configurable(self, gate_cache: EdgarCache) -> None:
+        # min_total_score=0 disables the soft threshold so only the hard
+        # gate can be responsible for the difference.
+        entry = (_fin("PRICEY", eps=1.0, dividends=-40_000_000), 4_000_000_000.0, 40.0)
+
+        strict = score_candidates(
+            self._with(entry),
+            as_of=self.AS_OF,
+            edgar_cache=gate_cache,
+            min_total_score=0.0,
+        )
+        loose = score_candidates(
+            self._with(entry),
+            as_of=self.AS_OF,
+            edgar_cache=gate_cache,
+            min_total_score=0.0,
+            max_pe_frac_of_market=10.0,
+        )
+
+        assert "PRICEY" not in {s.ticker for s in strict}
+        assert "PRICEY" in {s.ticker for s in loose}

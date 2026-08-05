@@ -35,6 +35,7 @@ def _fin(
     total_assets: float | None = 1_000_000_000.0,
     total_liabilities: float | None = 200_000_000.0,
     current_liabilities: float | None = 200_000_000.0,
+    operating_cash_flow: float | None = 50_000_000.0,
 ) -> PointInTimeFinancials:
     return PointInTimeFinancials(
         ticker=ticker,
@@ -58,6 +59,7 @@ def _fin(
         total_assets=total_assets,
         total_liabilities=total_liabilities,
         current_liabilities=current_liabilities,
+        operating_cash_flow=operating_cash_flow,
     )
 
 
@@ -84,8 +86,27 @@ class TestDividendYield:
         # |−20M| / 1B = 2%
         assert dividend_yield(1_000_000_000.0, _fin()) == pytest.approx(0.02)
 
-    def test_no_dividend(self) -> None:
-        assert dividend_yield(1_000_000_000.0, _fin(dividends_paid=None)) == 0.0
+    def test_no_dividend_on_a_tagged_cash_flow_statement_is_zero(self) -> None:
+        # A filer that reported operating cash flow and no dividend line
+        # has told us it pays nothing.
+        assert (
+            dividend_yield(
+                1_000_000_000.0,
+                _fin(dividends_paid=None, operating_cash_flow=50_000_000.0),
+            )
+            == 0.0
+        )
+
+    def test_no_dividend_and_no_cash_flow_statement_is_none(self) -> None:
+        # It told us nothing. Reading that as zero would make Neff's
+        # dividend gate reject genuine payers whose data is missing.
+        assert (
+            dividend_yield(
+                1_000_000_000.0,
+                _fin(dividends_paid=None, operating_cash_flow=None),
+            )
+            is None
+        )
 
     def test_missing_mcap(self) -> None:
         assert dividend_yield(None, _fin()) is None

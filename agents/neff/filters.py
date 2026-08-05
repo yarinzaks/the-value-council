@@ -89,11 +89,21 @@ def dividend_yield(
     SEC reports ``PaymentsOfDividends`` as a positive cash outflow in
     some filings and as a negative number in others — we take ``abs``
     to be robust.
+
+    Returns ``None`` when the yield cannot be established. An absent
+    ``PaymentsOfDividends`` is only read as zero when the filer tagged
+    its cash-flow statement at all — a company that reported operating
+    cash flow and no dividend line has told us it pays nothing, while
+    one that reported neither has told us nothing. The distinction
+    matters because Neff's dividend gate rejects on zero, and reading
+    missing data as zero would reject genuine payers.
     """
     if fin is None or market_cap is None or market_cap <= 0:
         return None
     div = fin.dividends_paid
     if div is None:
+        if fin.operating_cash_flow is None:
+            return None
         return 0.0
     return abs(div) / market_cap
 
