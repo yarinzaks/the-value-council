@@ -66,9 +66,24 @@ export interface NavRow {
   benchmark_nav: number;
 }
 
+/**
+ * BUY/SELL/HOLD/WATCH are the strategy's intent — what the doctrine
+ * decided. FILL/EXIT are the runner's execution — what the portfolio
+ * actually did about it, and at what price. Both were previously
+ * written as BUY, so every executed purchase appeared twice for the
+ * same ticker on the same day.
+ */
+export type DecisionKind =
+  | "BUY"
+  | "SELL"
+  | "HOLD"
+  | "WATCH"
+  | "FILL"
+  | "EXIT";
+
 export interface DecisionRow {
   ticker: string;
-  decision: "BUY" | "SELL" | "HOLD" | "WATCH";
+  decision: DecisionKind;
   agent: string;
   timestamp: string;
   criteria_met: string[];

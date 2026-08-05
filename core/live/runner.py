@@ -93,6 +93,9 @@ class AgentRunResult:
     trades: list[TradeRecord] = field(default_factory=list)
     universe_size: int = 0
     error: str | None = None  # set if the run failed for this agent
+    #: True when this agent had already completed ``as_of`` and the run
+    #: was a no-op. Distinguishes "nothing to do" from "traded nothing".
+    skipped: bool = False
 
 
 def build_default_adapters(
@@ -368,7 +371,9 @@ class DailyRunner:
         return results
 
     # ------------------------------------------------------------------
-    def run(self, *, as_of: date | None = None) -> list[AgentRunResult]:
+    def run(
+        self, *, as_of: date | None = None, force: bool = False
+    ) -> list[AgentRunResult]:
         if self.market == "TASE":
             return self._tase_placeholder("open", as_of)
         as_of = as_of or date.today()
@@ -395,7 +400,9 @@ class DailyRunner:
         results: list[AgentRunResult] = []
         for adapter in self.adapters:
             try:
-                result = self._run_one(adapter, as_of, members, prices, fundamentals)
+                result = self._run_one(
+                    adapter, as_of, members, prices, fundamentals, force=force
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.error(f"{as_of}: {adapter.name} failed: {exc}")
                 portfolio = LivePortfolio.load_or_seed(
@@ -418,12 +425,29 @@ class DailyRunner:
         members: list[str],
         prices: dict[str, float | None],
         fundamentals: dict[str, PointInTimeFinancials | None],
+        *,
+        force: bool = False,
     ) -> AgentRunResult:
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
             directory=self.portfolio_dir,
             initial_cash=self.initial_cash,
         )
+
+        # Idempotency. The workflow can fire twice for one date — a
+        # retry, a manual dispatch after a scheduled run, the watchdog's
+        # make-up trigger — and without this the second pass re-executes
+        # every rotation and writes a second set of decision records for
+        # the same day. last_open_run has been written since the runner
+        # was built and never read until now.
+        if not force and portfolio.last_open_run[:10] == as_of.isoformat():
+            logger.info(
+                f"{as_of}: {adapter.name} already completed this date — "
+                f"skipping (pass force=True to re-run)"
+            )
+            return AgentRunResult(
+                agent=adapter.name, portfolio=portfolio, skipped=True
+            )
 
         # Mark existing positions to today's price (some held tickers
         # may not be in members — still need their current price for NAV).
@@ -591,7 +615,9 @@ class DailyRunner:
             self.decision_logger.log(
                 make_decision(
                     ticker=target.ticker,
-                    decision="BUY",
+                    # FILL, not BUY. The strategy already logged BUY as
+                    # its intent; this record is the execution.
+                    decision="FILL",
                     agent=agent,
                     timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
                     criteria_met=[f"rank #{target.rank}", "live paper-trade"],
@@ -609,10 +635,14 @@ class DailyRunner:
             self.decision_logger.log(
                 make_decision(
                     ticker=pos.ticker,
-                    decision="SELL",
+                    # EXIT, not SELL — this is the executed disposal, and
+                    # the trigger is a real one: the name left today's
+                    # target list. Recording it as "SELL" made a
+                    # mechanical rotation look like a doctrine decision.
+                    decision="EXIT",
                     agent=agent,
                     timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
-                    criteria_met=["rotated out of target portfolio"],
+                    criteria_met=["left today's target list"],
                     rationale=(
                         f"Closed live position: entry ${pos.entry_price:.2f}, "
                         f"exit ${price:.2f} ({(price/pos.entry_price - 1)*100:+.2f}%)"

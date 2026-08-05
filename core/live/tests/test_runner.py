@@ -272,3 +272,125 @@ class TestMarkToMarket:
         pos = results[0].portfolio.positions[0]
         assert pos.current_price == pytest.approx(63.0)
         assert results[0].portfolio.last_close_run != ""
+
+
+# ---------------------------------------------------------------------------
+# Idempotency
+# ---------------------------------------------------------------------------
+class TestIdempotency:
+    """The workflow can fire twice for one date — a retry, a manual
+    dispatch after a scheduled run, the watchdog's make-up trigger. The
+    second pass used to re-execute every rotation and write a second set
+    of decision records for the same day."""
+
+    def _scan(self, runner: DailyRunner, *, force: bool = False):
+        adapter = _StubAdapter("stub_agent", [_target("KEEP", weight=0.5)])
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["KEEP"],
+            {"KEEP": 20.0},
+            {"KEEP": None},
+            force=force,
+        )
+
+    def test_second_run_on_the_same_date_is_a_no_op(
+        self, runner: DailyRunner
+    ) -> None:
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+
+        first = self._scan(runner)
+        second = self._scan(runner)
+
+        assert first.trades  # the first run actually bought
+        assert second.trades == []
+        assert second.skipped is True
+
+    def test_the_no_op_preserves_state(self, runner: DailyRunner) -> None:
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+
+        first = self._scan(runner)
+        nav_after_first = first.portfolio.total_nav
+        second = self._scan(runner)
+
+        assert second.portfolio.has("KEEP")
+        assert second.portfolio.total_nav == pytest.approx(nav_after_first)
+
+    def test_force_re_runs(self, runner: DailyRunner) -> None:
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+
+        self._scan(runner)
+        forced = self._scan(runner, force=True)
+
+        assert forced.skipped is False
+
+    def test_a_different_date_is_not_skipped(self, runner: DailyRunner) -> None:
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+        self._scan(runner)
+
+        adapter = _StubAdapter("stub_agent", [_target("KEEP", weight=0.5)])
+        tomorrow = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            date(2026, 8, 6),
+            ["KEEP"],
+            {"KEEP": 21.0},
+            {"KEEP": None},
+        )
+
+        assert tomorrow.skipped is False
+
+
+# ---------------------------------------------------------------------------
+# Decision-log labelling
+# ---------------------------------------------------------------------------
+class TestExecutionLabels:
+    """The strategy logs BUY as intent; the runner used to log BUY again
+    for the fill, so every executed purchase appeared twice for the same
+    ticker on the same day."""
+
+    def _records(self, runner: DailyRunner) -> list[dict]:
+        import json
+
+        root = runner.decision_logger.root / "stub_agent"
+        out: list[dict] = []
+        for path in sorted(root.glob("*.json")):
+            payload = json.loads(path.read_text())
+            out.extend(payload if isinstance(payload, list) else [payload])
+        return out
+
+    def test_a_fill_is_labelled_as_a_fill(self, runner: DailyRunner) -> None:
+        runner.price_loader = _StubPriceLoader({"NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+
+        runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW"],
+            {"NEW": 20.0},
+            {"NEW": None},
+        )
+
+        decisions = {r["decision"] for r in self._records(runner)}
+        assert "FILL" in decisions
+        assert "BUY" not in decisions  # the stub adapter logs no intent
+
+    def test_an_exit_is_labelled_as_an_exit(self, runner: DailyRunner) -> None:
+        _seed_holding(
+            runner, "stub_agent", "GONE", entry_price=50.0, current_price=55.0
+        )
+        runner.price_loader = _StubPriceLoader({"GONE": 55.0, "NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+
+        runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW", "GONE"],
+            {"NEW": 20.0, "GONE": 55.0},
+            {"NEW": None, "GONE": None},
+        )
+
+        records = self._records(runner)
+        exits = [r for r in records if r["decision"] == "EXIT"]
+        assert len(exits) == 1
+        assert exits[0]["ticker"] == "GONE"
+        assert "left today's target list" in exits[0]["criteria_met"]

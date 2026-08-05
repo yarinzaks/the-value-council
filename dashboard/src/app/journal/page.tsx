@@ -20,11 +20,15 @@ export default async function JournalPage({
 }) {
   const { locale, t } = getServerI18n();
   const agentSlug = searchParams.agent as AgentSlug | undefined;
+  // FILL/EXIT are the runner's executions; BUY/SELL are the strategy's
+  // intent. Both are real records and both belong in the journal.
   const decisionFilter = searchParams.decision as
     | "BUY"
     | "SELL"
     | "WATCH"
     | "HOLD"
+    | "FILL"
+    | "EXIT"
     | undefined;
 
   const [decisions, companyNames] = await Promise.all([
@@ -75,7 +79,7 @@ export default async function JournalPage({
           <span className="text-xs uppercase tracking-wider text-council-500">
             {t("filter_type")}
           </span>
-          {(["BUY", "WATCH", "SELL"] as const).map((d) => (
+          {(["BUY", "FILL", "WATCH", "SELL", "EXIT"] as const).map((d) => (
             <a
               key={d}
               href={`/journal?${agentSlug ? `agent=${agentSlug}&` : ""}decision=${d}`}
@@ -104,9 +108,9 @@ export default async function JournalPage({
                 <div className="flex items-start gap-3">
                   <span
                     className={`text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap ${
-                      d.decision === "BUY"
+                      d.decision === "BUY" || d.decision === "FILL"
                         ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : d.decision === "SELL"
+                        : d.decision === "SELL" || d.decision === "EXIT"
                           ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
                           : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
                     }`}
