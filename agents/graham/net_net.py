@@ -382,7 +382,20 @@ class BenjaminGraham(Strategy):
                         "pe": round(s.pe, 4),
                         "pb": round(s.pb, 4),
                         "current_ratio": round(s.current_ratio, 4),
-                        "graham_number": round(s.composite, 4),
+                        # Renamed. This is the ch.14 combined test, a
+                        # dimensionless product; the Graham Number is a
+                        # price per share and is logged beside it.
+                        "pe_times_pb": round(s.composite, 4),
+                        "graham_number": (
+                            round(s.graham_number, 4)
+                            if s.graham_number is not None
+                            else None
+                        ),
+                        "margin_of_safety_pct": (
+                            round(s.margin_of_safety_pct, 2)
+                            if s.margin_of_safety_pct is not None
+                            else None
+                        ),
                         "debt_to_equity": round(s.debt_to_equity, 4),
                         "net_income": s.net_income,
                         "market_cap": s.market_cap,
@@ -423,10 +436,12 @@ class BenjaminGraham(Strategy):
                     if sel.top_scores
                     else None
                 ),
-                "top_graham_number": (
+                # Same rename as the per-decision record: these are the
+                # ch.14 combined test, not the Graham Number.
+                "top_pe_times_pb": (
                     sel.top_defensive[0].composite if sel.top_defensive else None
                 ),
-                "median_graham_number": (
+                "median_pe_times_pb": (
                     sorted(s.composite for s in sel.top_defensive)[
                         len(sel.top_defensive) // 2
                     ]
