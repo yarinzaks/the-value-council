@@ -360,3 +360,61 @@ class TestDistressedPrice:
 
         assert result.passed is False
         assert "52-week low" in (result.rejection_reason or "")
+
+
+class TestTheDistressedPriceGateIsReachable:
+    """``require_distressed_price`` defaulted to False and no caller set it.
+
+    ``is_distressed_price`` encoded Schloss's entry condition and
+    ``passes_filters`` gated on it, so the rule was written and tested —
+    and unreachable, because ``filter_candidates`` had no way to supply
+    the two prices it needs. It does now.
+    """
+
+    @staticmethod
+    def _candidate(price: float) -> tuple[PointInTimeFinancials, float, float]:
+        fin = _fin(ticker="CHEAP")
+        return fin, 1_000_000_000.0, price
+
+    def test_without_a_lookup_the_condition_is_skipped(self) -> None:
+        # Backward compatibility: every existing caller passes nothing
+        # and must behave exactly as before.
+        out = filter_candidates(
+            [self._candidate(2.0)], as_of=date(2024, 6, 30), min_years_public=0
+        )
+
+        assert [f.ticker for f, _, _ in out] == ["CHEAP"]
+
+    def test_a_beaten_down_name_passes(self) -> None:
+        # Trading at 2.0 against a 52-week low of 1.95 — capitulation.
+        out = filter_candidates(
+            [self._candidate(2.0)],
+            as_of=date(2024, 6, 30),
+            min_years_public=0,
+            price_history=lambda t, d: (1.95, 20.0),
+        )
+
+        assert [f.ticker for f, _, _ in out] == ["CHEAP"]
+
+    def test_a_name_near_its_high_is_rejected(self) -> None:
+        # Cheap on book and nowhere near distress. Schloss wanted both.
+        out = filter_candidates(
+            [self._candidate(2.0)],
+            as_of=date(2024, 6, 30),
+            min_years_public=0,
+            price_history=lambda t, d: (1.0, 2.1),
+        )
+
+        assert out == []
+
+    def test_no_price_history_is_rejected_not_admitted(self) -> None:
+        # "Cannot tell" is not "qualifies". A name we cannot show is
+        # beaten down has not shown it.
+        out = filter_candidates(
+            [self._candidate(2.0)],
+            as_of=date(2024, 6, 30),
+            min_years_public=0,
+            price_history=lambda t, d: (None, None),
+        )
+
+        assert out == []

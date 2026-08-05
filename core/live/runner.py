@@ -111,6 +111,7 @@ def build_default_adapters(
     *,
     decision_logger: DecisionLogger,
     edgar_cache: EdgarCache | None = None,
+    price_loader: PriceDataLoader | None = None,
 ) -> list[AgentAdapter]:
     """Construct the live adapters for all 10 council members.
 
@@ -120,12 +121,17 @@ def build_default_adapters(
     Marks, Klarman, Fisher) DO need it for trailing growth / FCF /
     margin-trend lookups, so we pass the runner's cache through.
 
+    Schloss additionally takes the price loader: his entry condition is
+    a 52-week low and a five-year high, which are price facts rather
+    than filings.
+
     LLM analyzers are intentionally ``None`` for live mode here — same
     rationale as backtest: lookahead bias + free-tier quota burn. The
     quant pipelines drive selection identically; if/when the LLM-quota
     story changes, the analyzers can be wired in by the caller.
     """
     cache = edgar_cache or EdgarCache()
+    prices = price_loader or PriceDataLoader()
     return [
         GreenblattLive(
             MagicFormula(
@@ -139,6 +145,11 @@ def build_default_adapters(
                 portfolio_size=30,
                 min_years_public=0,  # universe filter handles "established" already
                 min_market_cap=500_000_000.0,
+                # Schloss's entry condition — near the 52-week low, or
+                # 50% off the five-year high. The rule was written and
+                # tested behind a flag no caller passed.
+                price_loader=prices,
+                require_distressed_price=True,
                 decision_logger=decision_logger,
             )
         ),
@@ -292,15 +303,18 @@ class DailyRunner:
         self.market = market
         self.cache = cache or EdgarCache()
         self.decision_logger = decision_logger or DecisionLogger()
+        # Before the adapters: Schloss's distressed-price condition
+        # needs this loader, and the builder takes it as an argument.
+        self.price_loader = price_loader or PriceDataLoader()
         self.adapters = adapters or build_default_adapters(
             decision_logger=self.decision_logger,
             edgar_cache=self.cache,
+            price_loader=self.price_loader,
         )
         self.portfolio_dir = portfolio_dir
         self.cost_bps = cost_bps
         self.initial_cash = initial_cash
         self.rebalance_band = rebalance_band
-        self.price_loader = price_loader or PriceDataLoader()
         self.universe = universe or FullMarketUniverse(cache=self.cache)
         if pit_loader is None:
             fetcher = FundamentalsFetcher(

@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from core.backtest.data_loader import PriceDataLoader
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -81,6 +82,8 @@ class WalterSchloss(Strategy):
         max_de: float = DEFAULT_MAX_DE,
         min_years_public: int = DEFAULT_MIN_YEARS_PUBLIC,
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+        price_loader: PriceDataLoader | None = None,
+        require_distressed_price: bool = False,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -91,7 +94,14 @@ class WalterSchloss(Strategy):
             raise ValueError(f"max_de must be positive; got {max_de}")
         if min_market_cap <= 0:
             raise ValueError(f"min_market_cap must be positive; got {min_market_cap}")
+        if require_distressed_price and price_loader is None:
+            raise ValueError(
+                "require_distressed_price needs a price_loader for the "
+                "52-week low and five-year high"
+            )
         self.portfolio_size = portfolio_size
+        self.price_loader = price_loader
+        self.require_distressed_price = require_distressed_price
         self.max_pb = max_pb
         self.max_de = max_de
         self.min_years_public = min_years_public
@@ -134,6 +144,7 @@ class WalterSchloss(Strategy):
             max_de=self.max_de,
             min_years_public=self.min_years_public,
             min_market_cap=self.min_market_cap,
+            price_history=self._price_history if self.require_distressed_price else None,
         )
 
         # 3. Score (sort by P/B asc) + take top N
@@ -170,6 +181,23 @@ class WalterSchloss(Strategy):
         return weights
 
     # ------------------------------------------------------------------
+    def _price_history(
+        self, ticker: str, as_of: date
+    ) -> tuple[float | None, float | None]:
+        """52-week low and five-year high, for Schloss's entry condition.
+
+        Both come from the cache: this runs across the whole universe
+        every rebalance, so a network call per candidate is not on.
+        ``(None, None)`` when nothing is cached, which the filter reads
+        as "cannot tell" and rejects — Schloss bought capitulation, and
+        a name we cannot show is beaten down has not shown it.
+        """
+        if self.price_loader is None:
+            return None, None
+        low, _ = self.price_loader.price_extremes(ticker, as_of, years=1.0)
+        _, high = self.price_loader.price_extremes(ticker, as_of, years=5.0)
+        return low, high
+
     @staticmethod
     def _market_cap(
         fin: PointInTimeFinancials | None,

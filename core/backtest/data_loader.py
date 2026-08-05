@@ -350,6 +350,36 @@ class PriceDataLoader:
             return pd.DataFrame()
         return pd.concat(series.values(), axis=1).sort_index()
 
+    def price_extremes(
+        self,
+        ticker: str,
+        as_of: date | datetime,
+        *,
+        years: float,
+    ) -> tuple[float | None, float | None]:
+        """Lowest and highest adjusted close over the trailing window.
+
+        Returns ``(low, high)``, either of which is None when the window
+        holds no bars. Reads the cache only — this is a screening input
+        evaluated across the whole universe, and one network call per
+        candidate per rebalance is not affordable. A ticker with no
+        cached history yields ``(None, None)``, which callers must read
+        as "cannot tell" rather than "not distressed".
+
+        Added for Schloss's entry condition, which needs a 52-week low
+        and a five-year high; :func:`agents.schloss.filters.is_distressed_price`
+        consumes both.
+        """
+        as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
+        start = as_of_d - timedelta(days=int(365.25 * years))
+        df = self._read_cached(ticker.upper(), start, as_of_d)
+        if df.empty:
+            return None, None
+        closes = df["adj_close"].dropna()
+        if closes.empty:
+            return None, None
+        return float(closes.min()), float(closes.max())
+
     @staticmethod
     def _fresh_close(
         df: pd.DataFrame,

@@ -24,16 +24,23 @@ Filters not implemented (documented as deferred):
   code. The Greenblatt agent has the same gap.
 * **Insider ownership ≥ 5%** — requires Form 4/DEF-14A parsing, not
   in the cache.
-* **Multi-year low / 50% below 5-year high** — would require fetching
-  5 years of price history per candidate per rebalance, which is
-  expensive. Schloss's behavior was opportunistic on the dip rather
-  than a hard filter, and our annual rebalance cadence partially
-  substitutes.
+**Multi-year low / 50% below 5-year high** — now implemented, and it
+took two steps. :func:`is_distressed_price` encoded the rule and
+:func:`passes_filters` gated on it behind ``require_distressed_price``,
+which defaulted to False and which no caller ever passed — a rule
+written, tested, and unreachable. It is reached now: pass
+``price_history`` to :func:`filter_candidates` and the strategy supplies
+a lookup backed by the price cache, so the "expensive" objection above
+no longer applies. Nothing is fetched per candidate; the extremes are
+read from bars already on disk, and a ticker with no cached history
+returns ``(None, None)``, which the filter reads as "cannot tell" and
+rejects. Schloss bought capitulation, and a name we cannot show is
+beaten down has not shown it.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date
 
@@ -42,6 +49,11 @@ from core.logger import get_logger
 from core.scoring.leverage import debt_to_equity as _shared_debt_to_equity
 
 logger = get_logger("agents.schloss.filters")
+
+#: ``(ticker, as_of) -> (low_52w, high_5y)``. Kept as a callable so
+#: the filter never needs the price loader itself — the strategy owns
+#: that dependency and hands over just the two numbers.
+PriceHistoryLookup = Callable[[str, date], tuple[float | None, float | None]]
 
 
 DEFAULT_MAX_PB: float = 0.75
@@ -299,17 +311,28 @@ def filter_candidates(
     max_de: float = DEFAULT_MAX_DE,
     min_years_public: int = DEFAULT_MIN_YEARS_PUBLIC,
     min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+    price_history: PriceHistoryLookup | None = None,
 ) -> list[tuple[PointInTimeFinancials, float, float]]:
     """Run the filter pipeline over a batch of candidates.
 
     ``candidates`` is an iterable of ``(financials, market_cap, price)``
     tuples — the strategy precomputes price and market cap so the
     filter doesn't need access to the price loader directly.
+
+    ``price_history`` turns on the multi-year-low condition. Pass a
+    callable returning ``(low_52w, high_5y)`` for a ticker and date; the
+    strategy supplies one backed by the price cache. Left None the
+    condition is skipped, which is what every caller did before it
+    existed — the rule was written, tested, and reachable only by
+    passing a flag nobody passed.
     """
     passed: list[tuple[PointInTimeFinancials, float, float]] = []
     rejected: dict[str, int] = {}
 
     for fin, mcap, price in candidates:
+        low_52w = high_5y = None
+        if price_history is not None and fin is not None:
+            low_52w, high_5y = price_history(fin.ticker, as_of)
         result = passes_filters(
             fin,
             mcap,
@@ -319,6 +342,9 @@ def filter_candidates(
             max_de=max_de,
             min_years_public=min_years_public,
             min_market_cap=min_market_cap,
+            low_52w=low_52w,
+            high_5y=high_5y,
+            require_distressed_price=price_history is not None,
         )
         if result.passed and fin is not None and mcap is not None and price is not None:
             passed.append((fin, mcap, price))
@@ -340,6 +366,7 @@ __all__ = [
     "DEFAULT_MIN_MARKET_CAP_USD",
     "DEFAULT_MIN_YEARS_PUBLIC",
     "FilterResult",
+    "PriceHistoryLookup",
     "book_value_per_share",
     "debt_to_equity",
     "filter_candidates",
