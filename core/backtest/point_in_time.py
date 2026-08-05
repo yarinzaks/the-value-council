@@ -26,20 +26,19 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Mapping
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import date, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Iterator, Protocol
 
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
 logger = get_logger("core.backtest.point_in_time")
 
-from core.paths import edgar_filings_db as _edgar_filings_db
-
+from core.paths import PROJECT_ROOT, edgar_filings_db as _edgar_filings_db
 DEFAULT_CACHE_PATH = _edgar_filings_db()
 
 
@@ -67,7 +66,7 @@ class FilingMetadata:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, str | None]) -> FilingMetadata:
+    def from_dict(cls, d: dict[str, str | None]) -> "FilingMetadata":
         return cls(
             ticker=str(d["ticker"]),
             cik=d.get("cik"),
@@ -123,6 +122,26 @@ class PointInTimeFinancials:
         return d
 
 
+# Fields that carry actual reported numbers. ``sic_code`` is excluded on
+# purpose: it is classification metadata, so a payload holding nothing
+# but a SIC code still says nothing about the company's financials.
+_DATA_FIELDS: frozenset[str] = frozenset(
+    f.name
+    for f in fields(PointInTimeFinancials)
+    if f.name not in {"ticker", "as_of", "source_filing", "sic_code"}
+)
+
+
+def _has_financial_data(payload: Mapping[str, object]) -> bool:
+    """True when ``payload`` carries at least one reported value.
+
+    Sparse XBRL is normal and stays valid — one real number is enough.
+    A payload with none at all is a parse failure, not a fact about the
+    company, and must not be dressed up as data.
+    """
+    return any(payload.get(name) is not None for name in _DATA_FIELDS)
+
+
 # ----------------------------------------------------------------------
 # Adapter protocol — the EDGAR layer is pluggable for testability.
 # ----------------------------------------------------------------------
@@ -153,12 +172,19 @@ class EdgartoolsAdapter:
 
     Lazily imports edgartools so that test environments without the
     library can still import and use a fake adapter.
+
+    Only :meth:`list_filings` is implemented. :meth:`parse_financials`
+    raises — see its docstring — so a default-constructed
+    :class:`PointInTimeLoader` will fail loudly rather than hand back
+    empty financials. Inject
+    :class:`~core.data.fundamentals_fetcher.CachedEdgarAdapter` to read
+    actual numbers.
     """
 
     def __init__(self) -> None:
         # Defer import for graceful failure
         try:
-            from edgar import set_identity
+            from edgar import set_identity  # noqa: F401
         except ImportError as exc:
             raise PointInTimeError(f"edgartools not installed: {exc}") from exc
         # Identity is set elsewhere via core.data.edgar_source._initialize_edgar;
@@ -178,7 +204,7 @@ class EdgartoolsAdapter:
         for form in form_types:
             try:
                 filings = company.get_filings(form=form)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — edgartools throws broad
                 logger.warning(f"list_filings({ticker}, {form}) failed: {exc}")
                 continue
             for f in filings:
@@ -195,49 +221,39 @@ class EdgartoolsAdapter:
                             accession_number=str(f.accession_number),
                         )
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — defensive
                     logger.debug(f"skipping malformed filing for {ticker}: {exc}")
         return results
 
     def parse_financials(
         self, filing: FilingMetadata
     ) -> dict[str, float | None]:
-        # edgartools' Financials API parses XBRL into pandas DataFrames.
-        # We extract a curated subset; missing concepts return None.
-        from edgar import Filing
+        """Unimplemented against the installed edgartools — always raises.
 
-        out: dict[str, float | None] = {}
-        try:
-            f = Filing(
-                accession_number=filing.accession_number,
-                cik=filing.cik,
-                form_type=filing.form_type,
-            )
-            obj = f.obj()  # Returns a TenK / TenQ object with .financials
-            financials = getattr(obj, "financials", None)
-            if financials is None:
-                return out
-        except Exception as exc:
-            logger.warning(
-                f"parse_financials({filing.ticker} {filing.accession_number}) "
-                f"failed: {exc}"
-            )
-            return out
+        This path has never worked. It called ``Filing()`` with keyword
+        names the library does not accept (``accession_number`` for
+        ``accession_no``, ``form_type`` for ``form``, and omitting the
+        required ``company`` and ``filing_date``), swallowed the
+        resulting ``TypeError``, and returned ``{}``.
 
-        # The API surface here varies by edgartools version. We use a
-        # defensive lookup that tries common attribute paths.
-        for field, getters in _FINANCIAL_GETTERS.items():
-            value: float | None = None
-            for getter in getters:
-                try:
-                    v = getter(financials)
-                    if v is not None:
-                        value = float(v)
-                        break
-                except Exception:
-                    continue
-            out[field] = value
-        return out
+        Fixing the constructor alone would change nothing observable:
+        :data:`_FINANCIAL_GETTERS` walks attribute paths such as
+        ``financials.income_statement.revenues``, but on the installed
+        version those statement accessors are *methods* and the values
+        live behind ``Financials.get_revenue()`` and friends — so every
+        field would still resolve to ``None``.
+
+        :class:`~core.data.fundamentals_fetcher.CachedEdgarAdapter`
+        already extracts these numbers correctly from the local EDGAR
+        cache, and is what every caller in the project injects.
+        """
+        raise PointInTimeError(
+            f"EdgartoolsAdapter cannot parse financials for {filing.ticker} "
+            f"(accession {filing.accession_number}): this adapter's XBRL "
+            f"extraction is not implemented against the installed edgartools. "
+            f"Pass CachedEdgarAdapter from core.data.fundamentals_fetcher to "
+            f"PointInTimeLoader instead."
+        )
 
 
 # Mapping from PointInTimeFinancials field → list of getter callables
@@ -251,6 +267,12 @@ def _safe_get(obj: object, *attrs: str) -> object | None:
     return obj
 
 
+# Currently unused: these attribute paths target an edgartools API
+# surface the installed version does not expose — the statement
+# accessors are methods there, and values live behind
+# ``Financials.get_revenue()`` and friends (see parse_financials above).
+# Kept as the field map for whoever implements that extraction: they
+# record which concept each field wants, not how to reach it.
 _FINANCIAL_GETTERS: dict[str, list] = {
     "revenue": [
         lambda f: _safe_get(f, "income_statement", "revenues"),
@@ -488,7 +510,14 @@ class PointInTimeLoader:
     ) -> PointInTimeFinancials | None:
         """Return point-in-time financials for ticker as of date.
 
-        Returns ``None`` if no qualifying filing exists.
+        Returns ``None`` when no filing exists on or before ``as_of``.
+
+        Raises :class:`PointInTimeError` when a filing *was* found but
+        yielded no usable data. That is a parse failure, and it is
+        deliberately not reported as ``None`` — which would be
+        indistinguishable from having no filing at all — nor as a
+        :class:`PointInTimeFinancials` whose every field is ``None``,
+        which would look like real data to every caller.
         """
         as_of_d = _to_date(as_of)
         filing = self.latest_filing_before(
@@ -501,15 +530,32 @@ class PointInTimeLoader:
             return None
 
         cached = self._cached_financials(filing.accession_number)
-        if cached is None:
+        if cached is not None and _has_financial_data(cached):
+            payload = cached
+        else:
+            # Either nothing cached, or a row holding no data at all —
+            # written back when parse failures were stored as if they
+            # were results. Re-parse instead of replaying it, so a cache
+            # poisoned by a broken adapter heals once the adapter works.
             logger.debug(
                 f"parsing financials for {ticker} {filing.form_type} "
                 f"filed {filing.filing_date} (acc {filing.accession_number})"
             )
             payload = self._adapter.parse_financials(filing)
-            self._store_financials(filing.accession_number, payload)
-        else:
-            payload = cached
+            # Never store an empty payload. An accession is immutable, so
+            # nothing would ever invalidate the row and the parse failure
+            # would outlive whatever caused it.
+            if _has_financial_data(payload):
+                self._store_financials(filing.accession_number, payload)
+
+        if not _has_financial_data(payload):
+            raise PointInTimeError(
+                f"{ticker.upper()}: {filing.form_type} filed "
+                f"{filing.filing_date} (accession {filing.accession_number}) "
+                f"yielded no usable financial data from "
+                f"{type(self._adapter).__name__}. The filing exists — this is "
+                f"a parse failure, not a missing filing."
+            )
 
         return PointInTimeFinancials(
             ticker=ticker.upper(),

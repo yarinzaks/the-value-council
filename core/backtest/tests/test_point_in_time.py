@@ -19,7 +19,9 @@ from core.backtest.point_in_time import (
     _PAYLOAD_VERSION,
     _VERSION_KEY,
     EdgarAdapter,
+    EdgartoolsAdapter,
     FilingMetadata,
+    PointInTimeError,
     PointInTimeLoader,
 )
 
@@ -190,6 +192,130 @@ class TestLatestFilingBefore:
         assert result is not None
         assert result.form_type == "10-Q"  # Q1 2015 is the most recent
         assert result.filing_date == date(2015, 4, 25)
+
+
+_UNPARSEABLE = FilingMetadata(
+    ticker="AAPL",
+    cik="320193",
+    form_type="10-K",
+    filing_date=date(2015, 10, 28),
+    period_of_report=date(2015, 9, 26),
+    accession_number="ACC-UNPARSEABLE",
+)
+
+
+class TestEmptyPayloadIsNotData:
+    """A filing that parses to nothing must never look like real data.
+
+    ``get_financials`` used to build a :class:`PointInTimeFinancials`
+    out of an empty payload, so every field came back ``None`` while the
+    object itself looked valid. Callers had no way to tell that apart
+    from a company that genuinely reports sparse XBRL.
+    """
+
+    def test_unparseable_filing_raises_instead_of_all_none_object(
+        self, adapter: FakeAdapter, loader: PointInTimeLoader
+    ) -> None:
+        # FakeAdapter returns {} for any accession it has no financials for.
+        adapter._filings["AAPL"].append(_UNPARSEABLE)
+        with pytest.raises(PointInTimeError, match="no usable financial data"):
+            loader.get_financials("AAPL", date(2015, 11, 1))
+
+    def test_missing_filing_still_returns_none(
+        self, loader: PointInTimeLoader
+    ) -> None:
+        """The other half of the distinction: no filing is not an error."""
+        assert loader.get_financials("AAPL", date(2015, 1, 1)) is None
+
+    def test_partially_populated_payload_is_returned(
+        self, adapter: FakeAdapter, loader: PointInTimeLoader
+    ) -> None:
+        """Sparse reporting is legitimate — only an empty payload is a failure."""
+        sparse = FilingMetadata(
+            ticker="AAPL",
+            cik="320193",
+            form_type="10-K",
+            filing_date=date(2015, 10, 28),
+            period_of_report=date(2015, 9, 26),
+            accession_number="ACC-SPARSE",
+        )
+        adapter._filings["AAPL"].append(sparse)
+        adapter._financials["ACC-SPARSE"] = {"eps_basic": 9.22}
+
+        result = loader.get_financials("AAPL", date(2015, 11, 1))
+
+        assert result is not None
+        assert result.eps_basic == pytest.approx(9.22)
+        assert result.revenue is None  # sparse, but the filing still parsed
+
+    def test_empty_payload_is_not_written_to_the_cache(
+        self, adapter: FakeAdapter, loader: PointInTimeLoader
+    ) -> None:
+        """Otherwise the failure outlives the bug that caused it.
+
+        An accession is immutable, so a cached empty payload would keep
+        being served even after the adapter is repaired.
+        """
+        adapter._filings["AAPL"].append(_UNPARSEABLE)
+        with pytest.raises(PointInTimeError):
+            loader.get_financials("AAPL", date(2015, 11, 1))
+
+        assert loader._cached_financials("ACC-UNPARSEABLE") is None
+
+    def test_empty_cached_payload_is_re_parsed_not_replayed(
+        self, adapter: FakeAdapter, loader: PointInTimeLoader
+    ) -> None:
+        """A cache poisoned by an earlier broken adapter must heal itself.
+
+        Real caches already hold rows written when parsing silently
+        returned ``{}``. Serving them back forever would keep the
+        failure alive long after the adapter that caused it was fixed.
+        """
+        poisoned = FilingMetadata(
+            ticker="AAPL",
+            cik="320193",
+            form_type="10-K",
+            filing_date=date(2015, 10, 28),
+            period_of_report=date(2015, 9, 26),
+            accession_number="ACC-POISONED",
+        )
+        adapter._filings["AAPL"].append(poisoned)
+        loader._store_financials("ACC-POISONED", {})
+        # The adapter can parse it now — the stale empty row must not win.
+        adapter._financials["ACC-POISONED"] = {"eps_basic": 8.31}
+
+        result = loader.get_financials("AAPL", date(2015, 11, 1))
+
+        assert result is not None
+        assert result.eps_basic == pytest.approx(8.31)
+        assert "ACC-POISONED" in adapter.parse_calls
+
+
+class TestDefaultAdapterPath:
+    """Regression: ``PointInTimeLoader()`` — the obvious construction.
+
+    ``EdgartoolsAdapter.parse_financials`` called edgartools' ``Filing()``
+    with kwargs that never matched the installed signature, swallowed the
+    resulting ``TypeError``, and returned ``{}``. Every field of the
+    resulting :class:`PointInTimeFinancials` was ``None``, and callers
+    got that back as though it were data.
+    """
+
+    def test_default_adapter_parse_financials_fails_loudly(self) -> None:
+        with pytest.raises(PointInTimeError, match="CachedEdgarAdapter"):
+            EdgartoolsAdapter().parse_financials(_UNPARSEABLE)
+
+    def test_default_constructed_loader_never_yields_all_none_financials(
+        self, tmp_path: Path
+    ) -> None:
+        # Default adapter — only cache_path is overridden, to keep the
+        # test off the real project cache. Seeding the filing directly
+        # keeps list_filings from reaching the network.
+        loader = PointInTimeLoader(cache_path=tmp_path / "edgar.sqlite")
+        loader._store_filings([_UNPARSEABLE])
+
+        with pytest.raises(PointInTimeError):
+            loader.get_financials("AAPL", date(2015, 11, 1))
 
 
 class TestFilingMetadataDataclass:
