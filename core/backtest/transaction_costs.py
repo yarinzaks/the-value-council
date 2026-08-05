@@ -88,4 +88,4 @@ class PerShareCost(CostModel):
         return f"PerShareCost(${self.rate:.4f}/share)"
 
 
-__all__ = ["CostModel", "ZeroCost", "PercentageCost", "PerShareCost"]
+__all__ = ["CostModel", "PerShareCost", "PercentageCost", "ZeroCost"]

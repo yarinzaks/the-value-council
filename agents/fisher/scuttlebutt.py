@@ -210,12 +210,12 @@ class ScuttlebuttAnalyzer:
             portfolio_state=portfolio_state,
         )
 
-        self.client._throttle()  # noqa: SLF001
+        self.client._throttle()
         try:
             import google.generativeai as genai
 
             model = genai.GenerativeModel(
-                model_name=self.client._model_name,  # noqa: SLF001
+                model_name=self.client._model_name,
                 system_instruction=_FISHER_SYSTEM_PROMPT,
             )
             response = model.generate_content(
@@ -225,17 +225,17 @@ class ScuttlebuttAnalyzer:
                     "response_mime_type": "application/json",
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise LLMError(f"Gemini Fisher call failed: {exc}") from exc
 
         text = (response.text or "").strip()
         if not text:
             raise LLMError("Gemini returned an empty response")
 
-        memo_dict = self.client._parse_json(text)  # noqa: SLF001
+        memo_dict = self.client._parse_json(text)
         try:
             return FisherMemo.model_validate(memo_dict)
-        except Exception as exc:  # noqa: BLE001 — pydantic ValidationError
+        except Exception as exc:
             raise LLMError(
                 f"Gemini response did not match FisherMemo schema: {exc}\n"
                 f"Raw: {text[:500]}"

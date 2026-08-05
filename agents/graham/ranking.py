@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from core.backtest.point_in_time import PointInTimeFinancials
-from core.scoring.graham_number import graham_number
 from core.logger import get_logger
+from core.scoring.graham_number import graham_number
 
 from .filters import (
     current_ratio,

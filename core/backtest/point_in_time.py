@@ -26,18 +26,20 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterator, Protocol
+from typing import Protocol
 
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
 logger = get_logger("core.backtest.point_in_time")
 
-from core.paths import PROJECT_ROOT, edgar_filings_db as _edgar_filings_db
+from core.paths import edgar_filings_db as _edgar_filings_db
+
 DEFAULT_CACHE_PATH = _edgar_filings_db()
 
 
@@ -65,7 +67,7 @@ class FilingMetadata:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, str | None]) -> "FilingMetadata":
+    def from_dict(cls, d: dict[str, str | None]) -> FilingMetadata:
         return cls(
             ticker=str(d["ticker"]),
             cik=d.get("cik"),
@@ -156,7 +158,7 @@ class EdgartoolsAdapter:
     def __init__(self) -> None:
         # Defer import for graceful failure
         try:
-            from edgar import set_identity  # noqa: F401
+            from edgar import set_identity
         except ImportError as exc:
             raise PointInTimeError(f"edgartools not installed: {exc}") from exc
         # Identity is set elsewhere via core.data.edgar_source._initialize_edgar;
@@ -176,7 +178,7 @@ class EdgartoolsAdapter:
         for form in form_types:
             try:
                 filings = company.get_filings(form=form)
-            except Exception as exc:  # noqa: BLE001 — edgartools throws broad
+            except Exception as exc:
                 logger.warning(f"list_filings({ticker}, {form}) failed: {exc}")
                 continue
             for f in filings:
@@ -193,7 +195,7 @@ class EdgartoolsAdapter:
                             accession_number=str(f.accession_number),
                         )
                     )
-                except Exception as exc:  # noqa: BLE001 — defensive
+                except Exception as exc:
                     logger.debug(f"skipping malformed filing for {ticker}: {exc}")
         return results
 
@@ -215,7 +217,7 @@ class EdgartoolsAdapter:
             financials = getattr(obj, "financials", None)
             if financials is None:
                 return out
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"parse_financials({filing.ticker} {filing.accession_number}) "
                 f"failed: {exc}"
@@ -232,7 +234,7 @@ class EdgartoolsAdapter:
                     if v is not None:
                         value = float(v)
                         break
-                except Exception:  # noqa: BLE001 — try next getter
+                except Exception:
                     continue
             out[field] = value
         return out

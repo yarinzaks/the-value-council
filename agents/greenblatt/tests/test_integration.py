@@ -31,7 +31,7 @@ from core.backtest.strategy_runner import (
     RunnerConfig,
 )
 from core.backtest.transaction_costs import ZeroCost
-from core.backtest.universe import Change, HistoricalUniverse
+from core.backtest.universe import HistoricalUniverse
 
 
 class _FakeFundamentalsAdapter(EdgarAdapter):
@@ -99,7 +99,7 @@ def setup(tmp_path: Path):
     # Each "loser" stays flat
     winners = ["WIN1", "WIN2", "WIN3"]
     losers = ["LOSE1", "LOSE2", "LOSE3"]
-    for i, t in enumerate(winners):
+    for _i, t in enumerate(winners):
         # start at 100, grow ~50% per year
         prices = {
             d: 100.0 * (1 + 0.0010 * day_idx)

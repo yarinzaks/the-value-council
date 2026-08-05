@@ -127,7 +127,7 @@ def main() -> None:
             f"(A={sel['tier_a_count']:>2d}, B={sel['tier_b_count']:>2d}) "
             f"deploy={sel['deployed_fraction']:.0%}"
         )
-    print(f"\nDecisions logged: data/decisions/philip_fisher/")
+    print("\nDecisions logged: data/decisions/philip_fisher/")
     print(f"Report: {report_dir}")
 
 

@@ -49,7 +49,8 @@ from core.logger import get_logger
 
 logger = get_logger("core.backtest.decision_logger")
 
-from core.paths import PROJECT_ROOT, decisions_dir as _decisions_dir
+from core.paths import decisions_dir as _decisions_dir
+
 DEFAULT_DECISIONS_DIR = _decisions_dir()
 
 # BUY/SELL are the strategy's *intent* — what the doctrine selected.
@@ -114,7 +115,7 @@ class Decision:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Decision":
+    def from_dict(cls, d: dict[str, Any]) -> Decision:
         return cls(
             ticker=str(d["ticker"]),
             decision=str(d["decision"]),  # type: ignore[arg-type]
@@ -302,10 +303,10 @@ def make_decision(
 
 __all__ = [
     "DEFAULT_DECISIONS_DIR",
+    "VALID_DECISION_TYPES",
     "Decision",
     "DecisionLogger",
     "DecisionLoggerError",
     "DecisionType",
-    "VALID_DECISION_TYPES",
     "make_decision",
 ]

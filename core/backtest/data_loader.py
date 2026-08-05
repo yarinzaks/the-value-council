@@ -25,11 +25,11 @@ calculations should use it.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Iterable, Iterator
 
 import pandas as pd
 
@@ -38,7 +38,8 @@ from core.logger import get_logger
 
 logger = get_logger("core.backtest.data_loader")
 
-from core.paths import PROJECT_ROOT, prices_db as _prices_db
+from core.paths import prices_db as _prices_db
+
 DEFAULT_CACHE_PATH = _prices_db()
 
 # Calendar days re-fetched by ``get_price_on(..., force_refresh=True)``.
@@ -516,7 +517,7 @@ class PriceDataLoader:
                 actions=True,
                 threads=False,
             )
-        except Exception as exc:  # noqa: BLE001 — yfinance throws broad types
+        except Exception as exc:
             raise PriceDataError(f"yfinance failed for {ticker}: {exc}") from exc
 
         if df is None or df.empty:

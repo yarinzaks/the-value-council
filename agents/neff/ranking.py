@@ -62,7 +62,7 @@ Total: max 70. Default qualifying threshold: 35 (50%).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 
 from core.backtest.point_in_time import PointInTimeFinancials
@@ -353,7 +353,7 @@ def score_candidates(
     pe_max_frac: float = DEFAULT_PE_MAX_FRAC_OF_MARKET,
     yield_pp_over_market: float = DEFAULT_YIELD_PCT_OVER_MARKET,
     tr_pe_market_multiple: float = DEFAULT_TR_PE_MARKET_MULTIPLE,
-    sales_growth_floor_frac: float = DEFAULT_SALES_GROWTH_FLOOR_FRAC,  # noqa: ARG001
+    sales_growth_floor_frac: float = DEFAULT_SALES_GROWTH_FLOOR_FRAC,
     use_industry_medians: bool = True,
     min_industry_peers: int = MIN_INDUSTRY_PEERS,
     min_total_score: float = DEFAULT_MIN_TOTAL_SCORE,

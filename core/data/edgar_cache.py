@@ -37,7 +37,8 @@ from .edgar_facts import XbrlFact, _parse_date_required
 
 logger = get_logger("core.data.edgar_cache")
 
-from core.paths import PROJECT_ROOT, fundamentals_cache_dir as _fundamentals_cache_dir
+from core.paths import fundamentals_cache_dir as _fundamentals_cache_dir
+
 DEFAULT_CACHE_DIR = _fundamentals_cache_dir()
 
 # Parquet schema — matches XbrlFact fields. Date columns stored as
@@ -130,7 +131,7 @@ class EdgarCache:
         path = self.path_for(ticker)
         try:
             pq.write_table(table, path, compression="snappy")
-        except Exception as exc:  # noqa: BLE001 — pyarrow throws broad
+        except Exception as exc:
             raise EdgarCacheError(f"write_table failed for {ticker}: {exc}") from exc
         logger.debug(f"cached {len(facts)} facts for {ticker} → {path.name}")
 
@@ -141,7 +142,7 @@ class EdgarCache:
             return []
         try:
             table = pq.read_table(path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EdgarCacheError(f"read_table failed for {ticker}: {exc}") from exc
         return self._table_to_facts(table)
 
@@ -166,7 +167,7 @@ class EdgarCache:
             return pd.DataFrame()
         try:
             df = pq.read_table(path).to_pandas()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EdgarCacheError(f"to_pandas failed for {ticker}: {exc}") from exc
         for col in ("period_start", "period_end", "filed"):
             if col in df.columns:
@@ -279,7 +280,7 @@ class EdgarCache:
             try:
                 meta = pq.read_metadata(f)
                 total_facts += meta.num_rows
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"could not read metadata for {f}: {exc}")
         return CacheStats(
             ticker_count=len(files),

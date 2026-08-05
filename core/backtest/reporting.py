@@ -6,30 +6,30 @@ Outputs go to ``data/backtest_results/<run_id>/`` by default.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from pathlib import Path
 
 import matplotlib
 
 # Use non-interactive backend for headless / CI environments
 matplotlib.use("Agg")
-import matplotlib.dates as mdates  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import pandas as pd  # noqa: E402
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
 
-from core.logger import get_logger  # noqa: E402
+from core.logger import get_logger
 
-from .metrics import (  # noqa: E402
+from .metrics import (
     PortfolioMetrics,
     annual_returns,
     compute_metrics,
     drawdown_series,
 )
-from .strategy_runner import BacktestResult  # noqa: E402
+from .strategy_runner import BacktestResult
 
 logger = get_logger("core.backtest.reporting")
 
-from core.paths import PROJECT_ROOT, backtest_results_dir as _backtest_results_dir
+from core.paths import backtest_results_dir as _backtest_results_dir
+
 DEFAULT_RESULTS_DIR = _backtest_results_dir()
 
 

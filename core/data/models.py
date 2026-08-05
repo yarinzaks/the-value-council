@@ -169,10 +169,10 @@ class StockSnapshot(_BaseModel):
 
 
 __all__ = [
-    "Quote",
-    "Fundamentals",
-    "NewsItem",
-    "InsiderTransaction",
     "FilingExcerpt",
+    "Fundamentals",
+    "InsiderTransaction",
+    "NewsItem",
+    "Quote",
     "StockSnapshot",
 ]

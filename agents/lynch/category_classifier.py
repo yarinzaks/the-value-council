@@ -279,12 +279,12 @@ class CategoryClassifier:
             portfolio_state=portfolio_state,
         )
 
-        self.client._throttle()  # noqa: SLF001
+        self.client._throttle()
         try:
             import google.generativeai as genai
 
             model = genai.GenerativeModel(
-                model_name=self.client._model_name,  # noqa: SLF001
+                model_name=self.client._model_name,
                 system_instruction=_LYNCH_SYSTEM_PROMPT,
             )
             response = model.generate_content(
@@ -294,17 +294,17 @@ class CategoryClassifier:
                     "response_mime_type": "application/json",
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise LLMError(f"Gemini Lynch call failed: {exc}") from exc
 
         text = (response.text or "").strip()
         if not text:
             raise LLMError("Gemini returned an empty response")
 
-        memo_dict = self.client._parse_json(text)  # noqa: SLF001
+        memo_dict = self.client._parse_json(text)
         try:
             return LynchMemo.model_validate(memo_dict)
-        except Exception as exc:  # noqa: BLE001 — pydantic ValidationError
+        except Exception as exc:
             raise LLMError(
                 f"Gemini response did not match LynchMemo schema: {exc}\n"
                 f"Raw: {text[:500]}"
@@ -312,22 +312,22 @@ class CategoryClassifier:
 
 
 __all__ = [
-    "AssetPlayData",
-    "CategoryClassifier",
-    "CategorySpecificData",
-    "CyclicalData",
     "FAST_GROWER_MAX_GROWTH_PCT",
     "FAST_GROWER_MIN_GROWTH_PCT",
-    "FastGrowerData",
-    "FundamentalsCheck",
-    "LynchCategory",
-    "LynchDecision",
-    "LynchMemo",
     "SLOW_GROWER_MAX_GROWTH_PCT",
     "SLOW_GROWER_MIN_YIELD_PCT",
     "STALWART_MAX_GROWTH_PCT",
     "STALWART_MIN_GROWTH_PCT",
     "STALWART_MIN_MARKET_CAP_USD",
+    "AssetPlayData",
+    "CategoryClassifier",
+    "CategorySpecificData",
+    "CyclicalData",
+    "FastGrowerData",
+    "FundamentalsCheck",
+    "LynchCategory",
+    "LynchDecision",
+    "LynchMemo",
     "TurnaroundData",
     "heuristic_classify",
 ]

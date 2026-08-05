@@ -14,7 +14,6 @@ from agents.klarman.downside import (
 )
 from core.exceptions import LLMError
 
-
 SAMPLE_MEMO_JSON: dict[str, Any] = {
     "ticker": "REAL-ESTATE-X",
     "decision": "BUY",
@@ -185,9 +184,8 @@ class TestAnalyze:
 
         with patch(
             "google.generativeai.GenerativeModel", return_value=fake_model
-        ):
-            with pytest.raises(LLMError, match="empty"):
-                analyzer.analyze(stock_data={}, portfolio_state={})
+        ), pytest.raises(LLMError, match="empty"):
+            analyzer.analyze(stock_data={}, portfolio_state={})
 
     def test_invalid_schema_raises(self, fake_client: MagicMock) -> None:
         analyzer = DownsideAnalyzer(client=fake_client, playbook="PB")
@@ -200,9 +198,8 @@ class TestAnalyze:
 
         with patch(
             "google.generativeai.GenerativeModel", return_value=fake_model
-        ):
-            with pytest.raises(LLMError, match="schema"):
-                analyzer.analyze(stock_data={}, portfolio_state={})
+        ), pytest.raises(LLMError, match="schema"):
+            analyzer.analyze(stock_data={}, portfolio_state={})
 
     def test_sdk_error_wrapped(self, fake_client: MagicMock) -> None:
         analyzer = DownsideAnalyzer(client=fake_client, playbook="PB")
@@ -211,6 +208,5 @@ class TestAnalyze:
 
         with patch(
             "google.generativeai.GenerativeModel", return_value=fake_model
-        ):
-            with pytest.raises(LLMError, match="failed"):
-                analyzer.analyze(stock_data={}, portfolio_state={})
+        ), pytest.raises(LLMError, match="failed"):
+            analyzer.analyze(stock_data={}, portfolio_state={})

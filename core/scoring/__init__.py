@@ -6,8 +6,8 @@ from .graham_number import graham_number
 from .piotroski import piotroski_f_score
 
 __all__ = [
-    "piotroski_f_score",
     "altman_z_score",
     "beneish_m_score",
     "graham_number",
+    "piotroski_f_score",
 ]

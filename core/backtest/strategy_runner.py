@@ -343,7 +343,7 @@ class BacktestRunner:
             rebalance_dates = sorted({first_trading_day, *rebalance_dates})
         rebalance_set = set(rebalance_dates)
         # Pre-fetch SPY (we may need to buy it for BuyAndHoldSPY)
-        spy_for_strategy = bench_history.copy() if cfg.benchmark_ticker == "SPY" else None
+        bench_history.copy() if cfg.benchmark_ticker == "SPY" else None
 
         # Universe membership cache per rebalance date
         universe_cache: dict[date, list[str]] = {}

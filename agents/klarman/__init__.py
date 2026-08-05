@@ -40,8 +40,8 @@ from agents.klarman.filters import (
     passes_quality_gates,
 )
 from agents.klarman.margin_of_safety import (
-    DEFAULT_MAX_POSITION_PCT,
     DEFAULT_MAX_PORTFOLIO_SIZE,
+    DEFAULT_MAX_POSITION_PCT,
     DeploymentDecision,
     KlarmanSelection,
     SethKlarman,
@@ -67,20 +67,20 @@ from agents.klarman.valuation import (
 )
 
 __all__ = [
-    "AssetType",
-    "CapitalStructurePosition",
-    "Catalyst",
-    "CatalystStrength",
     "DEFAULT_DCF_YEARS",
     "DEFAULT_DISCOUNT_RATE_PCT",
     "DEFAULT_FCF_AVG_YEARS",
     "DEFAULT_MAX_DE",
     "DEFAULT_MAX_GROWTH_PCT",
-    "DEFAULT_MAX_POSITION_PCT",
     "DEFAULT_MAX_PORTFOLIO_SIZE",
+    "DEFAULT_MAX_POSITION_PCT",
     "DEFAULT_MIN_MARGIN_OF_SAFETY_PCT",
     "DEFAULT_MIN_MARKET_CAP_USD",
     "DEFAULT_TERMINAL_MULTIPLE",
+    "AssetType",
+    "CapitalStructurePosition",
+    "Catalyst",
+    "CatalystStrength",
     "DeploymentDecision",
     "DiversificationDimension",
     "DownsideAnalyzer",

@@ -225,9 +225,8 @@ class TestClassify:
 
         with patch(
             "google.generativeai.GenerativeModel", return_value=fake_model
-        ):
-            with pytest.raises(LLMError, match="empty"):
-                analyzer.classify(stock_data={}, portfolio_state={})
+        ), pytest.raises(LLMError, match="empty"):
+            analyzer.classify(stock_data={}, portfolio_state={})
 
     def test_invalid_schema_raises(self, fake_client: MagicMock) -> None:
         analyzer = CategoryClassifier(client=fake_client, playbook="PB")
@@ -240,9 +239,8 @@ class TestClassify:
 
         with patch(
             "google.generativeai.GenerativeModel", return_value=fake_model
-        ):
-            with pytest.raises(LLMError, match="schema"):
-                analyzer.classify(stock_data={}, portfolio_state={})
+        ), pytest.raises(LLMError, match="schema"):
+            analyzer.classify(stock_data={}, portfolio_state={})
 
     def test_sdk_error_wrapped(self, fake_client: MagicMock) -> None:
         analyzer = CategoryClassifier(client=fake_client, playbook="PB")
@@ -251,6 +249,5 @@ class TestClassify:
 
         with patch(
             "google.generativeai.GenerativeModel", return_value=fake_model
-        ):
-            with pytest.raises(LLMError, match="failed"):
-                analyzer.classify(stock_data={}, portfolio_state={})
+        ), pytest.raises(LLMError, match="failed"):
+            analyzer.classify(stock_data={}, portfolio_state={})

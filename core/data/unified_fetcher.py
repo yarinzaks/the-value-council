@@ -71,7 +71,7 @@ class UnifiedFetcher:
                 instance = cls()
                 self._sources[instance.name] = instance
                 self.logger.info(f"loaded source: {instance.name}")
-            except Exception as exc:  # noqa: BLE001 — any setup failure is non-fatal
+            except Exception as exc:
                 self.logger.warning(f"skipping source {cls.__name__}: {exc}")
 
     # --- Source access -------------------------------------------------------
@@ -136,7 +136,7 @@ class UnifiedFetcher:
             except DataSourceError as exc:
                 self.logger.info(f"{name} failed for {ticker}: {exc}")
                 last_error = exc
-            except Exception as exc:  # noqa: BLE001 — defensive
+            except Exception as exc:
                 self.logger.warning(f"{name} unexpected error for {ticker}: {exc}")
                 last_error = exc
 
@@ -289,4 +289,4 @@ class UnifiedFetcher:
         )
 
 
-__all__ = ["UnifiedFetcher", "CACHE_TTL_SECONDS"]
+__all__ = ["CACHE_TTL_SECONDS", "UnifiedFetcher"]

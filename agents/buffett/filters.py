@@ -169,7 +169,7 @@ def avg_roe_5yr(
             break
     if len(nis) < years:
         return None
-    pairs = [n / e for n, e in zip(nis, eqs) if e > 0]
+    pairs = [n / e for n, e in zip(nis, eqs, strict=False) if e > 0]
     if not pairs:
         return None
     return 100.0 * sum(pairs) / len(pairs)

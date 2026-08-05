@@ -205,14 +205,14 @@ class MoatAnalyzer:
         # Use the underlying SDK directly so we can override the
         # system prompt to Buffett's persona (not the generic memo
         # prompt baked into GeminiClient).
-        self.client._throttle()  # noqa: SLF001
+        self.client._throttle()
         try:
             # Late-bind to avoid hard-importing google.generativeai
             # at module load (tests monkeypatch the SDK).
             import google.generativeai as genai
 
             model = genai.GenerativeModel(
-                model_name=self.client._model_name,  # noqa: SLF001
+                model_name=self.client._model_name,
                 system_instruction=_BUFFETT_SYSTEM_PROMPT,
             )
             response = model.generate_content(
@@ -222,17 +222,17 @@ class MoatAnalyzer:
                     "response_mime_type": "application/json",
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise LLMError(f"Gemini Buffett call failed: {exc}") from exc
 
         text = (response.text or "").strip()
         if not text:
             raise LLMError("Gemini returned an empty response")
 
-        memo_dict = self.client._parse_json(text)  # noqa: SLF001
+        memo_dict = self.client._parse_json(text)
         try:
             return BuffettMemo.model_validate(memo_dict)
-        except Exception as exc:  # noqa: BLE001 — pydantic ValidationError
+        except Exception as exc:
             raise LLMError(
                 f"Gemini response did not match BuffettMemo schema: {exc}\n"
                 f"Raw: {text[:500]}"

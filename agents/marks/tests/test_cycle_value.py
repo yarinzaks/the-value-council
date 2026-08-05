@@ -19,7 +19,7 @@ class _StaticPriceLookup:
     def __init__(self, prices: dict[str, float]) -> None:
         self._prices = prices
 
-    def get(self, ticker: str) -> float | None:  # noqa: D401
+    def get(self, ticker: str) -> float | None:
         return self._prices.get(ticker)
 
 
@@ -27,7 +27,7 @@ class _StaticFundamentalsLookup:
     def __init__(self, fins: dict[str, object]) -> None:
         self._fins = fins
 
-    def get(self, ticker: str) -> object | None:  # noqa: D401
+    def get(self, ticker: str) -> object | None:
         return self._fins.get(ticker)
 
 
@@ -193,7 +193,7 @@ class TestLlmFilterIntegration:
         rejected = dict(SAMPLE_MEMO_JSON)
         rejected["decision"] = "REJECT"
 
-        def _classify(*, stock_data, portfolio_state):  # noqa: ARG001
+        def _classify(*, stock_data, portfolio_state):
             r = dict(rejected)
             r["ticker"] = stock_data["ticker"]
             return MarksMemo.model_validate(r)
@@ -216,7 +216,7 @@ class TestLlmFilterIntegration:
     def test_llm_buy_keeps(self, empty_cache: EdgarCache) -> None:
         prices, fins = self._qualifying_universe()
 
-        def _classify(*, stock_data, portfolio_state):  # noqa: ARG001
+        def _classify(*, stock_data, portfolio_state):
             m = dict(SAMPLE_MEMO_JSON)
             m["ticker"] = stock_data["ticker"]
             return MarksMemo.model_validate(m)

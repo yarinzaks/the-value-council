@@ -44,7 +44,7 @@ class YFinanceSource(DataSource):
             t = yf.Ticker(symbol)
             info = t.fast_info
             price = float(info.last_price) if info.last_price is not None else None
-        except Exception as exc:  # noqa: BLE001 — yfinance raises broad types
+        except Exception as exc:
             raise DataSourceError(self.name, f"quote failed for {ticker}: {exc}") from exc
 
         if price is None:
@@ -72,7 +72,7 @@ class YFinanceSource(DataSource):
         try:
             t = yf.Ticker(symbol)
             info: dict[str, Any] = t.info or {}
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise DataSourceError(
                 self.name, f"fundamentals failed for {ticker}: {exc}"
             ) from exc

@@ -5,9 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-import pytest
-
-from core.data.edgar_cache import CacheStats, EdgarCache
+from core.data.edgar_cache import EdgarCache
 from core.data.edgar_facts import XbrlFact
 
 

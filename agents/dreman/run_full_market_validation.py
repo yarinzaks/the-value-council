@@ -101,7 +101,7 @@ def main() -> None:
     print((report_dir / "summary.txt").read_text())
     print("\nAnnual breakdown:")
     print(pd.read_csv(report_dir / "annual_returns.csv").to_string(index=False))
-    print(f"\nDecisions logged: data/decisions/david_dreman/")
+    print("\nDecisions logged: data/decisions/david_dreman/")
     print(f"Report: {report_dir}")
 
 

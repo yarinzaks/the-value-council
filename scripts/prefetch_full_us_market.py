@@ -185,7 +185,7 @@ def prefetch_full_market(
             continue
         try:
             facts = client.get_company_facts(ticker)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"[{i}/{requested}] {ticker}: error — {exc}")
             failed_error += 1
             continue
@@ -194,7 +194,7 @@ def prefetch_full_market(
             continue
         try:
             cache.save_facts(ticker, facts)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"[{i}/{requested}] {ticker}: cache write failed — {exc}")
             failed_error += 1
             continue
@@ -288,7 +288,7 @@ def main() -> None:
     print(f"Facts written:        {stats.total_facts:,}")
     print(f"Elapsed:              {stats.elapsed_seconds:.1f}s")
     print()
-    print(f"Cache state:")
+    print("Cache state:")
     print(f"  Tickers in cache: {s.ticker_count}")
     print(f"  Total facts:      {s.total_facts:,}")
     print(f"  Cache size:       {s.total_size_mb():.1f} MB")

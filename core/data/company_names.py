@@ -55,7 +55,7 @@ def load_or_fetch(*, path: Path = DEFAULT_CACHE_PATH) -> dict[str, str]:
                 logger.warning(f"failed to read {path}, re-fetching: {exc}")
     try:
         names = fetch_from_sec()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning(f"SEC tickers fetch failed: {exc}")
         # Fall back to whatever we had on disk, or empty.
         if path.exists():

@@ -68,11 +68,6 @@ from agents.buffett.wonderful_business import (
 )
 
 __all__ = [
-    "BuffettDecision",
-    "BuffettMemo",
-    "BuffettScore",
-    "BuffettSelection",
-    "CrossReferenceSignals",
     "DEFAULT_DCF_YEARS",
     "DEFAULT_DISCOUNT_RATE_PCT",
     "DEFAULT_EARNINGS_HISTORY_YEARS",
@@ -86,6 +81,11 @@ __all__ = [
     "DEFAULT_ROE_AVG_YEARS",
     "DEFAULT_TERMINAL_MULTIPLE",
     "EXCLUDED_SIC2",
+    "BuffettDecision",
+    "BuffettMemo",
+    "BuffettScore",
+    "BuffettSelection",
+    "CrossReferenceSignals",
     "FilterResult",
     "IntrinsicValueResult",
     "MoatAnalyzer",

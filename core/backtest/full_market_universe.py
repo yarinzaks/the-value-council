@@ -60,8 +60,6 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-import pandas as pd
-
 from core.data.edgar_cache import EdgarCache
 from core.data.ticker_filter import is_common_equity, is_primary_listing
 from core.exceptions import ValueCouncilError
@@ -69,7 +67,8 @@ from core.logger import get_logger
 
 logger = get_logger("core.backtest.full_market_universe")
 
-from core.paths import PROJECT_ROOT, cache_dir as _cache_dir
+from core.paths import cache_dir as _cache_dir
+
 DEFAULT_CACHE_DIR = _cache_dir()
 
 # Concepts a real operating company should have at least one of —

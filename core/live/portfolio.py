@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import json
 import tempfile
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
@@ -165,7 +166,7 @@ class LivePortfolio:
         price: float,
         shares: float | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
-    ) -> "TradeRecord":
+    ) -> TradeRecord:
         """Sell ``shares`` of ``ticker`` at ``price``; all of it by default.
 
         A partial sale keeps the position open at its original entry
@@ -244,7 +245,7 @@ class LivePortfolio:
         why_en: str,
         why_he: str,
         cost_bps: float = DEFAULT_COST_BPS,
-    ) -> "TradeRecord":
+    ) -> TradeRecord:
         """Buy ``ticker`` for at most ``target_dollars`` notional.
 
         Sizes fractional shares. Whole-share rounding used to discard
@@ -366,7 +367,7 @@ class LivePortfolio:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LivePortfolio":
+    def from_dict(cls, data: dict[str, Any]) -> LivePortfolio:
         positions = [
             Position(
                 ticker=str(p["ticker"]),
@@ -421,7 +422,7 @@ class LivePortfolio:
         *,
         directory: Path = DEFAULT_PORTFOLIO_DIR,
         initial_cash: float = DEFAULT_INITIAL_CASH,
-    ) -> "LivePortfolio":
+    ) -> LivePortfolio:
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / f"{agent}.json"
         if not path.exists():

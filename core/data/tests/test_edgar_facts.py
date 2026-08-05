@@ -157,7 +157,6 @@ class TestParseFacts:
 class TestClientConstruction:
     def test_missing_user_agent_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Simulate settings unavailable
-        from core.config import get_settings as _real_get
         def boom() -> object:
             raise RuntimeError("no .env")
         monkeypatch.setattr("core.data.edgar_facts.get_settings", boom)

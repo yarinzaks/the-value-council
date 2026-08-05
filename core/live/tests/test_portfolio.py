@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -12,7 +11,6 @@ from core.live.portfolio import (
     DEFAULT_INITIAL_CASH,
     LivePortfolio,
     LivePortfolioError,
-    Position,
     WatchEntry,
     now_iso,
 )

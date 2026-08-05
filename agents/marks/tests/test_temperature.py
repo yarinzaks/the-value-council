@@ -7,9 +7,7 @@ from datetime import date
 import pytest
 
 from agents.marks.temperature import (
-    Posture,
     PostureProfile,
-    TemperatureAssessment,
     _de,
     _vote_de,
     _vote_high_de_frac,

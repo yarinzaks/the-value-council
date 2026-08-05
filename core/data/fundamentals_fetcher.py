@@ -36,7 +36,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Any
 
 from core.backtest.point_in_time import (
     EdgarAdapter,
@@ -256,7 +255,7 @@ class FundamentalsFetcher:
             return False
         try:
             facts = self.client.get_company_facts(ticker)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"SEC fetch failed for {ticker}: {exc}")
             return False
         if not facts:
@@ -469,7 +468,7 @@ class CachedEdgarAdapter(EdgarAdapter):
                         accession_number=str(row["accession_number"]),
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"skipping malformed cache row for {ticker_u}: {exc}")
         return results
 

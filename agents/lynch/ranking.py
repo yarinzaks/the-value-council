@@ -193,10 +193,10 @@ def select_top_n(scores: list[LynchScore], n: int) -> list[LynchScore]:
 
 __all__ = [
     "FAST_GROWER_MAX_PEG",
-    "LynchScore",
     "SLOW_GROWER_MAX_PEG",
     "STALWART_MAX_PEG",
     "UNIVERSAL_MAX_PEG",
+    "LynchScore",
     "score_candidates",
     "select_top_n",
 ]

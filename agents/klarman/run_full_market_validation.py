@@ -125,7 +125,7 @@ def main() -> None:
             f"positions={len(sel['selected_tickers']):>2d} "
             f"top MoS={sel['top_mos_pct'] or 0:.1f}%"
         )
-    print(f"\nDecisions logged: data/decisions/seth_klarman/")
+    print("\nDecisions logged: data/decisions/seth_klarman/")
     print(f"Report: {report_dir}")
 
 

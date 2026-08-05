@@ -7,8 +7,8 @@ from datetime import date
 import pytest
 
 from agents.buffett.ranking import (
-    BuffettScore,
     DEFAULT_MIN_MARGIN_OF_SAFETY_PCT,
+    BuffettScore,
     score_candidates,
     select_top_n,
 )
