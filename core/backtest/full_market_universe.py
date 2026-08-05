@@ -36,7 +36,7 @@ from pathlib import Path
 import pandas as pd
 
 from core.data.edgar_cache import EdgarCache
-from core.data.ticker_filter import is_common_equity
+from core.data.ticker_filter import is_common_equity, is_primary_listing
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
@@ -236,6 +236,12 @@ class FullMarketUniverse:
                 continue  # company didn't exist publicly yet
             if self.require_common_equity and not is_common_equity(ticker):
                 continue  # preferred / baby bond / fund / warrant
+            if self.require_common_equity and not is_primary_listing(ticker):
+                # Same issuer, second symbol. Every ticker under one CIK
+                # resolves to that CIK's financial statements, so a
+                # $25-par note inherits the parent's revenue, equity and
+                # share count and prices as though it were the stock.
+                continue
             if self.require_operating_concepts and not act.has_operating_concepts:
                 continue
             if (

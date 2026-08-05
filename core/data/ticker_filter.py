@@ -47,7 +47,14 @@ digit is rejected.
 
 from __future__ import annotations
 
+import json
 import re
+from functools import lru_cache
+
+from core.logger import get_logger
+from core.paths import PROJECT_ROOT
+
+logger = get_logger("core.data.ticker_filter")
 
 # Anything matching this regex is *not* common equity.
 # Stays simple — if we need the regex to grow, the deny list is the
@@ -146,4 +153,85 @@ def filter_common_equity(tickers: list[str]) -> list[str]:
     return [t for t in tickers if is_common_equity(t)]
 
 
-__all__ = ["filter_common_equity", "is_common_equity"]
+# ---------------------------------------------------------------------------
+# One listing per issuer
+# ---------------------------------------------------------------------------
+# The symbol-shape rules above are a heuristic, and a heuristic cannot see
+# that ENBFF and ENB are the same company. Every ticker under one CIK
+# resolves to that CIK's financial statements, so a $25-par note inherits
+# the parent's revenue, equity and share count and is valued as though it
+# were the common stock.
+#
+# Measured on the bundled SEC map (10,412 rows): 1,464 CIKs carry more
+# than one ticker, and 418 of those still had more than one survive
+# is_common_equity — 579 redundant symbols.
+#
+# Selection rule: lowest index in company_tickers.json. The SEC orders
+# that file so the primary listing sits far above its derivatives, and it
+# holds across every case inspected — ENB at 138 ahead of fifteen foreign
+# classes, FMCC at 1,726 ahead of twelve preferreds, BMO at 129 ahead of
+# twenty-six exchange-traded notes.
+_TICKER_MAP_PATH = PROJECT_ROOT / "data_bundled" / "company_tickers.json"
+
+
+@lru_cache(maxsize=1)
+def primary_listings() -> frozenset[str]:
+    """Tickers that are the primary common listing for their issuer.
+
+    Returns an empty set when the bundled map is missing or unreadable,
+    which makes :func:`is_primary_listing` fall open rather than empty
+    the universe.
+    """
+    try:
+        raw = json.loads(_TICKER_MAP_PATH.read_text())
+    except (OSError, ValueError) as exc:
+        logger.warning(f"ticker map unavailable at {_TICKER_MAP_PATH}: {exc}")
+        return frozenset()
+
+    best: dict[int, tuple[int, str]] = {}
+    for index, row in enumerate(raw.values()):
+        try:
+            cik = int(row["cik_str"])
+            ticker = str(row["ticker"]).upper().strip()
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not is_common_equity(ticker):
+            continue
+        current = best.get(cik)
+        if current is None or index < current[0]:
+            best[cik] = (index, ticker)
+    return frozenset(ticker for _, ticker in best.values())
+
+
+def is_primary_listing(ticker: str) -> bool:
+    """Return True if ``ticker`` is its issuer's primary listing.
+
+    Falls open — returns True — when the bundled map has no opinion, so
+    a ticker the SEC map does not cover is left to the other filters
+    rather than being silently dropped.
+    """
+    known = primary_listings()
+    if not known:
+        return True
+    t = ticker.upper().strip()
+    return t in known or t not in _all_mapped_tickers()
+
+
+@lru_cache(maxsize=1)
+def _all_mapped_tickers() -> frozenset[str]:
+    """Every ticker the bundled SEC map knows about, common or not."""
+    try:
+        raw = json.loads(_TICKER_MAP_PATH.read_text())
+    except (OSError, ValueError):
+        return frozenset()
+    return frozenset(
+        str(row["ticker"]).upper().strip() for row in raw.values() if "ticker" in row
+    )
+
+
+__all__ = [
+    "filter_common_equity",
+    "is_common_equity",
+    "is_primary_listing",
+    "primary_listings",
+]
