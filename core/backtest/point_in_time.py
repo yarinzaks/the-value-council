@@ -110,6 +110,8 @@ class PointInTimeFinancials:
     current_liabilities: float | None = None
     ppe_net: float | None = None  # net property, plant & equipment (after depreciation)
     total_debt: float | None = None  # short-term + long-term debt for EV
+    goodwill: float | None = None
+    intangible_assets: float | None = None  # excluding goodwill
     sic_code: str | None = None  # for sector exclusions
 
     def to_dict(self) -> dict[str, object]:
@@ -338,7 +340,8 @@ CREATE TABLE IF NOT EXISTS financials (
 # miss and the filing is re-parsed on next access.
 #
 # 2: sic_code populated from the bundled SEC map (was always None).
-_PAYLOAD_VERSION = 2
+# 3: goodwill and intangible_assets, for tangible common equity.
+_PAYLOAD_VERSION = 3
 _VERSION_KEY = "_payload_version"
 
 
@@ -528,6 +531,8 @@ class PointInTimeLoader:
             current_liabilities=payload.get("current_liabilities"),
             ppe_net=payload.get("ppe_net"),
             total_debt=payload.get("total_debt"),
+            goodwill=payload.get("goodwill"),
+            intangible_assets=payload.get("intangible_assets"),
             sic_code=str(payload["sic_code"]) if payload.get("sic_code") else None,
         )
 

@@ -73,15 +73,104 @@ def book_value_per_share(
     return fin.total_equity / fin.shares_outstanding
 
 
+def tangible_common_equity(fin: PointInTimeFinancials | None) -> float | None:
+    """Stated equity less goodwill and other intangibles.
+
+    Schloss bought below book because book was an estimate of what the
+    business would fetch if broken up. Goodwill is the premium a prior
+    management paid on an acquisition; it has no liquidation value and
+    it is the first thing written off when things go wrong. Counting it
+    as book is counting the very optimism the discount is supposed to
+    protect against.
+
+    A filer that tags neither concept plausibly carries neither, so
+    absence is read as zero rather than as unknown — the balance-sheet
+    corroboration is the equity figure itself, which must be present.
+    """
+    if fin is None or fin.total_equity is None:
+        return None
+    goodwill = fin.goodwill or 0.0
+    intangibles = fin.intangible_assets or 0.0
+    return fin.total_equity - goodwill - intangibles
+
+
+def tangible_book_value_per_share(
+    fin: PointInTimeFinancials | None,
+) -> float | None:
+    """Tangible common equity per share; None when non-positive.
+
+    A company whose intangibles exceed its equity has no tangible book
+    at all, and a P/B computed against a negative denominator is not a
+    small number — it is a meaningless one.
+    """
+    tce = tangible_common_equity(fin)
+    if tce is None or tce <= 0:
+        return None
+    if fin is None or not fin.shares_outstanding or fin.shares_outstanding <= 0:
+        return None
+    return tce / fin.shares_outstanding
+
+
 def price_to_book(
     price: float | None,
     fin: PointInTimeFinancials | None,
+    *,
+    tangible: bool = True,
 ) -> float | None:
-    """P/B = price / book value per share."""
-    bvps = book_value_per_share(fin)
+    """P/B against tangible book by default.
+
+    ``tangible=False`` returns the stated-equity ratio, which is what
+    this used to compute unconditionally.
+    """
+    bvps = (
+        tangible_book_value_per_share(fin) if tangible else book_value_per_share(fin)
+    )
     if bvps is None or price is None or price <= 0:
         return None
     return price / bvps
+
+
+#: How close to the 52-week low still counts as "near" it. Schloss was
+#: buying capitulation, not the exact tick.
+DEFAULT_NEAR_LOW_TOLERANCE_PCT: float = 10.0
+
+#: Alternative route in: down at least this much from the five-year
+#: high. The playbook writes the two as OR — reject only if *neither*
+#: holds — so a name well off its multi-year peak qualifies even if it
+#: has bounced off the recent low.
+DEFAULT_MIN_DRAWDOWN_FROM_HIGH_PCT: float = 50.0
+
+
+def is_distressed_price(
+    price: float | None,
+    *,
+    low_52w: float | None,
+    high_5y: float | None,
+    near_low_tolerance_pct: float = DEFAULT_NEAR_LOW_TOLERANCE_PCT,
+    min_drawdown_pct: float = DEFAULT_MIN_DRAWDOWN_FROM_HIGH_PCT,
+) -> bool | None:
+    """Schloss's entry condition: near the 52-week low, OR far off the
+    five-year high.
+
+    The playbook states it as a rejection — "if neither, REJECT" — so
+    the two routes are alternatives, not a conjunction. A stock that has
+    fallen 70% over three years and stabilised is a Schloss situation
+    even though it is no longer making new lows.
+
+    Returns ``None`` when neither reference price is available, so the
+    caller can distinguish "does not qualify" from "cannot tell".
+    """
+    if price is None or price <= 0:
+        return None
+    near_low = None
+    if low_52w is not None and low_52w > 0:
+        near_low = price <= low_52w * (1.0 + near_low_tolerance_pct / 100.0)
+    off_high = None
+    if high_5y is not None and high_5y > 0:
+        off_high = (1.0 - price / high_5y) * 100.0 >= min_drawdown_pct
+    if near_low is None and off_high is None:
+        return None
+    return bool(near_low) or bool(off_high)
 
 
 def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
@@ -120,8 +209,16 @@ def passes_filters(
     max_de: float = DEFAULT_MAX_DE,
     min_years_public: int = DEFAULT_MIN_YEARS_PUBLIC,
     min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+    low_52w: float | None = None,
+    high_5y: float | None = None,
+    require_distressed_price: bool = False,
 ) -> FilterResult:
-    """Apply the full Schloss filter pipeline to one candidate."""
+    """Apply the full Schloss filter pipeline to one candidate.
+
+    ``require_distressed_price`` is opt-in because it needs price
+    history the caller has to supply; with it off the behaviour is
+    unchanged.
+    """
     ticker = fin.ticker if fin else "<unknown>"
 
     if fin is None:
@@ -142,7 +239,9 @@ def passes_filters(
     pb = price_to_book(price, fin)
     if pb is None:
         return FilterResult(
-            ticker, False, "P/B unavailable (missing equity, price, or shares)"
+            ticker,
+            False,
+            "P/B unavailable (no tangible book, or missing price or shares)",
         )
     if pb >= max_pb:
         return FilterResult(
@@ -165,6 +264,19 @@ def passes_filters(
         # a low P/B — many such candidates are deteriorating, not
         # cheap.
         return FilterResult(ticker, False, "negative net income (most recent filing)")
+
+    if require_distressed_price:
+        distressed = is_distressed_price(
+            price, low_52w=low_52w, high_5y=high_5y
+        )
+        if distressed is None:
+            return FilterResult(ticker, False, "no price history for the low check")
+        if not distressed:
+            return FilterResult(
+                ticker,
+                False,
+                "not near a 52-week low nor 50% off the 5-year high",
+            )
 
     yp = years_public(fin, as_of=as_of)
     if yp is None or yp < min_years_public:

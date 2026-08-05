@@ -122,6 +122,16 @@ CONCEPT_MAP: dict[str, list[tuple[str, str]]] = {
     "ppe_net": [
         ("us-gaap", "PropertyPlantAndEquipmentNet"),
     ],
+    # Needed to strip stated equity down to tangible common equity.
+    # A filer that tags neither plausibly carries neither, so absence
+    # is read as zero by the consumer rather than as unknown.
+    "goodwill": [
+        ("us-gaap", "Goodwill"),
+    ],
+    "intangible_assets": [
+        ("us-gaap", "IntangibleAssetsNetExcludingGoodwill"),
+        ("us-gaap", "FiniteLivedIntangibleAssetsNet"),
+    ],
     "total_debt": [
         # Total debt is rarely tagged directly; we approximate by
         # summing short-term and long-term debt later. Some companies
@@ -143,6 +153,8 @@ _STOCK_CONCEPTS: frozenset[str] = frozenset(
         "current_assets",
         "current_liabilities",
         "ppe_net",
+        "goodwill",
+        "intangible_assets",
         "total_debt",
         "shares_outstanding",
     ]
