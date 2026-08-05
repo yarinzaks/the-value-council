@@ -286,3 +286,101 @@ class TestSelectionHistory:
         assert rec["posture"] in ("Cold", "Cool", "Neutral", "Warm", "Hot")
         assert rec["temperature_score"] is not None
         assert rec["deployed_fraction"] is not None
+
+
+class TestTemperatureReadsTheMarketNotTheSurvivors:
+    """Stage order: the pendulum question comes before the screen.
+
+    ``select`` used to gate first and assess temperature over the
+    survivors. On the real 2026-04-01 universe that read Neutral where
+    the market was Cool — 537 measurable tickers scoring -2.0 against
+    107 survivors scoring -1.0 — because two of the five signals were
+    measuring the gate rather than the market.
+    """
+
+    @staticmethod
+    def _mixed_market() -> tuple[dict[str, object], dict[str, float]]:
+        """Sixteen names: half sound, half distressed and over-levered.
+
+        The distressed half fails the D/E gate, so it exists in the
+        market and not in the survivor set — which is the whole point.
+        """
+        fins: dict[str, object] = {}
+        prices: dict[str, float] = {}
+        for i in range(8):
+            fins[f"OK{i}"] = make_pit(
+                f"OK{i}",
+                eps_diluted=2.0,
+                net_income=200_000_000,
+                total_equity=2_000_000_000,
+                total_debt=400_000_000,
+                shares=100_000_000,
+                dividends_paid=-40_000_000,
+            )
+            prices[f"OK{i}"] = 24.0
+        for i in range(8):
+            fins[f"SICK{i}"] = make_pit(
+                f"SICK{i}",
+                eps_diluted=-1.0,
+                net_income=-150_000_000,
+                total_equity=300_000_000,
+                total_debt=1_200_000_000,  # D/E 4.0 — fails max_de
+                shares=100_000_000,
+                dividends_paid=0.0,
+            )
+            prices[f"SICK{i}"] = 12.0
+        return fins, prices
+
+    def test_the_distress_in_the_market_reaches_the_thermometer(
+        self, empty_cache: EdgarCache
+    ) -> None:
+        fins, prices = self._mixed_market()
+        s = HowardMarks(edgar_cache=empty_cache, min_market_cap=1.0)
+
+        s.select(
+            as_of=date(2024, 6, 30),
+            universe=sorted(fins),
+            prices=_StaticPriceLookup(prices),  # type: ignore[arg-type]
+            fundamentals=_StaticFundamentalsLookup(fins),  # type: ignore[arg-type]
+        )
+
+        assert s.last_temperature is not None
+        # Half the market is losing money. Read after the gates this is
+        # 0.0 and votes +2 (euphoria); read before, it is 0.5 and votes
+        # -2 (widespread distress).
+        assert s.last_temperature.signals.frac_negative_ni == pytest.approx(0.5)
+        assert s.last_temperature.votes["frac_negative_ni"] == -2
+
+    def test_the_over_levered_cohort_reaches_it_too(
+        self, empty_cache: EdgarCache
+    ) -> None:
+        fins, prices = self._mixed_market()
+        s = HowardMarks(edgar_cache=empty_cache, min_market_cap=1.0)
+
+        s.select(
+            as_of=date(2024, 6, 30),
+            universe=sorted(fins),
+            prices=_StaticPriceLookup(prices),  # type: ignore[arg-type]
+            fundamentals=_StaticFundamentalsLookup(fins),  # type: ignore[arg-type]
+        )
+
+        assert s.last_temperature is not None
+        assert s.last_temperature.signals.frac_high_de == pytest.approx(0.5)
+        assert s.last_temperature.signals.universe_size == 16
+
+    def test_the_gates_still_reject_the_distressed_names(
+        self, empty_cache: EdgarCache
+    ) -> None:
+        # Guard against over-correction: seeing the sick names must not
+        # mean buying them.
+        fins, prices = self._mixed_market()
+        s = HowardMarks(edgar_cache=empty_cache, min_market_cap=1.0)
+
+        out = s.select(
+            as_of=date(2024, 6, 30),
+            universe=sorted(fins),
+            prices=_StaticPriceLookup(prices),  # type: ignore[arg-type]
+            fundamentals=_StaticFundamentalsLookup(fins),  # type: ignore[arg-type]
+        )
+
+        assert not any(t.startswith("SICK") for t in out)
