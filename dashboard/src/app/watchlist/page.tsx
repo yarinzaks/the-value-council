@@ -27,7 +27,7 @@ export default async function WatchlistPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+              <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                 <th className="py-2 pr-3">{t("col_ticker")}</th>
                 <th className="py-2 pr-3">{t("col_watching")}</th>
                 <th className="py-2 pr-3 text-right">{t("col_agents")}</th>
@@ -48,7 +48,7 @@ export default async function WatchlistPage() {
                         unreadable on its own; the name is what makes
                         the row scannable. */}
                     {companyNames[e.ticker] && (
-                      <span className="ms-2 text-xs font-normal text-council-500">
+                      <span className="ms-2 text-xs font-normal text-muted">
                         {companyNames[e.ticker]}
                       </span>
                     )}
@@ -84,7 +84,7 @@ export default async function WatchlistPage() {
                       {e.agent_count}
                     </span>
                   </td>
-                  <td className="py-2.5 pl-3 text-right text-xs text-council-500 tabular">
+                  <td className="py-2.5 pl-3 text-right text-xs text-muted tabular">
                     {e.most_recent.split("T")[0]}
                   </td>
                 </tr>

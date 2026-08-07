@@ -37,13 +37,13 @@ export default async function AgentsPage() {
                   />
                   <h3 className="font-semibold">{meta?.display ?? a.slug}</h3>
                 </div>
-                <div className="text-xs text-council-500 mb-4">{meta?.school_label}</div>
+                <div className="text-xs text-muted mb-4">{meta?.school_label}</div>
                 <p className="text-sm text-council-600 dark:text-council-300 mb-4">
                   {meta?.description_label}
                 </p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <div className="text-xs text-council-500">
+                    <div className="text-xs text-muted">
                       <Term k="cagr">{t("col_cagr")}</Term>
                     </div>
                     <div className="font-semibold">
@@ -51,7 +51,7 @@ export default async function AgentsPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-council-500">
+                    <div className="text-xs text-muted">
                       <Term k="alpha">{t("alpha_vs_sp")}</Term>
                     </div>
                     <div className="font-semibold">
@@ -59,7 +59,7 @@ export default async function AgentsPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-council-500">
+                    <div className="text-xs text-muted">
                       <Term k="sharpe">{t("col_sharpe")}</Term>
                     </div>
                     <div>
@@ -67,7 +67,7 @@ export default async function AgentsPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-council-500">
+                    <div className="text-xs text-muted">
                       <Term k="max_dd">{t("col_max_dd")}</Term>
                     </div>
                     <div>
@@ -75,7 +75,7 @@ export default async function AgentsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-3 text-[11px] text-council-500">
+                <div className="mt-3 text-[11px] text-muted">
                   {a.summary.config.start_date} → {a.summary.config.end_date} · {a.summary.n_trades} {t("col_trades").toLowerCase()}
                 </div>
               </Card>

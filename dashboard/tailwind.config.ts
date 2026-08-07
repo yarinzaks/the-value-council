@@ -24,8 +24,9 @@ const config: Config = {
           900: "#11182a",
           950: "#0a1020",
         },
-        gain: "#16a34a",
-        loss: "#dc2626",
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        gain: "rgb(var(--gain) / <alpha-value>)",
+        loss: "rgb(var(--loss) / <alpha-value>)",
         watch: "#ca8a04",
       },
       fontFamily: {

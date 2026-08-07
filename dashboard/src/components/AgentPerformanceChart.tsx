@@ -151,7 +151,7 @@ export function AgentPerformanceChart({
   if (data.rows.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-council-500 text-center py-8">
+        <p className="text-sm text-muted text-center py-8">
           {t("no_history")}
         </p>
       </Card>
@@ -177,7 +177,7 @@ export function AgentPerformanceChart({
               className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                 period === p
                   ? "bg-white dark:bg-council-700 shadow-sm"
-                  : "text-council-500 hover:text-council-700 dark:hover:text-council-300"
+                  : "text-muted hover:text-council-700 dark:hover:text-council-300"
               }`}
             >
               {p === "ALL" ? (locale === "he" ? "הכל" : "ALL") : p}
@@ -271,18 +271,18 @@ export function AgentPerformanceChart({
       {data.stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-council-100 dark:border-council-800">
           <div>
-            <div className="text-xs text-council-500">
+            <div className="text-xs text-muted">
               {locale === "he" ? "מאז ההתחלה" : "Since start"}
             </div>
             <div className="font-semibold text-base">
               <PctCell value={data.stats.totalAgentPct} />
             </div>
-            <div className="text-xs text-council-500 tabular">
+            <div className="text-xs text-muted tabular">
               <Money value={data.stats.totalAgentUsd} signed digits={2} />
             </div>
           </div>
           <div>
-            <div className="text-xs text-council-500">
+            <div className="text-xs text-muted">
               {locale === "he" ? "מול S&P 500" : "vs S&P 500"}
             </div>
             <div className="font-semibold text-base">
@@ -291,42 +291,42 @@ export function AgentPerformanceChart({
                   value={data.stats.totalAgentPct - data.stats.totalBenchPct}
                 />
               ) : (
-                <span className="text-council-400">—</span>
+                <span className="text-muted">—</span>
               )}
             </div>
-            <div className="text-xs text-council-500">
+            <div className="text-xs text-muted">
               {data.stats.totalBenchPct !== null
                 ? (locale === "he" ? "אלפא" : "alpha")
                 : ""}
             </div>
           </div>
           <div>
-            <div className="text-xs text-council-500">
+            <div className="text-xs text-muted">
               {locale === "he" ? "היום הטוב ביותר" : "Best day"}
             </div>
             <div className="font-semibold text-base">
               {data.stats.best ? (
                 <PctCell value={data.stats.best.pct} />
               ) : (
-                <span className="text-council-400">—</span>
+                <span className="text-muted">—</span>
               )}
             </div>
-            <div className="text-xs text-council-500 tabular">
+            <div className="text-xs text-muted tabular">
               {data.stats.best?.date ?? ""}
             </div>
           </div>
           <div>
-            <div className="text-xs text-council-500">
+            <div className="text-xs text-muted">
               {locale === "he" ? "היום הגרוע ביותר" : "Worst day"}
             </div>
             <div className="font-semibold text-base">
               {data.stats.worst ? (
                 <PctCell value={data.stats.worst.pct} />
               ) : (
-                <span className="text-council-400">—</span>
+                <span className="text-muted">—</span>
               )}
             </div>
-            <div className="text-xs text-council-500 tabular">
+            <div className="text-xs text-muted tabular">
               {data.stats.worst?.date ?? ""}
             </div>
           </div>

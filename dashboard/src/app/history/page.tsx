@@ -92,14 +92,14 @@ export default async function HistoryPage() {
                 style={{ backgroundColor: h.meta.color }}
               />
               <h3 className="text-sm font-semibold">{h.meta.display}</h3>
-              <span className="text-xs text-council-500">
+              <span className="text-xs text-muted">
                 · {h.meta.school_label}
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+                  <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                     <th className="py-2 pr-3">{t("col_date")}</th>
                     <th className="py-2 pr-3 text-right">
                       <Term k="cagr">{t("col_nav")}</Term>
@@ -129,7 +129,7 @@ export default async function HistoryPage() {
                       </td>
                       <td className="py-2 pr-3">
                         {r.buys.length === 0 ? (
-                          <span className="text-xs text-council-400">—</span>
+                          <span className="text-xs text-muted">—</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
                             {r.buys.map((tk) => (
@@ -145,7 +145,7 @@ export default async function HistoryPage() {
                       </td>
                       <td className="py-2 pl-3">
                         {r.sells.length === 0 ? (
-                          <span className="text-xs text-council-400">—</span>
+                          <span className="text-xs text-muted">—</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
                             {r.sells.map((tk) => (

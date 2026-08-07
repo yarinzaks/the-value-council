@@ -117,12 +117,12 @@ export default async function OverviewPage() {
           <Card className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">{t("ranking_title")}</h2>
-              <span className="text-xs text-council-500">{t("ranking_subtitle")}</span>
+              <span className="text-xs text-muted">{t("ranking_subtitle")}</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+                  <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                     <th className="py-2 pr-3 w-16">{t("col_rank")}</th>
                     <th className="py-2 pr-3 w-12 text-center">{t("col_medal")}</th>
                     <th className="py-2 pr-3">{t("col_agent")}</th>
@@ -142,14 +142,14 @@ export default async function OverviewPage() {
                       i === 0
                         ? "font-semibold"
                         : i === 3
-                          ? "text-council-500"
+                          ? "text-muted"
                           : "";
                     return (
                       <tr
                         key={p.agent}
                         className={`border-b border-council-100 dark:border-council-800 last:border-b-0 hover:bg-council-50 dark:hover:bg-council-800/30 ${rankClass}`}
                       >
-                        <td className="py-2.5 pr-3 tabular text-council-500">
+                        <td className="py-2.5 pr-3 tabular text-muted">
                           #{i + 1}
                         </td>
                         <td className="py-2.5 pr-3 text-center text-2xl leading-none">
@@ -193,14 +193,14 @@ export default async function OverviewPage() {
           <Card className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">{t("live_portfolios")}</h2>
-              <span className="text-xs text-council-500">
+              <span className="text-xs text-muted">
                 {t("live_portfolios_caption")}
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+                  <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                     <th className="py-2 pr-3">{t("col_agent")}</th>
                     <th className="py-2 pr-3 text-right">{t("col_nav")}</th>
                     <th className="py-2 pr-3 text-right">{t("col_cash")}</th>
@@ -233,7 +233,7 @@ export default async function OverviewPage() {
                               {meta?.display ?? p.agent}
                             </span>
                           </Link>
-                          <div className="text-xs text-council-500 mt-0.5">
+                          <div className="text-xs text-muted mt-0.5">
                             {meta?.school_label}
                           </div>
                         </td>
@@ -255,7 +255,7 @@ export default async function OverviewPage() {
                         <td className="py-2.5 pr-3 text-right tabular">
                           {p.positions.length}
                         </td>
-                        <td className="py-2.5 pl-3 text-right tabular text-council-500">
+                        <td className="py-2.5 pl-3 text-right tabular text-muted">
                           {p.watchlist.length}
                         </td>
                       </tr>
@@ -265,7 +265,7 @@ export default async function OverviewPage() {
               </table>
             </div>
             {livePortfolios[0]?.last_updated && (
-              <div className="mt-3 text-xs text-council-500">
+              <div className="mt-3 text-xs text-muted">
                 {t("last_updated")}: {livePortfolios[0].last_updated.replace("T", " ").slice(0, 19)} UTC
               </div>
             )}
@@ -277,14 +277,14 @@ export default async function OverviewPage() {
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">{t("backtest_leaderboard")}</h2>
-            <span className="text-xs text-council-500">
+            <span className="text-xs text-muted">
               {t("ranked_by_alpha")}
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+                <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                   <th className="py-2 pr-3">{t("col_agent")}</th>
                   <th className="py-2 pr-3 text-right">{t("col_window")}</th>
                   <th className="py-2 pr-3 text-right">
@@ -334,7 +334,7 @@ export default async function OverviewPage() {
                             <span className="font-medium">{meta?.display ?? a.slug}</span>
                           </Link>
                         </td>
-                        <td className="py-2.5 pr-3 text-right text-xs text-council-500">
+                        <td className="py-2.5 pr-3 text-right text-xs text-muted">
                           {a.summary.config.start_date} → {a.summary.config.end_date}
                         </td>
                         <td className="py-2.5 pr-3 text-right">

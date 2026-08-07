@@ -65,34 +65,34 @@ export default async function AgentDrillPage({
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <Card>
-              <div className="text-xs text-council-500">{t("col_nav")}</div>
+              <div className="text-xs text-muted">{t("col_nav")}</div>
               <div className="text-2xl font-semibold">
                 <Money value={live.total_nav} />
               </div>
-              <div className="text-xs text-council-500 mt-1">
+              <div className="text-xs text-muted mt-1">
                 {t("seed_dollars").replace("{amount}", live.initial_cash.toLocaleString())}
               </div>
             </Card>
             <Card>
-              <div className="text-xs text-council-500">{t("cash_available")}</div>
+              <div className="text-xs text-muted">{t("cash_available")}</div>
               <div className="text-2xl font-semibold">
                 <Money value={live.cash} />
               </div>
-              <div className="text-xs text-council-500 mt-1">
+              <div className="text-xs text-muted mt-1">
                 {((live.cash / live.total_nav) * 100).toFixed(1)}% {t("pct_of_nav")}
               </div>
             </Card>
             <Card>
-              <div className="text-xs text-council-500">{t("col_invested")}</div>
+              <div className="text-xs text-muted">{t("col_invested")}</div>
               <div className="text-2xl font-semibold">
                 <Money value={live.invested} />
               </div>
-              <div className="text-xs text-council-500 mt-1">
+              <div className="text-xs text-muted mt-1">
                 {t("positions_count").replace("{n}", String(live.positions.length))}
               </div>
             </Card>
             <Card className={live.cumulative_return_pct > 0 ? "ring-1 ring-gain/30" : ""}>
-              <div className="text-xs text-council-500">{t("total_pnl")}</div>
+              <div className="text-xs text-muted">{t("total_pnl")}</div>
               <div className="text-2xl font-semibold">
                 <Money value={live.total_nav - live.initial_cash} signed digits={2} />
               </div>
@@ -121,7 +121,7 @@ export default async function AgentDrillPage({
           <Card className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold">{t("drilldown_live_positions")}</h3>
-              <span className="text-xs text-council-500">
+              <span className="text-xs text-muted">
                 {t("drilldown_updated_prefix")} {live.last_updated?.replace("T", " ").slice(0, 19) ?? "—"} UTC
               </span>
             </div>
@@ -139,7 +139,7 @@ export default async function AgentDrillPage({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+                    <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                       <th className="py-2 pr-3">{t("col_ticker")}</th>
                       <th className="py-2 pr-3">{t("company_name")}</th>
                       <th className="py-2 pr-3 text-right">{t("col_rank_short")}</th>
@@ -172,18 +172,18 @@ export default async function AgentDrillPage({
                           <td className="py-2 pr-3 text-right tabular">
                             {w.current_rank ?? "—"}
                           </td>
-                          <td className="py-2 pr-3 text-right tabular text-xs text-council-500">
+                          <td className="py-2 pr-3 text-right tabular text-xs text-muted">
                             {target !== null && target !== undefined
                               ? `$${target.toFixed(2)}`
                               : "—"}
                           </td>
-                          <td className="py-2 pr-3 text-right tabular text-xs text-council-500">
+                          <td className="py-2 pr-3 text-right tabular text-xs text-muted">
                             {distLabel}
                           </td>
-                          <td className="py-2 pr-3 text-xs text-council-600 dark:text-council-400">
+                          <td className="py-2 pr-3 text-xs text-council-600 dark:text-muted">
                             {translateTrigger(w.entry_trigger, locale)}
                           </td>
-                          <td className="py-2 pl-3 text-xs text-council-600 dark:text-council-400">
+                          <td className="py-2 pl-3 text-xs text-council-600 dark:text-muted">
                             {translateRationale(
                               locale === "he" ? w.why_he : w.why_en,
                               locale,
@@ -216,7 +216,7 @@ export default async function AgentDrillPage({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+                  <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                     <th className="py-2 pr-3">{t("col_year")}</th>
                     <th className="py-2 pr-3 text-right">{t("col_strategy")}</th>
                     <th className="py-2 pr-3 text-right">{t("col_sp500")}</th>
@@ -252,13 +252,13 @@ export default async function AgentDrillPage({
           <h3 className="text-sm font-semibold">{t("drilldown_recent_decisions")}</h3>
           <Link
             href={`/journal?agent=${slug}`}
-            className="text-xs text-council-500 hover:underline"
+            className="text-xs text-muted hover:underline"
           >
             {t("view_all")}
           </Link>
         </div>
         {recent.length === 0 ? (
-          <p className="text-sm text-council-500">{t("no_decisions")}</p>
+          <p className="text-sm text-muted">{t("no_decisions")}</p>
         ) : (
           <ul className="divide-y divide-council-100 dark:divide-council-800">
             {recent.slice(0, 10).map((d, i) => {
@@ -284,11 +284,11 @@ export default async function AgentDrillPage({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <span className="font-medium tabular">{d.ticker}</span>
-                      <span className="text-xs text-council-500">
+                      <span className="text-xs text-muted">
                         {d.timestamp.split("T")[0]}
                       </span>
                     </div>
-                    <p className="text-xs text-council-600 dark:text-council-400 mt-1 leading-relaxed">
+                    <p className="text-xs text-council-600 dark:text-muted mt-1 leading-relaxed">
                       {story}
                     </p>
                   </div>

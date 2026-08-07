@@ -71,11 +71,11 @@ export function PositionStoryCard({
               {story.ticker}
             </Link>
             {companyName && (
-              <span className="text-xs text-council-600 dark:text-council-400">
+              <span className="text-xs text-council-600 dark:text-muted">
                 {companyName}
               </span>
             )}
-            <span className="inline-flex items-center gap-1 text-xs text-council-500">
+            <span className="inline-flex items-center gap-1 text-xs text-muted">
               <span
                 className="inline-block w-1.5 h-1.5 rounded-full"
                 style={{ backgroundColor: agentColor }}
@@ -103,7 +103,7 @@ export function PositionStoryCard({
               {story.criteriaMet.slice(0, 6).map((c) => (
                 <span
                   key={c}
-                  className="text-[11px] px-1.5 py-0.5 rounded bg-council-50 dark:bg-council-800/60 text-council-600 dark:text-council-400"
+                  className="text-[11px] px-1.5 py-0.5 rounded bg-council-50 dark:bg-council-800/60 text-council-600 dark:text-muted"
                 >
                   {c}
                 </span>
@@ -114,7 +114,7 @@ export function PositionStoryCard({
 
         {/* Numbers, right-aligned and tabular so columns line up down
             the page even though each card is independent. */}
-        <div className="text-xs text-council-600 dark:text-council-400 text-right tabular min-w-[9rem] space-y-0.5">
+        <div className="text-xs text-council-600 dark:text-muted text-right tabular min-w-[9rem] space-y-0.5">
           <div>
             {t("pos_entry")}{" "}
             <span className="font-mono">{money(story.entryPrice)}</span>
@@ -131,13 +131,13 @@ export function PositionStoryCard({
             </div>
           )}
           {story.weightPct !== null && (
-            <div className="text-council-500">
+            <div className="text-muted">
               {t("pos_weight")} {story.weightPct.toFixed(1)}%
             </div>
           )}
           {story.openedAt && story.openedEvidence && (
             <div
-              className="text-[11px] text-council-400"
+              className="text-[11px] text-muted"
               title={evidenceLabel[story.openedEvidence]}
             >
               {story.openedAt}
@@ -149,26 +149,26 @@ export function PositionStoryCard({
 
       {story.timeline.length > 0 && (
         <details className="mt-3 group">
-          <summary className="cursor-pointer text-xs text-council-500 hover:text-council-700 dark:hover:text-council-300 select-none">
+          <summary className="cursor-pointer text-xs text-muted hover:text-council-700 dark:hover:text-council-300 select-none">
             {t("pos_show_timeline")} ({story.timeline.length})
           </summary>
-          <p className="mt-2 text-[11px] text-council-400 leading-relaxed">
+          <p className="mt-2 text-[11px] text-muted leading-relaxed">
             {t("pos_timeline_note")}
           </p>
           <ol className="mt-2 space-y-1.5 border-s-2 border-council-100 dark:border-council-800 ps-3">
             {story.timeline.map((d, i) => (
               <li
                 key={`${d.timestamp}-${i}`}
-                className="text-xs text-council-600 dark:text-council-400"
+                className="text-xs text-council-600 dark:text-muted"
               >
-                <span className="tabular text-council-400">
+                <span className="tabular text-muted">
                   {d.timestamp.slice(0, 10)}
                 </span>{" "}
                 <span className="font-medium">
                   {decisionLabel(d.decision, locale)}
                 </span>
                 {i === 0 && (
-                  <span className="ms-2 text-council-500">
+                  <span className="ms-2 text-muted">
                     {narrative(d, locale, { companyName })}
                   </span>
                 )}

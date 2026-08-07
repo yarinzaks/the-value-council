@@ -92,7 +92,7 @@ export default async function JournalPage({
     `px-2.5 py-1 rounded-full text-xs transition-colors ${
       active
         ? "bg-council-100 dark:bg-council-800"
-        : "text-council-500 hover:bg-council-50 dark:hover:bg-council-800/50"
+        : "text-muted hover:bg-council-50 dark:hover:bg-council-800/50"
     }`;
 
   const qs = (next: { agent?: string | null; state?: string | null }) => {
@@ -122,7 +122,7 @@ export default async function JournalPage({
             {t("pos_cards")}
           </span>
           {totals.longestHeld && totals.longestHeld.days > 0 && (
-            <span className="text-council-500 text-xs">
+            <span className="text-muted text-xs">
               {t("pos_longest")}:{" "}
               <span className="font-mono">{totals.longestHeld.ticker}</span>{" "}
               <span className="tabular">{totals.longestHeld.days}</span>{" "}
@@ -130,14 +130,14 @@ export default async function JournalPage({
             </span>
           )}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-council-400">
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">
           {t("pos_trades_from").replace("{date}", TRADE_HISTORY_STARTS_AT)}
         </p>
       </Card>
 
       <Card className="mb-4">
         <div className="flex flex-wrap gap-2 items-center text-sm">
-          <span className="text-xs uppercase tracking-wider text-council-500">
+          <span className="text-xs uppercase tracking-wider text-muted">
             {t("filter_agent")}
           </span>
           <a href={qs({ agent: null })} className={chip(!agentSlug)}>

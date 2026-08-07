@@ -23,7 +23,12 @@ export default async function InsightsPage() {
   const { locale, t } = getServerI18n();
   const [overview, allDecisions] = await Promise.all([
     loadCouncilOverview(),
-    loadJournal({ limit: 5000 }),
+    // No limit. The tiles below print allDecisions.length as
+    // "Decisions logged", so a cap rendered the cap itself as the
+    // count: the page read exactly 5,000 against a real 28,533, and
+    // "unique tickers" was computed from the same truncated slice.
+    // Reading every file is what the journal page already does.
+    loadJournal(),
   ]);
 
   if (overview.agents.length === 0) {
@@ -89,20 +94,20 @@ export default async function InsightsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-council-500">{t("insights_decisions_logged")}</div>
+          <div className="text-xs text-muted">{t("insights_decisions_logged")}</div>
           <div className="text-3xl font-semibold tabular">{totalDecisions.toLocaleString()}</div>
-          <div className="text-xs text-council-500 mt-1">{totalBuys} {t("decision_buy")}</div>
+          <div className="text-xs text-muted mt-1">{totalBuys} {t("decision_buy")}</div>
         </Card>
         <Card>
-          <div className="text-xs text-council-500">{t("insights_unique_tickers")}</div>
+          <div className="text-xs text-muted">{t("insights_unique_tickers")}</div>
           <div className="text-3xl font-semibold tabular">{uniqueTickers}</div>
         </Card>
         <Card>
-          <div className="text-xs text-council-500">{t("insights_council_alpha")}</div>
+          <div className="text-xs text-muted">{t("insights_council_alpha")}</div>
           <div className="text-3xl font-semibold">
             <PctCell value={overview.council_alpha_pct} />
           </div>
-          <div className="text-xs text-council-500 mt-1">{t("vs_sp")} 500</div>
+          <div className="text-xs text-muted mt-1">{t("vs_sp")} 500</div>
         </Card>
       </div>
 
@@ -110,7 +115,7 @@ export default async function InsightsPage() {
         <Card>
           <h3 className="text-sm font-semibold mb-3">{t("insights_consensus_title")}</h3>
           {consensus.length === 0 ? (
-            <p className="text-sm text-council-500">{t("insights_consensus_empty")}</p>
+            <p className="text-sm text-muted">{t("insights_consensus_empty")}</p>
           ) : (
             <ul className="divide-y divide-council-100 dark:divide-council-800">
               {consensus.slice(0, 12).map((c) => (
@@ -157,7 +162,7 @@ export default async function InsightsPage() {
         <Card>
           <h3 className="text-sm font-semibold mb-3">{t("insights_divergence_title")}</h3>
           {divergence.length === 0 ? (
-            <p className="text-sm text-council-500">{t("insights_divergence_empty")}</p>
+            <p className="text-sm text-muted">{t("insights_divergence_empty")}</p>
           ) : (
             <ul className="divide-y divide-council-100 dark:divide-council-800">
               {divergence.slice(0, 12).map((d) => {
@@ -174,11 +179,11 @@ export default async function InsightsPage() {
                       />
                       {t("decision_buy")} · {buyerMeta?.display ?? d.buyer}
                     </span>
-                    <span className="text-xs text-council-500">{t("passed_label")}</span>
+                    <span className="text-xs text-muted">{t("passed_label")}</span>
                     {d.passers.map((slug) => {
                       const m = metaLocalized(slug, locale);
                       return (
-                        <span key={slug} className="text-[11px] text-council-500">
+                        <span key={slug} className="text-[11px] text-muted">
                           {m?.display ?? slug}
                         </span>
                       );
@@ -212,7 +217,7 @@ export default async function InsightsPage() {
                     />
                     <span className="font-medium">{meta?.display ?? a.slug}</span>
                   </div>
-                  <div className="text-xs text-council-500">
+                  <div className="text-xs text-muted">
                     {t("insights_per_school_line")
                       .replace("{buys}", String(buys))
                       .replace("{watches}", String(watches))}

@@ -110,7 +110,7 @@ export default async function HeatmapPage() {
             </tbody>
           </table>
         </div>
-        <div className="mt-4 flex items-center gap-4 text-xs text-council-500 flex-wrap">
+        <div className="mt-4 flex items-center gap-4 text-xs text-muted flex-wrap">
           <span>{t("legend_color")}</span>
           <div className="flex items-center gap-1">
             <span className="inline-block w-4 h-4 bg-red-400 dark:bg-red-600/80 rounded" />
