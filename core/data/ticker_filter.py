@@ -232,6 +232,29 @@ def _all_mapped_tickers() -> frozenset[str]:
 __all__ = [
     "filter_common_equity",
     "is_common_equity",
+    "is_currently_listed",
     "is_primary_listing",
     "primary_listings",
 ]
+
+
+def is_currently_listed(ticker: str) -> bool:
+    """Return True if the SEC's current map still carries ``ticker``.
+
+    Distinct from :func:`is_primary_listing`, which falls open for
+    tickers the map does not cover so that an unmapped symbol is left to
+    the other filters rather than silently dropped. That fall-open is
+    right for a symbol nobody has an opinion on and wrong for one that
+    has been retired: ASGN is absent because the issuer renamed itself
+    Everforth and moved to EFOR under the same CIK, and the fall-open
+    let both into the same portfolio at the same entry price, reporting
+    -9.2% and +50.2% because the dead symbol stopped updating.
+
+    Falls **closed**: an empty or unreadable map returns False for
+    everything, so a caller that asks this question gets no answer
+    rather than a wrong one. Only the live path asks it.
+    """
+    known = _all_mapped_tickers()
+    if not known:
+        return False
+    return ticker.upper().strip() in known

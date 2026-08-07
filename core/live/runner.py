@@ -348,7 +348,13 @@ class DailyRunner:
         self.initial_cash = initial_cash
         self.rebalance_band = rebalance_band
         self.min_holding_days = min_holding_days
-        self.universe = universe or FullMarketUniverse(cache=self.cache)
+        self.universe = universe or FullMarketUniverse(
+            cache=self.cache,
+            # Live only: a symbol the SEC no longer lists cannot be
+            # bought today. ASGN became EFOR and both were held at
+            # once. Backtests leave this off — see the flag.
+            require_current_listing=True,
+        )
         if pit_loader is None:
             fetcher = FundamentalsFetcher(
                 cache=self.cache,
