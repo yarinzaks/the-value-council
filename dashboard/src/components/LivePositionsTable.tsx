@@ -61,7 +61,7 @@ export function LivePositionsTable({
   const { locale, t } = useUI();
   if (positions.length === 0) {
     return (
-      <p className="text-sm text-council-500">{t("no_open_positions")}</p>
+      <p className="text-sm text-muted">{t("no_open_positions")}</p>
     );
   }
   const sorted = [...positions].sort((a, b) => b.weight_pct - a.weight_pct);
@@ -70,7 +70,7 @@ export function LivePositionsTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+          <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
             <th className="py-2 pr-3">{t("col_ticker")}</th>
             <th className="py-2 pr-3">{t("company_name")}</th>
             <th className="py-2 pr-3 text-right">{t("col_shares")}</th>
@@ -113,7 +113,7 @@ export function LivePositionsTable({
                     <Money value={p.current_price} digits={2} />
                   </span>
                   {priceHm && (
-                    <span className="block text-[10px] text-council-400 mt-0.5">
+                    <span className="block text-[10px] text-muted mt-0.5">
                       {t("price_updated")}: {priceHm}
                     </span>
                   )}
@@ -127,7 +127,7 @@ export function LivePositionsTable({
                 <td className="py-2 pr-3 text-right">
                   <PctCell value={p.pnl_pct} />
                 </td>
-                <td className="py-2 pl-3 text-right tabular text-council-500">
+                <td className="py-2 pl-3 text-right tabular text-muted">
                   {p.weight_pct.toFixed(1)}%
                 </td>
               </tr>

@@ -1,4 +1,5 @@
 import { Card, EmptyState, PageTitle } from "@/components/Cards";
+import { BacktestCaveat } from "@/components/BacktestCaveat";
 import { loadCouncilOverview } from "@/lib/data";
 import { metaLocalized } from "@/lib/agents";
 import { getServerI18n } from "@/lib/locale-server";
@@ -31,6 +32,7 @@ export default async function HeatmapPage() {
     return (
       <>
         <PageTitle title={t("heatmap_title")} />
+
         <EmptyState>{t("no_backtest_data")}</EmptyState>
       </>
     );
@@ -45,6 +47,8 @@ export default async function HeatmapPage() {
   return (
     <>
       <PageTitle title={t("heatmap_title")} subtitle={t("heatmap_subtitle")} />
+
+      <BacktestCaveat title={t("caveat_title")} body={t("caveat_body")} />
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -110,7 +114,7 @@ export default async function HeatmapPage() {
             </tbody>
           </table>
         </div>
-        <div className="mt-4 flex items-center gap-4 text-xs text-council-500 flex-wrap">
+        <div className="mt-4 flex items-center gap-4 text-xs text-muted flex-wrap">
           <span>{t("legend_color")}</span>
           <div className="flex items-center gap-1">
             <span className="inline-block w-4 h-4 bg-red-400 dark:bg-red-600/80 rounded" />

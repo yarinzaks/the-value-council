@@ -1,16 +1,43 @@
+// Decision journal, grouped by company.
+//
+// This was a flat feed of every decision row ever written — 1,240 of
+// them for Benjamin Graham alone, in which ASGN appears 68 times, three
+// times on one date. Read as transactions that is incomprehensible.
+// They were never transactions: each row is the agent's verdict for
+// that day, re-emitted on every run because the thesis does not change
+// daily, and each carries shares=null and price=null.
+//
+// Grouped by ticker the same data reads as a short, honest story —
+// "Graham flagged ASGN on 2026-05-06 and has reaffirmed it every
+// trading day since" — and 1,240 rows become 41 cards. The raw feed is
+// still one click away inside each card, where it belongs: as evidence,
+// not as the front page.
+
 import { Card, EmptyState, PageTitle } from "@/components/Cards";
-import { loadCompanyNames, loadJournal } from "@/lib/data";
-import { metaLocalized, AGENTS } from "@/lib/agents";
-import type { AgentSlug } from "@/lib/types";
+import { PositionStoryCard } from "@/components/PositionStoryCard";
+import { AGENTS, metaLocalized } from "@/lib/agents";
+import {
+  loadCompanyNames,
+  loadJournal,
+  loadLivePortfolio,
+} from "@/lib/data";
 import { getServerI18n } from "@/lib/locale-server";
-import { translateExitTrigger } from "@/lib/translate-dynamic";
-import { decisionLabel, narrative } from "@/lib/narrative";
+import {
+  TRADE_HISTORY_STARTS_AT,
+  buildPositionStories,
+  summarise,
+  type Lifecycle,
+  type PositionStory,
+} from "@/lib/positions";
+import type { AgentSlug } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const LIFECYCLES: Lifecycle[] = ["held", "closed", "never_opened"];
+
 interface SearchParamsShape {
   agent?: string;
-  decision?: string;
+  state?: string;
 }
 
 export default async function JournalPage({
@@ -20,134 +47,144 @@ export default async function JournalPage({
 }) {
   const { locale, t } = getServerI18n();
   const agentSlug = searchParams.agent as AgentSlug | undefined;
-  // FILL/EXIT are the runner's executions; BUY/SELL are the strategy's
-  // intent. Both are real records and both belong in the journal.
-  const decisionFilter = searchParams.decision as
-    | "BUY"
-    | "SELL"
-    | "WATCH"
-    | "HOLD"
-    | "FILL"
-    | "EXIT"
-    | undefined;
+  // Default to what is actually owned. Unfiltered this is 576 cards
+  // across ten agents, which trades one kind of overwhelm for another;
+  // "held" is 210 and every one of them is a live commitment. `?state=`
+  // with any other value, including "all", turns the filter off.
+  const stateParam = searchParams.state ?? "held";
+  const stateFilter = LIFECYCLES.includes(stateParam as Lifecycle)
+    ? (stateParam as Lifecycle)
+    : undefined;
 
-  const [decisions, companyNames] = await Promise.all([
-    loadJournal({
-      agent: agentSlug,
-      decisions: decisionFilter ? [decisionFilter] : undefined,
-      limit: 500,
-    }),
+  const slugs: AgentSlug[] = agentSlug
+    ? [agentSlug]
+    : AGENTS.map((a) => a.slug);
+
+  const [companyNames, ...perAgent] = await Promise.all([
     loadCompanyNames(),
+    ...slugs.map(async (slug) => {
+      const [decisions, portfolio] = await Promise.all([
+        loadJournal({ agent: slug }),
+        loadLivePortfolio(slug),
+      ]);
+      return buildPositionStories(slug, decisions, portfolio?.positions ?? []);
+    }),
   ]);
+
+  const all: PositionStory[] = perAgent.flat();
+  const totals = summarise(all);
+  const shown = stateFilter
+    ? all.filter((s) => s.lifecycle === stateFilter)
+    : all;
+
+  const stateLabel: Record<Lifecycle, string> = {
+    held: t("pos_held"),
+    closed: t("pos_closed"),
+    never_opened: t("pos_never"),
+  };
+  const stateCount: Record<Lifecycle, number> = {
+    held: totals.held,
+    closed: totals.closed,
+    never_opened: totals.neverOpened,
+  };
+
+  const chip = (active: boolean) =>
+    `px-2.5 py-1 rounded-full text-xs transition-colors ${
+      active
+        ? "bg-council-100 dark:bg-council-800"
+        : "text-muted hover:bg-council-50 dark:hover:bg-council-800/50"
+    }`;
+
+  const qs = (next: { agent?: string | null; state?: string | null }) => {
+    const p = new URLSearchParams();
+    const agent = next.agent === undefined ? agentSlug : next.agent;
+    const state = next.state === undefined ? stateFilter : next.state;
+    if (agent) p.set("agent", agent);
+    // "all" has to be explicit: an absent state now means "held".
+    p.set("state", state ?? "all");
+    return `/journal?${p.toString()}`;
+  };
 
   return (
     <>
-      <PageTitle title={t("journal_title")} subtitle={t("journal_subtitle")} />
+      <PageTitle title={t("pos_title")} subtitle={t("pos_subtitle")} />
+
+      {/* What the grouping actually did, stated in numbers so the
+          change is legible rather than just felt. */}
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
+          <span className="text-council-700 dark:text-council-300">
+            <span className="font-semibold tabular">
+              {totals.decisionRows.toLocaleString()}
+            </span>{" "}
+            {t("pos_collapsed_from")}{" "}
+            <span className="font-semibold tabular">{all.length}</span>{" "}
+            {t("pos_cards")}
+          </span>
+          {totals.longestHeld && totals.longestHeld.days > 0 && (
+            <span className="text-muted text-xs">
+              {t("pos_longest")}:{" "}
+              <span className="font-mono">{totals.longestHeld.ticker}</span>{" "}
+              <span className="tabular">{totals.longestHeld.days}</span>{" "}
+              {t("pos_days_affirmed")}
+            </span>
+          )}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">
+          {t("pos_trades_from").replace("{date}", TRADE_HISTORY_STARTS_AT)}
+        </p>
+      </Card>
 
       <Card className="mb-4">
-        <div className="flex flex-wrap gap-3 items-center text-sm">
-          <span className="text-xs uppercase tracking-wider text-council-500">
+        <div className="flex flex-wrap gap-2 items-center text-sm">
+          <span className="text-xs uppercase tracking-wider text-muted">
             {t("filter_agent")}
           </span>
-          <a
-            href="/journal"
-            className={`px-2.5 py-1 rounded-full text-xs ${
-              !agentSlug
-                ? "bg-council-100 dark:bg-council-800"
-                : "text-council-500 hover:bg-council-50 dark:hover:bg-council-800/50"
-            }`}
-          >
+          <a href={qs({ agent: null })} className={chip(!agentSlug)}>
             {t("filter_all")}
           </a>
-          {AGENTS.map((a) => {
-            const meta = metaLocalized(a.slug, locale);
-            return (
-              <a
-                key={a.slug}
-                href={`/journal?agent=${a.slug}`}
-                className={`px-2.5 py-1 rounded-full text-xs ${
-                  agentSlug === a.slug
-                    ? "bg-council-100 dark:bg-council-800"
-                    : "text-council-500 hover:bg-council-50 dark:hover:bg-council-800/50"
-                }`}
-              >
-                {meta?.display ?? a.slug}
-              </a>
-            );
-          })}
-          <span className="mx-2 text-council-300">|</span>
-          <span className="text-xs uppercase tracking-wider text-council-500">
-            {t("filter_type")}
-          </span>
-          {(["BUY", "FILL", "WATCH", "SELL", "EXIT"] as const).map((d) => (
+          {AGENTS.map((a) => (
             <a
-              key={d}
-              href={`/journal?${agentSlug ? `agent=${agentSlug}&` : ""}decision=${d}`}
-              className={`px-2.5 py-1 rounded-full text-xs ${
-                decisionFilter === d
-                  ? "bg-council-100 dark:bg-council-800"
-                  : "text-council-500 hover:bg-council-50 dark:hover:bg-council-800/50"
-              }`}
+              key={a.slug}
+              href={qs({ agent: a.slug })}
+              className={chip(agentSlug === a.slug)}
             >
-              {decisionLabel(d, locale)}
+              {metaLocalized(a.slug, locale)?.display ?? a.slug}
+            </a>
+          ))}
+
+          <span className="mx-2 text-council-300">|</span>
+          <a href={qs({ state: null })} className={chip(!stateFilter)}>
+            {t("filter_all")}
+          </a>
+          {LIFECYCLES.map((s) => (
+            <a
+              key={s}
+              href={qs({ state: s })}
+              className={chip(stateFilter === s)}
+            >
+              {stateLabel[s]}{" "}
+              <span className="tabular opacity-60">{stateCount[s]}</span>
             </a>
           ))}
         </div>
       </Card>
 
-      {decisions.length === 0 ? (
+      {shown.length === 0 ? (
         <EmptyState>{t("no_journal_match")}</EmptyState>
       ) : (
         <div className="space-y-3">
-          {decisions.map((d, idx) => {
-            const meta = metaLocalized(d.agent, locale);
-            const companyName = companyNames[d.ticker] ?? "";
-            const story = narrative(d, locale, { companyName });
+          {shown.map((story) => {
+            const meta = metaLocalized(story.agent, locale);
             return (
-              <Card key={`${d.ticker}-${d.timestamp}-${d.agent}-${idx}`}>
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap ${
-                      d.decision === "BUY" || d.decision === "FILL"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : d.decision === "SELL" || d.decision === "EXIT"
-                          ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
-                    }`}
-                  >
-                    {decisionLabel(d.decision, locale)}
-                  </span>
-                  <div className="flex-1">
-                    <div className="flex items-baseline gap-3 flex-wrap">
-                      <span className="font-mono font-semibold tabular">{d.ticker}</span>
-                      {companyName && (
-                        <span className="text-xs text-council-600 dark:text-council-400">
-                          {companyName}
-                        </span>
-                      )}
-                      <span className="text-xs text-council-500">
-                        {d.timestamp.split("T")[0]}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs text-council-500">
-                        <span
-                          className="inline-block w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: meta?.color ?? "#999" }}
-                        />
-                        {meta?.display ?? d.agent}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm leading-relaxed text-council-700 dark:text-council-300">
-                      {story}
-                    </p>
-                    {d.exit_trigger && (
-                      <div className="mt-2 text-xs text-council-500">
-                        <span className="font-semibold">{t("exit_label")}</span>{" "}
-                        {translateExitTrigger(d.exit_trigger, locale)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
+              <PositionStoryCard
+                key={`${story.agent}-${story.ticker}`}
+                story={story}
+                companyName={companyNames[story.ticker] ?? ""}
+                agentDisplay={meta?.display ?? story.agent}
+                agentColor={meta?.color ?? "#999"}
+                t={t}
+              />
             );
           })}
         </div>

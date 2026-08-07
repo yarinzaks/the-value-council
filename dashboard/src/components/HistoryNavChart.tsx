@@ -5,6 +5,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -34,15 +35,16 @@ export function HistoryNavChart({
             minTickGap={20}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              `$${(v / 1000).toFixed(1)}k`
-            }
+            tickFormatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}
             tick={{ fontSize: 11 }}
             domain={["auto", "auto"]}
             width={56}
           />
+          {/* Zero is where every agent starts in this window, so the
+              line separating gains from losses has to be visible. */}
+          <ReferenceLine y={0} strokeOpacity={0.45} strokeDasharray="4 4" />
           <Tooltip
-            formatter={(v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            formatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`}
           />
           <Legend />
           {series.map((s) => (

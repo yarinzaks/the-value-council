@@ -30,7 +30,7 @@ export function TodaysActivity({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+            <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
               <th className="py-2 pr-3">{t("col_agent")}</th>
               <th className="py-2 pr-3 text-right">{t("nav_change_today")}</th>
               <th className="py-2 pr-3">{t("bought_today")}</th>
@@ -70,7 +70,7 @@ export function TodaysActivity({
                   </td>
                   <td className="py-2.5 pr-3">
                     {buys.length === 0 ? (
-                      <span className="text-xs text-council-500">—</span>
+                      <span className="text-xs text-muted">—</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {buys.map((tk) => (
@@ -86,7 +86,7 @@ export function TodaysActivity({
                   </td>
                   <td className="py-2.5 pl-3">
                     {sells.length === 0 ? (
-                      <span className="text-xs text-council-500">—</span>
+                      <span className="text-xs text-muted">—</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {sells.map((tk) => (

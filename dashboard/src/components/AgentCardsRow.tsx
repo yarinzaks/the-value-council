@@ -67,36 +67,36 @@ export function AgentCardsRow({
                   {meta?.display ?? portfolio.agent}
                 </span>
               </div>
-              <div className="text-xs text-council-500 mb-3">
+              <div className="text-xs text-muted mb-3">
                 {meta?.school_label}
               </div>
 
               <div className="space-y-2 text-sm">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-council-500">{t("col_nav")}</span>
+                  <span className="text-xs text-muted">{t("col_nav")}</span>
                   <span className="font-semibold">
                     <Money value={portfolio.total_nav} />
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-council-500">{t("col_cash")}</span>
+                  <span className="text-xs text-muted">{t("col_cash")}</span>
                   <span>
                     <Money value={portfolio.cash} />
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-council-500">{t("col_positions")}</span>
+                  <span className="text-xs text-muted">{t("col_positions")}</span>
                   <span className="tabular">{portfolio.positions.length}</span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-council-500">{t("col_watch")}</span>
-                  <span className="tabular text-council-500">
+                  <span className="text-xs text-muted">{t("col_watch")}</span>
+                  <span className="tabular text-muted">
                     {portfolio.watchlist.length}
                   </span>
                 </div>
                 <div className="border-t border-council-100 dark:border-council-800 pt-2 mt-2">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-council-500">
+                    <span className="text-xs text-muted">
                       {t("card_pnl_today")}
                     </span>
                     <span className="text-right">
@@ -112,7 +112,7 @@ export function AgentCardsRow({
                 {/* Per-agent timestamps — open + close. Empty when an
                     agent hasn't run that mode yet. */}
                 {(openHm || closeHm) && (
-                  <div className="border-t border-council-100 dark:border-council-800 pt-2 mt-2 flex items-baseline justify-between text-[11px] text-council-500">
+                  <div className="border-t border-council-100 dark:border-council-800 pt-2 mt-2 flex items-baseline justify-between text-[11px] text-muted">
                     {openHm && (
                       <span>
                         {t("last_open_scan")}: {openHm}

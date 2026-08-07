@@ -5,6 +5,34 @@
 :root {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
     "Helvetica Neue", Arial, sans-serif;
+
+  /* Muted foreground — labels, timestamps, captions.
+   *
+   * It has to be two values, not one. Against white, WCAG AA at body
+   * size needs relative luminance at or below 0.183; against the
+   * council-950 background it needs 0.199 or above. No single colour
+   * satisfies both, which is why council-500 read 5.35 in light and
+   * 3.27 in dark across 47 elements — the timestamps and the agent
+   * names in every list.
+   *
+   * Declaring it once here means a component asks for "muted" and gets
+   * the legible shade for the mode it is in, instead of every one of
+   * 113 sites having to remember a dark: variant. */
+  --muted: 81 108 142;   /* council-500 — 5.35:1 on white */
+
+  /* Gain and loss have the same two-value problem as muted, and it
+   * bites in opposite modes. #16a34a is 3.28:1 on white — below AA,
+   * across 76 P&L figures, which is exactly the text a reader most
+   * needs to read correctly. #dc2626 passes on white at 4.83 but falls
+   * to 3.66 on the dark background. */
+  --gain: 21 128 61;     /* green-700 — 5.01:1 on white */
+  --loss: 220 38 38;     /* red-600   — 4.83:1 on white */
+}
+
+html.dark {
+  --muted: 112 137 169;  /* council-400 — 5.26:1 on council-950 */
+  --gain: 34 197 94;     /* green-500 — 8.25:1 on council-950 */
+  --loss: 248 113 113;   /* red-400   — 6.89:1 on council-950 */
 }
 
 html {

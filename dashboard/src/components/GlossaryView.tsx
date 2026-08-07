@@ -45,7 +45,7 @@ export function GlossaryView({
           className="w-full px-4 py-2.5 rounded-lg border border-council-200 dark:border-council-700 bg-white dark:bg-council-950 text-base"
         />
         {filtered.length === 0 && (
-          <p className="text-sm text-council-500 mt-3 text-center">
+          <p className="text-sm text-muted mt-3 text-center">
             {locale === "he"
               ? "אין תוצאות התואמות את החיפוש."
               : "No results match your search."}
@@ -61,7 +61,7 @@ export function GlossaryView({
                 {locale === "he" ? e.term_he : e.term}
               </h3>
               {locale === "he" && e.term !== e.term_he && (
-                <span className="text-xs text-council-500 font-mono">
+                <span className="text-xs text-muted font-mono">
                   {e.term}
                 </span>
               )}
@@ -70,7 +70,7 @@ export function GlossaryView({
               {locale === "he" ? e.explanation_he : e.explanation_en}
             </p>
             <div className="rounded-md bg-council-50 dark:bg-council-800 px-3 py-2 mb-3 font-mono text-xs ltr">
-              <span className="block text-[10px] uppercase tracking-wider text-council-500 mb-1">
+              <span className="block text-[10px] uppercase tracking-wider text-muted mb-1">
                 {locale === "he" ? "נוסחה" : "Formula"}
               </span>
               <span className="text-council-900 dark:text-council-100">
@@ -78,7 +78,7 @@ export function GlossaryView({
               </span>
             </div>
             <div className="text-sm">
-              <span className="block text-[10px] uppercase tracking-wider text-council-500 mb-1">
+              <span className="block text-[10px] uppercase tracking-wider text-muted mb-1">
                 {locale === "he" ? "דוגמה" : "Example"}
               </span>
               <span className="text-council-700 dark:text-council-300">

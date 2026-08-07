@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import { Card, EmptyState, NumCell, PctCell, PageTitle } from "@/components/Cards";
+import { BacktestCaveat } from "@/components/BacktestCaveat";
 import { Term } from "@/components/Term";
 import { loadCouncilOverview } from "@/lib/data";
 import { metaLocalized } from "@/lib/agents";
@@ -51,6 +52,7 @@ export default async function BacktestPage() {
     return (
       <>
         <PageTitle title={t("backtest_tab_title")} subtitle={t("backtest_tab_subtitle")} />
+
         <EmptyState>{t("no_backtest_data")}</EmptyState>
       </>
     );
@@ -70,16 +72,18 @@ export default async function BacktestPage() {
     <>
       <PageTitle title={t("backtest_tab_title")} subtitle={t("backtest_tab_subtitle")} />
 
+      <BacktestCaveat title={t("caveat_title")} body={t("caveat_body")} />
+
       {/* Leaderboard ------------------------------------------------- */}
       <Card className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">{t("backtest_leaderboard")}</h2>
-          <span className="text-xs text-council-500">{t("ranked_by_alpha")}</span>
+          <span className="text-xs text-muted">{t("ranked_by_alpha")}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+              <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                 <th className="py-2 pr-3">{t("col_agent")}</th>
                 <th className="py-2 pr-3 text-right">{t("col_window")}</th>
                 <th className="py-2 pr-3 text-right">
@@ -111,7 +115,7 @@ export default async function BacktestPage() {
                         <span className="font-medium">{meta?.display ?? a.slug}</span>
                       </Link>
                     </td>
-                    <td className="py-2.5 pr-3 text-right text-xs text-council-500">
+                    <td className="py-2.5 pr-3 text-right text-xs text-muted">
                       {a.summary.config.start_date} → {a.summary.config.end_date}
                     </td>
                     <td className="py-2.5 pr-3 text-right"><PctCell value={m.cagr_pct} /></td>
@@ -178,14 +182,14 @@ export default async function BacktestPage() {
       {/* Crisis stress tests ---------------------------------------- */}
       <Card>
         <h2 className="text-lg font-semibold mb-2">{t("crisis_test_title")}</h2>
-        <p className="text-xs text-council-500 mb-4">{t("crisis_test_subtitle")}</p>
+        <p className="text-xs text-muted mb-4">{t("crisis_test_subtitle")}</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {CRISIS_YEARS.map((c) => (
             <div
               key={c.year}
               className="border border-council-200 dark:border-council-800 rounded-lg p-4"
             >
-              <div className="text-xs uppercase tracking-wider text-council-500 mb-3">
+              <div className="text-xs uppercase tracking-wider text-muted mb-3">
                 {t(c.key)}
               </div>
               <div className="space-y-2">
@@ -199,7 +203,7 @@ export default async function BacktestPage() {
                           <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: meta?.color ?? "#999" }} />
                           <span>{meta?.display ?? a.slug}</span>
                         </span>
-                        <span className="text-xs text-council-400">{t("crisis_no_data")}</span>
+                        <span className="text-xs text-muted">{t("crisis_no_data")}</span>
                       </div>
                     );
                   }
@@ -214,12 +218,12 @@ export default async function BacktestPage() {
                           <PctCell value={r.strategy_return_pct} />
                         </span>
                       </div>
-                      <div className="flex items-baseline justify-between text-[11px] text-council-500 ml-3">
+                      <div className="flex items-baseline justify-between text-[11px] text-muted ml-3">
                         <span>{t("crisis_benchmark_return")}</span>
                         <span><PctCell value={r.benchmark_return_pct} /></span>
                       </div>
                       <div className="flex items-baseline justify-between text-[11px] ml-3">
-                        <span className="text-council-500">
+                        <span className="text-muted">
                           <Term k="alpha">{t("crisis_alpha")}</Term>
                         </span>
                         <span className="font-semibold"><PctCell value={r.alpha_pct} /></span>

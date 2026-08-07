@@ -18,7 +18,9 @@ import {
   loadCompanyNames,
   loadJournal,
   loadLivePortfolio,
+  loadPriceSeries,
 } from "@/lib/data";
+import { PositionPriceChart } from "@/components/PositionPriceChart";
 import { metaLocalized } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
@@ -79,10 +81,11 @@ export default async function PositionDetailPage({
   const meta = metaLocalized(slug, locale);
   if (!meta) return notFound();
 
-  const [portfolio, names, decisionsAll] = await Promise.all([
+  const [portfolio, names, decisionsAll, priceSeries] = await Promise.all([
     loadLivePortfolio(slug),
     loadCompanyNames(),
     loadJournal({ agent: slug, decisions: ["BUY"], limit: 5000 }),
+    loadPriceSeries(ticker),
   ]);
   const position = portfolio?.positions.find((p) => p.ticker === ticker);
   if (!position) {
@@ -90,10 +93,10 @@ export default async function PositionDetailPage({
       <>
         <PageTitle title={ticker} subtitle={meta.display} />
         <Card>
-          <p className="text-sm text-council-500 mb-4">{t("no_position_found")}</p>
+          <p className="text-sm text-muted mb-4">{t("no_position_found")}</p>
           <Link
             href={`/agents/${slug}`}
-            className="text-sm text-council-600 dark:text-council-400 hover:underline"
+            className="text-sm text-council-600 dark:text-muted hover:underline"
           >
             {t("back_to_drilldown")}
           </Link>
@@ -114,7 +117,7 @@ export default async function PositionDetailPage({
     <>
       <Link
         href={`/agents/${slug}`}
-        className="inline-block text-sm text-council-600 dark:text-council-400 hover:underline mb-3"
+        className="inline-block text-sm text-council-600 dark:text-muted hover:underline mb-3"
       >
         {t("back_to_drilldown")}
       </Link>
@@ -123,31 +126,52 @@ export default async function PositionDetailPage({
         subtitle={`${meta.display} · ${meta.school_label}`}
       />
 
+      {/* The path between entry and today. Without it a position that
+          round-tripped 30% and came back looks identical to one that
+          never moved. */}
+      {priceSeries && priceSeries.points.length > 1 && (
+        <Card className="mb-6">
+          <div className="text-xs text-muted mb-2">
+            {t("price_chart_title")}
+          </div>
+          <PositionPriceChart
+            points={priceSeries.points}
+            entryPrice={position.entry_price}
+            entryDate={position.entry_date}
+            color={meta.color}
+            labels={{ entry: t("col_entry"), price: t("col_current") }}
+          />
+          <p className="mt-2 text-[11px] text-muted">
+            {t("price_chart_note")}
+          </p>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-council-500">{t("col_entry")}</div>
+          <div className="text-xs text-muted">{t("col_entry")}</div>
           <div className="text-2xl font-semibold">
             <Money value={position.entry_price} digits={2} />
           </div>
-          <div className="text-xs text-council-500 mt-1">
+          <div className="text-xs text-muted mt-1">
             {position.entry_date}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-council-500">{t("col_current")}</div>
+          <div className="text-xs text-muted">{t("col_current")}</div>
           <div className="text-2xl font-semibold">
             <Money value={position.current_price} digits={2} />
           </div>
-          <div className="text-xs text-council-500 mt-1">
+          <div className="text-xs text-muted mt-1">
             {position.shares.toFixed(0)} {t("col_shares").toLowerCase()}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-council-500">{t("col_value")}</div>
+          <div className="text-xs text-muted">{t("col_value")}</div>
           <div className="text-2xl font-semibold">
             <Money value={value} />
           </div>
-          <div className="text-xs text-council-500 mt-1">
+          <div className="text-xs text-muted mt-1">
             <Term k="weight">{t("col_weight")}</Term> {position.weight_pct.toFixed(1)}%
           </div>
         </Card>
@@ -160,7 +184,7 @@ export default async function PositionDetailPage({
                 : ""
           }
         >
-          <div className="text-xs text-council-500">{t("col_pnl_usd")}</div>
+          <div className="text-xs text-muted">{t("col_pnl_usd")}</div>
           <div className="text-2xl font-semibold">
             <Money value={position.pnl_usd} signed digits={2} />
           </div>
@@ -182,7 +206,7 @@ export default async function PositionDetailPage({
                 key={i}
                 className="text-sm text-council-600 dark:text-council-300 flex items-start gap-2"
               >
-                <span className="text-council-400 mt-0.5">•</span>
+                <span className="text-muted mt-0.5">•</span>
                 <span>{decorate(translateCriterion(c, locale))}</span>
               </li>
             ))}
@@ -207,7 +231,7 @@ export default async function PositionDetailPage({
               .filter(([, v]) => v !== null && v !== undefined)
               .map(([k, v]) => (
                 <div key={k}>
-                  <div className="text-xs text-council-500 uppercase tracking-wider">
+                  <div className="text-xs text-muted uppercase tracking-wider">
                     {k.replace(/_/g, " ")}
                   </div>
                   <div className="font-mono tabular">

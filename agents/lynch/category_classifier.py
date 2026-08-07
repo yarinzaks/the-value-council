@@ -31,6 +31,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from agents.evidence_rules import with_evidence_rules
 from core.exceptions import LLMError
 from core.llm.gemini_client import GeminiClient
 from core.logger import get_logger
@@ -285,7 +286,7 @@ class CategoryClassifier:
 
             model = genai.GenerativeModel(
                 model_name=self.client._model_name,
-                system_instruction=_LYNCH_SYSTEM_PROMPT,
+                system_instruction=with_evidence_rules(_LYNCH_SYSTEM_PROMPT),
             )
             response = model.generate_content(
                 prompt,

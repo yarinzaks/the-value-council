@@ -31,7 +31,7 @@ const en: Dict = {
   toggle_theme: "Toggle theme",
 
   // ---- Overview page ----
-  overview_subtitle: "Live paper-trading state across all four agents",
+  overview_subtitle: "Live paper-trading state across all ten investors",
   council_nav: "Council NAV",
   council_cash: "Council cash",
   council_invested: "Invested",
@@ -99,6 +99,11 @@ const en: Dict = {
   no_decisions: "No decisions logged yet.",
   drilldown_no_data: "No backtest run or live portfolio for this agent yet.",
 
+  // ---- Backtest caveat ----
+  caveat_title: "These returns predate the data fixes — read them as an upper bound",
+  caveat_body:
+    "Stored runs are from 2026-04-29 and report figures no value strategy produces: a 3,029% total return over five years and a best year of +476%. Three defects since fixed explain them — the universe holds only companies that survived to today, prices were carried forward across gaps of up to 4,021 days, and fundamentals were served a median seven fiscal years stale. Windows also differ between agents (one is measured against an S&P of 25.47%, another against 14.49%), so the ranking is partly a ranking of windows. Re-run the backtests to get comparable numbers.",
+
   // ---- Heatmap ----
   heatmap_title: "Annual Returns Heatmap",
   heatmap_subtitle: "Per-agent alpha vs S&P 500 each calendar year",
@@ -131,6 +136,36 @@ const en: Dict = {
   // ---- Journal ----
   journal_title: "Decision Journal",
   journal_subtitle: "Every BUY / WATCH the agents made, with full reasoning",
+
+  // ---- Position stories (grouped journal) ----
+  pos_title: "Positions",
+  pos_subtitle: "One card per company — what the agent decided, and what came of it",
+  pos_held: "Held",
+  pos_closed: "Closed",
+  pos_never: "Flagged, never bought",
+  pos_days_affirmed: "days reaffirmed",
+  pos_since: "since",
+  pos_entry: "Entry",
+  pos_now: "Now",
+  pos_weight: "Weight",
+  pos_show_timeline: "Show the full paper trail",
+  pos_timeline_note: "One row per run. The agent re-states its verdict every day; a long list is conviction, not activity.",
+  pos_evidence_position: "exact, from the open position",
+  pos_evidence_trade: "exact, from a recorded trade",
+  pos_evidence_flagged: "first flagged — the fill may have been later",
+  pos_collapsed_from: "decision rows, grouped into",
+  pos_cards: "companies",
+  pos_longest: "Longest conviction",
+  pos_trades_from: "Executed trades are recorded from {date}. Earlier days show no trades because the record was overwritten, not because nothing happened.",
+  pos_no_criteria: "no criteria recorded",
+  pos_watching: "Watching",
+  pos_event_opened: "Opened the position",
+  pos_event_reopened: "Bought back in",
+  pos_event_exited: "Sold out",
+  pos_event_changed: "Changed its view",
+  pos_still_held: "Held since, unchanged, through {days} trading days.",
+  price_chart_title: "Price since entry",
+  price_chart_note: "Adjusted closes over the past year. The dashed line is what the agent paid; the dot is the entry date when it falls inside this window.",
   filter_agent: "Agent",
   filter_all: "All",
   filter_type: "Type",
@@ -192,7 +227,7 @@ const en: Dict = {
   company_name: "Company",
 
   // ---- History tab ----
-  nav_chart_title: "NAV — last 7 days",
+  nav_chart_title: "Performance — last 7 days",
   daily_trades_title: "Daily trades",
   nav_change_table: "Day-by-day NAV change",
   col_date: "Date",
@@ -201,7 +236,7 @@ const en: Dict = {
   col_sells: "Sells",
   col_trades_count: "Trades",
   no_history: "No snapshots yet.",
-  history_subtitle: "Daily snapshots, what each agent bought / sold, and NAV change",
+  history_subtitle: "Percent change over the window, so all ten sit on one scale. Dollar NAV is in the tables below.",
 
   // ---- Backtest tab ----
   backtest_tab_title: "Backtests",
@@ -266,7 +301,7 @@ const he: Dict = {
   toggle_theme: "החלף ערכת צבעים",
 
   // ---- Overview page ----
-  overview_subtitle: "מצב מסחר הנייר החי בכל ארבעת הסוכנים",
+  overview_subtitle: "מצב מסחר הנייר החי בכל עשרת המשקיעים",
   council_nav: "שווי המועצה",
   council_cash: "מזומן המועצה",
   council_invested: "מושקע",
@@ -334,6 +369,11 @@ const he: Dict = {
   no_decisions: "אין החלטות מתועדות עדיין.",
   drilldown_no_data: "אין ריצת בקטסט או תיק חי לסוכן זה עדיין.",
 
+  // ---- Backtest caveat ----
+  caveat_title: "התשואות האלה קדמו לתיקוני הנתונים — קרא אותן כגבול עליון",
+  caveat_body:
+    "הריצות השמורות הן מ-29/04/2026 ומדווחות מספרים ששום אסטרטגיית ערך לא מייצרת: 3,029% תשואה כוללת בחמש שנים, ושנה טובה של 476%+. שלושה פגמים שתוקנו מאז מסבירים אותם — היקום מכיל רק חברות ששרדו עד היום, מחירים נגררו קדימה על פני חורים של עד 4,021 ימים, ונתוני היסוד הוגשו באיחור חציוני של שבע שנות כספים. גם החלונות שונים בין הסוכנים (אחד נמדד מול S&P של 25.47%, אחר מול 14.49%), אז הדירוג הוא בחלקו דירוג של חלונות. הרץ את הבקטסטים מחדש כדי לקבל מספרים ברי-השוואה.",
+
   // ---- Heatmap ----
   heatmap_title: "מפת חום של תשואות שנתיות",
   heatmap_subtitle: "אלפא של כל סוכן מול S&P 500 בכל שנה קלנדרית",
@@ -366,6 +406,36 @@ const he: Dict = {
   // ---- Journal ----
   journal_title: "יומן החלטות",
   journal_subtitle: "כל קנייה / מעקב שהסוכנים ביצעו, עם הנמקה מלאה",
+
+  // ---- Position stories (grouped journal) ----
+  pos_title: "פוזיציות",
+  pos_subtitle: "כרטיס אחד לכל חברה — מה הסוכן החליט, ומה יצא מזה",
+  pos_held: "מוחזקת",
+  pos_closed: "נסגרה",
+  pos_never: "סומנה, לא נקנתה",
+  pos_days_affirmed: "ימים שהתזה אושררה",
+  pos_since: "מאז",
+  pos_entry: "כניסה",
+  pos_now: "עכשיו",
+  pos_weight: "משקל",
+  pos_show_timeline: "הצג את כל התיעוד",
+  pos_timeline_note: "שורה לכל ריצה. הסוכן חוזר על הקביעה שלו כל יום; רשימה ארוכה היא שכנוע, לא פעילות.",
+  pos_evidence_position: "מדויק, מהפוזיציה הפתוחה",
+  pos_evidence_trade: "מדויק, מעסקה שנרשמה",
+  pos_evidence_flagged: "תאריך הסימון הראשון — הקנייה בפועל אולי הייתה מאוחר יותר",
+  pos_collapsed_from: "שורות החלטה, מקובצות ל־",
+  pos_cards: "חברות",
+  pos_longest: "השכנוע הארוך ביותר",
+  pos_trades_from: "עסקאות שבוצעו נרשמות החל מ־{date}. בימים קודמים לא מוצגות עסקאות כי הרישום נדרס, לא כי לא קרה כלום.",
+  pos_no_criteria: "לא נרשמו קריטריונים",
+  pos_watching: "במעקב",
+  pos_event_opened: "נפתחה פוזיציה",
+  pos_event_reopened: "נקנתה מחדש",
+  pos_event_exited: "נמכרה",
+  pos_event_changed: "שינה את דעתו",
+  pos_still_held: "מוחזקת מאז ללא שינוי, לאורך {days} ימי מסחר.",
+  price_chart_title: "מחיר מאז הכניסה",
+  price_chart_note: "מחירי סגירה מתואמים בשנה האחרונה. הקו המקווקו הוא מה שהסוכן שילם; הנקודה היא תאריך הכניסה, כשהוא נופל בתוך החלון הזה.",
   filter_agent: "סוכן",
   filter_all: "הכל",
   filter_type: "סוג",
@@ -427,7 +497,7 @@ const he: Dict = {
   company_name: "חברה",
 
   // ---- History tab ----
-  nav_chart_title: "שווי — 7 הימים האחרונים",
+  nav_chart_title: "ביצועים — 7 הימים האחרונים",
   daily_trades_title: "עסקאות יומיות",
   nav_change_table: "שינוי שווי יום-יום",
   col_date: "תאריך",
@@ -436,7 +506,7 @@ const he: Dict = {
   col_sells: "מכירות",
   col_trades_count: "עסקאות",
   no_history: "אין צילומי-מצב עדיין.",
-  history_subtitle: "צילומי-מצב יומיים, מה כל סוכן קנה / מכר, ושינוי השווי",
+  history_subtitle: "שינוי באחוזים על פני החלון, כך שכל העשרה על אותו סולם. השווי בדולרים בטבלאות למטה.",
 
   // ---- Backtest tab ----
   backtest_tab_title: "בקטסטים",

@@ -60,7 +60,7 @@ export function AppShell({
                   className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
                     active
                       ? "bg-council-100 dark:bg-council-800 text-council-900 dark:text-council-100"
-                      : "text-council-600 dark:text-council-400 hover:bg-council-50 dark:hover:bg-council-800/50"
+                      : "text-council-600 dark:text-muted hover:bg-council-50 dark:hover:bg-council-800/50"
                   }`}
                 >
                   {t(n.key)}
@@ -73,7 +73,7 @@ export function AppShell({
                 the toggle area uncluttered. */}
             {lastSyncLabel && (
               <span
-                className="hidden lg:inline-block text-xs text-council-500 mr-2"
+                className="hidden lg:inline-block text-xs text-muted mr-2"
                 title={lastSyncLabel}
               >
                 {t("last_sync")}: {lastSyncLabel}
@@ -107,7 +107,7 @@ export function AppShell({
                   className={`px-3 py-1.5 rounded-md text-xs whitespace-nowrap ${
                     active
                       ? "bg-council-100 dark:bg-council-800"
-                      : "text-council-600 dark:text-council-400"
+                      : "text-council-600 dark:text-muted"
                   }`}
                 >
                   {t(n.key)}
@@ -130,7 +130,7 @@ export function AppShell({
 
       {/* Schedule banner — informs the user when the agents scan and
           where prices come from. Bilingual via the i18n dictionary. */}
-      <div className="bg-council-50 dark:bg-council-900/60 border-b border-council-200 dark:border-council-800 text-xs text-council-600 dark:text-council-400">
+      <div className="bg-council-50 dark:bg-council-900/60 border-b border-council-200 dark:border-council-800 text-xs text-council-600 dark:text-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 text-center">
           {t("schedule_banner")}
         </div>
@@ -140,10 +140,10 @@ export function AppShell({
         {children}
       </main>
 
-      <footer className="border-t border-council-200 dark:border-council-800 py-4 text-center text-xs text-council-500">
+      <footer className="border-t border-council-200 dark:border-council-800 py-4 text-center text-xs text-muted">
         <div className="mb-1">{t("footer")}</div>
         {(nextUsLabel || nextTaseLabel) && (
-          <div className="text-[11px] text-council-400 dark:text-council-500">
+          <div className="text-[11px] text-muted">
             {t("next_us_update")}: {t("next_label")} {nextUsLabel}
             {" | "}
             {t("next_tase_update")}: {t("next_label")} {nextTaseLabel}

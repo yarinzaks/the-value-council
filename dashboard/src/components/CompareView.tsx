@@ -88,7 +88,7 @@ export function CompareView({ agents }: { agents: AgentForCompare[] }) {
                 className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
                   active
                     ? "border-council-700 dark:border-council-300 bg-council-50 dark:bg-council-800"
-                    : "border-council-200 dark:border-council-700 text-council-500"
+                    : "border-council-200 dark:border-council-700 text-muted"
                 }`}
               >
                 <span
@@ -125,7 +125,7 @@ export function CompareView({ agents }: { agents: AgentForCompare[] }) {
             </RadarChart>
           </ResponsiveContainer>
         </div>
-        <p className="text-xs text-council-500 mt-2">
+        <p className="text-xs text-muted mt-2">
           {t("compare_axis_caption")}
         </p>
       </Card>
@@ -135,7 +135,7 @@ export function CompareView({ agents }: { agents: AgentForCompare[] }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-council-500 border-b border-council-200 dark:border-council-800">
+              <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
                 <th className="py-2 pr-3">{t("col_agent")}</th>
                 <th className="py-2 pr-3 text-right">{t("col_cagr")}</th>
                 <th className="py-2 pr-3 text-right">{t("col_total_return")}</th>

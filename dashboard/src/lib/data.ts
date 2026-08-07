@@ -52,6 +52,7 @@ const DECISIONS_DIR = path.join(DATA_ROOT, "decisions");
 const PORTFOLIOS_DIR = path.join(DATA_ROOT, "portfolios");
 const SNAPSHOTS_DIR = path.join(DATA_ROOT, "snapshots");
 const COMPANY_NAMES_PATH = path.join(DATA_ROOT, "cache", "company_names.json");
+const PRICES_DIR = path.join(DATA_ROOT, "prices");
 
 // --------------------------------------------------------------------------
 // Backtest run discovery
@@ -377,4 +378,45 @@ export async function loadCouncilLive(): Promise<CouncilLive> {
     council_return_pct,
     council_pnl_usd,
   };
+}
+
+// --------------------------------------------------------------------------
+// Price series — one file per held ticker, written by the daily run
+// --------------------------------------------------------------------------
+
+export interface PricePoint {
+  /** ISO date. */
+  d: string;
+  /** Adjusted close. */
+  c: number;
+}
+
+export interface PriceSeries {
+  ticker: string;
+  as_of: string;
+  points: PricePoint[];
+}
+
+/**
+ * A year of adjusted closes for one ticker, or null when none was
+ * published.
+ *
+ * `core.live.price_export` writes these for held tickers only, from
+ * bars already in the price cache. Null means the chart is genuinely
+ * unavailable — a ticker nobody holds, or one with no cached history —
+ * and the caller should say so rather than draw a flat line.
+ */
+export async function loadPriceSeries(
+  ticker: string,
+): Promise<PriceSeries | null> {
+  // Path segment comes from a route param, so keep it to the shape a
+  // ticker actually has and never let it walk the filesystem.
+  if (!/^[A-Za-z0-9.-]{1,12}$/.test(ticker)) return null;
+  try {
+    return await readJson<PriceSeries>(
+      path.join(PRICES_DIR, `${ticker.toUpperCase()}.json`),
+    );
+  } catch {
+    return null;
+  }
 }
