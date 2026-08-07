@@ -244,3 +244,27 @@ dashboard/node_modules/
 LESSONS.md
 .claude/
 logs/
+
+# macOS / iCloud name-collision duplicates.
+#
+# ~/Documents is under iCloud Drive sync, which resolves a collision by
+# writing "name 2.ext" beside the original. Eighteen appeared during one
+# working day, byte-identical to tracked files, and pytest collected the
+# ten under tests/ — the suite read 1488 where the real figure is 1305.
+# One of them was ".github/workflows/ci 2.yml", which would have run a
+# second identical CI job on every push had it ever been committed.
+#
+# They are never wanted. Ignoring them keeps an accident out of history;
+# deleting them is still a manual step, since ignoring only hides them.
+# The pattern is literally "<name><space><digit>.<ext>". Anchoring on
+# the space matters: a bare "*[0-9].py" would also swallow sp500.py.
+* [0-9].py
+* [0-9].yml
+* [0-9].yaml
+* [0-9].json
+* [0-9].ts
+* [0-9].tsx
+* [0-9].md
+* [0-9].toml
+* [0-9].sqlite
+* [0-9].plist
