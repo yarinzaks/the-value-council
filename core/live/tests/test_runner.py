@@ -15,7 +15,11 @@ import pytest
 from core.backtest.decision_logger import DecisionLogger
 from core.live.agent_adapter import LiveTarget, ScanResult
 from core.live.portfolio import LivePortfolio, Position
-from core.live.runner import DailyRunner
+from core.live.runner import (
+    DEFAULT_MIN_HOLDING_DAYS,
+    DailyRunner,
+    pos_age_days,
+)
 
 AS_OF = date(2026, 8, 5)
 
@@ -882,3 +886,81 @@ class TestTheGuardComparesLogicalDates:
         result = self._scan(runner, date(2019, 3, 14))
 
         assert result.skipped is False  # type: ignore[attr-defined]
+
+
+class TestTheHoldingFloor:
+    """A name that slips a rank for a day must not be sold.
+
+    Across the ten agents the decision logs hold 246 completed
+    round-trips. Graham accounts for 75: he bought CRMD on 2026-05-12,
+    sold it on the 14th, bought back on the 15th, sold again on the
+    18th - four entries and three exits in three months, on a doctrine
+    whose holding period is measured in years.
+    """
+
+    @staticmethod
+    def _pos(ticker: str, entry_date: str) -> Position:
+        return Position(
+            ticker=ticker,
+            shares=10.0,
+            entry_price=20.0,
+            entry_date=entry_date,
+            current_price=20.0,
+        )
+
+    def test_a_fresh_position_is_not_rotated_out(
+        self, runner: DailyRunner
+    ) -> None:
+        # Bought two days ago and absent from today's targets — exactly
+        # the CRMD shape.
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0, "NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+        portfolio = LivePortfolio(agent="stub_agent", cash=5_000.0)
+        portfolio.positions.append(self._pos("KEEP", "2026-08-03"))
+        portfolio.save(directory=runner.portfolio_dir)
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            date(2026, 8, 5),
+            ["NEW"],
+            {"NEW": 20.0, "KEEP": 20.0},
+            {"NEW": None, "KEEP": None},
+        )
+
+        assert "KEEP" in {p.ticker for p in result.portfolio.positions}
+
+    def test_an_aged_position_is_rotated_out(self, runner: DailyRunner) -> None:
+        # Past the floor, the rotation works exactly as before.
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0, "NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+        portfolio = LivePortfolio(agent="stub_agent", cash=5_000.0)
+        portfolio.positions.append(self._pos("KEEP", "2026-01-05"))
+        portfolio.save(directory=runner.portfolio_dir)
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            date(2026, 8, 5),
+            ["NEW"],
+            {"NEW": 20.0, "KEEP": 20.0},
+            {"NEW": None, "KEEP": None},
+        )
+
+        assert "KEEP" not in {p.ticker for p in result.portfolio.positions}
+
+    def test_the_floor_is_thirty_days(self) -> None:
+        assert DEFAULT_MIN_HOLDING_DAYS == 30
+
+    def test_an_unreadable_entry_date_does_not_trap_a_position(self) -> None:
+        # "Cannot tell" must not become an infinite floor - a position
+        # with a corrupt date should still be sellable.
+        assert pos_age_days(Position(
+            ticker="ODD", shares=1.0, entry_price=1.0,
+            entry_date="not-a-date", current_price=1.0,
+        ), date(2026, 8, 5)) is None
+
+    def test_age_counts_from_entry(self) -> None:
+        assert pos_age_days(
+            Position(ticker="X", shares=1.0, entry_price=1.0,
+                     entry_date="2026-07-06", current_price=1.0),
+            date(2026, 8, 5),
+        ) == 30
