@@ -73,11 +73,19 @@ export interface NavRow {
  * written as BUY, so every executed purchase appeared twice for the
  * same ticker on the same day.
  */
+/** Mirrors `VALID_DECISION_TYPES` in core/backtest/decision_logger.py.
+ *
+ *  That list has nine members and this had six — REJECT, TRIM and ADD
+ *  were absent, so a row carrying one of them was typed as something it
+ *  is not and no exhaustive check could see it. */
 export type DecisionKind =
   | "BUY"
   | "SELL"
-  | "HOLD"
   | "WATCH"
+  | "REJECT"
+  | "HOLD"
+  | "TRIM"
+  | "ADD"
   | "FILL"
   | "EXIT";
 
@@ -195,4 +203,25 @@ export interface AgentDailyDelta {
   /** Today's NAV minus prev NAV. */
   nav_change_usd: number;
   nav_change_pct: number;
+}
+
+/** Decision kinds that mean "the agent wants to own this".
+ *
+ *  The runner logs an executed purchase as FILL and a rank rotation out
+ *  as EXIT, so a page that tests `decision === "BUY"` sees an intent
+ *  and misses the execution. Those labels merged on 2026-08-07 and the
+ *  live logs still hold only BUY/WATCH/SELL, so nothing is broken yet —
+ *  it breaks on the next run, which is why this exists now.
+ */
+export const BUY_KINDS: readonly DecisionKind[] = ["BUY", "FILL", "ADD"];
+
+/** Decision kinds that mean "the agent is out". */
+export const SELL_KINDS: readonly DecisionKind[] = ["SELL", "EXIT", "TRIM"];
+
+export function isBuy(d: DecisionKind): boolean {
+  return (BUY_KINDS as DecisionKind[]).includes(d);
+}
+
+export function isSell(d: DecisionKind): boolean {
+  return (SELL_KINDS as DecisionKind[]).includes(d);
 }

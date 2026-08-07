@@ -218,6 +218,14 @@ export function decisionLabel(
         return "בוצעה קנייה";
       case "EXIT":
         return "בוצעה מכירה";
+      // The remaining three the logger can emit. Without them a
+      // Hebrew reader saw the raw English token.
+      case "REJECT":
+        return "נפסלה";
+      case "TRIM":
+        return "הוקטנה";
+      case "ADD":
+        return "הוגדלה";
       default:
         return decision;
     }
@@ -227,6 +235,10 @@ export function decisionLabel(
       return "FILLED";
     case "EXIT":
       return "EXITED";
+    case "TRIM":
+      return "TRIMMED";
+    case "ADD":
+      return "ADDED";
     default:
       return decision;
   }

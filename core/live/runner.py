@@ -15,10 +15,12 @@ Orchestrates one day for all configured agents:
 7. Persist updated portfolio JSON + log decisions to
    ``data/decisions/<agent>/<YYYY-MM-DD>.json``.
 
-The runner deliberately *always* trades on every day's run — the user's
-spec says "Buy/sell decisions saved to data/decisions/" daily. In
-practice, on most days the target set won't change (fundamentals don't
-move daily), so trade churn stays low.
+The runner records a decision every day, but it does not trade every
+day. A name that leaves the target list is only sold once it has been
+held past ``min_holding_days`` — see DEFAULT_MIN_HOLDING_DAYS. The
+claim that "trade churn stays low" turned out to be false: the
+decision logs carry 246 completed round-trips across the ten agents,
+the shortest of them two days.
 """
 
 from __future__ import annotations
@@ -75,6 +77,7 @@ from core.live.portfolio import (
     now_iso,
 )
 from core.live.price_export import export_prices
+from core.live.sector_export import export_sectors
 from core.live.snapshots import make_snapshot, save_snapshot
 from core.logger import get_logger
 
@@ -90,6 +93,34 @@ MIN_TRADE_USD: float = 1.0
 #: previously never resized after entry at all, so every sizing doctrine
 #: was expressed once and then abandoned to price drift.
 DEFAULT_REBALANCE_BAND: float = 0.25
+
+#: Days a position is held before a rotation may sell it.
+#:
+#: Not a doctrine — a floor under one. Every investor here holds for
+#: years; none of them sells because a name slipped a rank overnight.
+#: The decision logs carry 246 completed round-trips, and the shortest
+#: are two days.
+#:
+#: Thirty days is deliberately short. It is long enough that a rank
+#: wobble resolves and the position is still there, and short enough
+#: that a genuine collapse still exits within the month. A longer floor
+#: would start overriding the agents' own exit rules, which is theirs
+#: to decide, not the runner's.
+DEFAULT_MIN_HOLDING_DAYS: int = 30
+
+
+def pos_age_days(pos: Position, as_of: date) -> int | None:
+    """Calendar days since entry, or None when the date is unusable.
+
+    None means "cannot tell", and the caller treats that as no floor
+    rather than as an infinite one — a position with a corrupt entry
+    date should still be sellable.
+    """
+    try:
+        entry = _to_date(pos.entry_date)
+    except (ValueError, TypeError):
+        return None
+    return max(0, (as_of - entry).days)
 
 
 @dataclass
@@ -291,6 +322,7 @@ class DailyRunner:
         cost_bps: float = DEFAULT_COST_BPS,
         initial_cash: float = DEFAULT_INITIAL_CASH,
         rebalance_band: float = DEFAULT_REBALANCE_BAND,
+        min_holding_days: int = DEFAULT_MIN_HOLDING_DAYS,
         cache: EdgarCache | None = None,
         price_loader: PriceDataLoader | None = None,
         universe: FullMarketUniverse | None = None,
@@ -316,7 +348,14 @@ class DailyRunner:
         self.cost_bps = cost_bps
         self.initial_cash = initial_cash
         self.rebalance_band = rebalance_band
-        self.universe = universe or FullMarketUniverse(cache=self.cache)
+        self.min_holding_days = min_holding_days
+        self.universe = universe or FullMarketUniverse(
+            cache=self.cache,
+            # Live only: a symbol the SEC no longer lists cannot be
+            # bought today. ASGN became EFOR and both were held at
+            # once. Backtests leave this off — see the flag.
+            require_current_listing=True,
+        )
         if pit_loader is None:
             fetcher = FundamentalsFetcher(
                 cache=self.cache,
@@ -477,12 +516,13 @@ class DailyRunner:
         # draw the line from entry to today. Cache-only and best-effort:
         # a chart is not worth failing a trading run over.
         try:
+            export_sectors([r.portfolio for r in results if r.portfolio is not None])
             export_prices(
                 [r.portfolio for r in results if r.portfolio is not None],
                 as_of=as_of,
                 loader=self.price_loader,
             )
-        except Exception as exc:  # noqa: BLE001 — presentation only
+        except Exception as exc:  # presentation only; never fails a run
             logger.warning(f"{as_of}: price export failed: {exc}")
 
         return results
@@ -562,6 +602,26 @@ class DailyRunner:
         if scan.targets:
             for pos in list(portfolio.positions):
                 if pos.ticker in target_tickers:
+                    continue
+                # A name can leave the target list for a day because a
+                # price moved and it slipped a rank, then come straight
+                # back. Selling on that is churn, not doctrine: across
+                # the ten agents the decision logs hold 246 completed
+                # round-trips, 75 of them Graham's, who bought CRMD,
+                # sold it two days later and bought it back the next
+                # morning — four times in three months. Whatever that
+                # is, it is not the Defensive Investor of chapter 14.
+                #
+                # So a position younger than the floor is held. If the
+                # thesis genuinely broke inside a month the exit is
+                # merely late; if it slipped a rank, the exit never
+                # happens and the round-trip costs nothing.
+                age = pos_age_days(pos, as_of)
+                if age is not None and age < self.min_holding_days:
+                    logger.info(
+                        f"{as_of}: {adapter.name} keeping {pos.ticker} — "
+                        f"held {age}d, floor is {self.min_holding_days}d"
+                    )
                     continue
                 # No fallback to pos.current_price. mark_to_market keeps the
                 # last known mark when a price is missing, which is right for

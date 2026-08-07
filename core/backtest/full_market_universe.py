@@ -61,7 +61,11 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from core.data.edgar_cache import EdgarCache
-from core.data.ticker_filter import is_common_equity, is_primary_listing
+from core.data.ticker_filter import (
+    is_common_equity,
+    is_currently_listed,
+    is_primary_listing,
+)
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
@@ -127,6 +131,7 @@ class FullMarketUniverse:
         require_positive_book_history: bool = True,
         require_two_year_positive_revenue: bool = True,
         require_common_equity: bool = True,
+        require_current_listing: bool = False,
         index_path: Path | None = None,
     ) -> None:
         self.cache = cache or EdgarCache()
@@ -139,6 +144,22 @@ class FullMarketUniverse:
         # rights at constituent-query time. See
         # :mod:`core.data.ticker_filter` for the rules.
         self.require_common_equity = require_common_equity
+        # Live-only, and off by default on purpose.
+        #
+        # A ticker absent from the SEC's current map is renamed or gone:
+        # ASGN became EFOR under the same CIK 890564, and both were held
+        # at once, at the same entry price, showing -9.2% and +50.2%
+        # because the dead symbol stopped updating. is_primary_listing
+        # cannot catch it — it falls open for tickers the map does not
+        # cover, which is precisely this case.
+        #
+        # It must stay off for backtests. Excluding every unmapped
+        # ticker is the survivorship bias this module's own warning is
+        # about, and applying it to history would bake that in rather
+        # than merely inherit it. Live is different: a symbol the SEC no
+        # longer lists cannot be bought today, so excluding it is a fact
+        # about the market rather than a filter on the past.
+        self.require_current_listing = require_current_listing
         self._index_path = (
             index_path or DEFAULT_CACHE_DIR / "full_market_universe_index.json"
         )
@@ -262,6 +283,8 @@ class FullMarketUniverse:
                 continue  # company didn't exist publicly yet
             if self.require_common_equity and not is_common_equity(ticker):
                 continue  # preferred / baby bond / fund / warrant
+            if self.require_current_listing and not is_currently_listed(ticker):
+                continue  # renamed or delisted — untradeable today
             if self.require_common_equity and not is_primary_listing(ticker):
                 # Same issuer, second symbol. Every ticker under one CIK
                 # resolves to that CIK's financial statements, so a

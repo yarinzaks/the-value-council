@@ -8,6 +8,7 @@ import {
   PageTitle,
 } from "@/components/Cards";
 import { NavChart } from "@/components/NavChart";
+import { SectorDonut, type SectorSlice } from "@/components/SectorDonut";
 import { LivePositionsTable } from "@/components/LivePositionsTable";
 import { AgentPerformanceChart } from "@/components/AgentPerformanceChart";
 import { Term } from "@/components/Term";
@@ -16,10 +17,12 @@ import {
   loadCompanyNames,
   loadJournal,
   loadLivePortfolio,
+  loadSectors,
   loadSnapshots,
 } from "@/lib/data";
 import { AGENTS, metaLocalized } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
+import { isBuy, isSell } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
 import { translateRationale, translateTrigger } from "@/lib/translate-dynamic";
 import { decisionLabel, narrative } from "@/lib/narrative";
@@ -40,13 +43,44 @@ export default async function AgentDrillPage({
   const meta = metaLocalized(slug, locale);
   if (!meta) return notFound();
 
-  const [run, recent, live, companyNames, snapshots] = await Promise.all([
+  const [run, recent, live, companyNames, snapshots, sectorMap] = await Promise.all([
     loadAgentLatest(slug),
     loadJournal({ agent: slug, limit: 30 }),
     loadLivePortfolio(slug),
     loadCompanyNames(),
     loadSnapshots(slug),
+    loadSectors(),
   ]);
+
+  // Weighted by market value, not by count: three 8% positions are a
+  // bigger bet than five 1% ones, and a donut sized by name count would
+  // say the opposite. "Unclassified" is its own slice rather than being
+  // folded somewhere plausible — an agent holding names nobody has
+  // classified is telling you something.
+  const sectorSlices: SectorSlice[] = (() => {
+    const positions = live?.positions ?? [];
+    const invested = positions.reduce(
+      (sum, p) => sum + p.shares * p.current_price,
+      0,
+    );
+    if (invested <= 0) return [];
+    const byKey = new Map<string, { value: number; count: number }>();
+    for (const p of positions) {
+      const key = sectorMap[p.ticker] ?? "unknown";
+      const e = byKey.get(key) ?? { value: 0, count: 0 };
+      e.value += p.shares * p.current_price;
+      e.count += 1;
+      byKey.set(key, e);
+    }
+    return [...byKey.entries()]
+      .map(([key, e]) => ({
+        key,
+        label: t(`sector_${key}`),
+        pct: (e.value / invested) * 100,
+        count: e.count,
+      }))
+      .sort((a, b) => b.pct - a.pct);
+  })();
 
   if (!run && !live) {
     return (
@@ -117,6 +151,15 @@ export default async function AgentDrillPage({
               />
             </div>
           )}
+
+          {/* Where the money sits, before the list of what it is
+              in. A position table answers "what"; this answers "what
+              is this investor actually doing". */}
+          <Card className="mb-6">
+            <h3 className="text-sm font-semibold mb-1">{t("sector_title")}</h3>
+            <p className="text-xs text-muted mb-3">{t("sector_note")}</p>
+            <SectorDonut slices={sectorSlices} emptyLabel={t("sector_empty")} />
+          </Card>
 
           <Card className="mb-6">
             <div className="flex items-center justify-between mb-3">
@@ -272,9 +315,9 @@ export default async function AgentDrillPage({
                 >
                   <span
                     className={`text-xs font-semibold w-14 px-1.5 py-0.5 rounded text-center whitespace-nowrap mt-0.5 ${
-                      d.decision === "BUY"
+                      isBuy(d.decision)
                         ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : d.decision === "SELL"
+                        : isSell(d.decision)
                           ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
                           : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
                     }`}
