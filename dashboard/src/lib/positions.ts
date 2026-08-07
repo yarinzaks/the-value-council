@@ -281,7 +281,7 @@ export function parseConditions(criteria: string[]): WatchCondition[] {
 /** One entry in the movements list — an event, not a daily heartbeat. */
 export interface Movement {
   date: string;
-  kind: "opened" | "exited" | "changed";
+  kind: "opened" | "reopened" | "exited" | "changed";
   note: string | null;
 }
 
@@ -298,15 +298,28 @@ export function movements(story: PositionStory): Movement[] {
   const out: Movement[] = [
     { date: dayOf(rows[0].timestamp), kind: "opened", note: rows[0].rationale ?? null },
   ];
+  // Track whether we are in or out, so a buy after a sell reads as a
+  // re-entry rather than as "changed its view". CRMD showed three
+  // exits and one opening, which left a reader asking where the stock
+  // was bought back — the answer was there, mislabelled.
   let prev = rows[0].decision;
+  let holding = BUY_KINDS.has(rows[0].decision);
   for (const r of rows.slice(1)) {
     if (r.decision === prev) continue;
     prev = r.decision;
-    out.push({
-      date: dayOf(r.timestamp),
-      kind: r.decision === "SELL" || r.decision === "EXIT" ? "exited" : "changed",
-      note: r.rationale ?? null,
-    });
+    const isBuy = BUY_KINDS.has(r.decision);
+    const isSell = r.decision === "SELL" || r.decision === "EXIT";
+    let kind: Movement["kind"];
+    if (isSell) {
+      kind = "exited";
+      holding = false;
+    } else if (isBuy && !holding) {
+      kind = "reopened";
+      holding = true;
+    } else {
+      kind = "changed";
+    }
+    out.push({ date: dayOf(r.timestamp), kind, note: r.rationale ?? null });
   }
   return out.reverse(); // newest first
 }
