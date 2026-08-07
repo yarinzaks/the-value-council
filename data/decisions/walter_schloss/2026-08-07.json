@@ -1,0 +1,557 @@
+[
+  {
+    "ticker": "BUR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.410 (< 0.75)",
+      "D/E=0.87 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.4101,
+      "debt_to_equity": 0.8692,
+      "book_value_per_share": 11.183419961421203,
+      "market_cap": 948920410.7502747,
+      "net_income": 62572000.0,
+      "price": 4.335000038146973
+    },
+    "market_conditions": {},
+    "confidence": 0.5899223895440563,
+    "entry_price": 4.335000038146973,
+    "target_price": 11.183419961421203,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.410, D/E 0.87, BVPS 11.18"
+  },
+  {
+    "ticker": "BHF",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.528 (< 0.75)",
+      "D/E=0.47 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.5283,
+      "debt_to_equity": 0.4662,
+      "book_value_per_share": 118.35457965334035,
+      "market_cap": 3575435877.2310104,
+      "net_income": 433000000.0,
+      "price": 62.525001525878906
+    },
+    "market_conditions": {},
+    "confidence": 0.4717145571467184,
+    "entry_price": 62.525001525878906,
+    "target_price": 118.35457965334035,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.528, D/E 0.47, BVPS 118.35"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.616 (< 0.75)",
+      "D/E=0.30 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.6159,
+      "debt_to_equity": 0.3009,
+      "book_value_per_share": 125.98787744331774,
+      "market_cap": 3487574822.1026917,
+      "net_income": 503000000.0,
+      "price": 77.58999633789062
+    },
+    "market_conditions": {},
+    "confidence": 0.38414712659320294,
+    "entry_price": 77.58999633789062,
+    "target_price": 125.98787744331774,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.616, D/E 0.30, BVPS 125.99"
+  },
+  {
+    "ticker": "UHAL",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 51.17,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $51.17, exit $75.48 (+47.51%)"
+  },
+  {
+    "ticker": "BHFAL",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 16.96,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $16.96, exit $15.74 (-7.19%)"
+  },
+  {
+    "ticker": "AIZN",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 19.66,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $19.66, exit $18.81 (-4.32%)"
+  },
+  {
+    "ticker": "HPP",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 9.77,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $9.77, exit $14.93 (+52.81%)"
+  },
+  {
+    "ticker": "PFH",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 16.84,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $16.84, exit $15.88 (-5.71%)"
+  },
+  {
+    "ticker": "VYLD",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 28.041,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $28.04, exit $30.22 (+7.78%)"
+  },
+  {
+    "ticker": "PRS",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 22.89,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $22.89, exit $21.16 (-7.56%)"
+  },
+  {
+    "ticker": "PRH",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 23.77,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $23.77, exit $22.09 (-7.07%)"
+  },
+  {
+    "ticker": "AMJB",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 35.896,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $35.90, exit $36.84 (+2.63%)"
+  },
+  {
+    "ticker": "SFB",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 20.13,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $20.13, exit $19.66 (-2.33%)"
+  },
+  {
+    "ticker": "UNMA",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 23.32,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $23.32, exit $21.22 (-9.02%)"
+  },
+  {
+    "ticker": "CUBB",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 22.55,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $22.55, exit $22.40 (-0.67%)"
+  },
+  {
+    "ticker": "LEVI",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 22.3,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $22.30, exit $24.29 (+8.92%)"
+  },
+  {
+    "ticker": "UZF",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 18.05,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $18.05, exit $16.69 (-7.53%)"
+  },
+  {
+    "ticker": "UZE",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 18.23,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $18.23, exit $16.79 (-7.90%)"
+  },
+  {
+    "ticker": "GNW",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 8.87,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $8.87, exit $9.57 (+7.95%)"
+  },
+  {
+    "ticker": "KSS",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 14.25,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $14.25, exit $18.50 (+29.86%)"
+  },
+  {
+    "ticker": "UZD",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 20.06,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $20.06, exit $19.14 (-4.59%)"
+  },
+  {
+    "ticker": "DTK",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 24.69,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $24.69, exit $23.55 (-4.64%)"
+  },
+  {
+    "ticker": "SRJN",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 24.989,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $24.99, exit $23.09 (-7.60%)"
+  },
+  {
+    "ticker": "SREA",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 21.5,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $21.50, exit $20.67 (-3.88%)"
+  },
+  {
+    "ticker": "KMPB",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 23.89,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $23.89, exit $24.64 (+3.14%)"
+  },
+  {
+    "ticker": "CMCSA",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 26.46,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $26.46, exit $25.38 (-4.10%)"
+  },
+  {
+    "ticker": "CENT",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 41.38,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $41.38, exit $44.99 (+8.74%)"
+  },
+  {
+    "ticker": "ARI",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 7.015,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $7.01, exit $6.74 (-3.91%)"
+  },
+  {
+    "ticker": "HPK",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 7.08,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $7.08, exit $6.97 (-1.62%)"
+  },
+  {
+    "ticker": "ARE",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 50.61,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $50.61, exit $49.01 (-3.15%)"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "FILL",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-07T00:00:00+00:00",
+    "criteria_met": [
+      "rank #3",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 77.58999633789062,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "P/B 0.62, D/E 0.30. Trades below tangible book \u2014 Schloss deep-value bargain."
+  }
+]
