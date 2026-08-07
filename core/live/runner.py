@@ -74,6 +74,7 @@ from core.live.portfolio import (
     WatchEntry,
     now_iso,
 )
+from core.live.price_export import export_prices
 from core.live.snapshots import make_snapshot, save_snapshot
 from core.logger import get_logger
 
@@ -471,6 +472,18 @@ class DailyRunner:
                     agent=adapter.name, portfolio=portfolio, error=str(exc)
                 )
             results.append(result)
+
+        # Publish a price series per held ticker so the dashboard can
+        # draw the line from entry to today. Cache-only and best-effort:
+        # a chart is not worth failing a trading run over.
+        try:
+            export_prices(
+                [r.portfolio for r in results if r.portfolio is not None],
+                as_of=as_of,
+                loader=self.price_loader,
+            )
+        except Exception as exc:  # noqa: BLE001 — presentation only
+            logger.warning(f"{as_of}: price export failed: {exc}")
 
         return results
 

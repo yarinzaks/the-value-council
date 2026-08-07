@@ -1,5 +1,5 @@
 import { Card, EmptyState, PageTitle } from "@/components/Cards";
-import { loadWatchlist } from "@/lib/data";
+import { loadCompanyNames, loadWatchlist } from "@/lib/data";
 import { metaLocalized } from "@/lib/agents";
 import { getServerI18n } from "@/lib/locale-server";
 
@@ -7,7 +7,10 @@ export const dynamic = "force-dynamic";
 
 export default async function WatchlistPage() {
   const { locale, t } = getServerI18n();
-  const entries = await loadWatchlist();
+  const [entries, companyNames] = await Promise.all([
+    loadWatchlist(),
+    loadCompanyNames(),
+  ]);
   if (entries.length === 0) {
     return (
       <>
@@ -37,7 +40,19 @@ export default async function WatchlistPage() {
                   key={e.ticker}
                   className="border-b border-council-100 dark:border-council-800 last:border-b-0"
                 >
-                  <td className="py-2.5 pr-3 font-mono font-medium tabular">{e.ticker}</td>
+                  <td className="py-2.5 pr-3">
+                    <span className="font-mono font-medium tabular">
+                      {e.ticker}
+                    </span>
+                    {/* A one-letter ticker like "G" or "M" is
+                        unreadable on its own; the name is what makes
+                        the row scannable. */}
+                    {companyNames[e.ticker] && (
+                      <span className="ms-2 text-xs font-normal text-council-500">
+                        {companyNames[e.ticker]}
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2.5 pr-3">
                     <div className="flex flex-wrap gap-1.5">
                       {e.agents.map((a) => {

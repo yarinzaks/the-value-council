@@ -31,7 +31,7 @@ const en: Dict = {
   toggle_theme: "Toggle theme",
 
   // ---- Overview page ----
-  overview_subtitle: "Live paper-trading state across all four agents",
+  overview_subtitle: "Live paper-trading state across all ten investors",
   council_nav: "Council NAV",
   council_cash: "Council cash",
   council_invested: "Invested",
@@ -153,6 +153,8 @@ const en: Dict = {
   pos_longest: "Longest conviction",
   pos_trades_from: "Executed trades are recorded from {date}. Earlier days show no trades because the record was overwritten, not because nothing happened.",
   pos_no_criteria: "no criteria recorded",
+  price_chart_title: "Price since entry",
+  price_chart_note: "Adjusted closes over the past year. The dashed line is what the agent paid; the dot is the entry date when it falls inside this window.",
   filter_agent: "Agent",
   filter_all: "All",
   filter_type: "Type",
@@ -288,7 +290,7 @@ const he: Dict = {
   toggle_theme: "החלף ערכת צבעים",
 
   // ---- Overview page ----
-  overview_subtitle: "מצב מסחר הנייר החי בכל ארבעת הסוכנים",
+  overview_subtitle: "מצב מסחר הנייר החי בכל עשרת המשקיעים",
   council_nav: "שווי המועצה",
   council_cash: "מזומן המועצה",
   council_invested: "מושקע",
@@ -410,6 +412,8 @@ const he: Dict = {
   pos_longest: "השכנוע הארוך ביותר",
   pos_trades_from: "עסקאות שבוצעו נרשמות החל מ־{date}. בימים קודמים לא מוצגות עסקאות כי הרישום נדרס, לא כי לא קרה כלום.",
   pos_no_criteria: "לא נרשמו קריטריונים",
+  price_chart_title: "מחיר מאז הכניסה",
+  price_chart_note: "מחירי סגירה מתואמים בשנה האחרונה. הקו המקווקו הוא מה שהסוכן שילם; הנקודה היא תאריך הכניסה, כשהוא נופל בתוך החלון הזה.",
   filter_agent: "סוכן",
   filter_all: "הכל",
   filter_type: "סוג",

@@ -91,7 +91,7 @@ export default async function OverviewPage() {
             />
             <MetricCard
               label={t("council_pnl")}
-              value={`${live.council_pnl_usd >= 0 ? "+" : "−"}$${Math.abs(live.council_pnl_usd).toFixed(2)}`}
+              value={`${live.council_pnl_usd >= 0 ? "+" : "−"}$${Math.abs(live.council_pnl_usd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               emphasis={live.council_pnl_usd > 0}
             />
           </div>

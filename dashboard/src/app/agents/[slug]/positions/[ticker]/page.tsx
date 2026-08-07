@@ -18,7 +18,9 @@ import {
   loadCompanyNames,
   loadJournal,
   loadLivePortfolio,
+  loadPriceSeries,
 } from "@/lib/data";
+import { PositionPriceChart } from "@/components/PositionPriceChart";
 import { metaLocalized } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
@@ -79,10 +81,11 @@ export default async function PositionDetailPage({
   const meta = metaLocalized(slug, locale);
   if (!meta) return notFound();
 
-  const [portfolio, names, decisionsAll] = await Promise.all([
+  const [portfolio, names, decisionsAll, priceSeries] = await Promise.all([
     loadLivePortfolio(slug),
     loadCompanyNames(),
     loadJournal({ agent: slug, decisions: ["BUY"], limit: 5000 }),
+    loadPriceSeries(ticker),
   ]);
   const position = portfolio?.positions.find((p) => p.ticker === ticker);
   if (!position) {
@@ -122,6 +125,27 @@ export default async function PositionDetailPage({
         title={`${ticker}${companyName ? ` · ${companyName}` : ""}`}
         subtitle={`${meta.display} · ${meta.school_label}`}
       />
+
+      {/* The path between entry and today. Without it a position that
+          round-tripped 30% and came back looks identical to one that
+          never moved. */}
+      {priceSeries && priceSeries.points.length > 1 && (
+        <Card className="mb-6">
+          <div className="text-xs text-council-500 mb-2">
+            {t("price_chart_title")}
+          </div>
+          <PositionPriceChart
+            points={priceSeries.points}
+            entryPrice={position.entry_price}
+            entryDate={position.entry_date}
+            color={meta.color}
+            labels={{ entry: t("col_entry"), price: t("col_current") }}
+          />
+          <p className="mt-2 text-[11px] text-council-400">
+            {t("price_chart_note")}
+          </p>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
