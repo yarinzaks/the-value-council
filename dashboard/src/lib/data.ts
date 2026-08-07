@@ -420,3 +420,25 @@ export async function loadPriceSeries(
     return null;
   }
 }
+
+// --------------------------------------------------------------------------
+// Sectors — SIC division per held ticker, written by the daily run
+// --------------------------------------------------------------------------
+
+/** `{ticker: sector_key}` for every ticker any agent holds.
+ *
+ *  Keys are SIC division slugs from `core.live.sector_export`; render
+ *  them through the `sector_*` i18n entries. Missing file yields an
+ *  empty map, and a ticker absent from it is "unknown" — which is a
+ *  real answer, since an agent holding unclassifiable names is telling
+ *  you something.
+ */
+export async function loadSectors(): Promise<Record<string, string>> {
+  try {
+    return await readJson<Record<string, string>>(
+      path.join(DATA_ROOT, "sectors.json"),
+    );
+  } catch {
+    return {};
+  }
+}

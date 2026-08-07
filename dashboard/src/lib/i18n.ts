@@ -104,6 +104,22 @@ const en: Dict = {
   caveat_body:
     "Stored runs are from 2026-04-29 and report figures no value strategy produces: a 3,029% total return over five years and a best year of +476%. Three defects since fixed explain them — the universe holds only companies that survived to today, prices were carried forward across gaps of up to 4,021 days, and fundamentals were served a median seven fiscal years stale. Windows also differ between agents (one is measured against an S&P of 25.47%, another against 14.49%), so the ranking is partly a ranking of windows. Re-run the backtests to get comparable numbers.",
 
+  // ---- Sectors ----
+  sector_title: "Where the money sits",
+  sector_note: "Share of invested value by SIC division. Weighted by value, not by number of holdings.",
+  sector_empty: "No holdings to break down yet.",
+  sector_agriculture: "Agriculture",
+  sector_mining: "Mining & energy",
+  sector_construction: "Construction",
+  sector_manufacturing: "Manufacturing",
+  sector_transport_utilities: "Transport & utilities",
+  sector_wholesale: "Wholesale",
+  sector_retail: "Retail",
+  sector_finance: "Finance & real estate",
+  sector_services: "Services",
+  sector_public_admin: "Public administration",
+  sector_unknown: "Unclassified",
+
   // ---- Heatmap ----
   heatmap_title: "Annual Returns Heatmap",
   heatmap_subtitle: "Per-agent alpha vs S&P 500 each calendar year",
@@ -373,6 +389,22 @@ const he: Dict = {
   caveat_title: "התשואות האלה קדמו לתיקוני הנתונים — קרא אותן כגבול עליון",
   caveat_body:
     "הריצות השמורות הן מ-29/04/2026 ומדווחות מספרים ששום אסטרטגיית ערך לא מייצרת: 3,029% תשואה כוללת בחמש שנים, ושנה טובה של 476%+. שלושה פגמים שתוקנו מאז מסבירים אותם — היקום מכיל רק חברות ששרדו עד היום, מחירים נגררו קדימה על פני חורים של עד 4,021 ימים, ונתוני היסוד הוגשו באיחור חציוני של שבע שנות כספים. גם החלונות שונים בין הסוכנים (אחד נמדד מול S&P של 25.47%, אחר מול 14.49%), אז הדירוג הוא בחלקו דירוג של חלונות. הרץ את הבקטסטים מחדש כדי לקבל מספרים ברי-השוואה.",
+
+  // ---- Sectors ----
+  sector_title: "איפה הכסף יושב",
+  sector_note: "חלק מהשווי המושקע לפי חטיבת SIC. משוקלל לפי שווי, לא לפי מספר החזקות.",
+  sector_empty: "אין עדיין החזקות לפילוח.",
+  sector_agriculture: "חקלאות",
+  sector_mining: "כרייה ואנרגיה",
+  sector_construction: "בנייה",
+  sector_manufacturing: "תעשייה",
+  sector_transport_utilities: "תחבורה ותשתיות",
+  sector_wholesale: "סיטונאות",
+  sector_retail: "קמעונאות",
+  sector_finance: "פיננסים ונדל\"ן",
+  sector_services: "שירותים",
+  sector_public_admin: "מנהל ציבורי",
+  sector_unknown: "לא מסווג",
 
   // ---- Heatmap ----
   heatmap_title: "מפת חום של תשואות שנתיות",

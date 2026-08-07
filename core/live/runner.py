@@ -77,6 +77,7 @@ from core.live.portfolio import (
     now_iso,
 )
 from core.live.price_export import export_prices
+from core.live.sector_export import export_sectors
 from core.live.snapshots import make_snapshot, save_snapshot
 from core.logger import get_logger
 
@@ -515,6 +516,7 @@ class DailyRunner:
         # draw the line from entry to today. Cache-only and best-effort:
         # a chart is not worth failing a trading run over.
         try:
+            export_sectors([r.portfolio for r in results if r.portfolio is not None])
             export_prices(
                 [r.portfolio for r in results if r.portfolio is not None],
                 as_of=as_of,

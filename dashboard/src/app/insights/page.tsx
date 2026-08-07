@@ -2,6 +2,7 @@ import { Card, EmptyState, PageTitle, PctCell } from "@/components/Cards";
 import { loadCouncilOverview, loadJournal } from "@/lib/data";
 import { metaLocalized, AGENTS } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
+import { isBuy } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export default async function InsightsPage() {
   const byTicker = new Map<string, { buy: Set<string>; watch: Set<string> }>();
   for (const d of currentDecisions) {
     const e = byTicker.get(d.ticker) ?? { buy: new Set(), watch: new Set() };
-    if (d.decision === "BUY") e.buy.add(d.agent);
+    if (isBuy(d.decision)) e.buy.add(d.agent);
     else if (d.decision === "WATCH") e.watch.add(d.agent);
     byTicker.set(d.ticker, e);
   }
@@ -85,7 +86,7 @@ export default async function InsightsPage() {
   divergence.sort((a, b) => b.passers.length - a.passers.length);
 
   const totalDecisions = allDecisions.length;
-  const totalBuys = allDecisions.filter((d) => d.decision === "BUY").length;
+  const totalBuys = allDecisions.filter((d) => isBuy(d.decision)).length;
   const uniqueTickers = new Set(allDecisions.map((d) => d.ticker)).size;
 
   return (
@@ -203,7 +204,7 @@ export default async function InsightsPage() {
             {AGENTS.map((a) => {
               const meta = metaLocalized(a.slug, locale);
               const buys = allDecisions.filter(
-                (d) => d.agent === a.slug && d.decision === "BUY",
+                (d) => d.agent === a.slug && isBuy(d.decision),
               ).length;
               const watches = allDecisions.filter(
                 (d) => d.agent === a.slug && d.decision === "WATCH",
