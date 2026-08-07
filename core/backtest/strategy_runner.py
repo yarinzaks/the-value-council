@@ -21,7 +21,11 @@ from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
 from .data_loader import PriceDataLoader
-from .point_in_time import PointInTimeFinancials, PointInTimeLoader
+from .point_in_time import (
+    PointInTimeError,
+    PointInTimeFinancials,
+    PointInTimeLoader,
+)
 from .portfolio import BacktestPortfolio, NavSnapshot, TradeRecord
 from .transaction_costs import CostModel, PercentageCost
 from .universe import load_universe
@@ -48,16 +52,40 @@ class PriceLookup:
 
 
 class FundamentalsLookup:
-    """Strategy-facing wrapper over :class:`PointInTimeLoader`."""
+    """Strategy-facing wrapper over :class:`PointInTimeLoader`.
+
+    :meth:`PointInTimeLoader.get_financials` raises when a filing exists
+    but yields nothing usable — the right call there, because returning
+    ``None`` would be indistinguishable from a company that never filed.
+    But this is the screening seam: a strategy asks it about every name
+    in a 6,600-ticker universe, and one unparseable 10-Q killed a
+    five-hour backtest at the fourth rebalance (Buffett, FCHS, 2026-08-07).
+
+    So the exception stops here and becomes ``None``. That is the honest
+    answer to the strategy's actual question — *can I value this
+    company?* — and no doctrine buys what it cannot value. The tickers
+    are kept in :attr:`unparseable` so the runner can report how many
+    names a rebalance dropped for this reason rather than swallowing it.
+    """
 
     def __init__(self, loader: PointInTimeLoader | None, as_of: date) -> None:
         self._loader = loader
         self._as_of = as_of
+        #: Tickers whose filing was found but could not be parsed.
+        self.unparseable: set[str] = set()
 
     def get(self, ticker: str) -> PointInTimeFinancials | None:
         if self._loader is None:
             return None
-        return self._loader.get_financials(ticker, self._as_of)
+        try:
+            return self._loader.get_financials(ticker, self._as_of)
+        except PointInTimeError as exc:
+            # Per-ticker at debug: a bad quarter for a data vendor can
+            # produce hundreds of these, and a warning each would bury
+            # the run's real output. The count is logged once, below.
+            self.unparseable.add(ticker.upper())
+            logger.debug(f"{ticker} @ {self._as_of}: unusable filing — {exc}")
+            return None
 
 
 # ----------------------------------------------------------------------
@@ -373,6 +401,13 @@ class BacktestRunner:
                 fund_lookup = FundamentalsLookup(self.pit_loader, today)
 
                 weights = strategy.select(today, universe_today, price_lookup, fund_lookup)
+                if fund_lookup.unparseable:
+                    sample = ", ".join(sorted(fund_lookup.unparseable)[:5])
+                    logger.warning(
+                        f"{today}: {len(fund_lookup.unparseable)} of "
+                        f"{len(universe_today)} names dropped — filing found "
+                        f"but unparseable (e.g. {sample})"
+                    )
                 # Add prices for any NEW tickers the strategy wants
                 new_tickers = [t for t in weights if t not in prices_today]
                 if new_tickers:

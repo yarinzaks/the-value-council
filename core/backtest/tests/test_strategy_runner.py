@@ -12,6 +12,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from core.backtest.point_in_time import PointInTimeError, PointInTimeFinancials
 from core.backtest.strategy_runner import (
     BuyAndHoldSPY,
     EqualWeightUniverse,
@@ -123,3 +124,67 @@ class TestStrategyABC:
     def test_equal_weight_zero_raises(self) -> None:
         with pytest.raises(ValueError):
             EqualWeightUniverse(max_positions=0)
+
+
+class TestFundamentalsLookupSurvivesABadFiling:
+    """One unparseable 10-Q must not end a five-hour backtest.
+
+    ``PointInTimeLoader.get_financials`` raises when a filing exists but
+    parses to nothing — correct there, since ``None`` would be
+    indistinguishable from a company that never filed. At the screening
+    seam it is fatal: Buffett's 2026-08-07 run died at the fourth
+    rebalance on FCHS, one name out of 6,601.
+    """
+
+    class _Raising:
+        """Stands in for a loader whose adapter cannot parse FCHS."""
+
+        def __init__(self) -> None:
+            self.asked: list[str] = []
+
+        def get_financials(
+            self, ticker: str, as_of: date
+        ) -> PointInTimeFinancials | None:
+            self.asked.append(ticker)
+            if ticker == "FCHS":
+                raise PointInTimeError(
+                    "FCHS: 10-Q filed 2018-11-07 yielded no usable data"
+                )
+            return None
+
+    def test_a_parse_failure_reads_as_no_data(self) -> None:
+        lookup = FundamentalsLookup(
+            self._Raising(),  # type: ignore[arg-type]
+            date(2022, 12, 30),
+        )
+
+        assert lookup.get("FCHS") is None
+
+    def test_the_screen_continues_past_it(self) -> None:
+        loader = self._Raising()
+        lookup = FundamentalsLookup(loader, date(2022, 12, 30))  # type: ignore[arg-type]
+
+        for ticker in ("AAPL", "FCHS", "MSFT"):
+            lookup.get(ticker)
+
+        # Before the fix the third call never happened.
+        assert loader.asked == ["AAPL", "FCHS", "MSFT"]
+
+    def test_the_dropped_ticker_is_recorded_not_swallowed(self) -> None:
+        lookup = FundamentalsLookup(
+            self._Raising(),  # type: ignore[arg-type]
+            date(2022, 12, 30),
+        )
+
+        lookup.get("AAPL")
+        lookup.get("FCHS")
+
+        # AAPL returned None because it has no filing — a different
+        # thing, and it must not show up here.
+        assert lookup.unparseable == {"FCHS"}
+
+    def test_no_loader_still_returns_none(self) -> None:
+        lookup = FundamentalsLookup(None, date(2022, 12, 30))
+
+        assert lookup.get("FCHS") is None
+        assert lookup.unparseable == set()
