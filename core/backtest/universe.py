@@ -25,10 +25,10 @@ Both are JSON files; refresh by calling :func:`refresh_universe_cache`.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 
@@ -37,7 +37,8 @@ from core.logger import get_logger
 
 logger = get_logger("core.backtest.universe")
 
-from core.paths import PROJECT_ROOT, cache_dir as _cache_dir
+from core.paths import cache_dir as _cache_dir
+
 DEFAULT_CACHE_DIR = _cache_dir()
 
 WIKI_SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
@@ -63,7 +64,7 @@ class Change:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, str | None]) -> "Change":
+    def from_dict(cls, d: dict[str, str | None]) -> Change:
         return cls(
             effective_date=date.fromisoformat(str(d["effective_date"])),
             added_ticker=d.get("added_ticker") or None,
@@ -162,7 +163,7 @@ class HistoricalUniverse:
         )
 
     @classmethod
-    def load(cls, cache_dir: Path | None = None) -> "HistoricalUniverse":
+    def load(cls, cache_dir: Path | None = None) -> HistoricalUniverse:
         """Load a previously persisted universe."""
         cdir = cache_dir or DEFAULT_CACHE_DIR
         cur_path = cdir / "sp500_current.json"
@@ -236,7 +237,7 @@ def fetch_universe_from_wikipedia() -> HistoricalUniverse:
         from io import StringIO
 
         tables = pd.read_html(StringIO(response.text))
-    except Exception as exc:  # noqa: BLE001 — many possible network errors
+    except Exception as exc:
         raise UniverseError(f"failed to fetch Wikipedia tables: {exc}") from exc
 
     current_df: pd.DataFrame | None = None

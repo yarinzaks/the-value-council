@@ -22,9 +22,9 @@ Only stocks passing every filter are eligible for ranking.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Iterable
 
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.logger import get_logger

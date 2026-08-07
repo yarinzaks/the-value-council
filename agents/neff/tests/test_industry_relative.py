@@ -127,15 +127,19 @@ def test_candidate_judged_against_its_own_industry(
         # divs=-22M = 1% yield, ROE = 100M / 800M = 12.5%
         f = _fin(f"TECH{i}", eps=1.0, dividends=-22_000_000)
         candidates.append((f, 2_200_000_000.0, 22.0))
-    # The "cheap tech" — PE=11 (= 50% of 22), high yield, high ROE.
+    # The "cheap tech" — PE=9.2 (42% of the tech median of 22), high
+    # yield, high ROE. Deliberately below the *universe* median too:
+    # Neff's hard P/E gate is measured against the market multiple, so
+    # a name that is only cheap relative to its own sector is rejected
+    # before scoring. See test_sector_relative_cheapness_is_not_enough.
     cheap_tech = _fin(
         "TECH6",
-        eps=2.0,
+        eps=2.4,
         net_income=130_000_000,
         equity=800_000_000,
         dividends=-100_000_000,
     )
-    candidates.append((cheap_tech, 2_000_000_000.0, 22.0))  # PE=11, yield=5%
+    candidates.append((cheap_tech, 2_000_000_000.0, 22.0))  # PE=9.2, yield=5%
 
     # Bank industry: 5 stocks at PE=10 + 1 cheap candidate at PE=5.
     for i in range(1, 6):
@@ -163,3 +167,40 @@ def test_candidate_judged_against_its_own_industry(
     # PE window (they sit at the median, not below 60% of it).
     assert "TECH1" not in tickers
     assert "BANK1" not in tickers
+
+
+def test_sector_relative_cheapness_is_not_enough(
+    cache_with_growth: EdgarCache,
+) -> None:
+    """A name cheap against its own industry but above the market
+    multiple is rejected before scoring.
+
+    Neff bought at 40-60% of the *market* P/E. Buying the cheapest tech
+    stock at a premium to the market is the sector-relative reasoning
+    his method exists to avoid, and the soft score could previously
+    carry such a name through on growth and ROE alone.
+    """
+    candidates = []
+    # An expensive industry: five peers at PE 22.
+    for i in range(1, 6):
+        f = _fin(f"TECH{i}", eps=1.0, dividends=-22_000_000)
+        candidates.append((f, 2_200_000_000.0, 22.0))
+    # Cheap against tech (PE 11 = 50% of 22) but above the market.
+    cheap_only_vs_sector = _fin(
+        "TECH6",
+        eps=2.0,
+        net_income=130_000_000,
+        equity=800_000_000,
+        dividends=-100_000_000,
+    )
+    candidates.append((cheap_only_vs_sector, 2_000_000_000.0, 22.0))
+    # A cheap industry that drags the market median below 11.
+    for i in range(1, 7):
+        f = _fin(f"BANK{i}", eps=1.0, dividends=-10_000_000)
+        candidates.append((f, 1_000_000_000.0, 10.0))
+
+    scores = score_candidates(
+        candidates, as_of=date(2024, 6, 30), edgar_cache=cache_with_growth
+    )
+
+    assert "TECH6" not in {s.ticker for s in scores}

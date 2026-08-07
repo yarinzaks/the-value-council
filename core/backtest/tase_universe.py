@@ -48,7 +48,8 @@ from core.logger import get_logger
 
 logger = get_logger("core.backtest.tase_universe")
 
-from core.paths import PROJECT_ROOT, cache_dir as _cache_dir
+from core.paths import cache_dir as _cache_dir
+
 DEFAULT_CACHE_DIR = _cache_dir()
 DEFAULT_TICKERS_PATH = DEFAULT_CACHE_DIR / "tase_tickers.json"
 
@@ -108,7 +109,7 @@ class TASEUniverse:
         tickers_path: Path | None = None,
         *,
         fall_back_to_starter: bool = True,
-    ) -> "TASEUniverse":
+    ) -> TASEUniverse:
         """Load a TASEUniverse from JSON, with starter fallback."""
         path = tickers_path or DEFAULT_TICKERS_PATH
         if path.exists():

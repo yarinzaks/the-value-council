@@ -1,8 +1,18 @@
 """Backtest engine for The Value Council.
 
-Production-quality, point-in-time-correct, survivorship-bias-free
-backtesting framework. See ``docs/backtest_architecture.md`` for the
-full design rationale.
+Production-quality and point-in-time-correct: no component reads a
+filing or a price stamped after the date it is asked about.
+
+Survivorship bias is handled per universe, not by the framework, and
+the two shipped universes differ. :class:`SP500Universe` is free of it
+— it walks the index change log backward, so removed members reappear
+at the dates they were members. :class:`FullMarketUniverse`, which the
+live runner uses, is **not**: its roster is the SEC's current
+registrant list, so anything delisted before the prefetch is missing at
+every historical date, and its backtest returns are an upper bound. The
+warning in :mod:`core.backtest.full_market_universe` has the evidence.
+
+See ``docs/backtest_architecture.md`` for the full design rationale.
 
 Public API::
 
@@ -47,23 +57,23 @@ from .transaction_costs import (
 )
 
 __all__ = [
+    # portfolio
+    "BacktestPortfolio",
     # strategy_runner
     "BacktestResult",
     "BacktestRunner",
     "BuyAndHoldSPY",
-    "EqualWeightUniverse",
-    "RunnerConfig",
-    "Strategy",
-    # portfolio
-    "BacktestPortfolio",
-    "Holding",
     # transaction_costs
     "CostModel",
-    "PercentageCost",
+    "EqualWeightUniverse",
+    "Holding",
     "PerShareCost",
-    "ZeroCost",
+    "PercentageCost",
     # metrics
     "PortfolioMetrics",
+    "RunnerConfig",
+    "Strategy",
+    "ZeroCost",
     "annual_returns",
     "cagr",
     "calmar_ratio",

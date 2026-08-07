@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 import sys
 from datetime import date
-from pathlib import Path
 
 from core.live.portfolio import LivePortfolio
 from core.live.snapshots import DailySnapshot, save_snapshot

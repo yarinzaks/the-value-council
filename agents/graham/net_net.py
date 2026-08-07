@@ -19,6 +19,7 @@ D/E ≤ 1.0, market cap ≥ $500M, exclude share classes/preferreds.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -27,6 +28,7 @@ from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
+    HeldPosition,
     PriceLookup,
     Strategy,
 )
@@ -144,6 +146,8 @@ class BenjaminGraham(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         logger.info(
             f"{as_of}: starting Graham selection over {len(universe)} candidates"
@@ -351,7 +355,7 @@ class BenjaminGraham(Strategy):
                     ),
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"decision log failed for {s.ticker}: {exc}")
 
     def _safe_log_defensive(
@@ -378,7 +382,20 @@ class BenjaminGraham(Strategy):
                         "pe": round(s.pe, 4),
                         "pb": round(s.pb, 4),
                         "current_ratio": round(s.current_ratio, 4),
-                        "graham_number": round(s.composite, 4),
+                        # Renamed. This is the ch.14 combined test, a
+                        # dimensionless product; the Graham Number is a
+                        # price per share and is logged beside it.
+                        "pe_times_pb": round(s.composite, 4),
+                        "graham_number": (
+                            round(s.graham_number, 4)
+                            if s.graham_number is not None
+                            else None
+                        ),
+                        "margin_of_safety_pct": (
+                            round(s.margin_of_safety_pct, 2)
+                            if s.margin_of_safety_pct is not None
+                            else None
+                        ),
                         "debt_to_equity": round(s.debt_to_equity, 4),
                         "net_income": s.net_income,
                         "market_cap": s.market_cap,
@@ -399,7 +416,7 @@ class BenjaminGraham(Strategy):
                     ),
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"decision log failed for {s.ticker}: {exc}")
 
     def selections_to_records(self) -> list[dict[str, Any]]:
@@ -419,10 +436,12 @@ class BenjaminGraham(Strategy):
                     if sel.top_scores
                     else None
                 ),
-                "top_graham_number": (
+                # Same rename as the per-decision record: these are the
+                # ch.14 combined test, not the Graham Number.
+                "top_pe_times_pb": (
                     sel.top_defensive[0].composite if sel.top_defensive else None
                 ),
-                "median_graham_number": (
+                "median_pe_times_pb": (
                     sorted(s.composite for s in sel.top_defensive)[
                         len(sel.top_defensive) // 2
                     ]

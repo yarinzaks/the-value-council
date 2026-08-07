@@ -30,10 +30,10 @@ treating every BUY decision on a given day as a "trade today" entry.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, replace
 from datetime import date
 from pathlib import Path
-from typing import Iterable
 
 from core.live.portfolio import LivePortfolio, TradeRecord
 from core.logger import get_logger
@@ -60,6 +60,10 @@ class DailySnapshot:
     buys: list[str]
     sells: list[str]
     trade_count: int
+    #: Cash dividends received to date. NAV already includes this; the
+    #: field lets a reader separate income from price appreciation, so
+    #: "total return" is auditable rather than inferred.
+    dividends_received_usd: float = 0.0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -86,13 +90,44 @@ def make_snapshot(
         buys=buys,
         sells=sells,
         trade_count=len(buys) + len(sells),
+        dividends_received_usd=round(portfolio.cumulative_dividends, 2),
     )
 
 
 def save_snapshot(snap: DailySnapshot, *, root: Path = SNAPSHOTS_DIR) -> Path:
+    """Write one day's snapshot, preserving trades already recorded.
+
+    Two runs write the same file each day. The morning scan executes
+    the rotations and passes them in; the close-of-day mark re-values
+    the book and passes ``trades=[]`` because it does not trade. This
+    used to be an unconditional overwrite, so the close run erased the
+    morning's record every single day — 68 of 68 snapshots held zero
+    trades for a portfolio that plainly had been traded, and the
+    dashboard had no transaction history to show at all.
+
+    So a save that carries no trades keeps whatever the day already
+    had. Valuation fields still update, which is the close run's actual
+    job. A save that does carry trades replaces them, so a re-run of
+    the morning scan corrects rather than appends.
+    """
     agent_dir = root / snap.agent
     agent_dir.mkdir(parents=True, exist_ok=True)
     path = agent_dir / f"{snap.date}.json"
+
+    if not snap.trade_count and path.exists():
+        try:
+            prior = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning(f"{snap.agent}@{snap.date}: unreadable snapshot: {exc}")
+        else:
+            if prior.get("trade_count"):
+                snap = replace(
+                    snap,
+                    buys=list(prior.get("buys") or []),
+                    sells=list(prior.get("sells") or []),
+                    trade_count=int(prior["trade_count"]),
+                )
+
     path.write_text(json.dumps(snap.to_dict(), indent=2))
     return path
 
@@ -122,8 +157,8 @@ def latest_snapshot(
 
 
 __all__ = [
-    "DailySnapshot",
     "SNAPSHOTS_DIR",
+    "DailySnapshot",
     "latest_snapshot",
     "load_snapshots",
     "make_snapshot",

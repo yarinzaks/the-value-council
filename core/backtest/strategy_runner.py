@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
-from typing import Callable, Iterator, Literal, Mapping
+from datetime import date, datetime
+from typing import Literal
 
 import pandas as pd
 
@@ -23,7 +24,7 @@ from .data_loader import PriceDataLoader
 from .point_in_time import PointInTimeFinancials, PointInTimeLoader
 from .portfolio import BacktestPortfolio, NavSnapshot, TradeRecord
 from .transaction_costs import CostModel, PercentageCost
-from .universe import HistoricalUniverse, load_universe
+from .universe import load_universe
 from .universe_protocol import Universe
 
 logger = get_logger("core.backtest.strategy_runner")
@@ -62,6 +63,35 @@ class FundamentalsLookup:
 # ----------------------------------------------------------------------
 # Strategy ABC
 # ----------------------------------------------------------------------
+@dataclass(frozen=True)
+class HeldPosition:
+    """What a strategy is allowed to know about a position it owns.
+
+    Deliberately narrow. A strategy needs to answer "how long have I
+    held this, at what price, and how has it done" to express an exit
+    rule; it does not need the portfolio object, and handing it one
+    would let a doctrine reach into cash and weights that the runner
+    owns.
+    """
+
+    ticker: str
+    shares: float
+    entry_price: float
+    entry_date: date
+    current_price: float
+
+    def days_held_at(self, as_of: date) -> int:
+        """Calendar days since entry. Zero for a same-day purchase."""
+        return max(0, (as_of - self.entry_date).days)
+
+    @property
+    def return_pct(self) -> float | None:
+        """Unrealised return in percent, or None when the basis is unusable."""
+        if self.entry_price <= 0 or self.current_price <= 0:
+            return None
+        return (self.current_price / self.entry_price - 1.0) * 100.0
+
+
 class Strategy(ABC):
     """Abstract base class for backtest strategies.
 
@@ -79,6 +109,8 @@ class Strategy(ABC):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         """Return target weights for ``as_of``.
 
@@ -88,6 +120,17 @@ class Strategy(ABC):
                 on this date.
             prices: Lookup for prices known on this date.
             fundamentals: Lookup for fundamentals known on this date.
+            held: What the agent currently owns, keyed by ticker, or
+                ``None`` when the caller does not track positions.
+
+                Without this a strategy could not express an exit rule
+                at all, so every agent inherited the same one — "sold
+                because you left today's top N". Greenblatt's twelve
+                month hold, Fisher's decades, Lynch's category-specific
+                exits and Schloss's fifty-percent rule were all
+                unimplementable, and eight doctrines whose real-world
+                turnover differed by an order of magnitude traded
+                identically.
 
         Returns:
             Dict ``{ticker: weight}`` where weights are non-negative
@@ -111,6 +154,8 @@ class BuyAndHoldSPY(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         return {"SPY": 1.0}
 
@@ -131,6 +176,8 @@ class EqualWeightUniverse(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         # Pick the first N alphabetically — stable, reproducible.
         # Real strategies will override this with their own ranking logic.
@@ -243,7 +290,7 @@ class BacktestRunner:
         if config.use_universe and universe is None:
             try:
                 self.universe = load_universe()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"could not load universe ({exc}); proceeding without")
                 self.universe = None
         else:
@@ -296,7 +343,7 @@ class BacktestRunner:
             rebalance_dates = sorted({first_trading_day, *rebalance_dates})
         rebalance_set = set(rebalance_dates)
         # Pre-fetch SPY (we may need to buy it for BuyAndHoldSPY)
-        spy_for_strategy = bench_history.copy() if cfg.benchmark_ticker == "SPY" else None
+        bench_history.copy() if cfg.benchmark_ticker == "SPY" else None
 
         # Universe membership cache per rebalance date
         universe_cache: dict[date, list[str]] = {}
@@ -380,7 +427,7 @@ class BacktestRunner:
                 p = self.price_loader.get_price_on(t, as_of)
                 if p is not None and p > 0:
                     out[t] = p
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"price lookup failed for {t} on {as_of}: {exc}")
         return out
 

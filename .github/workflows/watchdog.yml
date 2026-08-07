@@ -27,8 +27,8 @@ on:
     # GitHub's scheduler its typical drift window, short enough to still
     # catch the open before the market gets too far in.
     - cron: '0 14 * * 1-5'
-    # 30 min after US close schedule (20:00 UTC + 30). Same logic.
-    - cron: '30 20 * * 1-5'
+    # 30 min after US close schedule (20:30 UTC + 30). Same logic.
+    - cron: '0 21 * * 1-5'
 
   workflow_dispatch:
 
@@ -60,7 +60,7 @@ jobs:
             "0 14 * * 1-5")
               echo "mode=open" >> "$GITHUB_OUTPUT"
               ;;
-            "30 20 * * 1-5")
+            "0 21 * * 1-5")
               echo "mode=close" >> "$GITHUB_OUTPUT"
               ;;
             *)

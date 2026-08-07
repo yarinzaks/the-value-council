@@ -19,6 +19,7 @@ Concentration: Buffett targets 6-10 positions. We default to 8.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -27,6 +28,7 @@ from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
+    HeldPosition,
     PriceLookup,
     Strategy,
 )
@@ -130,6 +132,8 @@ class WarrenBuffett(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         logger.info(
             f"{as_of}: starting Buffett scan over {len(universe)} candidates"
@@ -250,7 +254,7 @@ class WarrenBuffett(Strategy):
                     stock_data=stock_data,
                     portfolio_state={"as_of": as_of.isoformat()},
                 )
-            except Exception as exc:  # noqa: BLE001 — LLM transients
+            except Exception as exc:
                 logger.warning(
                     f"{as_of} {s.ticker}: moat analyzer failed ({exc}); "
                     "keeping quant-only verdict"
@@ -368,7 +372,7 @@ class WarrenBuffett(Strategy):
                         ),
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"decision log failed for {s.ticker}: {exc}")
 
     # ------------------------------------------------------------------
@@ -401,4 +405,4 @@ class WarrenBuffett(Strategy):
         ]
 
 
-__all__ = ["BuffettSelection", "DEFAULT_PORTFOLIO_SIZE", "WarrenBuffett"]
+__all__ = ["DEFAULT_PORTFOLIO_SIZE", "BuffettSelection", "WarrenBuffett"]

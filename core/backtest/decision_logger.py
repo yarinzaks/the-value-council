@@ -49,11 +49,17 @@ from core.logger import get_logger
 
 logger = get_logger("core.backtest.decision_logger")
 
-from core.paths import PROJECT_ROOT, decisions_dir as _decisions_dir
+from core.paths import decisions_dir as _decisions_dir
+
 DEFAULT_DECISIONS_DIR = _decisions_dir()
 
+# BUY/SELL are the strategy's *intent* — what the doctrine selected.
+# FILL/EXIT are the runner's *execution* — what the portfolio actually
+# did about it, at what price. They were both logged as BUY, so every
+# executed purchase appeared twice for the same ticker on the same day
+# and no consumer could tell a rejected intent from a filled one.
 DecisionType = Literal[
-    "BUY", "SELL", "WATCH", "REJECT", "HOLD", "TRIM", "ADD"
+    "BUY", "SELL", "WATCH", "REJECT", "HOLD", "TRIM", "ADD", "FILL", "EXIT"
 ]
 VALID_DECISION_TYPES: tuple[str, ...] = (
     "BUY",
@@ -63,6 +69,8 @@ VALID_DECISION_TYPES: tuple[str, ...] = (
     "HOLD",
     "TRIM",
     "ADD",
+    "FILL",
+    "EXIT",
 )
 
 
@@ -107,7 +115,7 @@ class Decision:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Decision":
+    def from_dict(cls, d: dict[str, Any]) -> Decision:
         return cls(
             ticker=str(d["ticker"]),
             decision=str(d["decision"]),  # type: ignore[arg-type]
@@ -295,10 +303,10 @@ def make_decision(
 
 __all__ = [
     "DEFAULT_DECISIONS_DIR",
+    "VALID_DECISION_TYPES",
     "Decision",
     "DecisionLogger",
     "DecisionLoggerError",
     "DecisionType",
-    "VALID_DECISION_TYPES",
     "make_decision",
 ]

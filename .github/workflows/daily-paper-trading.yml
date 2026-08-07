@@ -4,7 +4,9 @@ name: Daily Paper Trading
 #
 # US market — Mon-Fri:
 #   - 13:35 UTC -> 09:35 ET (16:35 IL) -> open  -> full scan + trades
-#   - 20:00 UTC -> 16:00 ET (23:00 IL) -> close -> mark-to-market only
+#   - 20:30 UTC -> 16:30 ET (23:30 IL) -> close -> mark-to-market only
+#     (30 min after the bell so Yahoo has published the settled daily
+#     bar; running at 16:00 ET re-read the morning's intraday quote)
 #
 # TASE (Tel Aviv) — Sun-Thu:
 #   - 06:00 UTC -> 09:00 IL -> open  -> placeholder (Israeli scanner WIP)
@@ -31,8 +33,8 @@ on:
     - cron: '30 14 * * 0-4'
     # US open    (Mon-Fri 13:35 UTC = 09:35 ET = 16:35 IL)
     - cron: '35 13 * * 1-5'
-    # US close   (Mon-Fri 20:00 UTC = 16:00 ET = 23:00 IL)
-    - cron: '0 20 * * 1-5'
+    # US close   (Mon-Fri 20:30 UTC = 16:30 ET = 23:30 IL)
+    - cron: '30 20 * * 1-5'
 
   workflow_dispatch:
     inputs:
@@ -128,7 +130,7 @@ jobs:
               echo "mode=open" >> "$GITHUB_OUTPUT"
               echo "market=US" >> "$GITHUB_OUTPUT"
               ;;
-            *":0 20 * * 1-5")
+            *":30 20 * * 1-5")
               echo "mode=close" >> "$GITHUB_OUTPUT"
               echo "market=US" >> "$GITHUB_OUTPUT"
               ;;
@@ -169,6 +171,10 @@ jobs:
             prices-v2-
 
       - name: Run paper-trading scanner
+        # `shell: bash` is load-bearing, not style. The default shell runs
+        # `bash -e` without pipefail, so `python ... | tee` reported tee's
+        # exit code and a scanner that died mid-run looked successful.
+        shell: bash
         env:
           MODE: ${{ steps.dispatch.outputs.mode }}
           MARKET: ${{ steps.dispatch.outputs.market }}
@@ -181,23 +187,7 @@ jobs:
         if: steps.dispatch.outputs.market != 'TASE'
         env:
           MODE: ${{ steps.dispatch.outputs.mode }}
-        run: |
-          python <<'PY'
-          import json, os, sys
-          from pathlib import Path
-          mode = os.environ["MODE"]
-          portfolios = Path("data/portfolios")
-          all_seed = True
-          for f in sorted(portfolios.glob("*.json")):
-              d = json.loads(f.read_text())
-              if d.get("positions"):
-                  all_seed = False
-              print(f"  {d['agent']}: nav=${d['total_nav']:.2f} positions={len(d.get('positions', []))}")
-          if mode == "open" and all_seed:
-              print("::error::all portfolios came back at $10K seed — universe likely empty (cache corrupt?)")
-              sys.exit(1)
-          print(f"sanity check passed (mode={mode})")
-          PY
+        run: python -m scripts.verify_run_state --mode "$MODE"
 
       - name: Commit updated state back to the repo
         env:

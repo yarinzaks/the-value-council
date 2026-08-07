@@ -69,6 +69,24 @@ select = [
 ]
 ignore = [
     "E501",  # line too long (formatter handles)
+    # Typographic characters in prose are deliberate throughout this
+    # codebase — "10×", "current − prior", "≤ 0.5". These rules exist to
+    # catch a Cyrillic 'а' masquerading as a Latin one in an identifier,
+    # which is a real hazard; they do not distinguish that from an
+    # en-dash in a docstring, and 79 of them fire on documentation that
+    # is correct as written. Rewriting the prose to satisfy the linter
+    # would degrade it. RUF001 stays on for string literals, where the
+    # character can actually reach a comparison.
+    "RUF002",  # ambiguous unicode in docstrings
+    "RUF003",  # ambiguous unicode in comments
+    # RUF001 fires on string literals, where the character could in
+    # principle reach a comparison, so it was kept on to check. All five
+    # hits are display text — "1.0× book", "− 40 AAPL", "sh × price" —
+    # and one is Hebrew: `מ׳` in a dashboard string, where the geresh is
+    # the correct abbreviation mark and ruff's suggested grave accent
+    # would be wrong. The rule cannot tell a bilingual UI string from a
+    # homoglyph attack, and this project has the former throughout.
+    "RUF001",  # ambiguous unicode in strings
 ]
 
 [tool.ruff.format]
@@ -80,16 +98,13 @@ indent-style = "space"
 # -----------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "7.0"
+# Discover every tests/ package under core/ and agents/. The previous
+# explicit list silently omitted buffett, lynch, marks, klarman and
+# fisher — 322 passing tests that guarded nothing because they never ran.
 testpaths = [
-    "core/tests",
-    "core/backtest/tests",
-    "core/data/tests",
-    "agents/greenblatt/tests",
-    "agents/schloss/tests",
-    "agents/graham/tests",
-    "agents/dreman/tests",
-    "agents/neff/tests",
-    "core/live/tests",
+    "core",
+    "agents",
+    "scripts",
 ]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -116,3 +131,8 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 ignore_missing_imports = true
 disallow_untyped_defs = true
+# agents/ has no __init__.py, so mypy resolves agents/dreman/contrarian.py
+# as both "dreman.contrarian" and "agents.dreman.contrarian" and aborts
+# before checking anything. These two make the declared layout analysable.
+namespace_packages = true
+explicit_package_bases = true

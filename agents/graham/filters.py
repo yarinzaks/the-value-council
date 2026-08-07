@@ -22,12 +22,13 @@ the most important slice of "earnings stability."
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
-from typing import Iterable
 
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.logger import get_logger
+from core.scoring.leverage import debt_to_equity as _shared_debt_to_equity
 
 logger = get_logger("agents.graham.filters")
 
@@ -89,14 +90,15 @@ def price_to_ncav(price: float | None, fin: PointInTimeFinancials | None) -> flo
 
 
 def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
-    if fin is None or fin.total_equity is None or fin.total_equity <= 0:
-        return None
-    debt = fin.total_debt
-    if debt is None:
-        debt = fin.long_term_debt
-    if debt is None:
-        return 0.0
-    return debt / fin.total_equity
+    """D/E, or None when the ratio cannot be honestly established.
+
+    Delegates to :func:`core.scoring.leverage.debt_to_equity`. This used
+    to return 0.0 when no debt concept was tagged, which is the best
+    possible score on every leverage gate — 37% of the judgeable
+    universe passed on no evidence. See that module for why plain None
+    is also wrong and what distinguishes the two cases.
+    """
+    return _shared_debt_to_equity(fin)
 
 
 def pe_ratio(price: float | None, fin: PointInTimeFinancials | None) -> float | None:
@@ -142,6 +144,21 @@ def current_ratio(fin: PointInTimeFinancials | None) -> float | None:
     return fin.current_assets / cl
 
 
+def working_capital(fin: PointInTimeFinancials | None) -> float | None:
+    """Net current assets: current assets less current liabilities.
+
+    Graham's ch.14 criterion #2 caps long-term debt at this figure. It
+    can legitimately be negative — a company financing itself on its
+    suppliers — and a negative value fails the cap, which is the
+    intended reading.
+    """
+    if fin is None:
+        return None
+    if fin.current_assets is None or fin.current_liabilities is None:
+        return None
+    return fin.current_assets - fin.current_liabilities
+
+
 def passes_filters(
     fin: PointInTimeFinancials | None,
     market_cap_usd: float | None,
@@ -173,7 +190,7 @@ def passes_filters(
 
     de = debt_to_equity(fin)
     if de is None:
-        return FilterResult(ticker, False, "D/E undefined (non-positive equity)")
+        return FilterResult(ticker, False, "D/E undefined (no positive equity, or no debt reported on a sparse balance sheet)")
     if de > max_de:
         return FilterResult(ticker, False, f"D/E {de:.2f} > {max_de} threshold")
 
@@ -238,6 +255,8 @@ def passes_defensive_filters(
     min_current_ratio: float = DEFAULT_DEFENSIVE_MIN_CURRENT_RATIO,
     max_de: float = DEFAULT_MAX_DE,
     min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+    require_working_capital_cover: bool = True,
+    require_dividend: bool = True,
 ) -> FilterResult:
     """Graham's Defensive Investor (The Intelligent Investor, Ch. 14).
 
@@ -246,7 +265,15 @@ def passes_defensive_filters(
     * P/E ≤ 15 (Graham allowed up to 15× average earnings)
     * P/B ≤ 1.5 (no more than 1.5× book)
     * Current ratio ≥ 2.0 (adequate financial condition)
+    * Long-term debt ≤ working capital (criterion #2, second half)
+    * Pays a dividend (the checkable part of criterion #4)
     * D/E ≤ 1.0 + positive trailing earnings + size floor
+
+    Criteria #3 (ten years of positive earnings) and #5 (one-third EPS
+    growth on three-year averages at each end) still are not
+    implemented. Both need an annual EPS series from the cache, which
+    the six hybrid agents already take as ``edgar_cache``; this agent
+    is not yet constructed with one.
     """
     ticker = fin.ticker if fin else "<unknown>"
 
@@ -268,7 +295,7 @@ def passes_defensive_filters(
 
     de = debt_to_equity(fin)
     if de is None:
-        return FilterResult(ticker, False, "D/E undefined (non-positive equity)")
+        return FilterResult(ticker, False, "D/E undefined (no positive equity, or no debt reported on a sparse balance sheet)")
     if de > max_de:
         return FilterResult(ticker, False, f"D/E {de:.2f} > {max_de} threshold")
 
@@ -291,6 +318,41 @@ def passes_defensive_filters(
         return FilterResult(
             ticker, False, f"current ratio {cr:.2f} < {min_current_ratio} threshold"
         )
+
+    # Ch.14 criterion #2, second half: long-term debt must not exceed
+    # net current assets. The D/E <= 1.0 check above is Walter Schloss's
+    # rule, not Graham's, and it does not substitute — a firm with
+    # long-term debt at 0.9x equity but 3x working capital passes that
+    # one and fails this. This is the criterion that protects against
+    # the balance sheet a deep-value screen actually dies on: current
+    # assets already spoken for by creditors.
+    if require_working_capital_cover:
+        wc = working_capital(fin)
+        if wc is None:
+            return FilterResult(ticker, False, "working capital undefined")
+        ltd = fin.long_term_debt
+        if ltd is None:
+            return FilterResult(ticker, False, "long-term debt not reported")
+        if ltd > wc:
+            return FilterResult(
+                ticker,
+                False,
+                f"long-term debt ${ltd:,.0f} exceeds working capital ${wc:,.0f}",
+            )
+
+    # Ch.14 criterion #4. Graham wanted twenty uninterrupted years; the
+    # cache cannot see that far, so this is the weaker claim the data
+    # supports — the company pays a dividend at all. A non-payer fails
+    # his screen outright, and that much is checkable.
+    if require_dividend:
+        div = fin.dividends_paid
+        if div is None:
+            return FilterResult(ticker, False, "dividends not reported")
+        # SEC files PaymentsOfDividends as a positive outflow in some
+        # filings and negative in others, so the sign carries no
+        # information — only the magnitude does.
+        if abs(div) <= 0:
+            return FilterResult(ticker, False, "pays no dividend")
 
     return FilterResult(ticker, True, None)
 

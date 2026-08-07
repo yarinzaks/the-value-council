@@ -37,7 +37,8 @@ from .edgar_facts import XbrlFact, _parse_date_required
 
 logger = get_logger("core.data.edgar_cache")
 
-from core.paths import PROJECT_ROOT, fundamentals_cache_dir as _fundamentals_cache_dir
+from core.paths import fundamentals_cache_dir as _fundamentals_cache_dir
+
 DEFAULT_CACHE_DIR = _fundamentals_cache_dir()
 
 # Parquet schema — matches XbrlFact fields. Date columns stored as
@@ -130,7 +131,7 @@ class EdgarCache:
         path = self.path_for(ticker)
         try:
             pq.write_table(table, path, compression="snappy")
-        except Exception as exc:  # noqa: BLE001 — pyarrow throws broad
+        except Exception as exc:
             raise EdgarCacheError(f"write_table failed for {ticker}: {exc}") from exc
         logger.debug(f"cached {len(facts)} facts for {ticker} → {path.name}")
 
@@ -141,7 +142,7 @@ class EdgarCache:
             return []
         try:
             table = pq.read_table(path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EdgarCacheError(f"read_table failed for {ticker}: {exc}") from exc
         return self._table_to_facts(table)
 
@@ -166,7 +167,7 @@ class EdgarCache:
             return pd.DataFrame()
         try:
             df = pq.read_table(path).to_pandas()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EdgarCacheError(f"to_pandas failed for {ticker}: {exc}") from exc
         for col in ("period_start", "period_end", "filed"):
             if col in df.columns:
@@ -196,6 +197,8 @@ class EdgarCache:
         namespace: str = "us-gaap",
         forms: tuple[str, ...] | None = ("10-K", "10-Q"),
         prefer_annual: bool = False,
+        duration_days: tuple[int, int] | None = None,
+        units: tuple[str, ...] | None = None,
     ) -> XbrlFact | None:
         """Return the most recent reported value for ``concept`` known
         on ``as_of``.
@@ -215,6 +218,21 @@ class EdgarCache:
             prefer_annual: When True, prefer 10-K facts even if a
                 later 10-Q exists. Useful for snapshot metrics like
                 annual revenue or shares outstanding at year-end.
+            duration_days: Inclusive ``(min, max)`` window on the fact's
+                reporting period, in days. Required for flow concepts —
+                revenue, earnings, cash flow — because a 10-Q's
+                year-to-date figure carries a *later* ``period_end``
+                than the last 10-K's annual figure and would otherwise
+                win the sort, handing a three- or nine-month number to
+                a caller that asked for a year. Instant facts
+                (balance-sheet items, which carry no ``period_start``)
+                never satisfy a window, so pass ``None`` for those.
+            units: Restrict to these XBRL units. A foreign private issuer
+                files in its own currency, and those figures are otherwise
+                divided straight into a USD share price — an Enbridge-class
+                filer reporting CAD lands ~25% cheaper on every multiple
+                than it is. There is no point-in-time FX series here, so
+                the only honest answer is to reject rather than translate.
         """
         df = self.load_dataframe(ticker)
         if df.empty:
@@ -225,10 +243,20 @@ class EdgarCache:
         mask = (df["concept"] == concept) & (df["namespace"] == namespace)
         if forms is not None:
             mask &= df["form"].isin(forms)
+        if units is not None:
+            mask &= df["unit"].isin(units)
         mask &= df["filed"].dt.date <= as_of_d
         sub = df[mask]
         if sub.empty:
             return None
+        if duration_days is not None:
+            lo, hi = duration_days
+            # NaT period_start yields NaN days, and between() drops it —
+            # which is what we want for instant facts.
+            span = (sub["period_end"] - sub["period_start"]).dt.days
+            sub = sub[span.between(lo, hi)]
+            if sub.empty:
+                return None
         if prefer_annual:
             annual = sub[sub["form"] == "10-K"]
             if not annual.empty:
@@ -252,7 +280,7 @@ class EdgarCache:
             try:
                 meta = pq.read_metadata(f)
                 total_facts += meta.num_rows
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"could not read metadata for {f}: {exc}")
         return CacheStats(
             ticker_count=len(files),

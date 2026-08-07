@@ -146,7 +146,10 @@ class TestConstituentsAt:
             require_two_year_positive_revenue=False,
         require_common_equity=False,
             )
-        # On 2014-12-31, OLDCO had filed in June 2014 — within 18 months. Survivorship-bias-free.
+        # On 2014-12-31, OLDCO had filed in June 2014 — within 18 months.
+        # This is the *retirement* rule working, not a survivorship
+        # guarantee: it holds because OLDCO's facts are in the cache.
+        # See TestSurvivorshipBiasIsNotClosed for what it does not cover.
         assert "OLDCO" in u.constituents_at(date(2014, 12, 31))
 
     def test_company_not_yet_public_excluded(
@@ -193,6 +196,59 @@ class TestConstituentsAt:
             index_path=populated_cache.cache_dir / "idx.json",
         )
         assert "ETFCO" in u.constituents_at(date(2024, 6, 30))
+
+
+class TestSurvivorshipBiasIsNotClosed:
+    """Pins the gap the module docstring used to deny.
+
+    ``test_delisted_company_INCLUDED_when_querying_during_active_period``
+    reads like proof of a survivorship guarantee, and it is not: OLDCO
+    comes back only because OLDCO is in the cache. The roster is built
+    from the SEC's ``company_tickers.json``, which lists issuers
+    registered on the day the prefetch ran, so a company that was
+    acquired or failed earlier was never downloaded and has no row to
+    retire. Measured on the live index at the time of writing, none of
+    TWTR, ATVI, SIVB, FRC, CERN, XLNX, ANTM, MXIM, ALXN or TIF appears.
+
+    These tests exist so the claim cannot be quietly restored: if
+    somebody closes the gap, they will fail, and that is the signal to
+    rewrite the warning rather than delete the tests.
+    """
+
+    def test_an_uncached_issuer_is_absent_at_every_date(
+        self, populated_cache: EdgarCache
+    ) -> None:
+        # GONECO was a real, actively-filing company across this whole
+        # span. It is simply not in the cache — the prefetch could not
+        # see it, because it had already left the market.
+        u = FullMarketUniverse(
+            cache=populated_cache,
+            index_path=populated_cache.cache_dir / "idx.json",
+            require_positive_book_history=False,
+            require_two_year_positive_revenue=False,
+            require_common_equity=False,
+        )
+        for as_of in (date(2011, 6, 30), date(2015, 6, 30), date(2024, 6, 30)):
+            assert "GONECO" not in u.constituents_at(as_of)
+
+    def test_the_survivor_and_the_departed_are_indistinguishable(
+        self, populated_cache: EdgarCache
+    ) -> None:
+        # The bias is one-sided and that is what makes it dangerous:
+        # asked about 2014, the universe answers with companies that
+        # were still registered in 2026. A backtest cannot tell that
+        # anything is missing, so it reads the gap as a clean result.
+        u = FullMarketUniverse(
+            cache=populated_cache,
+            index_path=populated_cache.cache_dir / "idx.json",
+            require_positive_book_history=False,
+            require_two_year_positive_revenue=False,
+            require_common_equity=False,
+        )
+        members = u.constituents_at(date(2014, 12, 31))
+
+        assert set(members) <= {"AAPL", "OLDCO", "NEWCO", "ETFCO"}
+        assert "GONECO" not in members
 
 
 class TestProtocolCompliance:

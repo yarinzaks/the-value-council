@@ -24,23 +24,36 @@ Filters not implemented (documented as deferred):
   code. The Greenblatt agent has the same gap.
 * **Insider ownership ≥ 5%** — requires Form 4/DEF-14A parsing, not
   in the cache.
-* **Multi-year low / 50% below 5-year high** — would require fetching
-  5 years of price history per candidate per rebalance, which is
-  expensive. Schloss's behavior was opportunistic on the dip rather
-  than a hard filter, and our annual rebalance cadence partially
-  substitutes.
+**Multi-year low / 50% below 5-year high** — now implemented, and it
+took two steps. :func:`is_distressed_price` encoded the rule and
+:func:`passes_filters` gated on it behind ``require_distressed_price``,
+which defaulted to False and which no caller ever passed — a rule
+written, tested, and unreachable. It is reached now: pass
+``price_history`` to :func:`filter_candidates` and the strategy supplies
+a lookup backed by the price cache, so the "expensive" objection above
+no longer applies. Nothing is fetched per candidate; the extremes are
+read from bars already on disk, and a ticker with no cached history
+returns ``(None, None)``, which the filter reads as "cannot tell" and
+rejects. Schloss bought capitulation, and a name we cannot show is
+beaten down has not shown it.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date
-from typing import Iterable
 
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.logger import get_logger
+from core.scoring.leverage import debt_to_equity as _shared_debt_to_equity
 
 logger = get_logger("agents.schloss.filters")
+
+#: ``(ticker, as_of) -> (low_52w, high_5y)``. Kept as a callable so
+#: the filter never needs the price loader itself — the strategy owns
+#: that dependency and hands over just the two numbers.
+PriceHistoryLookup = Callable[[str, date], tuple[float | None, float | None]]
 
 
 DEFAULT_MAX_PB: float = 0.75
@@ -72,34 +85,118 @@ def book_value_per_share(
     return fin.total_equity / fin.shares_outstanding
 
 
+def tangible_common_equity(fin: PointInTimeFinancials | None) -> float | None:
+    """Stated equity less goodwill and other intangibles.
+
+    Schloss bought below book because book was an estimate of what the
+    business would fetch if broken up. Goodwill is the premium a prior
+    management paid on an acquisition; it has no liquidation value and
+    it is the first thing written off when things go wrong. Counting it
+    as book is counting the very optimism the discount is supposed to
+    protect against.
+
+    A filer that tags neither concept plausibly carries neither, so
+    absence is read as zero rather than as unknown — the balance-sheet
+    corroboration is the equity figure itself, which must be present.
+    """
+    if fin is None or fin.total_equity is None:
+        return None
+    goodwill = fin.goodwill or 0.0
+    intangibles = fin.intangible_assets or 0.0
+    return fin.total_equity - goodwill - intangibles
+
+
+def tangible_book_value_per_share(
+    fin: PointInTimeFinancials | None,
+) -> float | None:
+    """Tangible common equity per share; None when non-positive.
+
+    A company whose intangibles exceed its equity has no tangible book
+    at all, and a P/B computed against a negative denominator is not a
+    small number — it is a meaningless one.
+    """
+    tce = tangible_common_equity(fin)
+    if tce is None or tce <= 0:
+        return None
+    if fin is None or not fin.shares_outstanding or fin.shares_outstanding <= 0:
+        return None
+    return tce / fin.shares_outstanding
+
+
 def price_to_book(
     price: float | None,
     fin: PointInTimeFinancials | None,
+    *,
+    tangible: bool = True,
 ) -> float | None:
-    """P/B = price / book value per share."""
-    bvps = book_value_per_share(fin)
+    """P/B against tangible book by default.
+
+    ``tangible=False`` returns the stated-equity ratio, which is what
+    this used to compute unconditionally.
+    """
+    bvps = (
+        tangible_book_value_per_share(fin) if tangible else book_value_per_share(fin)
+    )
     if bvps is None or price is None or price <= 0:
         return None
     return price / bvps
 
 
-def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
-    """D/E using the most reliably reported debt fields.
+#: How close to the 52-week low still counts as "near" it. Schloss was
+#: buying capitulation, not the exact tick.
+DEFAULT_NEAR_LOW_TOLERANCE_PCT: float = 10.0
 
-    Prefers ``total_debt`` (synthesized by FundamentalsFetcher when
-    not directly reported); falls back to ``long_term_debt`` only.
-    Returns None when equity is non-positive (D/E undefined).
+#: Alternative route in: down at least this much from the five-year
+#: high. The playbook writes the two as OR — reject only if *neither*
+#: holds — so a name well off its multi-year peak qualifies even if it
+#: has bounced off the recent low.
+DEFAULT_MIN_DRAWDOWN_FROM_HIGH_PCT: float = 50.0
+
+
+def is_distressed_price(
+    price: float | None,
+    *,
+    low_52w: float | None,
+    high_5y: float | None,
+    near_low_tolerance_pct: float = DEFAULT_NEAR_LOW_TOLERANCE_PCT,
+    min_drawdown_pct: float = DEFAULT_MIN_DRAWDOWN_FROM_HIGH_PCT,
+) -> bool | None:
+    """Schloss's entry condition: near the 52-week low, OR far off the
+    five-year high.
+
+    The playbook states it as a rejection — "if neither, REJECT" — so
+    the two routes are alternatives, not a conjunction. A stock that has
+    fallen 70% over three years and stabilised is a Schloss situation
+    even though it is no longer making new lows.
+
+    Returns ``None`` when neither reference price is available, so the
+    caller can distinguish "does not qualify" from "cannot tell".
     """
-    if fin is None:
+    if price is None or price <= 0:
         return None
-    if fin.total_equity is None or fin.total_equity <= 0:
+    near_low = None
+    if low_52w is not None and low_52w > 0:
+        near_low = price <= low_52w * (1.0 + near_low_tolerance_pct / 100.0)
+    off_high = None
+    if high_5y is not None and high_5y > 0:
+        off_high = (1.0 - price / high_5y) * 100.0 >= min_drawdown_pct
+    if near_low is None and off_high is None:
         return None
-    debt = fin.total_debt
-    if debt is None:
-        debt = fin.long_term_debt
-    if debt is None:
-        return 0.0  # absence of reported debt → treat as zero
-    return debt / fin.total_equity
+    return bool(near_low) or bool(off_high)
+
+
+def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
+    """D/E, or None when the ratio cannot be honestly established.
+
+    Delegates to :func:`core.scoring.leverage.debt_to_equity`. This used
+    to return 0.0 when no debt concept was tagged, which is the best
+    possible score on every leverage gate — 37% of the judgeable
+    universe passed on no evidence. See that module for why plain None
+    is also wrong and what distinguishes the two cases. Schloss cares
+    more than most: "little or no debt" is one of his sixteen rules, and
+    it was being satisfied by absence of data.
+    """
+    return _shared_debt_to_equity(fin)
 
 
 def years_public(
@@ -124,8 +221,16 @@ def passes_filters(
     max_de: float = DEFAULT_MAX_DE,
     min_years_public: int = DEFAULT_MIN_YEARS_PUBLIC,
     min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+    low_52w: float | None = None,
+    high_5y: float | None = None,
+    require_distressed_price: bool = False,
 ) -> FilterResult:
-    """Apply the full Schloss filter pipeline to one candidate."""
+    """Apply the full Schloss filter pipeline to one candidate.
+
+    ``require_distressed_price`` is opt-in because it needs price
+    history the caller has to supply; with it off the behaviour is
+    unchanged.
+    """
     ticker = fin.ticker if fin else "<unknown>"
 
     if fin is None:
@@ -146,7 +251,9 @@ def passes_filters(
     pb = price_to_book(price, fin)
     if pb is None:
         return FilterResult(
-            ticker, False, "P/B unavailable (missing equity, price, or shares)"
+            ticker,
+            False,
+            "P/B unavailable (no tangible book, or missing price or shares)",
         )
     if pb >= max_pb:
         return FilterResult(
@@ -156,7 +263,7 @@ def passes_filters(
     de = debt_to_equity(fin)
     if de is None:
         return FilterResult(
-            ticker, False, "D/E undefined (non-positive equity)"
+            ticker, False, "D/E undefined (no positive equity, or no debt reported on a sparse balance sheet)"
         )
     if de > max_de:
         return FilterResult(
@@ -169,6 +276,19 @@ def passes_filters(
         # a low P/B — many such candidates are deteriorating, not
         # cheap.
         return FilterResult(ticker, False, "negative net income (most recent filing)")
+
+    if require_distressed_price:
+        distressed = is_distressed_price(
+            price, low_52w=low_52w, high_5y=high_5y
+        )
+        if distressed is None:
+            return FilterResult(ticker, False, "no price history for the low check")
+        if not distressed:
+            return FilterResult(
+                ticker,
+                False,
+                "not near a 52-week low nor 50% off the 5-year high",
+            )
 
     yp = years_public(fin, as_of=as_of)
     if yp is None or yp < min_years_public:
@@ -191,17 +311,28 @@ def filter_candidates(
     max_de: float = DEFAULT_MAX_DE,
     min_years_public: int = DEFAULT_MIN_YEARS_PUBLIC,
     min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+    price_history: PriceHistoryLookup | None = None,
 ) -> list[tuple[PointInTimeFinancials, float, float]]:
     """Run the filter pipeline over a batch of candidates.
 
     ``candidates`` is an iterable of ``(financials, market_cap, price)``
     tuples — the strategy precomputes price and market cap so the
     filter doesn't need access to the price loader directly.
+
+    ``price_history`` turns on the multi-year-low condition. Pass a
+    callable returning ``(low_52w, high_5y)`` for a ticker and date; the
+    strategy supplies one backed by the price cache. Left None the
+    condition is skipped, which is what every caller did before it
+    existed — the rule was written, tested, and reachable only by
+    passing a flag nobody passed.
     """
     passed: list[tuple[PointInTimeFinancials, float, float]] = []
     rejected: dict[str, int] = {}
 
     for fin, mcap, price in candidates:
+        low_52w = high_5y = None
+        if price_history is not None and fin is not None:
+            low_52w, high_5y = price_history(fin.ticker, as_of)
         result = passes_filters(
             fin,
             mcap,
@@ -211,6 +342,9 @@ def filter_candidates(
             max_de=max_de,
             min_years_public=min_years_public,
             min_market_cap=min_market_cap,
+            low_52w=low_52w,
+            high_5y=high_5y,
+            require_distressed_price=price_history is not None,
         )
         if result.passed and fin is not None and mcap is not None and price is not None:
             passed.append((fin, mcap, price))
@@ -232,6 +366,7 @@ __all__ = [
     "DEFAULT_MIN_MARKET_CAP_USD",
     "DEFAULT_MIN_YEARS_PUBLIC",
     "FilterResult",
+    "PriceHistoryLookup",
     "book_value_per_share",
     "debt_to_equity",
     "filter_candidates",

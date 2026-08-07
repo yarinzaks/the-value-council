@@ -121,7 +121,7 @@ def main() -> int:
             f"{CHECK} settings loaded (log_level={settings.log_level}, "
             f"tase_enabled={settings.tase_enabled})"
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"{CROSS} {BOLD}configuration error{RESET}\n")
         print(str(exc))
         return 2
@@ -134,7 +134,7 @@ def main() -> int:
         try:
             detail = probe.runner()
             print(f"  {CHECK} {label}  {DASH} {detail}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             mark = CROSS if probe.required else f"{YELLOW}!{RESET}"
             print(f"  {mark} {label}  {DASH} {type(exc).__name__}: {exc}")
             if probe.required:

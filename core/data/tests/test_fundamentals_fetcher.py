@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 
+from core.backtest.point_in_time import FilingMetadata
 from core.data.edgar_cache import EdgarCache
 from core.data.edgar_facts import XbrlFact
 from core.data.fundamentals_fetcher import (
     CONCEPT_MAP,
+    MAX_FACT_AGE_DAYS,
     CachedEdgarAdapter,
     FundamentalsError,
     FundamentalsFetcher,
+    expected_units,
 )
+from core.data.sic_codes import sic_for
 
 
 def _fact(
@@ -208,3 +212,595 @@ class TestCachedEdgarAdapter:
             )
         )
         assert adapter.list_filings("UNKNOWN", form_types=("10-K",)) == []
+
+
+class TestFlowConceptDuration:
+    """Flow fields must come from a full-year period.
+
+    Measured on 300 cached tickers: without the window, roughly a
+    quarter of the universe resolved revenue, EBIT, net income and
+    operating cash flow to a year-to-date figure, with a median value
+    of 0.48x the true annual number.
+    """
+
+    @staticmethod
+    def _cache_with_annual_and_ytd(tmp_path: Path) -> EdgarCache:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=1_000.0,
+                    period_start=date(2025, 1, 1),
+                    period_end=date(2025, 12, 31),
+                    filed=date(2026, 2, 15),
+                    form="10-K",
+                    fiscal_year=2025,
+                    fiscal_period="FY",
+                    accession_number="acc-fy",
+                ),
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=560.0,
+                    period_start=date(2026, 1, 1),
+                    period_end=date(2026, 9, 30),
+                    filed=date(2026, 10, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q3",
+                    accession_number="acc-q3",
+                ),
+                # A balance-sheet instant, to prove stock fields still work.
+                XbrlFact(
+                    concept="Assets",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=8_000.0,
+                    period_start=None,
+                    period_end=date(2026, 9, 30),
+                    filed=date(2026, 10, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q3",
+                    accession_number="acc-q3",
+                ),
+            ],
+        )
+        return cache
+
+    def test_revenue_resolves_to_the_annual_figure(self, tmp_path: Path) -> None:
+        fetcher = FundamentalsFetcher(
+            cache=self._cache_with_annual_and_ytd(tmp_path), client=None
+        )
+
+        fact = fetcher.get_field("ACME", "revenue", date(2026, 12, 1))
+
+        assert fact is not None
+        assert fact.value == 1_000.0
+
+    def test_stock_fields_still_use_the_latest_instant(
+        self, tmp_path: Path
+    ) -> None:
+        # The window must not be applied to balance-sheet concepts, which
+        # carry no period_start and would otherwise all resolve to None.
+        fetcher = FundamentalsFetcher(
+            cache=self._cache_with_annual_and_ytd(tmp_path), client=None
+        )
+
+        fact = fetcher.get_field("ACME", "total_assets", date(2026, 12, 1))
+
+        assert fact is not None
+        assert fact.value == 8_000.0
+
+    def test_quarter_only_filer_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "NEWCO",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=120.0,
+                    period_start=date(2026, 1, 1),
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-q1",
+                )
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        # A quarter is not a year. Better no number than a wrong one.
+        assert fetcher.get_field("NEWCO", "revenue", date(2026, 6, 1)) is None
+
+
+class TestChainRecency:
+    """The concept chain is ordered by preference, not by recency.
+
+    Returning the first hit meant a concept a company stopped tagging
+    years ago outranked one it still tags today. Measured on 300 cached
+    tickers: the oldest fact still being served was 5,577 days old.
+    """
+
+    @staticmethod
+    def _annual(
+        concept: str,
+        *,
+        value: float,
+        fy: int,
+        accession: str,
+    ) -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace="us-gaap",
+            unit="USD",
+            value=value,
+            period_start=date(fy, 1, 1),
+            period_end=date(fy, 12, 31),
+            filed=date(fy + 1, 2, 15),
+            form="10-K",
+            fiscal_year=fy,
+            fiscal_period="FY",
+            accession_number=accession,
+        )
+
+    def test_freshest_concept_wins_over_chain_order(
+        self, tmp_path: Path
+    ) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                # First in the chain, but the company stopped tagging it.
+                self._annual(
+                    "RevenueFromContractWithCustomerExcludingAssessedTax",
+                    value=400.0,
+                    fy=2016,
+                    accession="acc-old",
+                ),
+                # Later in the chain, and current.
+                self._annual("Revenues", value=1_800.0, fy=2025, accession="acc-new"),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "revenue", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.value == 1_800.0
+        assert fact.period_end == date(2025, 12, 31)
+
+    def test_chain_order_still_wins_when_both_are_current(
+        self, tmp_path: Path
+    ) -> None:
+        # Same period_end: preference order must decide, unchanged.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                self._annual(
+                    "RevenueFromContractWithCustomerExcludingAssessedTax",
+                    value=1_000.0,
+                    fy=2025,
+                    accession="acc-preferred",
+                ),
+                self._annual("Revenues", value=1_050.0, fy=2025, accession="acc-alt"),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "revenue", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.value == 1_000.0
+
+    def test_every_concept_stale_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "DORMANT",
+            [
+                self._annual("Revenues", value=90.0, fy=2011, accession="acc-2011"),
+                self._annual(
+                    "SalesRevenueNet", value=95.0, fy=2012, accession="acc-2012"
+                ),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        assert fetcher.get_field("DORMANT", "revenue", date(2026, 8, 4)) is None
+
+    def test_age_bound_boundary(self, tmp_path: Path) -> None:
+        as_of = date(2026, 8, 4)
+        cutoff = as_of - timedelta(days=MAX_FACT_AGE_DAYS)
+
+        inside = EdgarCache(cache_dir=tmp_path / "inside")
+        inside.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=500.0,
+                    period_start=cutoff - timedelta(days=365),
+                    period_end=cutoff,
+                    filed=cutoff + timedelta(days=45),
+                    form="10-K",
+                    fiscal_year=cutoff.year,
+                    fiscal_period="FY",
+                    accession_number="acc-edge",
+                )
+            ],
+        )
+        assert (
+            FundamentalsFetcher(cache=inside, client=None).get_field(
+                "ACME", "revenue", as_of
+            )
+            is not None
+        )
+
+        outside = EdgarCache(cache_dir=tmp_path / "outside")
+        outside.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="Revenues",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=500.0,
+                    period_start=cutoff - timedelta(days=366),
+                    period_end=cutoff - timedelta(days=1),
+                    filed=cutoff + timedelta(days=44),
+                    form="10-K",
+                    fiscal_year=cutoff.year,
+                    fiscal_period="FY",
+                    accession_number="acc-past",
+                )
+            ],
+        )
+        assert (
+            FundamentalsFetcher(cache=outside, client=None).get_field(
+                "ACME", "revenue", as_of
+            )
+            is None
+        )
+
+    def test_late_filer_keeps_its_annual_figure(self, tmp_path: Path) -> None:
+        # FY2025 ends 2025-12-31 and stays the newest annual fact until
+        # the FY2026 10-K lands. A 15-month-old period_end is normal, not
+        # stale, and must survive.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "SLOWCO",
+            [self._annual("Revenues", value=770.0, fy=2025, accession="acc-fy25")],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("SLOWCO", "revenue", date(2027, 3, 20))
+
+        assert fact is not None
+        assert fact.value == 770.0
+
+
+class TestUnitFilter:
+    """A foreign private issuer files in its home currency, and those
+    figures are divided straight into a USD share price. Measured on 400
+    cached tickers: 5 resolved CAD across every monetary field."""
+
+    @staticmethod
+    def _fact_in(unit: str, value: float, concept: str = "Revenues") -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace="us-gaap",
+            unit=unit,
+            value=value,
+            period_start=date(2025, 1, 1),
+            period_end=date(2025, 12, 31),
+            filed=date(2026, 2, 15),
+            form="10-K",
+            fiscal_year=2025,
+            fiscal_period="FY",
+            accession_number=f"acc-{unit}",
+        )
+
+    def test_cad_only_filer_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("ENBFF", [self._fact_in("CAD", 55_000.0)])
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        assert fetcher.get_field("ENBFF", "revenue", date(2026, 8, 4)) is None
+
+    def test_usd_wins_when_a_filer_reports_both(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "DUAL",
+            [self._fact_in("CAD", 55_000.0), self._fact_in("USD", 40_000.0)],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("DUAL", "revenue", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.unit == "USD"
+        assert fact.value == 40_000.0
+
+    def test_eps_requires_per_share_units(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                self._fact_in(
+                    "CAD/shares", 3.20, concept="EarningsPerShareDiluted"
+                ),
+                self._fact_in(
+                    "USD/shares", 2.35, concept="EarningsPerShareDiluted"
+                ),
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "eps_diluted", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.unit == "USD/shares"
+        assert fact.value == 2.35
+
+    def test_share_count_uses_the_shares_unit(self, tmp_path: Path) -> None:
+        # shares_outstanding is a count, not money — a USD mask would
+        # reject every filer.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                XbrlFact(
+                    concept="CommonStockSharesOutstanding",
+                    namespace="us-gaap",
+                    unit="shares",
+                    value=1_000_000.0,
+                    period_start=None,
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-shares",
+                )
+            ],
+        )
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+
+        fact = fetcher.get_field("ACME", "shares_outstanding", date(2026, 8, 4))
+
+        assert fact is not None
+        assert fact.value == 1_000_000.0
+
+    def test_expected_units_covers_every_mapped_field(self) -> None:
+        for field in CONCEPT_MAP:
+            assert expected_units(field), field
+
+
+class TestTotalDebt:
+    """total_debt mapped to DebtCurrentAndNoncurrent, which 0 of 400
+    sampled tickers tag, so it always fell through to long_term_debt —
+    LongTermDebtNoncurrent — dropping current maturities and every
+    short-term borrowing. Measured: 42% of companies understated."""
+
+    @staticmethod
+    def _instant(concept: str, value: float) -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace="us-gaap",
+            unit="USD",
+            value=value,
+            period_start=None,
+            period_end=date(2026, 3, 31),
+            filed=date(2026, 4, 30),
+            form="10-Q",
+            fiscal_year=2026,
+            fiscal_period="Q1",
+            accession_number=f"acc-{concept}",
+        )
+
+    def _fetcher(self, tmp_path: Path, *facts: XbrlFact) -> FundamentalsFetcher:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("ACME", list(facts))
+        return FundamentalsFetcher(cache=cache, client=None)
+
+    AS_OF = date(2026, 8, 4)
+
+    def test_split_components_are_summed(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 950.0
+        assert source == "split"
+
+    def test_rollup_is_not_added_to_its_own_components(
+        self, tmp_path: Path
+    ) -> None:
+        # US GAAP defines LongTermDebt as including current maturities.
+        # Adding it to the split would double-count the whole balance.
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+            self._instant("LongTermDebt", 950.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 950.0
+        assert source == "split"
+
+    def test_rollup_used_when_the_split_is_unavailable(
+        self, tmp_path: Path
+    ) -> None:
+        f = self._fetcher(tmp_path, self._instant("LongTermDebt", 1_200.0))
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 1_200.0
+        assert source == "rollup"
+
+    def test_short_term_borrowings_are_added(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+            self._instant("ShortTermBorrowings", 300.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 1_250.0
+        assert source == "split+short_term"
+
+    def test_short_term_only_filer_is_no_longer_debt_free(
+        self, tmp_path: Path
+    ) -> None:
+        # 15 of 300 sampled tickers looked debt-free purely because
+        # their only borrowing was short-term.
+        f = self._fetcher(tmp_path, self._instant("ShortTermBorrowings", 500.0))
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 500.0
+        assert source == "absent+short_term"
+
+    def test_no_debt_concept_yields_none_not_zero(self, tmp_path: Path) -> None:
+        f = self._fetcher(tmp_path, self._instant("Assets", 5_000.0))
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total is None
+        assert source == "absent"
+
+    def test_get_all_fields_uses_the_composed_figure(
+        self, tmp_path: Path
+    ) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+            self._instant("ShortTermBorrowings", 300.0),
+        )
+        values, _ = f.get_all_fields("ACME", self.AS_OF)
+        assert values["total_debt"] == 1_250.0
+
+    def test_stale_debt_facts_are_ignored(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "DORMANT",
+            [
+                XbrlFact(
+                    concept="LongTermDebt",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=900.0,
+                    period_start=None,
+                    period_end=date(2012, 12, 31),
+                    filed=date(2013, 2, 15),
+                    form="10-K",
+                    fiscal_year=2012,
+                    fiscal_period="FY",
+                    accession_number="acc-old",
+                )
+            ],
+        )
+        f = FundamentalsFetcher(cache=cache, client=None)
+        total, source = f._compute_total_debt("DORMANT", self.AS_OF)
+        assert total is None
+        assert source == "absent"
+
+
+class TestSicCodePopulation:
+    """sic_code was hard-coded None, so Greenblatt's mandatory
+    financials-and-utilities exclusion never fired once. Measured across
+    the 8,290 cached tickers: 8,170 have a bundled SIC code and 2,623 of
+    those (32%) fall in the excluded ranges."""
+
+    def test_parse_financials_populates_sic(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "AAPL",
+            [
+                XbrlFact(
+                    concept="Assets",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=1_000.0,
+                    period_start=None,
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-1",
+                )
+            ],
+        )
+        adapter = CachedEdgarAdapter(
+            fetcher=FundamentalsFetcher(cache=cache, client=None)
+        )
+        filing = FilingMetadata(
+            ticker="AAPL",
+            cik="320193",
+            form_type="10-Q",
+            filing_date=date(2026, 4, 30),
+            period_of_report=date(2026, 3, 31),
+            accession_number="acc-1",
+        )
+
+        payload = adapter.parse_financials(filing)
+
+        assert payload["sic_code"] == sic_for("AAPL")
+        assert payload["sic_code"] is not None
+
+    def test_unknown_ticker_still_yields_none(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ZZZQQ",
+            [
+                XbrlFact(
+                    concept="Assets",
+                    namespace="us-gaap",
+                    unit="USD",
+                    value=1.0,
+                    period_start=None,
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    fiscal_year=2026,
+                    fiscal_period="Q1",
+                    accession_number="acc-z",
+                )
+            ],
+        )
+        adapter = CachedEdgarAdapter(
+            fetcher=FundamentalsFetcher(cache=cache, client=None)
+        )
+        filing = FilingMetadata(
+            ticker="ZZZQQ",
+            cik="0",
+            form_type="10-Q",
+            filing_date=date(2026, 4, 30),
+            period_of_report=date(2026, 3, 31),
+            accession_number="acc-z",
+        )
+
+        assert adapter.parse_financials(filing)["sic_code"] is None
+
+    def test_a_bank_is_now_excluded_by_greenblatt(self) -> None:
+        # The rule existed and was correct; it was simply never fed.
+        from agents.greenblatt.filters import is_excluded_sector
+
+        bank_sic = sic_for("JPM")
+        assert bank_sic is not None
+        assert is_excluded_sector(str(bank_sic))
+
+    def test_an_operating_company_is_not_excluded(self) -> None:
+        from agents.greenblatt.filters import is_excluded_sector
+
+        assert not is_excluded_sector(str(sic_for("AAPL")))

@@ -212,9 +212,22 @@ export function decisionLabel(
         return "מעקב";
       case "HOLD":
         return "החזקה";
+      // FILL/EXIT are executions — what the portfolio actually did —
+      // as opposed to BUY/SELL, which are the strategy's intent.
+      case "FILL":
+        return "בוצעה קנייה";
+      case "EXIT":
+        return "בוצעה מכירה";
       default:
         return decision;
     }
   }
-  return decision;
+  switch (decision) {
+    case "FILL":
+      return "FILLED";
+    case "EXIT":
+      return "EXITED";
+    default:
+      return decision;
+  }
 }

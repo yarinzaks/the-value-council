@@ -32,6 +32,10 @@ def _fin(
     long_term_debt: float | None = 100_000_000.0,
     net_income: float | None = 50_000_000.0,
     shares_outstanding: float | None = 100_000_000.0,
+    total_assets: float | None = 1_000_000_000.0,
+    total_liabilities: float | None = 200_000_000.0,
+    current_liabilities: float | None = 200_000_000.0,
+    operating_cash_flow: float | None = 50_000_000.0,
 ) -> PointInTimeFinancials:
     return PointInTimeFinancials(
         ticker=ticker,
@@ -52,6 +56,10 @@ def _fin(
         long_term_debt=long_term_debt,
         net_income=net_income,
         shares_outstanding=shares_outstanding,
+        total_assets=total_assets,
+        total_liabilities=total_liabilities,
+        current_liabilities=current_liabilities,
+        operating_cash_flow=operating_cash_flow,
     )
 
 
@@ -78,8 +86,27 @@ class TestDividendYield:
         # |−20M| / 1B = 2%
         assert dividend_yield(1_000_000_000.0, _fin()) == pytest.approx(0.02)
 
-    def test_no_dividend(self) -> None:
-        assert dividend_yield(1_000_000_000.0, _fin(dividends_paid=None)) == 0.0
+    def test_no_dividend_on_a_tagged_cash_flow_statement_is_zero(self) -> None:
+        # A filer that reported operating cash flow and no dividend line
+        # has told us it pays nothing.
+        assert (
+            dividend_yield(
+                1_000_000_000.0,
+                _fin(dividends_paid=None, operating_cash_flow=50_000_000.0),
+            )
+            == 0.0
+        )
+
+    def test_no_dividend_and_no_cash_flow_statement_is_none(self) -> None:
+        # It told us nothing. Reading that as zero would make Neff's
+        # dividend gate reject genuine payers whose data is missing.
+        assert (
+            dividend_yield(
+                1_000_000_000.0,
+                _fin(dividends_paid=None, operating_cash_flow=None),
+            )
+            is None
+        )
 
     def test_missing_mcap(self) -> None:
         assert dividend_yield(None, _fin()) is None
@@ -110,8 +137,38 @@ class TestDebtToEquity:
             _fin(total_debt=None, long_term_debt=200_000_000)
         ) == pytest.approx(0.25)
 
-    def test_missing_treats_zero(self) -> None:
-        assert debt_to_equity(_fin(total_debt=None, long_term_debt=None)) == 0.0
+    def test_missing_debt_on_a_tagged_balance_sheet_is_zero(self) -> None:
+        # A filer that tagged assets, liabilities and current liabilities
+        # but no debt concept has told us its liabilities are not
+        # borrowings. XBRL does not require tagging a zero.
+        assert (
+            debt_to_equity(
+                _fin(
+                    total_debt=None,
+                    long_term_debt=None,
+                    total_assets=1_000_000_000.0,
+                    total_liabilities=200_000_000.0,
+                    current_liabilities=200_000_000.0,
+                )
+            )
+            == 0.0
+        )
+
+    def test_missing_debt_on_a_sparse_balance_sheet_is_none(self) -> None:
+        # Nothing was reported. Scoring that as zero leverage is the
+        # best possible mark on no evidence.
+        assert (
+            debt_to_equity(
+                _fin(
+                    total_debt=None,
+                    long_term_debt=None,
+                    total_assets=None,
+                    total_liabilities=None,
+                    current_liabilities=None,
+                )
+            )
+            is None
+        )
 
 
 class TestTotalReturnToPe:

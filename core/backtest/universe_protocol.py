@@ -26,9 +26,22 @@ class Universe(Protocol):
     def constituents_at(self, as_of: date | datetime) -> list[str]:
         """Return the ticker list active on ``as_of``.
 
-        Implementations must guarantee survivorship-bias-free
+        Implementations should aim for survivorship-bias-free
         membership: a ticker that was a member on ``as_of`` and later
-        delisted MUST still appear in the result.
+        delisted should still appear in the result. An implementation
+        that cannot meet this must say so in its own docstring rather
+        than inherit the guarantee by silence — a caller reading only
+        this protocol would otherwise assume it holds everywhere.
+
+        Where the two shipped implementations stand:
+
+        * :class:`core.backtest.universe.SP500Universe` — meets it. It
+          reconstructs membership from the index change log, so removed
+          members reappear at the dates they were in the index.
+        * :class:`core.backtest.full_market_universe.FullMarketUniverse`
+          — does **not**. Its roster is the SEC's current registrant
+          list, so issuers that left the market before the prefetch are
+          absent at every historical date. See that module's warning.
         """
         ...
 

@@ -21,7 +21,7 @@ from core.backtest.strategy_runner import (
     Strategy,
     _rebalance_dates,
 )
-from core.backtest.transaction_costs import PercentageCost, ZeroCost
+from core.backtest.transaction_costs import ZeroCost
 
 
 class TestRunnerConfig:

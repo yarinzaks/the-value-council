@@ -8,9 +8,9 @@ from .prompts import (
 )
 
 __all__ = [
-    "GeminiClient",
-    "InvestmentMemo",
     "INVESTMENT_MEMO_SCHEMA",
     "INVESTMENT_MEMO_SYSTEM",
     "INVESTMENT_MEMO_USER_TEMPLATE",
+    "GeminiClient",
+    "InvestmentMemo",
 ]

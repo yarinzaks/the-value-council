@@ -104,3 +104,80 @@ def steady_fcf_cache(tmp_path: Path) -> EdgarCache:
         ])
     cache.save_facts("STEADY", facts)
     return cache
+
+
+def _fcf_cache(
+    tmp_path: Path,
+    ticker: str,
+    fcfs: list[float],
+    *,
+    first_year: int = 2016,
+) -> EdgarCache:
+    """A filer whose annual FCF series is exactly ``fcfs``, oldest first.
+
+    Capex is held flat at $100M so the series is driven entirely by OCF —
+    the growth term under test is FCF's, not a capex artefact.
+    """
+    cache = EdgarCache(cache_dir=tmp_path)
+    capex = 100_000_000.0
+    facts: list[XbrlFact] = []
+    for i, fcf in enumerate(fcfs):
+        fy = first_year + i
+        period_end = date(fy, 12, 31)
+        filed = date(fy + 1, 2, 15)
+        accession = f"{ticker}-{fy}"
+        facts.extend([
+            make_fact(
+                concept="NetCashProvidedByUsedInOperatingActivities",
+                value=fcf + capex,
+                period_end=period_end,
+                filed=filed,
+                accession=accession,
+            ),
+            make_fact(
+                concept="PaymentsToAcquirePropertyPlantAndEquipment",
+                value=capex,
+                period_end=period_end,
+                filed=filed,
+                accession=accession,
+            ),
+        ])
+    cache.save_facts(ticker, facts)
+    return cache
+
+
+@pytest.fixture
+def mild_decline_cache(tmp_path: Path) -> EdgarCache:
+    """FADING: FCF shrinking ~5%/yr — the Cardinal Health / Avery
+    Dennison shape. Real business, real decline, still valuable."""
+    return _fcf_cache(
+        tmp_path, "FADING", [300_000_000.0 * (0.95**i) for i in range(6)]
+    )
+
+
+@pytest.fixture
+def steep_decline_cache(tmp_path: Path) -> EdgarCache:
+    """SINKING: FCF shrinking ~30%/yr. Five-year average is still
+    positive, so the old avg>0 guard lets it through."""
+    return _fcf_cache(
+        tmp_path, "SINKING", [300_000_000.0 * (0.70**i) for i in range(6)]
+    )
+
+
+@pytest.fixture
+def collapsed_fcf_cache(tmp_path: Path) -> EdgarCache:
+    """BURNING: was a cash generator, latest year burns cash. Average
+    across the window stays positive — which is exactly why the average
+    guard alone never caught it."""
+    return _fcf_cache(
+        tmp_path,
+        "BURNING",
+        [
+            400_000_000.0,
+            380_000_000.0,
+            300_000_000.0,
+            150_000_000.0,
+            20_000_000.0,
+            -90_000_000.0,
+        ],
+    )

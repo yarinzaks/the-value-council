@@ -21,6 +21,7 @@ framework.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -29,6 +30,7 @@ from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
+    HeldPosition,
     PriceLookup,
     Strategy,
 )
@@ -115,6 +117,8 @@ class HowardMarks(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         logger.info(
             f"{as_of}: starting Marks cycle-value scan over {len(universe)} candidates"
@@ -131,18 +135,42 @@ class HowardMarks(Strategy):
 
         with_data = sum(1 for fin, _, _ in triples if fin is not None)
 
-        # Stage 1: quality gates.
+        # Stage 1: where is the pendulum? Marks asks this BEFORE looking
+        # at any individual security, and it has to be asked of the
+        # market — not of the names that already cleared our screen.
+        #
+        # This used to run on the post-gate survivors, which made two of
+        # the five signals vote backwards. Measured at 2026-04-01 over
+        # 537 tickers with data: 46% of the market had negative net
+        # income, a strongly Cold reading, but 0% of the 107 survivors
+        # did, because the gates exclude them — so the distress signal
+        # flipped to strongly Hot. Likewise 17.5% of the market carried
+        # D/E above 1.0 against 0% of survivors, because max_de is a
+        # gate. Each signal was reading the filter back to itself.
+        #
+        # The composite came out -1.0 (Neutral) instead of -2.0 (Cool),
+        # and posture drives sizing: 18 names at 80% deployed rather
+        # than 22 at 90%.
+        #
+        # Only rows missing data are dropped here. That is an
+        # availability filter, not a quality one — a company we cannot
+        # measure tells us nothing about the cycle either way.
+        measurable = [
+            (fin, mcap, price)
+            for fin, mcap, price in triples
+            if fin is not None and mcap is not None and price is not None
+        ]
+        temperature = assess_market_temperature(measurable, as_of=as_of)
+        self.last_temperature = temperature
+        profile = profile_for(temperature.posture)
+
+        # Stage 2: quality gates, now that the posture is known.
         survivors = apply_quality_gates(
             triples,
             as_of=as_of,
             min_market_cap=self.min_market_cap,
             max_de=self.max_de,
         )
-
-        # Stage 2: market temperature over the post-gate universe.
-        temperature = assess_market_temperature(survivors, as_of=as_of)
-        self.last_temperature = temperature
-        profile = profile_for(temperature.posture)
 
         logger.info(
             f"{as_of}: posture={temperature.posture} → "
@@ -266,7 +294,7 @@ class HowardMarks(Strategy):
                         "posture": temperature.posture,
                     },
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     f"{as_of} {s.ticker}: second-level analyzer failed ({exc}); "
                     "keeping quant-only verdict"
@@ -387,7 +415,7 @@ class HowardMarks(Strategy):
                         ),
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"decision log failed for {s.ticker}: {exc}")
 
     # ------------------------------------------------------------------

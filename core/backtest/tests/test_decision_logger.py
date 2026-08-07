@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from datetime import UTC, date, datetime
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -111,7 +110,7 @@ class TestLog:
 
     def test_multiple_decisions_appended(self, tmp_path: Path) -> None:
         log = DecisionLogger(root=tmp_path)
-        for i, t in enumerate(["AAPL", "MSFT", "GOOG"]):
+        for _i, t in enumerate(["AAPL", "MSFT", "GOOG"]):
             log.log(_decision(ticker=t, timestamp="2024-06-30T12:00:00+00:00"))
         loaded = log.read_day("greenblatt", date(2024, 6, 30))
         assert [d.ticker for d in loaded] == ["AAPL", "MSFT", "GOOG"]

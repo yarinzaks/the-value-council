@@ -20,6 +20,7 @@ import type {
   CouncilLive,
   CouncilOverview,
   DailySnapshot,
+  DecisionKind,
   DecisionRow,
   LivePortfolio,
   NavRow,
@@ -175,7 +176,7 @@ export interface JournalQuery {
   /** Restrict to a single agent. Omit to scan all agents. */
   agent?: AgentSlug;
   /** Restrict to specific decision types. */
-  decisions?: ("BUY" | "SELL" | "HOLD" | "WATCH")[];
+  decisions?: DecisionKind[];
   /** Maximum rows to return — default 500 for sane page sizes. */
   limit?: number;
 }

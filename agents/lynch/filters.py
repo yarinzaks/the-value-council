@@ -23,13 +23,14 @@ to the LLM category classifier in live mode.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Iterable
 
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
+from core.scoring.leverage import debt_to_equity as _shared_debt_to_equity
 
 logger = get_logger("agents.lynch.filters")
 
@@ -76,13 +77,15 @@ class FilterResult:
 
 # ---- Per-stock helpers ----------------------------------------------------
 def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
-    """D/E using total_debt when present, else long-term debt only."""
-    if fin is None or fin.total_equity is None or fin.total_equity <= 0:
-        return None
-    debt = fin.total_debt if fin.total_debt is not None else fin.long_term_debt
-    if debt is None:
-        return 0.0
-    return debt / fin.total_equity
+    """D/E, or None when the ratio cannot be honestly established.
+
+    Delegates to :func:`core.scoring.leverage.debt_to_equity`. This used
+    to return 0.0 when no debt concept was tagged, which is the best
+    possible score on every leverage gate — 37% of the judgeable
+    universe passed on no evidence. See that module for why plain None
+    is also wrong and what distinguishes the two cases.
+    """
+    return _shared_debt_to_equity(fin)
 
 
 def dividend_yield_pct(
@@ -220,7 +223,7 @@ def passes_quality_gates(
         return FilterResult(
             ticker,
             False,
-            "D/E undefined",
+            "D/E undefined (no positive equity, or no debt reported on a sparse balance sheet)",
             pass_share_class=True,
             pass_size=True,
         )

@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import json
 import tempfile
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
@@ -27,6 +28,11 @@ logger = get_logger("core.live.portfolio")
 
 DEFAULT_INITIAL_CASH: float = 10_000.0
 DEFAULT_COST_BPS: float = 0.001  # 0.1% per trade
+
+#: Decimal places share counts are rounded to. Matches what ``to_dict``
+#: already persists, so a round-trip through JSON is lossless. Six
+#: places on a $10,000 book is sub-cent precision.
+SHARE_PRECISION: int = 6
 
 from core.paths import portfolios_dir as _portfolios_dir
 
@@ -96,8 +102,26 @@ class LivePortfolio:
     last_updated: str = ""
     last_open_run: str = ""
     last_close_run: str = ""
+    #: The ``as_of`` each run covered, as an ISO date. Deliberately
+    #: separate from the timestamps above, which are wall-clock: the
+    #: idempotency guard compares logical dates, and a run that crosses
+    #: UTC midnight stamps tomorrow while covering today. Comparing the
+    #: two directly made the guard skip a genuine trading day. Empty on
+    #: a portfolio written before this field existed, which never equals
+    #: an as_of — so the first run after the upgrade proceeds, which is
+    #: the safe direction.
+    last_open_date: str = ""
+    last_close_date: str = ""
     initial_cash: float = DEFAULT_INITIAL_CASH
     cumulative_costs: float = 0.0
+    #: Cash dividends received to date. NAV already contains this money
+    #: — the field exists so the dashboard can separate income from
+    #: price appreciation, and so a total-return figure is auditable
+    #: rather than inferred.
+    cumulative_dividends: float = 0.0
+    #: Latest ex-date already settled. The watermark that stops a
+    #: dividend being paid twice when a date is re-run.
+    last_dividend_date: str = ""
 
     # ------------------------------------------------------------------
     # Derived metrics (computed against current_price on positions)
@@ -150,32 +174,76 @@ class LivePortfolio:
         ticker: str,
         *,
         price: float,
+        shares: float | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
-    ) -> "TradeRecord":
-        """Liquidate the entire position in ``ticker`` at ``price``.
+    ) -> TradeRecord:
+        """Sell ``shares`` of ``ticker`` at ``price``; all of it by default.
 
-        Returns a TradeRecord; raises LivePortfolioError if no such
-        position exists.
+        A partial sale keeps the position open at its original entry
+        price — trimming does not change the cost basis of what remains,
+        so the reported P&L on the residual stays honest. Selling the
+        whole line, or more than is held, closes it.
+
+        Raises LivePortfolioError if no such position exists.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive sell price for {ticker}: {price}")
         idx = self._index_of(ticker)
         if idx is None:
             raise LivePortfolioError(f"{ticker} not in portfolio")
-        pos = self.positions.pop(idx)
-        gross = pos.shares * price
+
+        pos = self.positions[idx]
+        if shares is None:
+            sold = pos.shares
+        else:
+            if shares <= 0:
+                raise LivePortfolioError(
+                    f"non-positive sell quantity for {ticker}: {shares}"
+                )
+            sold = round(min(shares, pos.shares), SHARE_PRECISION)
+
+        remaining = round(pos.shares - sold, SHARE_PRECISION)
+        if remaining <= 0:
+            self.positions.pop(idx)
+        else:
+            pos.shares = remaining
+
+        gross = sold * price
         cost = gross * cost_bps
         self.cash += gross - cost
         self.cumulative_costs += cost
         return TradeRecord(
             ticker=ticker,
             side="SELL",
-            shares=pos.shares,
+            shares=sold,
             price=price,
             gross_value=gross,
             cost_paid=cost,
-            realized_pnl_usd=(price - pos.entry_price) * pos.shares,
+            realized_pnl_usd=(price - pos.entry_price) * sold,
         )
+
+    def credit_dividend(
+        self, ticker: str, *, amount_per_share: float, ex_date: str
+    ) -> float:
+        """Pay a cash dividend on the current holding of ``ticker``.
+
+        Returns the cash credited, 0.0 when the position is not held.
+        The caller is responsible for not replaying an ex-date — see
+        ``last_dividend_date``.
+        """
+        if amount_per_share <= 0:
+            raise LivePortfolioError(
+                f"non-positive dividend for {ticker}: {amount_per_share}"
+            )
+        idx = self._index_of(ticker)
+        if idx is None:
+            return 0.0
+        cash = self.positions[idx].shares * amount_per_share
+        self.cash += cash
+        self.cumulative_dividends += cash
+        if ex_date > self.last_dividend_date:
+            self.last_dividend_date = ex_date
+        return cash
 
     def buy(
         self,
@@ -187,12 +255,20 @@ class LivePortfolio:
         why_en: str,
         why_he: str,
         cost_bps: float = DEFAULT_COST_BPS,
-    ) -> "TradeRecord":
+    ) -> TradeRecord:
         """Buy ``ticker`` for at most ``target_dollars`` notional.
 
-        Sizes whole shares only (paper-trades round down) and leaves
-        residual cash. Costs are taken on top of notional so target
-        dollars is the limit including fees.
+        Sizes fractional shares. Whole-share rounding used to discard
+        the remainder of every position, and on a $10,000 book spread
+        across 27 names the residue compounded into roughly a fifth of
+        the portfolio sitting in cash against a design target of zero —
+        an accounting artifact large enough to dominate the return
+        difference between two agents. Every real broker has offered
+        fractional shares for years; the constraint was ours, not the
+        market's.
+
+        Costs are taken on top of notional, so ``target_dollars`` is the
+        limit including fees.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive buy price for {ticker}: {price}")
@@ -207,12 +283,13 @@ class LivePortfolio:
             )
         # Solve: notional + notional*cost_bps <= target_dollars  →  notional max.
         max_notional = target_dollars / (1.0 + cost_bps)
-        shares_int = int(max_notional // price)
-        if shares_int <= 0:
+        shares_bought = round(max_notional / price, SHARE_PRECISION)
+        if shares_bought <= 0:
             raise LivePortfolioError(
-                f"price ${price:.2f} too high for ${target_dollars:.2f} target on {ticker}"
+                f"${target_dollars:.2f} target on {ticker} at ${price:.2f} "
+                f"rounds to zero shares"
             )
-        gross = shares_int * price
+        gross = shares_bought * price
         cost = gross * cost_bps
         spend = gross + cost
         if spend > self.cash + 1e-9:
@@ -225,7 +302,7 @@ class LivePortfolio:
         existing = self._index_of(ticker)
         if existing is not None:
             old = self.positions[existing]
-            new_shares = old.shares + shares_int
+            new_shares = old.shares + shares_bought
             new_basis = old.cost_basis + gross
             self.positions[existing] = Position(
                 ticker=ticker,
@@ -240,7 +317,7 @@ class LivePortfolio:
             self.positions.append(
                 Position(
                     ticker=ticker,
-                    shares=shares_int,
+                    shares=shares_bought,
                     entry_price=price,
                     entry_date=entry_date,
                     current_price=price,
@@ -251,7 +328,7 @@ class LivePortfolio:
         return TradeRecord(
             ticker=ticker,
             side="BUY",
-            shares=shares_int,
+            shares=shares_bought,
             price=price,
             gross_value=gross,
             cost_paid=cost,
@@ -290,15 +367,19 @@ class LivePortfolio:
             "cumulative_return_pct": round(self.cumulative_return_pct, 4),
             "initial_cash": round(self.initial_cash, 2),
             "cumulative_costs": round(self.cumulative_costs, 4),
+            "cumulative_dividends": round(self.cumulative_dividends, 4),
+            "last_dividend_date": self.last_dividend_date,
             "positions": [_round_position(p) for p in self.positions],
             "watchlist": [asdict(w) for w in self.watchlist],
             "last_updated": self.last_updated,
             "last_open_run": self.last_open_run,
             "last_close_run": self.last_close_run,
+            "last_open_date": self.last_open_date,
+            "last_close_date": self.last_close_date,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LivePortfolio":
+    def from_dict(cls, data: dict[str, Any]) -> LivePortfolio:
         positions = [
             Position(
                 ticker=str(p["ticker"]),
@@ -340,8 +421,12 @@ class LivePortfolio:
             last_updated=str(data.get("last_updated", "")),
             last_open_run=str(data.get("last_open_run", "")),
             last_close_run=str(data.get("last_close_run", "")),
+            last_open_date=str(data.get("last_open_date", "")),
+            last_close_date=str(data.get("last_close_date", "")),
             initial_cash=float(data.get("initial_cash", DEFAULT_INITIAL_CASH)),
             cumulative_costs=float(data.get("cumulative_costs", 0.0)),
+            cumulative_dividends=float(data.get("cumulative_dividends", 0.0)),
+            last_dividend_date=str(data.get("last_dividend_date", "")),
         )
 
     @classmethod
@@ -351,7 +436,7 @@ class LivePortfolio:
         *,
         directory: Path = DEFAULT_PORTFOLIO_DIR,
         initial_cash: float = DEFAULT_INITIAL_CASH,
-    ) -> "LivePortfolio":
+    ) -> LivePortfolio:
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / f"{agent}.json"
         if not path.exists():

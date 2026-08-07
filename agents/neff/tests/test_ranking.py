@@ -133,7 +133,7 @@ class TestScoreCandidatesScreen:
         #     window), yield = 5% (above 1+2=3% floor), 12% growth,
         #     16.25% ROE
         candidates: list = []
-        for i, t in enumerate(("HIGH1", "HIGH2", "HIGH3", "HIGH4")):
+        for _i, t in enumerate(("HIGH1", "HIGH2", "HIGH3", "HIGH4")):
             # PE=20 stock with 1% yield (divs=-10M, mcap=1B).
             f = _fin(ticker=t, eps=1.0, dividends=-10_000_000.0)
             candidates.append((f, 1_000_000_000.0, 20.0))

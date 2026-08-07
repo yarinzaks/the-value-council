@@ -17,14 +17,12 @@ per-field deltas and a summary.
 from __future__ import annotations
 
 import random
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
-from typing import Iterable
 
-from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
-from .edgar_cache import EdgarCache
 from .fundamentals_fetcher import FundamentalsFetcher
 
 logger = get_logger("core.data.cache_validator")
@@ -166,7 +164,7 @@ class CacheValidator:
             filings = self.fmp.list_filings(
                 ticker, form_types=("10-K", "10-Q")
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"FMP list_filings({ticker}) failed: {exc}")
             filings = []
         eligible = [f for f in filings if f.filing_date <= as_of_d]
@@ -176,7 +174,7 @@ class CacheValidator:
         fmp_filing = max(eligible, key=lambda f: f.filing_date)
         try:
             fmp_values = self.fmp.parse_financials(fmp_filing)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"FMP parse_financials({ticker}) failed: {exc}")
             fmp_values = {}
 
@@ -249,9 +247,9 @@ def _compare(
 
 
 __all__ = [
-    "CacheValidator",
     "DEFAULT_FIELDS_TO_VALIDATE",
     "DEFAULT_TOLERANCE",
+    "CacheValidator",
     "FieldComparison",
     "TickerValidation",
     "ValidationReport",

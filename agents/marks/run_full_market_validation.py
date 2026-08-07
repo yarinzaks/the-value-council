@@ -130,7 +130,7 @@ def main() -> None:
             f"deploy={sel['deployed_fraction']:.0%} "
             f"positions={len(sel['selected_tickers'])}"
         )
-    print(f"\nDecisions logged: data/decisions/howard_marks/")
+    print("\nDecisions logged: data/decisions/howard_marks/")
     print(f"Report: {report_dir}")
 
 

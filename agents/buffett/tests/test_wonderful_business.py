@@ -9,7 +9,6 @@ import pytest
 
 from agents.buffett.moat_analyzer import BuffettMemo
 from agents.buffett.wonderful_business import WarrenBuffett
-from core.backtest.strategy_runner import FundamentalsLookup, PriceLookup
 from core.data.edgar_cache import EdgarCache
 
 from .conftest import make_pit
@@ -20,7 +19,7 @@ class _StaticPriceLookup:
     def __init__(self, prices: dict[str, float]) -> None:
         self._prices = prices
 
-    def get(self, ticker: str) -> float | None:  # noqa: D401
+    def get(self, ticker: str) -> float | None:
         return self._prices.get(ticker)
 
 
@@ -28,7 +27,7 @@ class _StaticFundamentalsLookup:
     def __init__(self, fins: dict[str, object]) -> None:
         self._fins = fins
 
-    def get(self, ticker: str) -> object | None:  # noqa: D401
+    def get(self, ticker: str) -> object | None:
         return self._fins.get(ticker)
 
 

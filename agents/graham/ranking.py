@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.logger import get_logger
+from core.scoring.graham_number import graham_number
 
 from .filters import (
     current_ratio,
@@ -37,9 +38,17 @@ class DefensiveScore:
     """Ranking row for a Defensive Investor candidate.
 
     ``composite`` is the cheapness metric we sort on — lower is better.
-    Defined as ``pe * pb`` (Graham's Number proxy: he wanted the product
-    not to exceed 22.5 = 15 × 1.5). Cheaper on either dimension = lower
-    composite, regardless of which one drove it.
+    Defined as ``pe * pb``, which is the ch.14 combined test: Graham
+    wanted the product not to exceed 22.5 = 15 x 1.5. Cheaper on either
+    dimension gives a lower composite regardless of which one drove it.
+
+    ``graham_number`` is a different thing and must not be confused with
+    it. The composite is a dimensionless product; the Graham Number is
+    sqrt(22.5 x EPS x BVPS), a price per share, and it is what the
+    playbook's sell trigger refers to. The decision log used to record
+    the composite under the name "graham_number", which made the trigger
+    uncheckable — you cannot compare a share price to a dimensionless
+    product.
     """
 
     ticker: str
@@ -51,6 +60,12 @@ class DefensiveScore:
     debt_to_equity: float
     net_income: float
     composite: float  # pe * pb — cheaper = lower
+    #: sqrt(22.5 x EPS x BVPS), in dollars per share. None when EPS or
+    #: book value is non-positive, where the formula is meaningless.
+    graham_number: float | None = None
+    #: Discount to the Graham Number, in percent. Negative means the
+    #: price is above it.
+    margin_of_safety_pct: float | None = None
 
 
 def score_candidates(
@@ -105,6 +120,25 @@ def score_defensive_candidates(
             or fin.net_income is None
         ):
             continue
+
+        # The real Graham Number, in dollars per share, alongside the
+        # composite. Ch.20 makes margin of safety the central concept
+        # and this is the only figure in the Defensive path that
+        # expresses it; without it the playbook's sell trigger has
+        # nothing to compare against.
+        eps = fin.eps_diluted if fin.eps_diluted is not None else fin.eps_basic
+        bvps = (
+            fin.total_equity / fin.shares_outstanding
+            if fin.total_equity is not None
+            and fin.shares_outstanding
+            and fin.shares_outstanding > 0
+            else None
+        )
+        gn = (
+            graham_number(eps, bvps)
+            if eps is not None and bvps is not None
+            else None
+        )
         scores.append(
             DefensiveScore(
                 ticker=fin.ticker,
@@ -116,6 +150,10 @@ def score_defensive_candidates(
                 debt_to_equity=de,
                 net_income=fin.net_income,
                 composite=pe * pb,
+                graham_number=gn,
+                margin_of_safety_pct=(
+                    (gn - price) / gn * 100.0 if gn and gn > 0 else None
+                ),
             )
         )
     scores.sort(key=lambda s: (s.composite, s.debt_to_equity))

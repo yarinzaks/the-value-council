@@ -62,7 +62,7 @@ Total: max 70. Default qualifying threshold: 35 (50%).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 
 from core.backtest.point_in_time import PointInTimeFinancials
@@ -102,6 +102,12 @@ MAX_TOTAL_SCORE: float = PER_CRITERION_MAX * NUM_CRITERIA  # 70.0
 
 #: Default minimum total score to qualify for selection. 35/70 = 50%.
 DEFAULT_MIN_TOTAL_SCORE: float = 35.0
+
+#: Hard ceiling on P/E as a fraction of the market median. Neff bought
+#: at 40-60% of the market multiple; 1.0 is the loosest bar that is
+#: still recognisably him — a low-P/E investor does not buy above the
+#: market's own multiple, whatever else the candidate scores.
+DEFAULT_MAX_PE_FRAC_OF_MARKET: float = 1.0
 
 #: Persistence is deferred (no quarterly fact series yet). We award a
 #: neutral 5 pts so the 70-pt scale still aligns with the user spec.
@@ -347,10 +353,12 @@ def score_candidates(
     pe_max_frac: float = DEFAULT_PE_MAX_FRAC_OF_MARKET,
     yield_pp_over_market: float = DEFAULT_YIELD_PCT_OVER_MARKET,
     tr_pe_market_multiple: float = DEFAULT_TR_PE_MARKET_MULTIPLE,
-    sales_growth_floor_frac: float = DEFAULT_SALES_GROWTH_FLOOR_FRAC,  # noqa: ARG001
+    sales_growth_floor_frac: float = DEFAULT_SALES_GROWTH_FLOOR_FRAC,
     use_industry_medians: bool = True,
     min_industry_peers: int = MIN_INDUSTRY_PEERS,
     min_total_score: float = DEFAULT_MIN_TOTAL_SCORE,
+    require_dividend: bool = True,
+    max_pe_frac_of_market: float = DEFAULT_MAX_PE_FRAC_OF_MARKET,
 ) -> list[NeffScore]:
     """Soft-score Neff's 7 criteria; return survivors above
     ``min_total_score`` sorted by total score descending.
@@ -389,6 +397,8 @@ def score_candidates(
     )
 
     out: list[NeffScore] = []
+    rejected_no_dividend = 0
+    rejected_expensive = 0
     for m in metrics:
         # Pick the benchmark stats: industry-specific if available,
         # else universe fallback.
@@ -412,6 +422,26 @@ def score_candidates(
             or stats.median_roe_pct is None
             or stats.median_tr_pe is None
         ):
+            continue
+
+        # ---- Hard gates, ahead of the soft score ----------------------
+        # The soft-scoring refactor dissolved all seven criteria into a
+        # single 35/70 threshold, so no individual criterion could
+        # reject any more. A candidate strong on growth and ROE could
+        # carry a zero yield and a market-multiple P/E through the gate
+        # on the strength of the others — which is how the live book
+        # ended up with three zero-dividend holdings and a name bought
+        # at a P/E of 39.6.
+        #
+        # These two are not preferences Neff traded off. He called the
+        # dividend a free part of total return, and his whole method is
+        # buying at 40-60% of the market multiple. Scoring them is
+        # right; letting them be outvoted is not.
+        if require_dividend and m.yield_pct <= 0:
+            rejected_no_dividend += 1
+            continue
+        if m.pe >= universe_stats.median_pe * max_pe_frac_of_market:
+            rejected_expensive += 1
             continue
 
         # Per-criterion soft scores.
@@ -483,6 +513,14 @@ def score_candidates(
                 pass_sales_drives_eps=s_sales >= STRONG,
                 pass_roe=s_roe >= STRONG,
             )
+        )
+
+    if rejected_no_dividend or rejected_expensive:
+        logger.info(
+            f"{as_of}: hard gates rejected {rejected_no_dividend} non-payer(s) "
+            f"and {rejected_expensive} name(s) at or above "
+            f"{max_pe_frac_of_market:.0%} of the market P/E "
+            f"({universe_stats.median_pe:.1f})"
         )
 
     out.sort(key=lambda s: -s.total_score)

@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
-
 from agents.greenblatt.filters import (
-    DEFAULT_MIN_MARKET_CAP_USD,
     EXCLUDED_SIC_RANGES,
     filter_candidates,
     has_positive_ebit,

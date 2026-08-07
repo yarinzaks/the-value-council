@@ -31,6 +31,27 @@ this is the closest faithful quantification we can build from EDGAR
 data alone. Signals NOT available from XBRL (deferred to LLM
 second-level analysis in live mode): VIX, IPO volume, credit
 spreads, default rates, SLO survey, sentiment indices.
+
+What the caller must pass
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **whole measurable universe**, before any quality gate. Marks's
+question is where the market sits; a screened subset answers a
+different question and answers it backwards.
+
+:class:`agents.marks.cycle_value.MarksCycleValue` used to call this on
+its post-gate survivors, and two of the five signals inverted as a
+result. At 2026-04-01, 46% of the 537 measurable tickers had negative
+net income — widespread distress, a strongly Cold reading — while 0% of
+the 107 survivors did, because the gates exclude them. The signal
+designed to detect distress was being shown a population with the
+distress removed, and voted strongly Hot. The high-leverage fraction
+inverted the same way against ``max_de``. Composite -1.0 (Neutral)
+instead of -2.0 (Cool), which is the difference between deploying 80%
+across 18 names and 90% across 22.
+
+Dropping rows with missing data is fine and necessary. Dropping rows
+for being *bad* is what breaks it.
 """
 
 from __future__ import annotations
@@ -41,6 +62,7 @@ from typing import Literal
 
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.logger import get_logger
+from core.scoring.leverage import debt_to_equity as _shared_debt_to_equity
 
 logger = get_logger("agents.marks.temperature")
 
@@ -175,12 +197,21 @@ def _pe(price: float, fin: PointInTimeFinancials) -> float | None:
 
 
 def _de(fin: PointInTimeFinancials) -> float | None:
-    if fin.total_equity is None or fin.total_equity <= 0:
-        return None
-    debt = fin.total_debt if fin.total_debt is not None else fin.long_term_debt
-    if debt is None:
-        return 0.0
-    return debt / fin.total_equity
+    """D/E via the shared helper, which refuses to call an untagged
+    balance sheet debt-free.
+
+    This used to return 0.0 whenever no debt concept was tagged — the
+    best possible reading on both leverage signals, awarded on no
+    evidence. At 2026-04-01, 182 of 537 measurable tickers read exactly
+    0.000, and for 60 of them the shared helper declines to judge at
+    all. Sixty companies about which nothing was known were voting for
+    a deleveraged market, dragging the median down and the posture
+    colder than the evidence supports.
+
+    See :mod:`core.scoring.leverage` for what separates a genuinely
+    debt-free filer from a sparse one.
+    """
+    return _shared_debt_to_equity(fin)
 
 
 def _div_yield_pct(market_cap: float, fin: PointInTimeFinancials) -> float | None:

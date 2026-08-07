@@ -130,7 +130,7 @@ class GeminiClient:
                     "response_mime_type": "application/json",
                 },
             )
-        except Exception as exc:  # noqa: BLE001 — SDK raises broad types
+        except Exception as exc:
             raise LLMError(f"Gemini API call failed: {exc}") from exc
 
         text = (response.text or "").strip()
@@ -140,7 +140,7 @@ class GeminiClient:
         memo_dict = self._parse_json(text)
         try:
             return InvestmentMemo.model_validate(memo_dict)
-        except Exception as exc:  # noqa: BLE001 — pydantic ValidationError
+        except Exception as exc:
             raise LLMError(
                 f"Gemini response did not match InvestmentMemo schema: {exc}\n"
                 f"Raw: {text[:500]}"
@@ -176,4 +176,4 @@ class GeminiClient:
             raise LLMError(f"invalid JSON in response: {exc}") from exc
 
 
-__all__ = ["GeminiClient", "InvestmentMemo", "DEFAULT_MODEL"]
+__all__ = ["DEFAULT_MODEL", "GeminiClient", "InvestmentMemo"]

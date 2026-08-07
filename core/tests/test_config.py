@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from core import config
-from core.exceptions import ConfigError
 
 
 def test_missing_env_file_loads_with_defaults(

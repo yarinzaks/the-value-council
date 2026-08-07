@@ -100,10 +100,28 @@ def _annual_value(
     *,
     namespace: str = "us-gaap",
 ) -> tuple[float, int] | None:
-    """Most recent annual (10-K) value among ``concepts`` filed by
+    """Freshest annual (10-K) value among ``concepts`` filed by
     ``as_of``. Returns ``(value, fiscal_year)`` or None. Tolerates
     null fiscal_year on individual facts.
+
+    Resolves the *whole* chain and keeps the newest fiscal year. It used
+    to return the first concept that produced anything, which quietly
+    froze a company at the year it changed its tagging. The revenue
+    chain starts with ``Revenues``; filers that moved to the ASC 606
+    concept in 2018 kept a stale ``Revenues`` fact on file, so the first
+    match was that fact — forever.
+
+    Measured over a 1,101-ticker sample of the live universe: 224 of 838
+    resolvable revenue reads (26.7%) were stale, median lag 7 fiscal
+    years. NextEra Energy read FY2012 revenue in 2026; Kennedy Wilson
+    read FY2011, against a current figure 8x larger. Operating income
+    was 3.8% stale — Hartford read FY2009, where the fresh figure has
+    the opposite sign — and the share chain 6.9%.
+
+    Ties go to the earlier concept in the chain, which is the canonical
+    one for that quantity.
     """
+    best: tuple[float, int] | None = None
     for concept in concepts:
         fact = cache.latest_value_at(
             ticker,
@@ -113,12 +131,48 @@ def _annual_value(
             forms=("10-K",),
             prefer_annual=True,
         )
-        if fact is None:
+        if fact is None or fact.fiscal_year is None:
             continue
-        if fact.fiscal_year is None:
-            continue
-        return float(fact.value), int(fact.fiscal_year)
-    return None
+        fy = int(fact.fiscal_year)
+        if best is None or fy > best[1]:
+            best = (float(fact.value), fy)
+    return best
+
+
+#: How far apart two facts may sit and still be divided into a ratio.
+#: Zero: a margin is one year's income over the same year's revenue.
+#: The chains resolve independently, so without this a company can pair
+#: FY2025 operating income with FY2012 revenue and report the quotient
+#: as an operating margin.
+_MAX_RATIO_YEAR_GAP: int = 0
+
+#: Tolerance on the span of a "5-year" comparison. The lookback is done
+#: by date, but which fiscal year comes back depends on what the filer
+#: tagged, so exact 5s are not guaranteed. 3-7 years is still a
+#: multi-year trend; 14 is a different question wearing the same
+#: threshold.
+_MIN_TREND_YEARS: int = 3
+_MAX_TREND_YEARS: int = 7
+
+
+def _aligned_ratio(
+    numerator: tuple[float, int] | None,
+    denominator: tuple[float, int] | None,
+) -> float | None:
+    """``100 * num / den`` when both come from the same fiscal year.
+
+    Returns None when either is missing, when the years disagree, or
+    when the denominator is not positive. Fisher scores a company on
+    affirmative evidence, and two facts from different years are not
+    evidence about either one.
+    """
+    if numerator is None or denominator is None:
+        return None
+    if abs(numerator[1] - denominator[1]) > _MAX_RATIO_YEAR_GAP:
+        return None
+    if denominator[0] <= 0:
+        return None
+    return 100.0 * numerator[0] / denominator[0]
 
 
 def revenue_cagr_5yr_pct(
@@ -133,7 +187,10 @@ def revenue_cagr_5yr_pct(
     now_v, now_fy = now
     then_v, then_fy = then
     n = now_fy - then_fy
-    if n <= 0 or then_v <= 0:
+    if not _MIN_TREND_YEARS <= n <= _MAX_TREND_YEARS or then_v <= 0:
+        # ``n`` is the span the chains actually produced, not the five
+        # years the lookback asked for. A 14-year span still yields a
+        # valid CAGR, but not one the 8% threshold was set against.
         return None
     if now_v <= 0:
         return -100.0
@@ -148,16 +205,15 @@ def rd_to_revenue_pct(
     side is missing — companies that don't report R&D fail the point
     by default, which is faithful to Fisher (R&D-effectiveness is
     point 3 — no R&D = no point 3).
+
+    Also None when the two sides come from different fiscal years. The
+    two chains resolve independently and can land years apart; dividing
+    across that gap produces a number, not an R&D intensity.
     """
-    rd = _annual_value(cache, ticker, _RD_CONCEPTS, as_of)
-    rev = _annual_value(cache, ticker, _REVENUE_CONCEPTS, as_of)
-    if rd is None or rev is None:
-        return None
-    rd_v, _ = rd
-    rev_v, _ = rev
-    if rev_v <= 0:
-        return None
-    return 100.0 * rd_v / rev_v
+    return _aligned_ratio(
+        _annual_value(cache, ticker, _RD_CONCEPTS, as_of),
+        _annual_value(cache, ticker, _REVENUE_CONCEPTS, as_of),
+    )
 
 
 def operating_margin_pct(
@@ -180,6 +236,13 @@ def margin_trend_5yr_bps(
 ) -> float | None:
     """Operating margin change over 5 years, in basis points (current −
     5y prior). Positive = expanding margin. None when undefined.
+
+    Each margin is built from one fiscal year's income over the same
+    year's revenue, and the two endpoints must actually be a multi-year
+    span apart. Both margins used to be quotients of whatever the two
+    chains happened to return, then differenced — so a company could
+    report a margin "trend" between two figures that were never a
+    margin and never five years apart.
     """
     now_oi = _annual_value(cache, ticker, _OPERATING_INCOME_CONCEPTS, as_of)
     now_rev = _annual_value(cache, ticker, _REVENUE_CONCEPTS, as_of)
@@ -188,17 +251,20 @@ def margin_trend_5yr_bps(
         cache, ticker, _OPERATING_INCOME_CONCEPTS, then_date
     )
     then_rev = _annual_value(cache, ticker, _REVENUE_CONCEPTS, then_date)
-    if (
-        now_oi is None
-        or now_rev is None
-        or then_oi is None
-        or then_rev is None
-    ):
+
+    if now_oi is None or then_oi is None:
         return None
-    if now_rev[0] <= 0 or then_rev[0] <= 0:
+    now_m = _aligned_ratio(now_oi, now_rev)
+    then_m = _aligned_ratio(then_oi, then_rev)
+    if now_m is None or then_m is None:
         return None
-    now_m = 100.0 * now_oi[0] / now_rev[0]
-    then_m = 100.0 * then_oi[0] / then_rev[0]
+    span = now_oi[1] - then_oi[1]
+    if not _MIN_TREND_YEARS <= span <= _MAX_TREND_YEARS:
+        logger.debug(
+            f"{ticker}@{as_of}: margin endpoints FY{then_oi[1]}-FY{now_oi[1]} "
+            f"span {span}y, outside {_MIN_TREND_YEARS}-{_MAX_TREND_YEARS}"
+        )
+        return None
     return 100.0 * (now_m - then_m)  # convert pp → bps
 
 
@@ -212,6 +278,15 @@ def share_count_change_5yr_pct(
 
     Tries us-gaap and dei namespaces because shares-outstanding lives
     in different concepts depending on the filer.
+
+    Returns None unless the two endpoints are genuinely years apart.
+    This is the point where a stale chain did real damage rather than
+    merely reporting a wrong number: when both lookups resolved to the
+    same frozen fiscal year the change came out 0.0%, which *passes*
+    the dilution test. A company about which nothing was known scored
+    as one with an unblemished buyback record — the same
+    absence-reads-as-a-good-grade failure as an untagged debt figure
+    scoring as zero leverage.
     """
     namespaces = ("us-gaap", "dei")
     now: tuple[float, int] | None = None
@@ -234,6 +309,13 @@ def share_count_change_5yr_pct(
     if then is None:
         return None
     if then[0] <= 0:
+        return None
+    span = now[1] - then[1]
+    if not _MIN_TREND_YEARS <= span <= _MAX_TREND_YEARS:
+        logger.debug(
+            f"{ticker}@{as_of}: share endpoints FY{then[1]}-FY{now[1]} span "
+            f"{span}y, outside {_MIN_TREND_YEARS}-{_MAX_TREND_YEARS}"
+        )
         return None
     return 100.0 * (now[0] - then[0]) / then[0]
 

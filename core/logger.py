@@ -69,7 +69,7 @@ def setup_logging(level: str = "INFO", log_dir: Path | None = None) -> None:
     _CONFIGURED = True
 
 
-def get_logger(name: str) -> "_logger.__class__":  # type: ignore[name-defined]
+def get_logger(name: str) -> _logger.__class__:  # type: ignore[name-defined]
     """Return a logger bound to ``name``.
 
     Auto-configures on first use with sensible defaults so callers do
@@ -80,4 +80,4 @@ def get_logger(name: str) -> "_logger.__class__":  # type: ignore[name-defined]
     return _logger.bind(module=name)
 
 
-__all__ = ["setup_logging", "get_logger"]
+__all__ = ["get_logger", "setup_logging"]

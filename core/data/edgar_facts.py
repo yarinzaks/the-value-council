@@ -20,7 +20,6 @@ we read it from settings.
 
 from __future__ import annotations
 
-import json
 import threading
 import time
 from dataclasses import dataclass
@@ -124,7 +123,7 @@ class EdgarFactsClient:
         if user_agent is None:
             try:
                 user_agent = get_settings().sec_user_agent
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise EdgarFactsError(
                     f"SEC User-Agent unavailable: {exc}"
                 ) from exc
@@ -190,7 +189,7 @@ class EdgarFactsClient:
                     data = _json.loads(local_path.read_text())
                     logger.info(f"loaded company_tickers from local {local_path}")
                     break
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.warning(
                         f"local company_tickers file unreadable ({local_path}): {exc}"
                     )

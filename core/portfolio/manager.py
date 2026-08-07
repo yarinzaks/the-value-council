@@ -65,7 +65,7 @@ class Portfolio:
         try:
             settings = get_settings()
             settings_loaded = True
-        except Exception:  # noqa: BLE001 — tests may call without .env
+        except Exception:
             settings = None
 
         base_agents = (
@@ -182,7 +182,7 @@ class Portfolio:
         for pos in self.positions.values():
             try:
                 price = price_lookup(pos.ticker)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.logger.warning(
                     f"price lookup failed for {pos.ticker}; using avg_cost: {exc}"
                 )
@@ -207,7 +207,7 @@ class Portfolio:
         agent_name: str,
         *,
         agents_dir: Path | None = None,
-    ) -> "Portfolio":
+    ) -> Portfolio:
         """Recreate a Portfolio from its serialized dict."""
         portfolio = cls(
             agent_name,
@@ -230,7 +230,7 @@ class Portfolio:
         self.logger.debug(f"saved portfolio to {self._state_path}")
 
     @classmethod
-    def load(cls, agent_name: str, *, agents_dir: Path | None = None) -> "Portfolio":
+    def load(cls, agent_name: str, *, agents_dir: Path | None = None) -> Portfolio:
         """Load a portfolio from disk, creating fresh state if absent."""
         portfolio = cls(agent_name, agents_dir=agents_dir)
         if portfolio._state_path.exists():

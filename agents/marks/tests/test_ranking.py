@@ -10,7 +10,6 @@ from agents.marks.ranking import MarksScore, score_candidates, select_top_n
 from agents.marks.temperature import (
     TemperatureAssessment,
     TemperatureSignals,
-    assess_market_temperature,
 )
 from core.data.edgar_cache import EdgarCache
 

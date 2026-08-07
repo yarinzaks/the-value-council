@@ -9,6 +9,7 @@ import pytest
 from agents.graham.ranking import (
     GrahamScore,
     score_candidates,
+    score_defensive_candidates,
     select_top_n,
 )
 from core.backtest.point_in_time import FilingMetadata, PointInTimeFinancials
@@ -118,3 +119,80 @@ class TestSelectTopN:
     def test_negative_n_raises(self) -> None:
         with pytest.raises(ValueError):
             select_top_n([], -1)
+
+
+def _defensive_fin(
+    *, total_equity: float = 800_000_000.0, eps: float = 2.0
+) -> PointInTimeFinancials:
+    """A Defensive candidate: EPS 2.00 on 100M shares, BVPS 8.00."""
+    return PointInTimeFinancials(
+        ticker="GN",
+        as_of=date(2024, 6, 30),
+        source_filing=FilingMetadata(
+            ticker="GN",
+            cik="1",
+            form_type="10-K",
+            filing_date=date(2024, 2, 15),
+            period_of_report=date(2023, 12, 31),
+            accession_number="a-GN",
+        ),
+        eps_diluted=eps,
+        eps_basic=eps,
+        total_equity=total_equity,
+        current_assets=500_000_000.0,
+        current_liabilities=200_000_000.0,
+        total_liabilities=300_000_000.0,
+        total_debt=100_000_000.0,
+        long_term_debt=100_000_000.0,
+        net_income=200_000_000.0,
+        shares_outstanding=100_000_000.0,
+        dividends_paid=-20_000_000.0,
+    )
+
+
+class TestGrahamNumber:
+    """The decision log recorded pe x pb under the name graham_number.
+    One is a dimensionless product, the other a price per share, and the
+    playbook's sell trigger — "when the price approaches the Graham
+    Number, sell" — was uncheckable against the wrong one."""
+
+    def test_a_dollar_denominated_number_is_computed(self) -> None:
+        # EPS 2.00, BVPS 800M/100M = 8.00.
+        # sqrt(22.5 x 2 x 8) = sqrt(360) = 18.97
+        fin = _defensive_fin()
+        scores = score_defensive_candidates([(fin, 1_000_000_000.0, 10.0)])
+
+        assert len(scores) == 1
+        assert scores[0].graham_number == pytest.approx(18.9737, rel=1e-4)
+
+    def test_it_is_not_the_composite(self) -> None:
+        fin = _defensive_fin()
+        s = score_defensive_candidates([(fin, 1_000_000_000.0, 10.0)])[0]
+
+        assert s.composite == pytest.approx(s.pe * s.pb)
+        assert s.graham_number != pytest.approx(s.composite)
+
+    def test_margin_of_safety_is_the_discount_to_it(self) -> None:
+        fin = _defensive_fin()
+        s = score_defensive_candidates([(fin, 1_000_000_000.0, 10.0)])[0]
+
+        # Price 10 against a Graham Number of 18.97 → 47.3% discount.
+        assert s.margin_of_safety_pct == pytest.approx(
+            (18.9737 - 10.0) / 18.9737 * 100.0, rel=1e-3
+        )
+
+    def test_a_price_above_the_number_gives_a_negative_margin(self) -> None:
+        fin = _defensive_fin()
+        s = score_defensive_candidates([(fin, 3_000_000_000.0, 30.0)])[0]
+
+        assert s.margin_of_safety_pct is not None
+        assert s.margin_of_safety_pct < 0
+
+    def test_it_is_none_where_the_formula_is_meaningless(self) -> None:
+        # Non-positive book value: sqrt of a negative product.
+        fin = _defensive_fin(total_equity=-100_000_000.0)
+        scores = score_defensive_candidates([(fin, 1_000_000_000.0, 10.0)])
+
+        # The candidate is dropped before scoring on a negative book,
+        # which is the correct outcome; nothing claims a number.
+        assert scores == []

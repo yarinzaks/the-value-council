@@ -28,7 +28,7 @@ from core.backtest.strategy_runner import (
     RunnerConfig,
 )
 from core.backtest.transaction_costs import PercentageCost
-from core.backtest.universe import Change, HistoricalUniverse
+from core.backtest.universe import HistoricalUniverse
 from core.logger import get_logger
 
 logger = get_logger("agents.greenblatt.run_validation")

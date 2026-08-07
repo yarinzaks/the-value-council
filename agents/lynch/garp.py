@@ -28,6 +28,7 @@ Buffett's moat analyzer. Documented in
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -36,6 +37,7 @@ from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
+    HeldPosition,
     PriceLookup,
     Strategy,
 )
@@ -43,18 +45,89 @@ from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
 
 from .category_classifier import CategoryClassifier, LynchMemo
+from .exits import ExitDecision, retained
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
     apply_quality_gates,
 )
-from .ranking import LynchScore, score_candidates, select_top_n
+from .ranking import LynchScore, score_candidates
 
 logger = get_logger("agents.lynch.garp")
 
 #: Default position count — Lynch ran 1,400 in Magellan; we target
 #: the lower end of his §6.1 range (30-50) for our $10K paper book.
 DEFAULT_PORTFOLIO_SIZE: int = 30
+
+
+def _category_weights(top: list[LynchScore]) -> dict[str, float]:
+    """Size each position by its Lynch category.
+
+    The six categories exist because Lynch sizes and holds them
+    differently — a fast grower is where the tenbagger lives, a
+    turnaround is a binary bet, a slow grower is a bond substitute he
+    would rather not own. :func:`agents.lynch.ranking._position_size_for`
+    already encodes his per-category caps (3% slow grower and
+    turnaround, 4% cyclical and asset play, 5% stalwart and fast
+    grower) and stamps them onto every score.
+
+    This used to be ``1.0 / len(top)``. The category was classified,
+    logged, written into the memo and shown on the dashboard, and then
+    every name got the same weight regardless — so the whole taxonomy
+    was decoration. On the live book that is 29 holdings at 3.45% each,
+    a turnaround carrying the same capital as a stalwart.
+
+    The caps set relative size, are normalised to fully invested, and
+    are then enforced as caps — because normalising a small book pushes
+    names above the very limit that was meant to bound them. Ten names
+    normalise to 7-12% against caps of 3-5%. Excess is redistributed to
+    names with headroom.
+
+    At Lynch's own target of 30-50 positions (§6.1) the caps multiply
+    out to 90-150% of NAV, so a properly sized book absorbs everything
+    and the clip never binds. It binds only on a thin book, and there
+    the remainder stays in cash. That is a deliberate departure from
+    Lynch, who ran Magellan near-fully invested: when four names pass
+    the screen, honouring a 5% cap means 20% invested, and the
+    alternative is 25% positions in a strategy whose own limit is 5%.
+    A screen that returns four names has failed, and concentrating into
+    its output is not the fix.
+    """
+    if not top:
+        return {}
+    raw = {s.ticker: max(s.suggested_position_size_pct, 0.0) for s in top}
+    total = sum(raw.values())
+    if total <= 0:
+        equal = 1.0 / len(top)
+        return {s.ticker: equal for s in top}
+
+    weights = {t: v / total for t, v in raw.items()}
+    caps = {s.ticker: s.suggested_position_size_pct / 100.0 for s in top}
+
+    # Clip to caps and redistribute, repeating because redistribution
+    # can push another name over its own cap. Bounded by the number of
+    # positions: each pass fixes at least one, or there is nothing left
+    # to fix.
+    for _ in range(len(top)):
+        over = {t for t, w in weights.items() if w > caps[t] + 1e-12}
+        if not over:
+            break
+        excess = sum(weights[t] - caps[t] for t in over)
+        for t in over:
+            weights[t] = caps[t]
+        headroom = {
+            t: caps[t] - weights[t] for t in weights if t not in over
+        }
+        room = sum(v for v in headroom.values() if v > 0)
+        if room <= 0:
+            # Every name is at its cap. The book cannot absorb the rest
+            # without breaking a cap, so the remainder stays in cash —
+            # the one case where Lynch's own limits force it.
+            break
+        for t, h in headroom.items():
+            if h > 0:
+                weights[t] += excess * (h / room)
+    return weights
 
 
 @dataclass
@@ -116,6 +189,7 @@ class PeterLynch(Strategy):
         self.decision_logger = decision_logger
         self.selection_history: list[LynchSelection] = []
         self.last_memos: list[LynchMemo] = []
+        self.last_exits: list[ExitDecision] = []
 
     def select(
         self,
@@ -123,6 +197,8 @@ class PeterLynch(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         logger.info(
             f"{as_of}: starting Lynch GARP scan over {len(universe)} candidates"
@@ -154,7 +230,24 @@ class PeterLynch(Strategy):
             as_of=as_of,
             edgar_cache=self.edgar_cache,
         )
-        top = select_top_n(scores, n=self.portfolio_size)
+        # Stage 2b: what we already own keeps its slot unless the story
+        # broke. Without this the top-N is recomputed from scratch every
+        # rebalance and anything that went up — higher P/E, higher PEG,
+        # worse rank — is sold for having worked. See :mod:`.exits`.
+        keep, exit_decisions = retained(scores, held)
+        self.last_exits = exit_decisions
+        kept_tickers = {s.ticker for s in keep}
+        room = max(0, self.portfolio_size - len(keep))
+        newcomers = [s for s in scores if s.ticker not in kept_tickers][:room]
+        top = keep + newcomers
+        top.sort(
+            key=lambda s: s.pegy if s.lynch_category == "Slow Grower" else s.peg
+        )
+        if held:
+            logger.info(
+                f"{as_of}: kept {len(keep)} of {len(held)} held, "
+                f"{len(newcomers)} new"
+            )
 
         # Stage 3 (live only): LLM category re-classification + veto.
         memos: list[LynchMemo] = []
@@ -171,8 +264,7 @@ class PeterLynch(Strategy):
             )
             return {}
 
-        weight = 1.0 / len(top)
-        weights = {s.ticker: weight for s in top}
+        weights = _category_weights(top)
         self._record(
             as_of,
             len(universe),
@@ -240,7 +332,7 @@ class PeterLynch(Strategy):
                     stock_data=stock_data,
                     portfolio_state={"as_of": as_of.isoformat()},
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     f"{as_of} {s.ticker}: classifier failed ({exc}); "
                     "keeping quant-only verdict"
@@ -362,7 +454,7 @@ class PeterLynch(Strategy):
                         ),
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"decision log failed for {s.ticker}: {exc}")
 
     # ------------------------------------------------------------------

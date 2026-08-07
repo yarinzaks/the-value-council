@@ -15,10 +15,10 @@ from .net_net import BenjaminGraham, GrahamSelection
 from .ranking import GrahamScore, score_candidates, select_top_n
 
 __all__ = [
-    "BenjaminGraham",
     "DEFAULT_MAX_DE",
     "DEFAULT_MIN_MARKET_CAP_USD",
     "DEFAULT_NCAV_DISCOUNT_FACTOR",
+    "BenjaminGraham",
     "FilterResult",
     "GrahamScore",
     "GrahamSelection",

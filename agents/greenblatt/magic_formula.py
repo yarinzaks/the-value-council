@@ -20,21 +20,24 @@ backtest runner's ``rebalance_freq`` to ``"annual"``.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
 from core.backtest.decision_logger import DecisionLogger, make_decision
-from core.backtest.point_in_time import PointInTimeFinancials, PointInTimeLoader
+from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
+    HeldPosition,
     PriceLookup,
     Strategy,
 )
 from core.logger import get_logger
 
+from .exits import DEFAULT_HOLDING_PERIOD_DAYS, build_targets
 from .filters import DEFAULT_MIN_MARKET_CAP_USD, filter_candidates
-from .ranking import MagicFormulaScore, score_candidates, select_top_n
+from .ranking import MagicFormulaScore, score_candidates
 
 logger = get_logger("agents.greenblatt.magic_formula")
 
@@ -78,6 +81,7 @@ class MagicFormula(Strategy):
         portfolio_size: int = 30,
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
         earnings_recency_days: int = 7,
+        holding_period_days: int = DEFAULT_HOLDING_PERIOD_DAYS,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -87,6 +91,7 @@ class MagicFormula(Strategy):
         self.portfolio_size = portfolio_size
         self.min_market_cap = min_market_cap
         self.earnings_recency_days = earnings_recency_days
+        self.holding_period_days = holding_period_days
         self.decision_logger = decision_logger
         self.selection_history: list[MagicFormulaSelection] = []
 
@@ -99,11 +104,19 @@ class MagicFormula(Strategy):
         universe: list[str],
         prices: PriceLookup,
         fundamentals: FundamentalsLookup,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
         """Choose target weights for ``as_of``.
 
-        The runner provides the survivorship-bias-free universe and the
-        point-in-time fundamentals lookup. We do all the rest.
+        The runner provides the universe and the point-in-time
+        fundamentals lookup. We do all the rest.
+
+        Which universe arrives matters for how the result should be
+        read: the S&P 500 backtests pass a survivorship-bias-free one,
+        the live runner passes :class:`FullMarketUniverse`, which is
+        not. Selection here is identical either way — the difference
+        lands in the historical return, not in the picks.
         """
         logger.info(
             f"{as_of}: starting Magic Formula selection over {len(universe)} candidates"
@@ -128,16 +141,42 @@ class MagicFormula(Strategy):
 
         # 3. Score & rank.
         scores = score_candidates(survivors)
-        top = select_top_n(scores, n=self.portfolio_size)
 
-        # 4. Equal weighting.
-        if not top:
+        # 4. Apply the holding period before taking the top N. The
+        #    formula's edge is the ranking; the one-year hold is what
+        #    lets it survive the stretches where it lags. Without it the
+        #    book churned 28% in three trading days.
+        ranked = [s.ticker for s in scores]
+        chosen = build_targets(
+            ranked,
+            held,
+            as_of,
+            portfolio_size=self.portfolio_size,
+            holding_period_days=self.holding_period_days,
+        )
+        by_ticker = {s.ticker: s for s in scores}
+        top = [by_ticker[t] for t in chosen if t in by_ticker]
+        # A protected holding that no longer scores today (it dropped out
+        # of the filtered universe) still has to keep its slot, so pad
+        # the count even though we have no fresh score object for it.
+        unscored = [t for t in chosen if t not in by_ticker]
+        if unscored:
+            logger.info(
+                f"{as_of}: {len(unscored)} held name(s) no longer scoring but "
+                f"still inside the holding period: {', '.join(sorted(unscored))}"
+            )
+
+        # 5. Equal weighting.
+        if not top and not unscored:
             logger.warning(f"{as_of}: no Magic Formula candidates qualified — staying in cash")
             self._record(as_of, len(universe), with_data, len(survivors), 0, [], [], scores)
             return {}
 
-        weight = 1.0 / len(top)
-        weights = {s.ticker: weight for s in top}
+        # Weight over every chosen slot, scored or not — an unscored
+        # holding still occupies a slot and must not have its weight
+        # redistributed to the others.
+        weight = 1.0 / len(chosen)
+        weights = {t: weight for t in chosen}
         self._record(
             as_of,
             len(universe),
@@ -212,7 +251,7 @@ class MagicFormula(Strategy):
                         ),
                     )
                 )
-            except Exception as exc:  # noqa: BLE001 — never break a backtest on logging
+            except Exception as exc:
                 logger.warning(f"decision log failed for {s.ticker}: {exc}")
 
     # ------------------------------------------------------------------

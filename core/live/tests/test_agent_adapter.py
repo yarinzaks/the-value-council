@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
-
 from agents.dreman.contrarian import DavidDreman
 from agents.greenblatt.magic_formula import MagicFormula
 from core.backtest.point_in_time import FilingMetadata, PointInTimeFinancials

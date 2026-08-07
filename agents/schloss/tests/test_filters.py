@@ -14,8 +14,11 @@ from agents.schloss.filters import (
     book_value_per_share,
     debt_to_equity,
     filter_candidates,
+    is_distressed_price,
     passes_filters,
     price_to_book,
+    tangible_book_value_per_share,
+    tangible_common_equity,
     years_public,
 )
 from core.backtest.point_in_time import FilingMetadata, PointInTimeFinancials
@@ -30,6 +33,9 @@ def _fin(
     long_term_debt: float | None = 200_000_000.0,
     net_income: float | None = 50_000_000.0,
     filing_date: date = date(2018, 6, 15),
+    total_assets: float | None = 1_000_000_000.0,
+    total_liabilities: float | None = 200_000_000.0,
+    current_liabilities: float | None = 200_000_000.0,
 ) -> PointInTimeFinancials:
     return PointInTimeFinancials(
         ticker=ticker,
@@ -47,6 +53,9 @@ def _fin(
         total_debt=total_debt,
         long_term_debt=long_term_debt,
         net_income=net_income,
+        total_assets=total_assets,
+        total_liabilities=total_liabilities,
+        current_liabilities=current_liabilities,
     )
 
 
@@ -101,10 +110,35 @@ class TestDebtToEquity:
         de = debt_to_equity(_fin(total_debt=None, long_term_debt=300_000_000))
         assert de == pytest.approx(0.3)
 
-    def test_missing_debt_treated_as_zero(self) -> None:
+    def test_missing_debt_on_a_tagged_balance_sheet_is_zero(self) -> None:
+        # A filer that tagged assets, liabilities and current liabilities
+        # but no debt concept has told us its liabilities are not
+        # borrowings. XBRL does not require tagging a zero.
         assert debt_to_equity(
-            _fin(total_debt=None, long_term_debt=None)
+            _fin(
+                total_debt=None,
+                long_term_debt=None,
+                total_assets=1_000_000_000.0,
+                total_liabilities=200_000_000.0,
+                current_liabilities=200_000_000.0,
+            )
         ) == pytest.approx(0.0)
+
+    def test_missing_debt_on_a_sparse_balance_sheet_is_none(self) -> None:
+        # "Little or no debt" is one of Schloss's sixteen rules. It was
+        # being satisfied by absence of data.
+        assert (
+            debt_to_equity(
+                _fin(
+                    total_debt=None,
+                    long_term_debt=None,
+                    total_assets=None,
+                    total_liabilities=None,
+                    current_liabilities=None,
+                )
+            )
+            is None
+        )
 
     def test_negative_equity_returns_none(self) -> None:
         assert debt_to_equity(_fin(total_equity=-1)) is None
@@ -223,3 +257,164 @@ class TestDefaults:
 
     def test_default_min_market_cap(self) -> None:
         assert DEFAULT_MIN_MARKET_CAP_USD >= 100_000_000.0
+
+
+class TestTangibleBook:
+    """Schloss bought below book because book estimated what the
+    business would fetch broken up. Goodwill is the premium a prior
+    management paid on an acquisition — no liquidation value, and the
+    first thing written off when things go wrong. The screen was
+    computing P/B on stated equity while the decision log told the
+    reader it traded below *tangible* book."""
+
+    def test_goodwill_and_intangibles_are_stripped(self) -> None:
+        fin = _fin(total_equity=1_000_000_000.0)
+        object.__setattr__(fin, "goodwill", 300_000_000.0)
+        object.__setattr__(fin, "intangible_assets", 100_000_000.0)
+
+        assert tangible_common_equity(fin) == pytest.approx(600_000_000.0)
+
+    def test_absence_is_read_as_none_carried(self) -> None:
+        # A filer that tags neither plausibly carries neither; the
+        # corroboration is the equity figure, which must be present.
+        fin = _fin(total_equity=1_000_000_000.0)
+
+        assert tangible_common_equity(fin) == pytest.approx(1_000_000_000.0)
+
+    def test_pb_uses_tangible_book_by_default(self) -> None:
+        fin = _fin(total_equity=1_000_000_000.0)
+        object.__setattr__(fin, "goodwill", 500_000_000.0)
+
+        # BVPS 10.00 stated, 5.00 tangible. At $7.50 the stated ratio
+        # says 0.75 — a bargain — and the tangible one says 1.50.
+        assert price_to_book(7.5, fin, tangible=False) == pytest.approx(0.75)
+        assert price_to_book(7.5, fin) == pytest.approx(1.50)
+
+    def test_a_goodwill_heavy_name_is_now_rejected(self) -> None:
+        fin = _fin(total_equity=1_000_000_000.0)
+        object.__setattr__(fin, "goodwill", 500_000_000.0)
+
+        result = passes_filters(
+            fin, 750_000_000.0, 7.5, as_of=date(2024, 6, 30)
+        )
+
+        assert result.passed is False
+        assert "P/B" in (result.rejection_reason or "")
+
+    def test_intangibles_exceeding_equity_leave_no_book(self) -> None:
+        fin = _fin(total_equity=1_000_000_000.0)
+        object.__setattr__(fin, "goodwill", 1_200_000_000.0)
+
+        assert tangible_book_value_per_share(fin) is None
+        assert price_to_book(5.0, fin) is None
+
+
+class TestDistressedPrice:
+    """The playbook states the entry as a rejection — near the 52-week
+    low, or 50% off the five-year high, and 'if neither, REJECT'. The
+    two are alternatives, not a conjunction."""
+
+    def test_near_the_52_week_low_qualifies(self) -> None:
+        assert is_distressed_price(21.0, low_52w=20.0, high_5y=25.0) is True
+
+    def test_far_off_the_five_year_high_qualifies(self) -> None:
+        # Bounced well off the low, but still down 60% from the peak —
+        # the case an AND would wrongly reject.
+        assert is_distressed_price(40.0, low_52w=20.0, high_5y=100.0) is True
+
+    def test_neither_is_rejected(self) -> None:
+        assert is_distressed_price(90.0, low_52w=20.0, high_5y=100.0) is False
+
+    def test_the_tolerance_band_is_inclusive(self) -> None:
+        # 10% above the low still counts; Schloss bought capitulation,
+        # not the exact tick.
+        assert is_distressed_price(22.0, low_52w=20.0, high_5y=1_000.0) is True
+        assert is_distressed_price(22.01, low_52w=20.0, high_5y=23.0) is False
+
+    def test_one_reference_price_is_enough(self) -> None:
+        assert is_distressed_price(21.0, low_52w=20.0, high_5y=None) is True
+        assert is_distressed_price(40.0, low_52w=None, high_5y=100.0) is True
+
+    def test_no_reference_prices_is_unknown_not_false(self) -> None:
+        # So the caller can tell "does not qualify" from "cannot tell".
+        assert is_distressed_price(21.0, low_52w=None, high_5y=None) is None
+
+    def test_the_gate_is_opt_in(self) -> None:
+        # Off by default: it needs price history the caller supplies.
+        fin = _fin()
+        assert passes_filters(
+            fin, 750_000_000.0, 5.0, as_of=date(2024, 6, 30)
+        ).passed is True
+
+    def test_the_gate_rejects_when_enabled(self) -> None:
+        fin = _fin()
+        result = passes_filters(
+            fin,
+            750_000_000.0,
+            5.0,
+            as_of=date(2024, 6, 30),
+            low_52w=1.0,
+            high_5y=6.0,
+            require_distressed_price=True,
+        )
+
+        assert result.passed is False
+        assert "52-week low" in (result.rejection_reason or "")
+
+
+class TestTheDistressedPriceGateIsReachable:
+    """``require_distressed_price`` defaulted to False and no caller set it.
+
+    ``is_distressed_price`` encoded Schloss's entry condition and
+    ``passes_filters`` gated on it, so the rule was written and tested —
+    and unreachable, because ``filter_candidates`` had no way to supply
+    the two prices it needs. It does now.
+    """
+
+    @staticmethod
+    def _candidate(price: float) -> tuple[PointInTimeFinancials, float, float]:
+        fin = _fin(ticker="CHEAP")
+        return fin, 1_000_000_000.0, price
+
+    def test_without_a_lookup_the_condition_is_skipped(self) -> None:
+        # Backward compatibility: every existing caller passes nothing
+        # and must behave exactly as before.
+        out = filter_candidates(
+            [self._candidate(2.0)], as_of=date(2024, 6, 30), min_years_public=0
+        )
+
+        assert [f.ticker for f, _, _ in out] == ["CHEAP"]
+
+    def test_a_beaten_down_name_passes(self) -> None:
+        # Trading at 2.0 against a 52-week low of 1.95 — capitulation.
+        out = filter_candidates(
+            [self._candidate(2.0)],
+            as_of=date(2024, 6, 30),
+            min_years_public=0,
+            price_history=lambda t, d: (1.95, 20.0),
+        )
+
+        assert [f.ticker for f, _, _ in out] == ["CHEAP"]
+
+    def test_a_name_near_its_high_is_rejected(self) -> None:
+        # Cheap on book and nowhere near distress. Schloss wanted both.
+        out = filter_candidates(
+            [self._candidate(2.0)],
+            as_of=date(2024, 6, 30),
+            min_years_public=0,
+            price_history=lambda t, d: (1.0, 2.1),
+        )
+
+        assert out == []
+
+    def test_no_price_history_is_rejected_not_admitted(self) -> None:
+        # "Cannot tell" is not "qualifies". A name we cannot show is
+        # beaten down has not shown it.
+        out = filter_candidates(
+            [self._candidate(2.0)],
+            as_of=date(2024, 6, 30),
+            min_years_public=0,
+            price_history=lambda t, d: (None, None),
+        )
+
+        assert out == []

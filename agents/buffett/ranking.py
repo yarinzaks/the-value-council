@@ -27,6 +27,7 @@ from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
 
 from .filters import avg_roe_5yr, debt_to_equity
+from .moat import DEFAULT_MIN_ROE_PCT, FranchiseAssessment, assess_franchise
 from .owner_earnings import (
     DEFAULT_DCF_YEARS,
     DEFAULT_DISCOUNT_RATE_PCT,
@@ -62,6 +63,9 @@ class BuffettScore:
     debt_to_equity: float
     net_income: float
     valuation_notes: tuple[str, ...] = ()
+    #: Evidence for a durable advantage. ``None`` only when the gate was
+    #: disabled; a candidate that failed it never reaches this list.
+    franchise: FranchiseAssessment | None = None
 
 
 def _per_share(iv_total: float, fin: PointInTimeFinancials) -> float | None:
@@ -80,14 +84,27 @@ def score_candidates(
     dcf_years: int = DEFAULT_DCF_YEARS,
     history_years: int = DEFAULT_OE_AVG_YEARS,
     min_mos_pct: float = DEFAULT_MIN_MARGIN_OF_SAFETY_PCT,
+    require_franchise: bool = True,
+    min_roe_pct: float = DEFAULT_MIN_ROE_PCT,
 ) -> list[BuffettScore]:
-    """Score each candidate by MoS. Drop those below ``min_mos_pct``
-    or with no computable IV. Return sorted MoS-desc.
+    """Score candidates, franchise first and price second.
+
+    Two changes from sorting on margin of safety alone. A candidate must
+    now show a durable advantage — see :mod:`agents.buffett.moat` — and
+    the survivors are ordered by the strength of that advantage, with
+    cheapness breaking ties.
+
+    Sorting on discount alone meant the agent bought the *cheapest*
+    survivor of a quality floor rather than the *best* business
+    available at a fair price, which is the opposite of the position
+    Buffett spent the 1980s arguing for: "a wonderful company at a fair
+    price" over "a fair company at a wonderful price".
     """
     if not candidates:
         return []
 
     out: list[BuffettScore] = []
+    rejected_no_moat = 0
     for fin, mcap, price in candidates:
         iv: IntrinsicValueResult | None = intrinsic_value(
             edgar_cache,
@@ -102,6 +119,13 @@ def score_candidates(
             continue
         mos = margin_of_safety_pct(iv.intrinsic_value_usd, mcap)
         if mos is None or mos < min_mos_pct:
+            continue
+
+        assessment = assess_franchise(
+            edgar_cache, fin.ticker, as_of, min_roe_pct=min_roe_pct
+        )
+        if require_franchise and not assessment.qualifies:
+            rejected_no_moat += 1
             continue
         ips = _per_share(iv.intrinsic_value_usd, fin)
         if ips is None:
@@ -123,10 +147,29 @@ def score_candidates(
                 debt_to_equity=de if de is not None else 0.0,
                 net_income=fin.net_income or 0.0,
                 valuation_notes=iv.notes,
+                franchise=assessment,
             )
         )
 
-    out.sort(key=lambda s: -s.margin_of_safety_pct)
+    if rejected_no_moat:
+        logger.info(
+            f"{as_of}: {rejected_no_moat} candidate(s) cheap enough but with no "
+            f"durable advantage on the record"
+        )
+
+    # Franchise first, price second. The primary key is how many of the
+    # observed years cleared the return bar, then the worst of them —
+    # a business whose floor is high has pricing power it did not have
+    # to fight for. Margin of safety only separates equals.
+    def _key(s: BuffettScore) -> tuple[float, float, float]:
+        f = s.franchise
+        return (
+            -(f.fraction_above if f else 0.0),
+            -(f.worst_roe_pct if f and f.worst_roe_pct is not None else -1e9),
+            -s.margin_of_safety_pct,
+        )
+
+    out.sort(key=_key)
     return out
 
 

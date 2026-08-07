@@ -26,18 +26,20 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterator, Protocol
+from typing import Protocol
 
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
 logger = get_logger("core.backtest.point_in_time")
 
-from core.paths import PROJECT_ROOT, edgar_filings_db as _edgar_filings_db
+from core.paths import edgar_filings_db as _edgar_filings_db
+
 DEFAULT_CACHE_PATH = _edgar_filings_db()
 
 
@@ -65,7 +67,7 @@ class FilingMetadata:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, str | None]) -> "FilingMetadata":
+    def from_dict(cls, d: dict[str, str | None]) -> FilingMetadata:
         return cls(
             ticker=str(d["ticker"]),
             cik=d.get("cik"),
@@ -110,6 +112,8 @@ class PointInTimeFinancials:
     current_liabilities: float | None = None
     ppe_net: float | None = None  # net property, plant & equipment (after depreciation)
     total_debt: float | None = None  # short-term + long-term debt for EV
+    goodwill: float | None = None
+    intangible_assets: float | None = None  # excluding goodwill
     sic_code: str | None = None  # for sector exclusions
 
     def to_dict(self) -> dict[str, object]:
@@ -154,7 +158,7 @@ class EdgartoolsAdapter:
     def __init__(self) -> None:
         # Defer import for graceful failure
         try:
-            from edgar import set_identity  # noqa: F401
+            from edgar import set_identity
         except ImportError as exc:
             raise PointInTimeError(f"edgartools not installed: {exc}") from exc
         # Identity is set elsewhere via core.data.edgar_source._initialize_edgar;
@@ -174,7 +178,7 @@ class EdgartoolsAdapter:
         for form in form_types:
             try:
                 filings = company.get_filings(form=form)
-            except Exception as exc:  # noqa: BLE001 — edgartools throws broad
+            except Exception as exc:
                 logger.warning(f"list_filings({ticker}, {form}) failed: {exc}")
                 continue
             for f in filings:
@@ -191,7 +195,7 @@ class EdgartoolsAdapter:
                             accession_number=str(f.accession_number),
                         )
                     )
-                except Exception as exc:  # noqa: BLE001 — defensive
+                except Exception as exc:
                     logger.debug(f"skipping malformed filing for {ticker}: {exc}")
         return results
 
@@ -213,7 +217,7 @@ class EdgartoolsAdapter:
             financials = getattr(obj, "financials", None)
             if financials is None:
                 return out
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 f"parse_financials({filing.ticker} {filing.accession_number}) "
                 f"failed: {exc}"
@@ -230,7 +234,7 @@ class EdgartoolsAdapter:
                     if v is not None:
                         value = float(v)
                         break
-                except Exception:  # noqa: BLE001 — try next getter
+                except Exception:
                     continue
             out[field] = value
         return out
@@ -331,6 +335,17 @@ CREATE TABLE IF NOT EXISTS financials (
 );
 """
 
+# Stamped into every stored payload. Bump whenever parse_financials
+# starts producing a field it did not before, otherwise the cache keeps
+# serving payloads that silently lack it — an accession is immutable, so
+# nothing else would ever invalidate the row. A mismatch is treated as a
+# miss and the filing is re-parsed on next access.
+#
+# 2: sic_code populated from the bundled SEC map (was always None).
+# 3: goodwill and intangible_assets, for tangible common equity.
+_PAYLOAD_VERSION = 3
+_VERSION_KEY = "_payload_version"
+
 
 class PointInTimeLoader:
     """Looks up the financial data publicly known on a given date."""
@@ -412,15 +427,21 @@ class PointInTimeLoader:
             ).fetchone()
         if not row:
             return None
-        return json.loads(row[0])
+        payload = json.loads(row[0])
+        if payload.get(_VERSION_KEY) != _PAYLOAD_VERSION:
+            # Written before parse_financials produced its current field
+            # set. Treat as a miss so the filing is re-parsed.
+            return None
+        return payload
 
     def _store_financials(
         self, accession: str, payload: dict[str, float | None]
     ) -> None:
+        stamped = {**payload, _VERSION_KEY: _PAYLOAD_VERSION}
         with self._connect() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO financials (accession_number, payload_json) VALUES (?, ?)",
-                (accession, json.dumps(payload)),
+                (accession, json.dumps(stamped)),
             )
 
     # ------------------------------------------------------------------
@@ -512,6 +533,8 @@ class PointInTimeLoader:
             current_liabilities=payload.get("current_liabilities"),
             ppe_net=payload.get("ppe_net"),
             total_debt=payload.get("total_debt"),
+            goodwill=payload.get("goodwill"),
+            intangible_assets=payload.get("intangible_assets"),
             sic_code=str(payload["sic_code"]) if payload.get("sic_code") else None,
         )
 

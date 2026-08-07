@@ -81,7 +81,7 @@ class EdgarSource(DataSource):
         try:
             company = Company(ticker.upper())
             filings = company.get_filings(form=form_type).head(limit)
-        except Exception as exc:  # noqa: BLE001 — edgartools raises broad types
+        except Exception as exc:
             raise DataSourceError(
                 self.name, f"failed to fetch {form_type} for {ticker}: {exc}"
             ) from exc
@@ -99,7 +99,7 @@ class EdgarSource(DataSource):
                         url=str(filing.filing_url) if hasattr(filing, "filing_url") else None,
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.logger.warning(f"skipping filing for {ticker}: {exc}")
         return results
 
@@ -124,7 +124,7 @@ class EdgarSource(DataSource):
         try:
             company = Company(ticker.upper())
             filings = company.get_filings(form="4").head(limit)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise DataSourceError(
                 self.name, f"failed Form 4 fetch for {ticker}: {exc}"
             ) from exc
@@ -145,7 +145,7 @@ class EdgarSource(DataSource):
                         filing_date=self._to_datetime(filing.filing_date),
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.logger.warning(f"skipping Form 4 for {ticker}: {exc}")
         return results
 
@@ -160,7 +160,7 @@ class EdgarSource(DataSource):
         try:
             company = Company(cik)
             filings = company.get_filings(form="13F-HR").head(1)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise DataSourceError(self.name, f"failed 13F fetch for {cik}: {exc}") from exc
 
         if not filings:
@@ -169,7 +169,7 @@ class EdgarSource(DataSource):
         # the raw filing object so callers can inspect.
         try:
             return list(filings)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
 
     # --- Helpers -------------------------------------------------------------

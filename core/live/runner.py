@@ -24,9 +24,8 @@ move daily), so trade churn stays low.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
-from typing import Iterable
 
 from agents.buffett import WarrenBuffett
 from agents.dreman.contrarian import DavidDreman
@@ -38,10 +37,11 @@ from agents.lynch import PeterLynch
 from agents.marks import HowardMarks
 from agents.neff.total_return import JohnNeff
 from agents.schloss.deep_value import WalterSchloss
-from core.backtest.data_loader import PriceDataLoader
+from core.backtest.data_loader import PriceDataLoader, _to_date
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.full_market_universe import FullMarketUniverse
 from core.backtest.point_in_time import PointInTimeFinancials, PointInTimeLoader
+from core.backtest.strategy_runner import HeldPosition
 from core.data.edgar_cache import EdgarCache
 from core.data.fundamentals_fetcher import (
     CachedEdgarAdapter,
@@ -61,7 +61,6 @@ from core.live.agent_adapter import (
     LynchLive,
     MarksLive,
     NeffLive,
-    ScanResult,
     SchlossLive,
 )
 from core.live.portfolio import (
@@ -74,12 +73,22 @@ from core.live.portfolio import (
     TradeRecord,
     WatchEntry,
     now_iso,
-    today_iso,
 )
 from core.live.snapshots import make_snapshot, save_snapshot
 from core.logger import get_logger
 
 logger = get_logger("core.live.runner")
+
+#: Smallest notional worth executing. Below this the transaction cost
+#: dominates and the position is noise in the weight table.
+MIN_TRADE_USD: float = 1.0
+
+#: How far a position may drift from its target weight before the
+#: rebalance pass corrects it, as a fraction of the target. 0.25 means a
+#: 3.7% target is left alone between 2.8% and 4.6%. Positions were
+#: previously never resized after entry at all, so every sizing doctrine
+#: was expressed once and then abandoned to price drift.
+DEFAULT_REBALANCE_BAND: float = 0.25
 
 
 @dataclass
@@ -93,12 +102,16 @@ class AgentRunResult:
     trades: list[TradeRecord] = field(default_factory=list)
     universe_size: int = 0
     error: str | None = None  # set if the run failed for this agent
+    #: True when this agent had already completed ``as_of`` and the run
+    #: was a no-op. Distinguishes "nothing to do" from "traded nothing".
+    skipped: bool = False
 
 
 def build_default_adapters(
     *,
     decision_logger: DecisionLogger,
     edgar_cache: EdgarCache | None = None,
+    price_loader: PriceDataLoader | None = None,
 ) -> list[AgentAdapter]:
     """Construct the live adapters for all 10 council members.
 
@@ -108,12 +121,17 @@ def build_default_adapters(
     Marks, Klarman, Fisher) DO need it for trailing growth / FCF /
     margin-trend lookups, so we pass the runner's cache through.
 
+    Schloss additionally takes the price loader: his entry condition is
+    a 52-week low and a five-year high, which are price facts rather
+    than filings.
+
     LLM analyzers are intentionally ``None`` for live mode here — same
     rationale as backtest: lookahead bias + free-tier quota burn. The
     quant pipelines drive selection identically; if/when the LLM-quota
     story changes, the analyzers can be wired in by the caller.
     """
     cache = edgar_cache or EdgarCache()
+    prices = price_loader or PriceDataLoader()
     return [
         GreenblattLive(
             MagicFormula(
@@ -127,6 +145,11 @@ def build_default_adapters(
                 portfolio_size=30,
                 min_years_public=0,  # universe filter handles "established" already
                 min_market_cap=500_000_000.0,
+                # Schloss's entry condition — near the 52-week low, or
+                # 50% off the five-year high. The rule was written and
+                # tested behind a flag no caller passed.
+                price_loader=prices,
+                require_distressed_price=True,
                 decision_logger=decision_logger,
             )
         ),
@@ -141,6 +164,10 @@ def build_default_adapters(
             DavidDreman(
                 portfolio_size=25,
                 min_market_cap=500_000_000.0,
+                # Playbook 4.2's strength battery reads multi-year
+                # margin and earnings trends; without the cache it
+                # cannot run and the agent buys on cheapness alone.
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -199,6 +226,33 @@ def build_default_adapters(
     ]
 
 
+def _held_positions(
+    portfolio: LivePortfolio, prices: dict[str, float | None]
+) -> dict[str, HeldPosition]:
+    """Project the portfolio into what a strategy is allowed to see.
+
+    Narrow on purpose: entry price, entry date, size and current mark.
+    A doctrine needs those to express an exit; it has no business
+    reaching into cash or weights, which the runner owns.
+    """
+    out: dict[str, HeldPosition] = {}
+    for pos in portfolio.positions:
+        mark = prices.get(pos.ticker)
+        try:
+            entry = _to_date(pos.entry_date)
+        except (TypeError, ValueError):
+            logger.debug(f"unparseable entry_date on {pos.ticker}: {pos.entry_date!r}")
+            continue
+        out[pos.ticker] = HeldPosition(
+            ticker=pos.ticker,
+            shares=pos.shares,
+            entry_price=pos.entry_price,
+            entry_date=entry,
+            current_price=mark if mark is not None else pos.current_price,
+        )
+    return out
+
+
 class _DictLookup:
     """Trivial wrapper exposing .get(ticker) for the Strategy protocol."""
 
@@ -235,6 +289,7 @@ class DailyRunner:
         portfolio_dir: Path = DEFAULT_PORTFOLIO_DIR,
         cost_bps: float = DEFAULT_COST_BPS,
         initial_cash: float = DEFAULT_INITIAL_CASH,
+        rebalance_band: float = DEFAULT_REBALANCE_BAND,
         cache: EdgarCache | None = None,
         price_loader: PriceDataLoader | None = None,
         universe: FullMarketUniverse | None = None,
@@ -248,14 +303,18 @@ class DailyRunner:
         self.market = market
         self.cache = cache or EdgarCache()
         self.decision_logger = decision_logger or DecisionLogger()
+        # Before the adapters: Schloss's distressed-price condition
+        # needs this loader, and the builder takes it as an argument.
+        self.price_loader = price_loader or PriceDataLoader()
         self.adapters = adapters or build_default_adapters(
             decision_logger=self.decision_logger,
             edgar_cache=self.cache,
+            price_loader=self.price_loader,
         )
         self.portfolio_dir = portfolio_dir
         self.cost_bps = cost_bps
         self.initial_cash = initial_cash
-        self.price_loader = price_loader or PriceDataLoader()
+        self.rebalance_band = rebalance_band
         self.universe = universe or FullMarketUniverse(cache=self.cache)
         if pit_loader is None:
             fetcher = FundamentalsFetcher(
@@ -313,13 +372,19 @@ class DailyRunner:
                     directory=self.portfolio_dir,
                     initial_cash=self.initial_cash,
                 )
-                # Fetch fresh prices for every held ticker.
+                # Fetch fresh prices for every held ticker. force_refresh
+                # is required: the morning run cached an intraday quote
+                # under today's date, and without it get_price_on's fast
+                # path returns that same number, so the close-of-day mark
+                # silently records the 09:35 ET price as the close.
                 tickers = [p.ticker for p in portfolio.positions]
                 fresh: dict[str, float | None] = {}
                 for t in tickers:
                     try:
-                        fresh[t] = self.price_loader.get_price_on(t, as_of)
-                    except Exception as exc:  # noqa: BLE001
+                        fresh[t] = self.price_loader.get_price_on(
+                            t, as_of, force_refresh=True
+                        )
+                    except Exception as exc:
                         logger.warning(
                             f"close-of-day price for {t} @ {as_of} failed: {exc}"
                         )
@@ -328,12 +393,13 @@ class DailyRunner:
                 stamp = now_iso()
                 portfolio.last_updated = stamp
                 portfolio.last_close_run = stamp
+                portfolio.last_close_date = as_of.isoformat()
                 portfolio.save(directory=self.portfolio_dir)
                 # Snapshot — no trades, just refreshed valuation.
                 try:
                     snap = make_snapshot(portfolio, as_of=as_of, trades=[])
                     save_snapshot(snap)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.warning(
                         f"{as_of}: close snapshot for {adapter.name} failed: {exc}"
                     )
@@ -347,7 +413,7 @@ class DailyRunner:
                         universe_size=0,
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error(f"{as_of}: {adapter.name} close failed: {exc}")
                 portfolio = LivePortfolio.load_or_seed(
                     adapter.name,
@@ -362,12 +428,14 @@ class DailyRunner:
         return results
 
     # ------------------------------------------------------------------
-    def run(self, *, as_of: date | None = None) -> list[AgentRunResult]:
+    def run(
+        self, *, as_of: date | None = None, force: bool = False
+    ) -> list[AgentRunResult]:
         if self.market == "TASE":
             return self._tase_placeholder("open", as_of)
         as_of = as_of or date.today()
         logger.info(f"daily run for {as_of}")
-        self.universe._ensure_loaded()  # noqa: SLF001 — public API surface
+        self.universe._ensure_loaded()
         members = self.universe.constituents_at(as_of)
         logger.info(f"{as_of}: universe = {len(members)} tickers")
 
@@ -389,8 +457,10 @@ class DailyRunner:
         results: list[AgentRunResult] = []
         for adapter in self.adapters:
             try:
-                result = self._run_one(adapter, as_of, members, prices, fundamentals)
-            except Exception as exc:  # noqa: BLE001
+                result = self._run_one(
+                    adapter, as_of, members, prices, fundamentals, force=force
+                )
+            except Exception as exc:
                 logger.error(f"{as_of}: {adapter.name} failed: {exc}")
                 portfolio = LivePortfolio.load_or_seed(
                     adapter.name,
@@ -412,12 +482,36 @@ class DailyRunner:
         members: list[str],
         prices: dict[str, float | None],
         fundamentals: dict[str, PointInTimeFinancials | None],
+        *,
+        force: bool = False,
     ) -> AgentRunResult:
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
             directory=self.portfolio_dir,
             initial_cash=self.initial_cash,
         )
+
+        # Idempotency. The workflow can fire twice for one date — a
+        # retry, a manual dispatch after a scheduled run, the watchdog's
+        # make-up trigger — and without this the second pass re-executes
+        # every rotation and writes a second set of decision records for
+        # the same day. last_open_run has been written since the runner
+        # was built and never read until now.
+        # Compare logical date to logical date. This used to read
+        # ``last_open_run[:10]``, a wall-clock stamp, against ``as_of``.
+        # The two agree only when a run happens on the same calendar day
+        # it covers — so a run that crosses UTC midnight stamped
+        # tomorrow, and the next day's run skipped itself as a duplicate
+        # and lost a trading day silently. The 2026-08-07 00:51Z make-up
+        # run is exactly that shape.
+        if not force and portfolio.last_open_date == as_of.isoformat():
+            logger.info(
+                f"{as_of}: {adapter.name} already completed this date — "
+                f"skipping (pass force=True to re-run)"
+            )
+            return AgentRunResult(
+                agent=adapter.name, portfolio=portfolio, skipped=True
+            )
 
         # Mark existing positions to today's price (some held tickers
         # may not be in members — still need their current price for NAV).
@@ -429,14 +523,25 @@ class DailyRunner:
                 )
         portfolio.mark_to_market(held_prices)
 
+        # The agent sees what it owns. Without this every doctrine
+        # inherited the same exit rule — "sold because you left today's
+        # top N" — and eight investors whose real-world turnover
+        # differed by an order of magnitude traded identically.
         scan = adapter.run_scan(
             as_of,
             members,
             _DictLookup(prices),
             _DictLookup(fundamentals),
+            held=_held_positions(portfolio, held_prices),
         )
         target_tickers = {t.ticker for t in scan.targets}
         trades: list[TradeRecord] = []
+
+        # ---- DIVIDENDS: pay income before any trading ------------------
+        # Before the diff, so a name sold today still collects a dividend
+        # whose ex-date has already passed. Ordering matters: after the
+        # sell it would be silently forfeited.
+        self._settle_dividends(portfolio, as_of)
 
         # ---- SELLs: positions that left the target list ---------------
         # Skip if no targets — that's a "no-trade" signal (e.g. universe
@@ -445,10 +550,18 @@ class DailyRunner:
             for pos in list(portfolio.positions):
                 if pos.ticker in target_tickers:
                     continue
-                price = held_prices.get(pos.ticker) or pos.current_price
+                # No fallback to pos.current_price. mark_to_market keeps the
+                # last known mark when a price is missing, which is right for
+                # valuing a position but wrong for executing a sale: a
+                # delisted or halted holding would book fabricated proceeds
+                # at a price that no longer trades, and a realized P&L of
+                # exactly zero. Absent a fresh price we hold and retry
+                # tomorrow.
+                price = held_prices.get(pos.ticker)
                 if price is None or price <= 0:
                     logger.warning(
-                        f"{as_of}: cannot sell {pos.ticker} — no price; skipping"
+                        f"{as_of}: cannot sell {pos.ticker} — no fresh price; "
+                        f"holding position"
                     )
                     continue
                 try:
@@ -469,7 +582,7 @@ class DailyRunner:
             if portfolio.has(target.ticker):
                 # Refresh the why string on the existing position so the
                 # dashboard always shows the *current* rationale.
-                idx = portfolio._index_of(target.ticker)  # noqa: SLF001
+                idx = portfolio._index_of(target.ticker)
                 if idx is not None:
                     portfolio.positions[idx].why_en = target.why_en
                     portfolio.positions[idx].why_he = target.why_he
@@ -483,10 +596,14 @@ class DailyRunner:
             target_dollars = nav_after_sells * target.weight
             if target_dollars > portfolio.cash:
                 target_dollars = portfolio.cash * 0.99  # leave a sliver for cost
-            if target_dollars < price:
+            # Was `target_dollars < price` — a $50 slot in a $500 stock
+            # bought nothing and the cash sat idle. Fractional shares
+            # make any positive target executable; the floor now only
+            # rejects amounts too small to be worth a trade.
+            if target_dollars < MIN_TRADE_USD:
                 logger.info(
-                    f"{as_of}: skipping {target.ticker} — "
-                    f"target ${target_dollars:.2f} < price ${price:.2f}"
+                    f"{as_of}: skipping {target.ticker} — target "
+                    f"${target_dollars:.2f} below ${MIN_TRADE_USD:.2f} floor"
                 )
                 continue
             try:
@@ -503,6 +620,11 @@ class DailyRunner:
                 self._log_buy(adapter.name, target, price, as_of)
             except LivePortfolioError as exc:
                 logger.warning(f"{as_of}: buy of {target.ticker} failed: {exc}")
+
+        # ---- REBALANCE: pull drifted holdings back toward target ------
+        trades.extend(
+            self._rebalance(portfolio, scan.targets, prices, as_of, adapter.name)
+        )
 
         # Re-mark after trades and refresh weights.
         portfolio.mark_to_market(held_prices)
@@ -525,13 +647,14 @@ class DailyRunner:
         stamp = now_iso()
         portfolio.last_updated = stamp
         portfolio.last_open_run = stamp
+        portfolio.last_open_date = as_of.isoformat()
         portfolio.save(directory=self.portfolio_dir)
 
         # Persist a daily snapshot for History tab + Today's-activity.
         try:
             snap = make_snapshot(portfolio, as_of=as_of, trades=trades)
             save_snapshot(snap)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(f"{as_of}: snapshot save for {adapter.name} failed: {exc}")
 
         return AgentRunResult(
@@ -544,6 +667,153 @@ class DailyRunner:
         )
 
     # ------------------------------------------------------------------
+    def _settle_dividends(self, portfolio: LivePortfolio, as_of: date) -> float:
+        """Credit cash for every unpaid dividend on the current holdings.
+
+        Marking a position at the close means the ex-date price drop
+        lands in NAV while the payment never does, so the recorded
+        return was price return rather than total return. The penalty
+        is proportional to yield, which makes it doctrine-correlated:
+        Neff, Dreman and Graham were losing roughly their portfolio
+        yield a year against Buffett and Fisher for no reason either
+        investor would recognise.
+
+        Two watermarks stop a dividend being paid twice. The portfolio's
+        ``last_dividend_date`` bounds the whole book, and each position's
+        own ``entry_date`` bounds it individually — a name bought
+        yesterday must not collect on an ex-date from before it was
+        owned.
+        """
+        if not portfolio.positions:
+            return 0.0
+
+        floor = portfolio.last_dividend_date[:10] or portfolio.last_open_run[:10]
+        if not floor:
+            # First run for this book: settle from today only, so a
+            # freshly seeded portfolio does not harvest history.
+            floor = as_of.isoformat()
+
+        total = 0.0
+        for pos in list(portfolio.positions):
+            since = max(floor, pos.entry_date[:10])
+            try:
+                payments = self.price_loader.dividends_between(
+                    pos.ticker, since, as_of
+                )
+            except Exception as exc:
+                logger.warning(f"{as_of}: dividend lookup {pos.ticker} failed: {exc}")
+                continue
+            for ex_date, amount in payments:
+                try:
+                    cash = portfolio.credit_dividend(
+                        pos.ticker,
+                        amount_per_share=amount,
+                        ex_date=ex_date.isoformat(),
+                    )
+                except LivePortfolioError as exc:
+                    logger.warning(f"{as_of}: dividend {pos.ticker} failed: {exc}")
+                    continue
+                if cash:
+                    total += cash
+                    logger.info(
+                        f"{as_of}: {portfolio.agent} received ${cash:,.2f} "
+                        f"from {pos.ticker} (ex {ex_date}, ${amount:.4f}/sh)"
+                    )
+        if total:
+            portfolio.last_dividend_date = as_of.isoformat()
+        return total
+
+    # ------------------------------------------------------------------
+    def _rebalance(
+        self,
+        portfolio: LivePortfolio,
+        targets: list[LiveTarget],
+        prices: dict[str, float | None],
+        as_of: date,
+        agent: str,
+    ) -> list[TradeRecord]:
+        """Pull holdings that drifted outside the band back to target.
+
+        Positions were sized once at entry and never touched again, so a
+        name that doubled became twice its intended weight and every
+        sizing doctrine decayed into "whatever the market did since we
+        bought". Rebalancing is not a doctrine choice — an agent that
+        states equal weights means to hold equal weights.
+
+        Only names still in the target list are considered; anything
+        that left is handled by the exit path. Trims are executed before
+        adds so the cash from a trim is available to fund an add in the
+        same pass.
+        """
+        if not targets:
+            return []
+
+        band = self.rebalance_band
+        nav = portfolio.total_nav
+        if nav <= 0:
+            return []
+
+        trims: list[tuple[str, float, float]] = []  # (ticker, price, shares)
+        adds: list[tuple[str, float, float]] = []  # (ticker, price, dollars)
+
+        for target in targets:
+            idx = portfolio._index_of(target.ticker)
+            if idx is None:
+                continue
+            price = prices.get(target.ticker)
+            if price is None or price <= 0:
+                continue
+            pos = portfolio.positions[idx]
+            want = nav * target.weight
+            have = pos.shares * price
+            if want <= 0:
+                continue
+            drift = (have - want) / want
+            if abs(drift) <= band:
+                continue
+            delta = abs(have - want)
+            if delta < MIN_TRADE_USD:
+                continue
+            if drift > 0:
+                trims.append((target.ticker, price, delta / price))
+            else:
+                adds.append((target.ticker, price, delta))
+
+        out: list[TradeRecord] = []
+        for ticker, price, shares in trims:
+            try:
+                out.append(
+                    portfolio.sell(
+                        ticker, price=price, shares=shares, cost_bps=self.cost_bps
+                    )
+                )
+                logger.info(f"{as_of}: {agent} trimmed {ticker} back to target")
+            except LivePortfolioError as exc:
+                logger.warning(f"{as_of}: trim of {ticker} failed: {exc}")
+
+        for ticker, price, dollars in adds:
+            spend = min(dollars, portfolio.cash * 0.99)
+            if spend < MIN_TRADE_USD:
+                continue
+            try:
+                out.append(
+                    portfolio.buy(
+                        ticker,
+                        target_dollars=spend,
+                        price=price,
+                        entry_date=as_of.isoformat(),
+                        why_en="",
+                        why_he="",
+                        cost_bps=self.cost_bps,
+                    )
+                )
+                logger.info(f"{as_of}: {agent} added to {ticker} back to target")
+            except LivePortfolioError as exc:
+                logger.warning(f"{as_of}: add to {ticker} failed: {exc}")
+
+        return out
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
     def _fetch_prices(
@@ -553,7 +823,7 @@ class DailyRunner:
         for t in tickers:
             try:
                 out[t] = self.price_loader.get_price_on(t, as_of)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(f"price fetch {t} @ {as_of} failed: {exc}")
                 out[t] = None
         return out
@@ -565,7 +835,7 @@ class DailyRunner:
         for t in tickers:
             try:
                 out[t] = self.pit_loader.get_financials(t, as_of)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug(f"fundamentals {t} @ {as_of} failed: {exc}")
                 out[t] = None
         return out
@@ -577,7 +847,9 @@ class DailyRunner:
             self.decision_logger.log(
                 make_decision(
                     ticker=target.ticker,
-                    decision="BUY",
+                    # FILL, not BUY. The strategy already logged BUY as
+                    # its intent; this record is the execution.
+                    decision="FILL",
                     agent=agent,
                     timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
                     criteria_met=[f"rank #{target.rank}", "live paper-trade"],
@@ -585,7 +857,7 @@ class DailyRunner:
                     entry_price=price,
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"decision log BUY {target.ticker} failed: {exc}")
 
     def _log_sell(
@@ -595,10 +867,14 @@ class DailyRunner:
             self.decision_logger.log(
                 make_decision(
                     ticker=pos.ticker,
-                    decision="SELL",
+                    # EXIT, not SELL — this is the executed disposal, and
+                    # the trigger is a real one: the name left today's
+                    # target list. Recording it as "SELL" made a
+                    # mechanical rotation look like a doctrine decision.
+                    decision="EXIT",
                     agent=agent,
                     timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
-                    criteria_met=["rotated out of target portfolio"],
+                    criteria_met=["left today's target list"],
                     rationale=(
                         f"Closed live position: entry ${pos.entry_price:.2f}, "
                         f"exit ${price:.2f} ({(price/pos.entry_price - 1)*100:+.2f}%)"
@@ -606,7 +882,7 @@ class DailyRunner:
                     entry_price=pos.entry_price,
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug(f"decision log SELL {pos.ticker} failed: {exc}")
 
 

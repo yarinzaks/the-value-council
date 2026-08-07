@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
-from typing import Mapping
 
 import pytest
 
@@ -12,6 +12,7 @@ from agents.graham.filters import (
     DEFAULT_DEFENSIVE_MAX_PE,
     DEFAULT_DEFENSIVE_MIN_CURRENT_RATIO,
     current_ratio,
+    debt_to_equity,
     filter_defensive_candidates,
     passes_defensive_filters,
     pb_ratio,
@@ -35,6 +36,7 @@ def _fin(
     net_income: float | None = 50_000_000.0,
     shares_outstanding: float | None = 100_000_000.0,
     total_liabilities: float | None = 300_000_000.0,
+    dividends_paid: float | None = -20_000_000.0,
 ) -> PointInTimeFinancials:
     return PointInTimeFinancials(
         ticker=ticker,
@@ -57,6 +59,7 @@ def _fin(
         net_income=net_income,
         shares_outstanding=shares_outstanding,
         total_liabilities=total_liabilities,
+        dividends_paid=dividends_paid,
     )
 
 
@@ -394,3 +397,107 @@ class TestStrategyConfigDefensive:
         assert DEFAULT_DEFENSIVE_MAX_PE == 15.0
         assert DEFAULT_DEFENSIVE_MAX_PB == 1.5
         assert DEFAULT_DEFENSIVE_MIN_CURRENT_RATIO == 2.0
+
+
+class TestWorkingCapitalDebtCover:
+    """Ch.14 criterion #2, second half. The D/E <= 1.0 check is Walter
+    Schloss's rule, not Graham's, and it does not substitute."""
+
+    def test_debt_within_working_capital_passes(self) -> None:
+        # WC = 500M - 200M = 300M; LTD 100M.
+        result = passes_defensive_filters(
+            _fin(),
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+        )
+        assert result.passed is True
+
+    def test_debt_above_working_capital_is_rejected(self) -> None:
+        # The case D/E cannot catch: long-term debt at 0.9x equity but
+        # 2.4x working capital.
+        fin = _fin(long_term_debt=720_000_000.0, total_debt=720_000_000.0)
+        result = passes_defensive_filters(
+            fin,
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+        )
+        assert result.passed is False
+        assert "working capital" in (result.rejection_reason or "")
+
+    def test_the_de_gate_alone_would_have_passed_it(self) -> None:
+        # Proof the two rules are not interchangeable.
+        fin = _fin(long_term_debt=720_000_000.0, total_debt=720_000_000.0)
+        assert debt_to_equity(fin) == pytest.approx(0.9)
+
+        lenient = passes_defensive_filters(
+            fin,
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+            require_working_capital_cover=False,
+        )
+        assert lenient.passed is True
+
+    def test_unreported_long_term_debt_is_rejected(self) -> None:
+        fin = _fin(long_term_debt=None, total_debt=None)
+        result = passes_defensive_filters(
+            fin,
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+        )
+        assert result.passed is False
+
+
+class TestDividendRequirement:
+    """Ch.14 criterion #4. Graham wanted twenty uninterrupted years; the
+    cache cannot see that far, so this is the checkable part."""
+
+    def test_a_payer_passes(self) -> None:
+        result = passes_defensive_filters(
+            _fin(dividends_paid=-20_000_000.0),
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+        )
+        assert result.passed is True
+
+    def test_the_sign_carries_no_information(self) -> None:
+        # SEC files PaymentsOfDividends positive in some filings and
+        # negative in others; only the magnitude means anything.
+        result = passes_defensive_filters(
+            _fin(dividends_paid=20_000_000.0),
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+        )
+        assert result.passed is True
+
+    def test_a_non_payer_is_rejected(self) -> None:
+        result = passes_defensive_filters(
+            _fin(dividends_paid=0.0),
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+        )
+        assert result.passed is False
+        assert "dividend" in (result.rejection_reason or "")
+
+    def test_unreported_dividends_are_rejected(self) -> None:
+        result = passes_defensive_filters(
+            _fin(dividends_paid=None),
+            1_000_000_000.0,
+            10.0,
+            as_of=date(2024, 6, 30),
+            min_market_cap=100_000_000,
+        )
+        assert result.passed is False

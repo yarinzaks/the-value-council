@@ -5,9 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-import pytest
-
-from core.data.edgar_cache import CacheStats, EdgarCache
+from core.data.edgar_cache import EdgarCache
 from core.data.edgar_facts import XbrlFact
 
 
@@ -219,3 +217,126 @@ class TestStats:
         assert s.ticker_count == 2
         assert s.total_facts == 3
         assert s.total_size_bytes > 0
+
+
+class TestDurationFilter:
+    """A 10-Q's year-to-date figure carries a later period_end than the
+    last 10-K's annual figure, so without a duration window it wins the
+    sort and a nine-month number is handed back as a year."""
+
+    @staticmethod
+    def _annual_and_ytd() -> list[XbrlFact]:
+        return [
+            # FY2025 annual, filed Feb 2026.
+            _fact(
+                value=1_000.0,
+                period_start=date(2025, 1, 1),
+                period_end=date(2025, 12, 31),
+                filed=date(2026, 2, 15),
+                form="10-K",
+                accession_number="acc-fy2025",
+            ),
+            # Q3 2026 year-to-date (nine months) — later period_end.
+            _fact(
+                value=560.0,
+                period_start=date(2026, 1, 1),
+                period_end=date(2026, 9, 30),
+                filed=date(2026, 10, 30),
+                form="10-Q",
+                accession_number="acc-q3-2026",
+            ),
+        ]
+
+    def test_without_window_the_ytd_figure_wins(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("ACME", self._annual_and_ytd())
+
+        fact = cache.latest_value_at("ACME", "Revenues", date(2026, 12, 1))
+
+        assert fact is not None
+        assert fact.value == 560.0  # nine months, consumed as a year
+
+    def test_window_selects_the_annual_figure(self, tmp_path: Path) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("ACME", self._annual_and_ytd())
+
+        fact = cache.latest_value_at(
+            "ACME", "Revenues", date(2026, 12, 1), duration_days=(330, 400)
+        )
+
+        assert fact is not None
+        assert fact.value == 1_000.0
+        assert fact.period_end == date(2025, 12, 31)
+
+    def test_no_annual_fact_returns_none_not_a_quarter(
+        self, tmp_path: Path
+    ) -> None:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "NEWCO",
+            [
+                _fact(
+                    value=120.0,
+                    period_start=date(2026, 1, 1),
+                    period_end=date(2026, 3, 31),
+                    filed=date(2026, 4, 30),
+                    form="10-Q",
+                    accession_number="acc-q1",
+                )
+            ],
+        )
+
+        assert (
+            cache.latest_value_at(
+                "NEWCO", "Revenues", date(2026, 6, 1), duration_days=(330, 400)
+            )
+            is None
+        )
+
+    def test_instant_facts_never_satisfy_a_window(self, tmp_path: Path) -> None:
+        # Balance-sheet items carry no period_start. Asking for a
+        # duration must exclude them rather than crash.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "ACME",
+            [
+                _fact(
+                    concept="Assets",
+                    value=5_000.0,
+                    period_start=None,
+                    period_end=date(2025, 12, 31),
+                    accession_number="acc-bs",
+                )
+            ],
+        )
+
+        assert cache.latest_value_at("ACME", "Assets", date(2026, 6, 1)) is not None
+        assert (
+            cache.latest_value_at(
+                "ACME", "Assets", date(2026, 6, 1), duration_days=(330, 400)
+            )
+            is None
+        )
+
+    def test_52_and_53_week_fiscal_years_both_pass(self, tmp_path: Path) -> None:
+        # Retail-style fiscal years are 364 or 371 days, never exactly 365.
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts(
+            "RETAIL",
+            [
+                _fact(
+                    value=900.0,
+                    period_start=date(2025, 2, 2),
+                    period_end=date(2026, 1, 31),  # 364 days
+                    filed=date(2026, 3, 20),
+                    accession_number="acc-52w",
+                )
+            ],
+        )
+
+        fact = cache.latest_value_at(
+            "RETAIL", "Revenues", date(2026, 6, 1), duration_days=(330, 400)
+        )
+
+        assert fact is not None
+        assert fact.value == 900.0

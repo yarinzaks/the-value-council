@@ -8,11 +8,11 @@ import pytest
 
 from agents.fisher.quality_score import QualityScore
 from agents.fisher.ranking import (
-    FisherScore,
     TIER_A_MAX_PE,
     TIER_A_POSITION_PCT,
     TIER_B_MAX_PE,
     TIER_B_POSITION_PCT,
+    FisherScore,
     score_candidates,
     select_top_n,
 )
