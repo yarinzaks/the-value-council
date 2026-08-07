@@ -7,7 +7,7 @@ import Link from "next/link";
 
 import { Card, PctCell } from "@/components/Cards";
 import type { Locale } from "@/lib/i18n";
-import { decisionLabel, narrative } from "@/lib/narrative";
+import { narrative } from "@/lib/narrative";
 import type { Evidence, PositionStory } from "@/lib/positions";
 
 const LIFECYCLE_STYLE = {
@@ -156,24 +156,34 @@ export function PositionStoryCard({
             {t("pos_timeline_note")}
           </p>
           <ol className="mt-2 space-y-1.5 border-s-2 border-council-100 dark:border-council-800 ps-3">
-            {story.timeline.map((d, i) => (
-              <li
-                key={`${d.timestamp}-${i}`}
-                className="text-xs text-council-600 dark:text-muted"
-              >
-                <span className="tabular text-muted">
-                  {d.timestamp.slice(0, 10)}
-                </span>{" "}
-                <span className="font-medium">
-                  {decisionLabel(d.decision, locale)}
-                </span>
-                {i === 0 && (
-                  <span className="ms-2 text-muted">
-                    {narrative(d, locale, { companyName })}
+            {story.timeline.map((d, i) => {
+              // Newest first, so the LAST row is the day the agent
+              // first said yes. Every row above it is that same verdict
+              // restated on a later run, not another purchase. Labelling
+              // all 68 "BUY" is what made one held position read as
+              // sixty-eight separate trades.
+              const isFirstEver = i === story.timeline.length - 1;
+              return (
+                <li
+                  key={`${d.timestamp}-${i}`}
+                  className="text-xs text-council-600 dark:text-muted"
+                >
+                  <span className="tabular text-muted">
+                    {d.timestamp.slice(0, 10)}
+                  </span>{" "}
+                  <span className="font-medium">
+                    {isFirstEver
+                      ? t("pos_first_flagged")
+                      : t("pos_reaffirmed")}
                   </span>
-                )}
-              </li>
-            ))}
+                  {i === 0 && (
+                    <span className="ms-2 text-muted">
+                      {narrative(d, locale, { companyName })}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </details>
       )}
