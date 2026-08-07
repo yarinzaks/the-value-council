@@ -1,14 +1,19 @@
 // One company, one card — the whole arc instead of a row per day.
 //
-// The timeline is a native <details>, so expanding costs no client
-// JavaScript and the page still works with scripts disabled.
+// Two things are on it: what moved, and what the agent is waiting
+// for. The daily verdict rows are neither. A position held 68
+// trading days produced 68 of them, all saying the same thing, and
+// they buried the two days that actually mattered.
 
 import Link from "next/link";
 
 import { Card, PctCell } from "@/components/Cards";
-import type { Locale } from "@/lib/i18n";
-import { narrative } from "@/lib/narrative";
-import type { Evidence, PositionStory } from "@/lib/positions";
+import {
+  movements,
+  parseConditions,
+  type Evidence,
+  type PositionStory,
+} from "@/lib/positions";
 
 const LIFECYCLE_STYLE = {
   held: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -26,7 +31,6 @@ interface Props {
   companyName: string;
   agentDisplay: string;
   agentColor: string;
-  locale: Locale;
   t: (key: string) => string;
 }
 
@@ -35,7 +39,6 @@ export function PositionStoryCard({
   companyName,
   agentDisplay,
   agentColor,
-  locale,
   t,
 }: Props) {
   const lifecycleLabel =
@@ -50,6 +53,9 @@ export function PositionStoryCard({
     trade: t("pos_evidence_trade"),
     first_flagged: t("pos_evidence_flagged"),
   };
+
+  const conditions = parseConditions(story.criteriaMet);
+  const events = movements(story);
 
   return (
     <Card>
@@ -98,16 +104,57 @@ export function PositionStoryCard({
             )}
           </p>
 
-          {story.criteriaMet.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {story.criteriaMet.slice(0, 6).map((c) => (
-                <span
-                  key={c}
-                  className="text-[11px] px-1.5 py-0.5 rounded bg-council-50 dark:bg-council-800/60 text-council-600 dark:text-muted"
-                >
-                  {c}
-                </span>
-              ))}
+          {/* What would make him sell, and how close it is.
+              The criteria strings carry both the current reading and
+              the level that breaks it, so this is the part a reader can
+              learn from: not "Graham likes cheap stocks" but "this one
+              goes if P/E doubles, and it is halfway there." */}
+          {conditions.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[11px] uppercase tracking-wider text-muted mb-1.5">
+                {t("pos_watching")}
+              </div>
+              <div className="space-y-1">
+                {conditions.map((c) =>
+                  c.used === null ? (
+                    <div key={c.raw} className="text-xs text-council-600 dark:text-muted">
+                      · {c.label}
+                    </div>
+                  ) : (
+                    <div key={c.raw} className="flex items-center gap-2 text-xs">
+                      <span className="w-28 shrink-0 text-council-700 dark:text-council-300">
+                        {c.label}
+                      </span>
+                      <span className="tabular font-mono w-14 shrink-0 text-end">
+                        {c.value}
+                      </span>
+                      {/* Fill shows room consumed, so a nearly-full bar
+                          is a position close to breaking its own rule. */}
+                      <span className="flex-1 h-1.5 rounded-full bg-council-100 dark:bg-council-800 overflow-hidden min-w-[3rem]">
+                        <span
+                          className={`block h-full rounded-full ${
+                            c.used >= 0.9
+                              ? "bg-loss"
+                              : c.used >= 0.7
+                                ? "bg-amber-500"
+                                : "bg-gain"
+                          }`}
+                          style={{ width: `${Math.min(100, c.used * 100)}%` }}
+                        />
+                      </span>
+                      <span className="tabular text-muted w-20 shrink-0">
+                        {c.op} {c.threshold}
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
+              {story.exitTrigger && (
+                <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                  <span className="font-semibold">{t("exit_label")}</span>{" "}
+                  {story.exitTrigger}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -147,45 +194,41 @@ export function PositionStoryCard({
         </div>
       </div>
 
-      {story.timeline.length > 0 && (
-        <details className="mt-3 group">
-          <summary className="cursor-pointer text-xs text-muted hover:text-council-700 dark:hover:text-council-300 select-none">
-            {t("pos_show_timeline")} ({story.timeline.length})
-          </summary>
-          <p className="mt-2 text-[11px] text-muted leading-relaxed">
-            {t("pos_timeline_note")}
-          </p>
-          <ol className="mt-2 space-y-1.5 border-s-2 border-council-100 dark:border-council-800 ps-3">
-            {story.timeline.map((d, i) => {
-              // Newest first, so the LAST row is the day the agent
-              // first said yes. Every row above it is that same verdict
-              // restated on a later run, not another purchase. Labelling
-              // all 68 "BUY" is what made one held position read as
-              // sixty-eight separate trades.
-              const isFirstEver = i === story.timeline.length - 1;
-              return (
-                <li
-                  key={`${d.timestamp}-${i}`}
-                  className="text-xs text-council-600 dark:text-muted"
-                >
-                  <span className="tabular text-muted">
-                    {d.timestamp.slice(0, 10)}
-                  </span>{" "}
-                  <span className="font-medium">
-                    {isFirstEver
-                      ? t("pos_first_flagged")
-                      : t("pos_reaffirmed")}
-                  </span>
-                  {i === 0 && (
-                    <span className="ms-2 text-muted">
-                      {narrative(d, locale, { companyName })}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </details>
+      {/* Movements only. The rows are one per run, so a position held
+          68 trading days produced 68 of them — a list that said "still
+          holding" sixty-eight times and buried the two days that
+          mattered. An open position that has not changed has one
+          entry, which is the truth about it. */}
+      {events.length > 0 && (
+        <ol className="mt-3 space-y-1.5 border-s-2 border-council-100 dark:border-council-800 ps-3">
+          {events.map((m) => (
+            <li key={`${m.date}-${m.kind}`} className="text-xs">
+              <span className="tabular text-muted">{m.date}</span>{" "}
+              <span
+                className={`font-medium ${
+                  m.kind === "exited"
+                    ? "text-loss"
+                    : "text-council-700 dark:text-council-300"
+                }`}
+              >
+                {t(`pos_event_${m.kind}`)}
+              </span>
+              {m.note && (
+                <p className="mt-0.5 text-council-600 dark:text-muted leading-relaxed">
+                  {m.note}
+                </p>
+              )}
+            </li>
+          ))}
+          {story.lifecycle === "held" && (
+            <li className="text-xs text-muted">
+              {t("pos_still_held").replace(
+                "{days}",
+                String(story.daysAffirmed),
+              )}
+            </li>
+          )}
+        </ol>
       )}
     </Card>
   );

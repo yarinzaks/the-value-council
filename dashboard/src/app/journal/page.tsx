@@ -183,7 +183,6 @@ export default async function JournalPage({
                 companyName={companyNames[story.ticker] ?? ""}
                 agentDisplay={meta?.display ?? story.agent}
                 agentColor={meta?.color ?? "#999"}
-                locale={locale}
                 t={t}
               />
             );

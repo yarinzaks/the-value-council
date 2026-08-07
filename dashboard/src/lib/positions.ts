@@ -213,3 +213,100 @@ export function summarise(stories: PositionStory[]): StoryTotals {
     longestHeld: longest,
   };
 }
+
+// ---------------------------------------------------------------------------
+// What the agent is watching
+// ---------------------------------------------------------------------------
+//
+// A daily log of "still holding" is not a record, it is noise — 68 rows
+// saying the same thing. What is worth showing is movement, and what
+// the agent is waiting for.
+//
+// The criteria strings already carry both halves: "P/E=7.34 (≤ 15.0)"
+// is the current reading and the level that would break it. Parsed out
+// they become the thing a reader can learn from — not "Graham likes
+// cheap stocks" but "this one sells if P/E doubles from here, and it is
+// currently using 49% of that room".
+
+export interface WatchCondition {
+  /** "P/E", "current ratio". */
+  label: string;
+  value: number;
+  /** "≤" means the value must stay at or below `threshold`. */
+  op: "≤" | "≥";
+  threshold: number;
+  /** 0..1.5 — how much of the allowed room is used; 1.0 is at the
+   *  limit. Null when the entry carries no comparison at all. */
+  used: number | null;
+  /** The original string, for criteria with no number
+   *  ("positive trailing net income"). */
+  raw: string;
+}
+
+const CRITERION = /^(.+?)=(-?[\d.]+)\s*\((≤|≥)\s*(-?[\d.]+)\)$/;
+
+/** Parse `criteria_met` strings into conditions with headroom. */
+export function parseConditions(criteria: string[]): WatchCondition[] {
+  const out: WatchCondition[] = [];
+  for (const raw of criteria) {
+    const m = CRITERION.exec(raw.trim());
+    if (!m) {
+      out.push({
+        label: raw,
+        value: Number.NaN,
+        op: "≤",
+        threshold: Number.NaN,
+        used: null,
+        raw,
+      });
+      continue;
+    }
+    const [, label, valueStr, opStr, thresholdStr] = m;
+    const value = Number(valueStr);
+    const threshold = Number(thresholdStr);
+    const op = opStr as "≤" | "≥";
+    // Fraction of the permitted room consumed. A ceiling uses
+    // value/threshold; a floor inverts it, so in both directions a
+    // higher number means closer to breaking.
+    let used: number | null = null;
+    if (Number.isFinite(value) && Number.isFinite(threshold) && threshold !== 0 && value !== 0) {
+      const ratio = op === "≤" ? value / threshold : threshold / value;
+      used = Math.max(0, Math.min(1.5, ratio));
+    }
+    out.push({ label, value, op, threshold, used, raw });
+  }
+  return out;
+}
+
+/** One entry in the movements list — an event, not a daily heartbeat. */
+export interface Movement {
+  date: string;
+  kind: "opened" | "exited" | "changed";
+  note: string | null;
+}
+
+/**
+ * Reduce a timeline to the days something actually happened.
+ *
+ * Rows are one per run, so a position held 68 trading days produces 68
+ * of them. Only the first, and any day the verdict changed, are events.
+ * The rest are the same answer restated and belong nowhere on screen.
+ */
+export function movements(story: PositionStory): Movement[] {
+  const rows = [...story.timeline].reverse(); // oldest first
+  if (rows.length === 0) return [];
+  const out: Movement[] = [
+    { date: dayOf(rows[0].timestamp), kind: "opened", note: rows[0].rationale ?? null },
+  ];
+  let prev = rows[0].decision;
+  for (const r of rows.slice(1)) {
+    if (r.decision === prev) continue;
+    prev = r.decision;
+    out.push({
+      date: dayOf(r.timestamp),
+      kind: r.decision === "SELL" || r.decision === "EXIT" ? "exited" : "changed",
+      note: r.rationale ?? null,
+    });
+  }
+  return out.reverse(); // newest first
+}
