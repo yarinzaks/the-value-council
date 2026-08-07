@@ -194,8 +194,17 @@ jobs:
           MODE: ${{ steps.dispatch.outputs.mode }}
           MARKET: ${{ steps.dispatch.outputs.market }}
         run: |
-          git config user.name  "council-bot"
-          git config user.email "council-bot@users.noreply.github.com"
+          # GitHub's own Actions identity, with the canonical
+          # ID-prefixed noreply. The previous value,
+          # council-bot@users.noreply.github.com, is the legacy
+          # format without an account ID, which GitHub resolves to
+          # whoever currently holds the username - a real, dormant
+          # account created six weeks before this repo existed. It
+          # was credited with 148 commits and stood as the top
+          # contributor. This address belongs to no one and cannot
+          # be claimed.
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/portfolios data/decisions data/snapshots data/cron_logs
           if git diff --cached --quiet; then
             echo "no data changes — nothing to commit"
