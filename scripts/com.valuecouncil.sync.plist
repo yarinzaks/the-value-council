@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pull GitHub-generated state down to the local Mac data directory.
+
+  Schedule: every hour, always. Not a window.
+
+  This replaces com.valuecouncil.sync.open and .close, which fired on
+  guessed windows — 17:00-21:00 and 00:00-02:00 Israel time — chosen to
+  sit shortly after each GitHub Actions run. The guess failed twice in
+  three days:
+
+    2026-08-05  run committed 19:12 IL; the single 17:00 sync had
+                already logged "no new commits" and the dashboard sat
+                on the previous evening's data for a full day.
+    2026-08-06  the scheduled 23:30 IL close run did not fire at all.
+                The watchdog caught it and dispatched a make-up, which
+                itself queued and committed at 03:51 IL on 08-07 —
+                outside BOTH widened windows. The dashboard showed
+                two-day-old data.
+
+  Widening the windows was the wrong response to the first failure.
+  The premise is unfixable: GitHub documents scheduled triggers as
+  best-effort, the scan itself takes 14-60 minutes, and a watchdog
+  make-up run can land at any hour. No window predicts that.
+
+  So there is no window. Hourly costs one shallow fetch when nothing
+  has changed — value-council-sync.sh compares SHAs before doing any
+  work, and 23 of every 24 fires log "no new commits" and exit.
+
+  The open/close split went with it. MODE was only ever used to pick a
+  log filename; both modes ran identical code.
+
+  RunAtLoad plus StartInterval means launchd fires a missed run when
+  the Mac wakes, so an overnight commit is picked up on wake rather
+  than waiting for the next calendar slot.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.valuecouncil.sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yarinzaks/.local/bin/value-council-sync.sh</string>
+    <string>hourly</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/yarinzaks</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/sync.hourly.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/yarinzaks/Library/Application Support/value-council/cron_logs/sync.hourly.err.log</string>
+</dict>
+</plist>
