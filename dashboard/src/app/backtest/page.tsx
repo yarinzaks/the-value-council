@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import { Card, EmptyState, NumCell, PctCell, PageTitle } from "@/components/Cards";
+import { BacktestCaveat } from "@/components/BacktestCaveat";
 import { Term } from "@/components/Term";
 import { loadCouncilOverview } from "@/lib/data";
 import { metaLocalized } from "@/lib/agents";
@@ -51,6 +52,7 @@ export default async function BacktestPage() {
     return (
       <>
         <PageTitle title={t("backtest_tab_title")} subtitle={t("backtest_tab_subtitle")} />
+
         <EmptyState>{t("no_backtest_data")}</EmptyState>
       </>
     );
@@ -69,6 +71,8 @@ export default async function BacktestPage() {
   return (
     <>
       <PageTitle title={t("backtest_tab_title")} subtitle={t("backtest_tab_subtitle")} />
+
+      <BacktestCaveat title={t("caveat_title")} body={t("caveat_body")} />
 
       {/* Leaderboard ------------------------------------------------- */}
       <Card className="mb-6">

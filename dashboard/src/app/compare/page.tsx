@@ -1,4 +1,5 @@
 import { PageTitle, EmptyState } from "@/components/Cards";
+import { BacktestCaveat } from "@/components/BacktestCaveat";
 import { CompareView } from "@/components/CompareView";
 import { loadCouncilOverview } from "@/lib/data";
 import { getServerI18n } from "@/lib/locale-server";
@@ -13,6 +14,7 @@ export default async function ComparePage() {
     return (
       <>
         <PageTitle title={t("compare_title")} />
+
         <EmptyState>{t("no_backtest_data")}</EmptyState>
       </>
     );
@@ -20,6 +22,8 @@ export default async function ComparePage() {
   return (
     <>
       <PageTitle title={t("compare_title")} subtitle={t("compare_subtitle")} />
+
+      <BacktestCaveat title={t("caveat_title")} body={t("caveat_body")} />
       <CompareView
         agents={overview.agents.map((a) => ({
           slug: a.slug,

@@ -99,6 +99,11 @@ const en: Dict = {
   no_decisions: "No decisions logged yet.",
   drilldown_no_data: "No backtest run or live portfolio for this agent yet.",
 
+  // ---- Backtest caveat ----
+  caveat_title: "These returns predate the data fixes — read them as an upper bound",
+  caveat_body:
+    "Stored runs are from 2026-04-29 and report figures no value strategy produces: a 3,029% total return over five years and a best year of +476%. Three defects since fixed explain them — the universe holds only companies that survived to today, prices were carried forward across gaps of up to 4,021 days, and fundamentals were served a median seven fiscal years stale. Windows also differ between agents (one is measured against an S&P of 25.47%, another against 14.49%), so the ranking is partly a ranking of windows. Re-run the backtests to get comparable numbers.",
+
   // ---- Heatmap ----
   heatmap_title: "Annual Returns Heatmap",
   heatmap_subtitle: "Per-agent alpha vs S&P 500 each calendar year",
@@ -357,6 +362,11 @@ const he: Dict = {
   view_all: "צפה בהכל ←",
   no_decisions: "אין החלטות מתועדות עדיין.",
   drilldown_no_data: "אין ריצת בקטסט או תיק חי לסוכן זה עדיין.",
+
+  // ---- Backtest caveat ----
+  caveat_title: "התשואות האלה קדמו לתיקוני הנתונים — קרא אותן כגבול עליון",
+  caveat_body:
+    "הריצות השמורות הן מ-29/04/2026 ומדווחות מספרים ששום אסטרטגיית ערך לא מייצרת: 3,029% תשואה כוללת בחמש שנים, ושנה טובה של 476%+. שלושה פגמים שתוקנו מאז מסבירים אותם — היקום מכיל רק חברות ששרדו עד היום, מחירים נגררו קדימה על פני חורים של עד 4,021 ימים, ונתוני היסוד הוגשו באיחור חציוני של שבע שנות כספים. גם החלונות שונים בין הסוכנים (אחד נמדד מול S&P של 25.47%, אחר מול 14.49%), אז הדירוג הוא בחלקו דירוג של חלונות. הרץ את הבקטסטים מחדש כדי לקבל מספרים ברי-השוואה.",
 
   // ---- Heatmap ----
   heatmap_title: "מפת חום של תשואות שנתיות",
