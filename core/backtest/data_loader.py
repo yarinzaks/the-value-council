@@ -77,6 +77,25 @@ REFRESH_WINDOW_DAYS = 7
 #: or a table of dates to maintain.
 MAX_CARRY_FORWARD_DAYS = 5
 
+#: How long a "yfinance has nothing for this symbol" answer is trusted.
+#:
+#: 979 of the full-market universe's 6,601 tickers (14.8%) have no price
+#: series at all — mostly SPAC units, warrants and rights (AACBU, AACIW,
+#: ACHR-WT) that Yahoo does not serve under those symbols. Nothing
+#: recorded that fact, so every screen re-asked about every one of them:
+#: at ~0.7s per doomed request that is 11 minutes per rebalance, and
+#: across six rebalances and ten agents roughly eleven hours of a
+#: validation campaign spent waiting on companies that do not trade.
+#:
+#: The entry is only written when :meth:`PriceDataLoader._fetch_yfinance`
+#: returns an empty frame *without raising* — network failures and rate
+#: limits come back as :class:`PriceDataError`, so a transient outage
+#: cannot be mistaken for an absent symbol. The expiry is the second
+#: guard: a symbol wrongly recorded, or one that genuinely starts
+#: trading later, is retried within the week instead of being skipped
+#: forever.
+NO_DATA_TTL_DAYS = 7
+
 
 class PriceDataError(ValueCouncilError):
     """Raised when price data cannot be retrieved."""
@@ -126,6 +145,16 @@ CREATE TABLE IF NOT EXISTS dividends (
     PRIMARY KEY (ticker, ex_date)
 );
 CREATE INDEX IF NOT EXISTS idx_dividends_ticker ON dividends(ticker);
+
+-- Symbols yfinance has no series for, so a screen stops re-asking.
+-- ``through`` is the end of the window that came back empty: a hit only
+-- counts when the request does not reach past it, so recording that a
+-- symbol had nothing up to 2024 never suppresses a 2026 lookup.
+CREATE TABLE IF NOT EXISTS no_price_data (
+    ticker      TEXT PRIMARY KEY,
+    through     TEXT NOT NULL,   -- ISO YYYY-MM-DD, end of the empty window
+    checked_at  TEXT NOT NULL    -- ISO YYYY-MM-DD, for the TTL
+);
 """
 
 
@@ -166,6 +195,47 @@ class PriceDataLoader:
         if not row or row[0] is None:
             return None
         return date.fromisoformat(row[0]), date.fromisoformat(row[1])
+
+    def known_absent(self, ticker: str, end: date, *, today: date) -> bool:
+        """Has yfinance already said it has no series for ``ticker``?
+
+        Only answers True for a request that does not reach past the
+        window that came back empty, and only while the record is inside
+        :data:`NO_DATA_TTL_DAYS`. Both bounds matter: the first keeps a
+        2024 miss from suppressing a 2026 lookup, the second lets a
+        symbol that starts trading — or one recorded during a bad hour
+        at the vendor — come back on its own.
+        """
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT through, checked_at FROM no_price_data WHERE ticker = ?",
+                (ticker.upper(),),
+            ).fetchone()
+        if row is None:
+            return False
+        through, checked_at = date.fromisoformat(row[0]), date.fromisoformat(row[1])
+        if (today - checked_at).days > NO_DATA_TTL_DAYS:
+            return False
+        return end <= through
+
+    def _record_absent(self, ticker: str, end: date, *, today: date) -> None:
+        """Remember that ``ticker`` has no series through ``end``.
+
+        Callers must only reach this after an empty fetch for a ticker
+        with no cached bars at all — a symbol that has ever returned a
+        price is never suppressed, whatever a later window does.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO no_price_data (ticker, through, checked_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(ticker) DO UPDATE SET
+                    through = MAX(excluded.through, no_price_data.through),
+                    checked_at = excluded.checked_at
+                """,
+                (ticker.upper(), end.isoformat(), today.isoformat()),
+            )
 
     def _read_cached(
         self, ticker: str, start: date, end: date
@@ -298,17 +368,24 @@ class PriceDataLoader:
         if start_d > end_d:
             raise ValueError(f"start ({start_d}) must be <= end ({end_d})")
 
+        cached_range = self.cached_range(ticker)
+        today = date.today()
         if not force_refresh:
-            cached = self._read_cached(ticker, start_d, end_d)
-            cached_range = self.cached_range(ticker)
             if cached_range is not None:
                 cmin, cmax = cached_range
                 # If the requested range is fully covered, return cache.
                 if cmin <= start_d and cmax >= end_d:
+                    cached = self._read_cached(ticker, start_d, end_d)
                     logger.debug(
                         f"cache hit for {ticker} {start_d}..{end_d} ({len(cached)} rows)"
                     )
                     return cached
+            elif self.known_absent(ticker, end_d, today=today):
+                logger.debug(
+                    f"{ticker}: recorded as having no series through {end_d} — "
+                    f"not re-asking yfinance"
+                )
+                return self._read_cached(ticker, start_d, end_d)
 
         # Fetch from yfinance — we always fetch the full requested range
         # (yfinance is fast enough and merging partial fetches is fragile).
@@ -318,6 +395,11 @@ class PriceDataLoader:
             n = self._write_cache(ticker, df)
             d = self._write_dividends(ticker, df)
             logger.debug(f"cached {n} rows for {ticker} ({d} dividends)")
+        elif cached_range is None:
+            # Empty *without* an exception — _fetch_yfinance turns network
+            # and rate-limit failures into PriceDataError, so this is the
+            # vendor saying the symbol has no series, not a bad moment.
+            self._record_absent(ticker, end_d, today=today)
         return self._read_cached(ticker, start_d, end_d)
 
     def get_adj_close(
