@@ -2,7 +2,7 @@
 
 Universe: every SEC active filer with operating XBRL footprint, market
 cap ≥ $5B (Buffett's modern size floor). Decisions logged per
-rebalance to ``data/decisions/warren_buffett/<YYYY-MM-DD>.json``.
+rebalance to ``data/backtest_decisions/warren_buffett/<YYYY-MM-DD>.json``.
 
 Usage::
 
@@ -35,8 +35,6 @@ replicate in a 5-year paper backtest.
 
 from __future__ import annotations
 
-from datetime import date
-
 import pandas as pd
 
 from agents.buffett.wonderful_business import WarrenBuffett
@@ -50,6 +48,10 @@ from core.backtest.strategy_runner import (
     RunnerConfig,
 )
 from core.backtest.transaction_costs import PercentageCost
+from core.backtest.validation_window import (
+    VALIDATION_END,
+    VALIDATION_START,
+)
 from core.data.edgar_cache import EdgarCache
 from core.data.fundamentals_fetcher import (
     CachedEdgarAdapter,
@@ -57,6 +59,7 @@ from core.data.fundamentals_fetcher import (
     FundamentalsFetcherConfig,
 )
 from core.logger import get_logger
+from core.paths import backtest_decisions_dir
 
 logger = get_logger("agents.buffett.run_full_market_validation")
 
@@ -90,11 +93,11 @@ def main() -> None:
         f"{universe_stats['with_operating_concepts']} with operating data"
     )
 
-    decision_logger = DecisionLogger()
+    decision_logger = DecisionLogger(root=backtest_decisions_dir())
 
     cfg = RunnerConfig(
-        start_date=date(2019, 12, 30),  # 2020-2024 sanity run
-        end_date=date(2024, 12, 31),
+        start_date=VALIDATION_START,
+        end_date=VALIDATION_END,
         initial_cash=10_000.0,
         rebalance_freq="annual",
         benchmark_ticker="SPY",
@@ -126,7 +129,7 @@ def main() -> None:
     print((report_dir / "summary.txt").read_text())
     print("\nAnnual breakdown:")
     print(pd.read_csv(report_dir / "annual_returns.csv").to_string(index=False))
-    print("\nDecisions logged: data/decisions/warren_buffett/")
+    print("\nDecisions logged: data/backtest_decisions/warren_buffett/")
     print(f"Report: {report_dir}")
 
 

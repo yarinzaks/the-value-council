@@ -84,7 +84,24 @@ def portfolios_dir() -> Path:
 
 
 def decisions_dir() -> Path:
+    """Decisions the live runner made — the dashboard's journal."""
     return DATA_ROOT / "decisions"
+
+
+def backtest_decisions_dir() -> Path:
+    """Decisions a *backtest* made, kept out of the live journal.
+
+    Both logs share the :class:`~core.backtest.decision_logger.Decision`
+    schema and are named by decision date, so writing them to one
+    directory put a 2020 rebalance's BUY next to a 2026 live BUY with
+    nothing but the date to tell them apart. The dashboard concatenates
+    every file in an agent's directory, so a five-year backtest silently
+    added its own history to the journal of what the agent actually did.
+
+    Separate roots make the distinction structural rather than something
+    each reader has to infer from a year.
+    """
+    return DATA_ROOT / "backtest_decisions"
 
 
 def backtest_results_dir() -> Path:
@@ -116,6 +133,7 @@ def ensure_dirs() -> None:
         fundamentals_cache_dir(),
         portfolios_dir(),
         decisions_dir(),
+        backtest_decisions_dir(),
         backtest_results_dir(),
         cron_logs_dir(),
     ):
@@ -125,6 +143,7 @@ def ensure_dirs() -> None:
 __all__ = [
     "DATA_ROOT",
     "PROJECT_ROOT",
+    "backtest_decisions_dir",
     "backtest_results_dir",
     "cache_dir",
     "cron_logs_dir",
