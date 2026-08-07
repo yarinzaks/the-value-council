@@ -393,6 +393,7 @@ class DailyRunner:
                 stamp = now_iso()
                 portfolio.last_updated = stamp
                 portfolio.last_close_run = stamp
+                portfolio.last_close_date = as_of.isoformat()
                 portfolio.save(directory=self.portfolio_dir)
                 # Snapshot — no trades, just refreshed valuation.
                 try:
@@ -496,7 +497,14 @@ class DailyRunner:
         # every rotation and writes a second set of decision records for
         # the same day. last_open_run has been written since the runner
         # was built and never read until now.
-        if not force and portfolio.last_open_run[:10] == as_of.isoformat():
+        # Compare logical date to logical date. This used to read
+        # ``last_open_run[:10]``, a wall-clock stamp, against ``as_of``.
+        # The two agree only when a run happens on the same calendar day
+        # it covers — so a run that crosses UTC midnight stamped
+        # tomorrow, and the next day's run skipped itself as a duplicate
+        # and lost a trading day silently. The 2026-08-07 00:51Z make-up
+        # run is exactly that shape.
+        if not force and portfolio.last_open_date == as_of.isoformat():
             logger.info(
                 f"{as_of}: {adapter.name} already completed this date — "
                 f"skipping (pass force=True to re-run)"
@@ -639,6 +647,7 @@ class DailyRunner:
         stamp = now_iso()
         portfolio.last_updated = stamp
         portfolio.last_open_run = stamp
+        portfolio.last_open_date = as_of.isoformat()
         portfolio.save(directory=self.portfolio_dir)
 
         # Persist a daily snapshot for History tab + Today's-activity.

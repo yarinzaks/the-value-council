@@ -102,6 +102,16 @@ class LivePortfolio:
     last_updated: str = ""
     last_open_run: str = ""
     last_close_run: str = ""
+    #: The ``as_of`` each run covered, as an ISO date. Deliberately
+    #: separate from the timestamps above, which are wall-clock: the
+    #: idempotency guard compares logical dates, and a run that crosses
+    #: UTC midnight stamps tomorrow while covering today. Comparing the
+    #: two directly made the guard skip a genuine trading day. Empty on
+    #: a portfolio written before this field existed, which never equals
+    #: an as_of — so the first run after the upgrade proceeds, which is
+    #: the safe direction.
+    last_open_date: str = ""
+    last_close_date: str = ""
     initial_cash: float = DEFAULT_INITIAL_CASH
     cumulative_costs: float = 0.0
     #: Cash dividends received to date. NAV already contains this money
@@ -364,6 +374,8 @@ class LivePortfolio:
             "last_updated": self.last_updated,
             "last_open_run": self.last_open_run,
             "last_close_run": self.last_close_run,
+            "last_open_date": self.last_open_date,
+            "last_close_date": self.last_close_date,
         }
 
     @classmethod
@@ -409,6 +421,8 @@ class LivePortfolio:
             last_updated=str(data.get("last_updated", "")),
             last_open_run=str(data.get("last_open_run", "")),
             last_close_run=str(data.get("last_close_run", "")),
+            last_open_date=str(data.get("last_open_date", "")),
+            last_close_date=str(data.get("last_close_date", "")),
             initial_cash=float(data.get("initial_cash", DEFAULT_INITIAL_CASH)),
             cumulative_costs=float(data.get("cumulative_costs", 0.0)),
             cumulative_dividends=float(data.get("cumulative_dividends", 0.0)),

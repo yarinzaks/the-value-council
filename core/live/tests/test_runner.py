@@ -796,3 +796,89 @@ class TestHeldPositionsAreVisible:
         )
 
         assert pos.days_held_at(AS_OF) == 0
+
+
+class TestTheGuardComparesLogicalDates:
+    """The idempotency guard read a wall-clock stamp as a logical date.
+
+    ``last_open_run`` is ``now_iso()`` — when the run happened. ``as_of``
+    is which trading day it covers. The guard compared
+    ``last_open_run[:10]`` to ``as_of``, which agree only when a run
+    executes on the same calendar day it represents.
+
+    That is not guaranteed. A run dispatched near the UTC day boundary,
+    or a watchdog make-up for a missed session, stamps one date while
+    covering another. The 2026-08-07 00:51Z make-up run is exactly that
+    shape. Two failures follow: a genuine repeat is not recognised, and
+    worse, the *next* day's run sees its own date already stamped and
+    skips itself — a trading day lost with only a log line.
+
+    It also made the test suite date-dependent. These tests passed when
+    written on 2026-08-05 and CI failed on 2026-08-07 with the same
+    code.
+    """
+
+    @staticmethod
+    def _scan(runner: DailyRunner, as_of: date) -> object:
+        adapter = _StubAdapter("stub_agent", [_target("KEEP", weight=0.5)])
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            as_of,
+            ["KEEP"],
+            {"KEEP": 20.0},
+            {"KEEP": None},
+        )
+
+    def test_a_repeat_is_skipped_whatever_today_is(
+        self, runner: DailyRunner
+    ) -> None:
+        # A date deliberately far from any plausible "today", so the
+        # wall-clock stamp cannot accidentally match it.
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+        past = date(2019, 3, 14)
+
+        first = self._scan(runner, past)
+        second = self._scan(runner, past)
+
+        assert first.trades  # type: ignore[attr-defined]
+        assert second.skipped is True  # type: ignore[attr-defined]
+
+    def test_a_new_date_is_not_skipped_after_a_midnight_crossing(
+        self, runner: DailyRunner
+    ) -> None:
+        # The damaging half. Under the old guard the first run stamped
+        # today's wall clock, so a run for *today* was refused as a
+        # duplicate of a run that actually covered yesterday.
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+
+        self._scan(runner, date(2019, 3, 14))
+        next_day = self._scan(runner, date(2019, 3, 15))
+
+        assert next_day.skipped is False  # type: ignore[attr-defined]
+
+    def test_the_wall_clock_stamp_is_still_wall_clock(
+        self, runner: DailyRunner
+    ) -> None:
+        # verify_run_state reads last_open_run to answer "did a run
+        # happen recently", which is a freshness question and wants the
+        # real time. Only the guard changed.
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+        past = date(2019, 3, 14)
+
+        result = self._scan(runner, past)
+
+        p = result.portfolio  # type: ignore[attr-defined]
+        assert p.last_open_date == "2019-03-14"
+        assert not p.last_open_run.startswith("2019-03-14")
+
+    def test_a_portfolio_from_before_the_field_existed_runs(
+        self, runner: DailyRunner
+    ) -> None:
+        # Existing JSON on disk has no last_open_date. Empty never
+        # equals an as_of, so the first run after the upgrade proceeds
+        # rather than silently skipping.
+        runner.price_loader = _StubPriceLoader({"KEEP": 20.0})  # type: ignore[assignment]
+
+        result = self._scan(runner, date(2019, 3, 14))
+
+        assert result.skipped is False  # type: ignore[attr-defined]
