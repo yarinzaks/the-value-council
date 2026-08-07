@@ -36,11 +36,24 @@ export default async function HistoryPage() {
   const dateSet = new Set<string>();
   for (const h of histories) for (const s of h.snapshots) dateSet.add(s.date);
   const dates = Array.from(dateSet).sort();
+  // Percent change across the window, not absolute NAV.
+  //
+  // Plotted in dollars the chart is unreadable: Graham is at $12.8k
+  // while the other nine sit between $10.2k and $11.3k, so the axis
+  // spans $3.4k to fit one line and the 1-2% moves everybody came to
+  // compare collapse into a single band at the bottom.
+  //
+  // Rebasing each agent to 0% on its first day in the window puts them
+  // on one scale and makes the question the chart actually answers —
+  // who moved, and how much, over these seven days — the thing you can
+  // see. Absolute NAV is already in the per-agent tables below, and on
+  // the overview.
   const chartData = dates.map((d) => {
     const row: Record<string, number | string> = { date: d };
     for (const h of histories) {
       const s = h.snapshots.find((s) => s.date === d);
-      if (s) row[h.meta.display] = s.nav;
+      const base = h.snapshots[0]?.nav;
+      if (s && base) row[h.meta.display] = ((s.nav / base - 1) * 100);
     }
     return row;
   });

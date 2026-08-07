@@ -216,7 +216,7 @@ const en: Dict = {
   company_name: "Company",
 
   // ---- History tab ----
-  nav_chart_title: "NAV — last 7 days",
+  nav_chart_title: "Performance — last 7 days",
   daily_trades_title: "Daily trades",
   nav_change_table: "Day-by-day NAV change",
   col_date: "Date",
@@ -225,7 +225,7 @@ const en: Dict = {
   col_sells: "Sells",
   col_trades_count: "Trades",
   no_history: "No snapshots yet.",
-  history_subtitle: "Daily snapshots, what each agent bought / sold, and NAV change",
+  history_subtitle: "Percent change over the window, so all ten sit on one scale. Dollar NAV is in the tables below.",
 
   // ---- Backtest tab ----
   backtest_tab_title: "Backtests",
@@ -475,7 +475,7 @@ const he: Dict = {
   company_name: "חברה",
 
   // ---- History tab ----
-  nav_chart_title: "שווי — 7 הימים האחרונים",
+  nav_chart_title: "ביצועים — 7 הימים האחרונים",
   daily_trades_title: "עסקאות יומיות",
   nav_change_table: "שינוי שווי יום-יום",
   col_date: "תאריך",
@@ -484,7 +484,7 @@ const he: Dict = {
   col_sells: "מכירות",
   col_trades_count: "עסקאות",
   no_history: "אין צילומי-מצב עדיין.",
-  history_subtitle: "צילומי-מצב יומיים, מה כל סוכן קנה / מכר, ושינוי השווי",
+  history_subtitle: "שינוי באחוזים על פני החלון, כך שכל העשרה על אותו סולם. השווי בדולרים בטבלאות למטה.",
 
   // ---- Backtest tab ----
   backtest_tab_title: "בקטסטים",
