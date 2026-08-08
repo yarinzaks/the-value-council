@@ -41,6 +41,7 @@ from core.backtest.strategy_runner import (
 from core.backtest.transaction_costs import PercentageCost
 from core.backtest.validation_window import (
     VALIDATION_END,
+    VALIDATION_REBALANCE,
     VALIDATION_START,
 )
 from core.data.edgar_cache import EdgarCache
@@ -90,7 +91,7 @@ def main() -> None:
         start_date=VALIDATION_START,
         end_date=VALIDATION_END,
         initial_cash=10_000.0,
-        rebalance_freq="annual",
+        rebalance_freq=VALIDATION_REBALANCE,
         benchmark_ticker="SPY",
         cost_model=PercentageCost(0.001),
         use_universe=True,

@@ -46,4 +46,26 @@ VALIDATION_START: date = date(2019, 12, 30)
 #: Last trading day of 2024.
 VALIDATION_END: date = date(2024, 12, 31)
 
-__all__ = ["VALIDATION_END", "VALIDATION_START"]
+#: How often the leaderboard runs ask their strategies to decide.
+#:
+#: Quarterly, not annual. Annual is too coarse for half the council:
+#: Marks's doctrine is a cycle pendulum and Dreman's is a reaction to
+#: earnings surprises, and neither can express itself on a book it is
+#: only allowed to touch once a year. Graham's net-nets and Buffett's
+#: forever-holds are unaffected, because each agent's own exit rules —
+#: Greenblatt's twelve-month hold, Schloss's fifty-percent rule — decide
+#: whether anything actually moves. Being *asked* four times a year does
+#: not force churn; it just stops a doctrine from being mute for eleven
+#: months at a time.
+#:
+#: What this does NOT buy is statistical confidence. The t-statistic on
+#: an agent's alpha comes from the length of the window and the
+#: consistency of the excess return, both measured on the daily series;
+#: rebalancing more often changes the strategy, not the sample. On the
+#: annual runs no agent's alpha was distinguishable from zero — the best
+#: was Marks at t = 1.04 against the ~2 needed — and that will still be
+#: true here. Only a longer window moves it, and a longer window makes
+#: the surviving-companies bias worse, so it is not free either.
+VALIDATION_REBALANCE = "quarterly"
+
+__all__ = ["VALIDATION_END", "VALIDATION_REBALANCE", "VALIDATION_START"]
