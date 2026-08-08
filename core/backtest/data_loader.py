@@ -82,10 +82,15 @@ MAX_CARRY_FORWARD_DAYS = 5
 #: 979 of the full-market universe's 6,601 tickers (14.8%) have no price
 #: series at all — mostly SPAC units, warrants and rights (AACBU, AACIW,
 #: ACHR-WT) that Yahoo does not serve under those symbols. Nothing
-#: recorded that fact, so every screen re-asked about every one of them:
-#: at ~0.7s per doomed request that is 11 minutes per rebalance, and
-#: across six rebalances and ten agents roughly eleven hours of a
-#: validation campaign spent waiting on companies that do not trade.
+#: recorded that fact, so every screen re-asked about every one of them,
+#: at roughly 0.7s per doomed request.
+#:
+#: The saving is real but far smaller than that 979 suggests, and the
+#: 2026-08-07 campaign measured it: only 13 symbols were ever recorded
+#: across all ten agents. Doctrine screens on fundamentals before it
+#: asks for a price, so the great majority of dead symbols are filtered
+#: out before anyone requests a quote. Call it minutes over a campaign,
+#: not hours — worth having, not worth claiming more for.
 #:
 #: The entry is only written when :meth:`PriceDataLoader._fetch_yfinance`
 #: returns an empty frame *without raising* — network failures and rate
