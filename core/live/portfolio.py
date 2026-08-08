@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import tempfile
 from collections.abc import Iterable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -251,6 +251,97 @@ class LivePortfolio:
             cost_paid=cost,
             realized_pnl_usd=(price - pos.entry_price) * sold,
         )
+
+    def consolidate(self, ticker: str) -> bool:
+        """Fold every line in ``ticker`` into one. Returns True if any did.
+
+        The book is supposed to hold one line per ticker — ``buy`` goes
+        through ``_index_of`` and adds to the existing position rather
+        than appending. A second line is therefore a repair case, not a
+        normal state, and it is a quiet one: ``_index_of`` returns the
+        first match, so the rest are invisible to buys, sells and
+        dividend settlement while still counting toward NAV.
+
+        The survivor takes the share-weighted average cost and the
+        earliest entry date, because the position began when the first
+        shares were bought.
+        """
+        key = ticker.upper()
+        idx = [i for i, p in enumerate(self.positions) if p.ticker.upper() == key]
+        if len(idx) < 2:
+            return False
+
+        lines = [self.positions[i] for i in idx]
+        total = sum(p.shares for p in lines)
+        merged = replace(
+            lines[0],
+            ticker=key,
+            shares=round(total, SHARE_PRECISION),
+            entry_price=(
+                sum(p.shares * p.entry_price for p in lines) / total
+                if total > 0
+                else lines[0].entry_price
+            ),
+            # Two lines in one ticker should carry the same mark, and any
+            # difference is a data inconsistency rather than a fact about
+            # the market. Weighting preserves total market value either
+            # way, so consolidating can never move NAV — which a repair
+            # has no business doing.
+            current_price=(
+                sum(p.shares * p.current_price for p in lines) / total
+                if total > 0
+                else lines[0].current_price
+            ),
+            entry_date=min(p.entry_date for p in lines),
+        )
+        self.positions = [
+            merged if i == idx[0] else p
+            for i, p in enumerate(self.positions)
+            if i == idx[0] or i not in idx[1:]
+        ]
+        return True
+
+    def rename_ticker(self, old: str, new: str) -> bool:
+        """Relabel a holding after its issuer changed symbol.
+
+        Returns True when anything moved. Not a trade: shares and cost
+        basis carry over, because a rename changes the label and nothing
+        else.
+
+        Folds into an existing ``new`` line when one is present, which
+        is not a corner case — an agent can hold the same issuer under
+        both labels while the SEC's map is mid-transition, and Klarman
+        held ASGN and EFOR at once. Renaming without merging leaves two
+        positions in one company, breaking the one-line-per-ticker
+        invariant every other method here assumes; ``_index_of`` returns
+        the first, so the second becomes invisible to buys, sells and
+        dividends while still counting toward NAV.
+
+        The merged line takes the share-weighted average cost and the
+        earlier entry date — the position began when the first shares
+        were bought, whatever they were called then.
+        """
+        old_u, new_u = old.upper(), new.upper()
+        if self._index_of(old_u) is None:
+            return False
+
+        self.positions = [
+            replace(p, ticker=new_u) if p.ticker.upper() == old_u else p
+            for p in self.positions
+        ]
+        self.consolidate(new_u)
+
+        for i, w in enumerate(self.watchlist):
+            if w.ticker.upper() == old_u:
+                self.watchlist[i] = replace(w, ticker=new_u)
+
+        # Dividends already paid follow the shares, not the label.
+        if old_u in self.paid_dividends:
+            merged = set(self.paid_dividends.pop(old_u))
+            merged.update(self.paid_dividends.get(new_u, []))
+            self.paid_dividends[new_u] = sorted(merged)
+
+        return True
 
     def credit_dividend(
         self, ticker: str, *, amount_per_share: float, ex_date: str
