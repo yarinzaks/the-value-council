@@ -133,7 +133,14 @@ export default async function BacktestPage() {
 
       {/* Heatmap ----------------------------------------------------- */}
       <Card className="mb-6">
-        <h2 className="text-lg font-semibold mb-4">{t("heatmap_title")}</h2>
+        {/* The cells are alpha, not return — Graham's 2024 cell reads
+            -29.1 while his actual 2024 return was -4.22%. heatmap_title
+            alone says "Annual Returns", so the subtitle that names alpha
+            is not decoration here. */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">{t("heatmap_title")}</h2>
+          <span className="text-xs text-muted">{t("heatmap_subtitle")}</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

@@ -2,7 +2,7 @@
 
 Universe: every SEC active filer with operating XBRL footprint, market
 cap ≥ $1B (Fisher mid- to large-cap tilt). Decisions logged per
-rebalance to ``data/decisions/philip_fisher/<YYYY-MM-DD>.json``.
+rebalance to ``data/backtest_decisions/philip_fisher/<YYYY-MM-DD>.json``.
 
 Usage::
 
@@ -29,8 +29,6 @@ a 5-year paper backtest cannot fully reproduce.
 
 from __future__ import annotations
 
-from datetime import date
-
 import pandas as pd
 
 from agents.fisher.quality_growth import PhilipFisher
@@ -44,6 +42,10 @@ from core.backtest.strategy_runner import (
     RunnerConfig,
 )
 from core.backtest.transaction_costs import PercentageCost
+from core.backtest.validation_window import (
+    VALIDATION_END,
+    VALIDATION_START,
+)
 from core.data.edgar_cache import EdgarCache
 from core.data.fundamentals_fetcher import (
     CachedEdgarAdapter,
@@ -51,6 +53,7 @@ from core.data.fundamentals_fetcher import (
     FundamentalsFetcherConfig,
 )
 from core.logger import get_logger
+from core.paths import backtest_decisions_dir
 
 logger = get_logger("agents.fisher.run_full_market_validation")
 
@@ -84,11 +87,11 @@ def main() -> None:
         f"{universe_stats['with_operating_concepts']} with operating data"
     )
 
-    decision_logger = DecisionLogger()
+    decision_logger = DecisionLogger(root=backtest_decisions_dir())
 
     cfg = RunnerConfig(
-        start_date=date(2019, 12, 30),
-        end_date=date(2024, 12, 31),
+        start_date=VALIDATION_START,
+        end_date=VALIDATION_END,
         initial_cash=10_000.0,
         rebalance_freq="annual",
         benchmark_ticker="SPY",
@@ -127,7 +130,7 @@ def main() -> None:
             f"(A={sel['tier_a_count']:>2d}, B={sel['tier_b_count']:>2d}) "
             f"deploy={sel['deployed_fraction']:.0%}"
         )
-    print("\nDecisions logged: data/decisions/philip_fisher/")
+    print("\nDecisions logged: data/backtest_decisions/philip_fisher/")
     print(f"Report: {report_dir}")
 
 

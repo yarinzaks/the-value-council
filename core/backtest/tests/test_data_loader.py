@@ -15,6 +15,7 @@ import pytest
 
 from core.backtest.data_loader import (
     MAX_CARRY_FORWARD_DAYS,
+    NO_DATA_TTL_DAYS,
     REFRESH_WINDOW_DAYS,
     PriceDataLoader,
     _to_date,
@@ -477,4 +478,174 @@ class TestCarryForwardIsBounded:
         assert (
             loader.get_price_on("AAPL", date(2026, 7, 31), force_refresh=True)
             is None
+        )
+
+
+class TestNoDataCache:
+    """Stop re-asking Yahoo about symbols it does not carry.
+
+    979 of the full-market universe's 6,601 tickers have no series at
+    all — SPAC units, warrants, rights. Every screen asked about every
+    one of them, every rebalance, in every agent's run.
+    """
+
+    @staticmethod
+    def _loader(tmp_path: Path) -> PriceDataLoader:
+        return PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+
+    def test_an_unrecorded_ticker_is_not_absent(self, tmp_path: Path) -> None:
+        loader = self._loader(tmp_path)
+
+        assert not loader.known_absent(
+            "AACBU", date(2024, 12, 31), today=date(2026, 8, 7)
+        )
+
+    def test_a_recorded_ticker_is_absent(self, tmp_path: Path) -> None:
+        loader = self._loader(tmp_path)
+        loader._record_absent("AACBU", date(2024, 12, 31), today=date(2026, 8, 7))
+
+        assert loader.known_absent(
+            "AACBU", date(2024, 12, 31), today=date(2026, 8, 7)
+        )
+
+    def test_it_is_case_insensitive(self, tmp_path: Path) -> None:
+        loader = self._loader(tmp_path)
+        loader._record_absent("aacbu", date(2024, 12, 31), today=date(2026, 8, 7))
+
+        assert loader.known_absent(
+            "AACBU", date(2024, 12, 31), today=date(2026, 8, 7)
+        )
+
+    def test_a_later_window_is_not_suppressed(self, tmp_path: Path) -> None:
+        # Nothing through 2024 says nothing about 2026: a company can
+        # list after the window that came back empty.
+        loader = self._loader(tmp_path)
+        loader._record_absent("NEWCO", date(2024, 12, 31), today=date(2026, 8, 7))
+
+        assert not loader.known_absent(
+            "NEWCO", date(2026, 8, 6), today=date(2026, 8, 7)
+        )
+
+    def test_an_earlier_window_is_suppressed(self, tmp_path: Path) -> None:
+        loader = self._loader(tmp_path)
+        loader._record_absent("AACBU", date(2024, 12, 31), today=date(2026, 8, 7))
+
+        assert loader.known_absent(
+            "AACBU", date(2020, 12, 31), today=date(2026, 8, 7)
+        )
+
+    def test_the_record_expires(self, tmp_path: Path) -> None:
+        # The safety valve. A symbol recorded during a bad hour at the
+        # vendor must not be skipped forever.
+        loader = self._loader(tmp_path)
+        checked = date(2026, 8, 7)
+        loader._record_absent("AACBU", date(2024, 12, 31), today=checked)
+
+        stale = checked + timedelta(days=NO_DATA_TTL_DAYS + 1)
+        assert not loader.known_absent("AACBU", date(2024, 12, 31), today=stale)
+
+    def test_it_is_still_trusted_on_the_last_day(self, tmp_path: Path) -> None:
+        loader = self._loader(tmp_path)
+        checked = date(2026, 8, 7)
+        loader._record_absent("AACBU", date(2024, 12, 31), today=checked)
+
+        edge = checked + timedelta(days=NO_DATA_TTL_DAYS)
+        assert loader.known_absent("AACBU", date(2024, 12, 31), today=edge)
+
+    def test_re_recording_keeps_the_widest_window(self, tmp_path: Path) -> None:
+        # Two agents screen the same dead symbol over different windows.
+        # The narrower one must not shrink what the wider one learned.
+        loader = self._loader(tmp_path)
+        loader._record_absent("AACBU", date(2024, 12, 31), today=date(2026, 8, 7))
+        loader._record_absent("AACBU", date(2020, 12, 31), today=date(2026, 8, 7))
+
+        assert loader.known_absent(
+            "AACBU", date(2024, 12, 31), today=date(2026, 8, 7)
+        )
+
+    def test_re_recording_refreshes_the_clock(self, tmp_path: Path) -> None:
+        loader = self._loader(tmp_path)
+        loader._record_absent("AACBU", date(2024, 12, 31), today=date(2026, 8, 1))
+        loader._record_absent("AACBU", date(2024, 12, 31), today=date(2026, 8, 7))
+
+        # Expired against the first check, live against the second.
+        assert loader.known_absent(
+            "AACBU", date(2024, 12, 31), today=date(2026, 8, 13)
+        )
+
+
+class TestGetHistorySkipsKnownDeadSymbols:
+    """The end-to-end effect: one network call, not one per screen."""
+
+    @staticmethod
+    def _stub_loader(tmp_path: Path) -> tuple[PriceDataLoader, list[str]]:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        calls: list[str] = []
+
+        def _empty(ticker: str, start: date, end: date) -> pd.DataFrame:
+            calls.append(ticker)
+            return pd.DataFrame()
+
+        loader._fetch_yfinance = _empty  # type: ignore[method-assign]
+        return loader, calls
+
+    def test_the_second_ask_does_not_reach_the_network(
+        self, tmp_path: Path
+    ) -> None:
+        loader, calls = self._stub_loader(tmp_path)
+
+        first = loader.get_history("AACBU", date(2019, 12, 30), date(2024, 12, 31))
+        second = loader.get_history("AACBU", date(2019, 12, 30), date(2024, 12, 31))
+
+        assert first.empty and second.empty
+        # Before the no-data table this was ["AACBU", "AACBU"] — and in a
+        # real campaign, sixty of them.
+        assert calls == ["AACBU"]
+
+    def test_force_refresh_still_reaches_the_network(self, tmp_path: Path) -> None:
+        # An explicit re-check must never be answered from a negative
+        # record; that is the manual override for a wrong one.
+        loader, calls = self._stub_loader(tmp_path)
+
+        loader.get_history("AACBU", date(2019, 12, 30), date(2024, 12, 31))
+        loader.get_history(
+            "AACBU", date(2019, 12, 30), date(2024, 12, 31), force_refresh=True
+        )
+
+        assert calls == ["AACBU", "AACBU"]
+
+    def test_a_ticker_with_bars_is_never_suppressed(self, tmp_path: Path) -> None:
+        # The invariant that makes this safe: a symbol that has ever
+        # returned a price keeps going to the network for windows the
+        # cache does not cover, whatever an empty fetch recorded.
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        idx = pd.DatetimeIndex(["2024-01-02", "2024-01-03"])
+        loader._write_cache(
+            "REAL",
+            pd.DataFrame(
+                {
+                    "Open": [10.0, 11.0],
+                    "High": [11.0, 12.0],
+                    "Low": [9.0, 10.0],
+                    "Close": [10.5, 11.5],
+                    "Adj Close": [10.5, 11.5],
+                    "Volume": [1000, 1000],
+                },
+                index=idx,
+            ),
+        )
+        calls: list[str] = []
+
+        def _empty(ticker: str, start: date, end: date) -> pd.DataFrame:
+            calls.append(ticker)
+            return pd.DataFrame()
+
+        loader._fetch_yfinance = _empty  # type: ignore[method-assign]
+
+        loader.get_history("REAL", date(2019, 12, 30), date(2024, 12, 31))
+        loader.get_history("REAL", date(2019, 12, 30), date(2024, 12, 31))
+
+        assert calls == ["REAL", "REAL"]
+        assert not loader.known_absent(
+            "REAL", date(2024, 12, 31), today=date(2026, 8, 7)
         )

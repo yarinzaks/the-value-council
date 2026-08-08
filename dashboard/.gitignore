@@ -1,5 +1,8 @@
 node_modules/
 .next/
+# Any NEXT_DIST_DIR a verification build was sent to, so it cannot stomp
+# a running dev server's .next. See next.config.mjs.
+.next-*/
 out/
 .env
 .env.local

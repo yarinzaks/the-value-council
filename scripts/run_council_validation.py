@@ -18,7 +18,6 @@ Usage::
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 
 import pandas as pd
 
@@ -38,6 +37,10 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.backtest.transaction_costs import PercentageCost
+from core.backtest.validation_window import (
+    VALIDATION_END,
+    VALIDATION_START,
+)
 from core.data.edgar_cache import EdgarCache
 from core.data.fundamentals_fetcher import (
     CachedEdgarAdapter,
@@ -84,8 +87,8 @@ def _build_runner() -> tuple[BacktestRunner, EdgarCache, RunnerConfig]:
     universe._ensure_loaded()
 
     cfg = RunnerConfig(
-        start_date=date(2019, 12, 30),
-        end_date=date(2024, 12, 31),
+        start_date=VALIDATION_START,
+        end_date=VALIDATION_END,
         initial_cash=10_000.0,
         rebalance_freq="annual",
         benchmark_ticker="SPY",
