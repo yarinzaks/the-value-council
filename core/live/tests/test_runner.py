@@ -592,6 +592,11 @@ class TestDividends:
         )
         p.cash = 1_000.0
         p.last_open_run = "2026-08-01T14:00:00+00:00"
+        # A book that has been running since before the ex-dates under
+        # test. Without an inception the first settlement stamps today
+        # and pays nothing earlier, which is the correct default for a
+        # book of unknown age but not what these tests are about.
+        p.inception_date = "2026-07-01"
         p.save(directory=runner.portfolio_dir)
 
     def _run(self, runner: DailyRunner, loader) -> object:  # type: ignore[no-untyped-def]
@@ -682,6 +687,136 @@ class TestDividends:
         snap = make_snapshot(result.portfolio, as_of=AS_OF, trades=[])
 
         assert snap.dividends_received_usd == pytest.approx(100.0)
+
+    def _rerun(self, runner: DailyRunner, loader) -> object:  # type: ignore[no-untyped-def]
+        """Another run of the same day, bypassing the idempotency guard."""
+        runner.price_loader = loader
+        return runner._run_one(
+            _StubAdapter("stub_agent", [_target("DIV", weight=0.9)]),  # type: ignore[arg-type]
+            AS_OF,
+            ["DIV"],
+            {"DIV": 50.0},
+            {"DIV": None},
+            force=True,
+        )
+
+    def test_a_run_stamped_today_still_collects(
+        self, runner: DailyRunner
+    ) -> None:
+        """The production condition, which nothing used to cover.
+
+        Settlement took its floor from ``last_open_run``, and the
+        previous run had already advanced that to the current date — so
+        the query asked for dividends over an empty interval, and 68
+        consecutive daily runs credited $0.00 while eleven ex-dates
+        passed on Neff's book. Every existing test set that stamp in the
+        past, a state production is never in.
+        """
+        self._held(runner)
+        p = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)
+        p.last_open_run = f"{AS_OF.isoformat()}T15:11:28+00:00"
+        p.save(directory=runner.portfolio_dir)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.cumulative_dividends == pytest.approx(100.0)
+
+    def test_a_dividend_learned_late_is_still_collected(
+        self, runner: DailyRunner
+    ) -> None:
+        """Self-healing, which a one-day window cannot do.
+
+        yfinance publishes an ex-date row when it publishes it. Under a
+        window bounded by the previous run, a row arriving even a day
+        late fell behind the mark and was lost for good.
+        """
+        self._held(runner)
+        # The cache does not know about the ex-date yet.
+        first = self._run(runner, _StubPriceLoaderWithDividends({"DIV": 50.0}, {}))
+        assert first.portfolio.cumulative_dividends == 0.0
+
+        # It shows up later, dated three days back.
+        late = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+        second = self._rerun(runner, late)
+
+        assert second.portfolio.cumulative_dividends == pytest.approx(100.0)
+
+    def test_the_paid_record_is_what_prevents_the_double_pay(
+        self, runner: DailyRunner
+    ) -> None:
+        self._held(runner)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.paid_dividends == {"DIV": ["2026-08-04"]}
+
+    def test_closing_a_line_forgets_its_dividend_history(
+        self, runner: DailyRunner
+    ) -> None:
+        # Otherwise the map grows with the book's whole history rather
+        # than its size. Safe because a re-entry carries a later
+        # entry_date, which excludes the old ex-dates on its own.
+        self._held(runner)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0, "OTHER": 10.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+        runner.price_loader = loader
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", [_target("OTHER", weight=0.9)]),  # type: ignore[arg-type]
+            AS_OF,
+            ["DIV", "OTHER"],
+            {"DIV": 50.0, "OTHER": 10.0},
+            {"DIV": None, "OTHER": None},
+        )
+
+        assert result.portfolio.cumulative_dividends == pytest.approx(100.0)
+        assert "DIV" not in result.portfolio.paid_dividends
+
+    def test_inception_is_stamped_once_and_never_moves(
+        self, runner: DailyRunner
+    ) -> None:
+        self._held(runner)
+
+        result = self._run(runner, _StubPriceLoaderWithDividends({"DIV": 50.0}, {}))
+
+        assert result.portfolio.inception_date == "2026-07-01"
+
+    def test_a_book_of_unknown_age_stamps_today_and_pays_nothing_earlier(
+        self, runner: DailyRunner
+    ) -> None:
+        # The safe direction on an upgrade: a missing dividend understates
+        # a return, an invented one overstates it.
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DIV",
+                shares=100.0,
+                entry_price=50.0,
+                entry_date="2026-07-01",
+                current_price=50.0,
+                why_en="",
+                why_he="",
+            )
+        )
+        p.cash = 1_000.0  # no inception_date
+        p.save(directory=runner.portfolio_dir)
+        loader = _StubPriceLoaderWithDividends(
+            {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.cumulative_dividends == 0.0
+        assert result.portfolio.inception_date == AS_OF.isoformat()
 
     def test_a_freshly_seeded_book_does_not_harvest_history(
         self, runner: DailyRunner
