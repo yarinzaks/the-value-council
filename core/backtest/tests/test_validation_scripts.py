@@ -76,6 +76,14 @@ class TestNoScriptNamesItsOwnDates:
         assert "start_date=VALIDATION_START" in src
         assert "end_date=VALIDATION_END" in src
 
+    def test_it_uses_the_shared_rebalance_frequency(self, script: Path) -> None:
+        # Same failure mode as the window: a per-script literal makes two
+        # rows in one table mean different things. A doctrine asked once
+        # a year and one asked quarterly are not the same strategy.
+        src = script.read_text()
+        assert "rebalance_freq=VALIDATION_REBALANCE" in src
+        assert 'rebalance_freq="' not in src
+
     def test_it_constructs_no_date_literal(self, script: Path) -> None:
         # Catches the regression directly: Schloss ran from 2022-01-04
         # and Greenblatt from 2022-12-30, each behind a comment calling
