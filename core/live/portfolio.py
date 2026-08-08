@@ -119,9 +119,34 @@ class LivePortfolio:
     #: price appreciation, and so a total-return figure is auditable
     #: rather than inferred.
     cumulative_dividends: float = 0.0
-    #: Latest ex-date already settled. The watermark that stops a
-    #: dividend being paid twice when a date is re-run.
+    #: Latest ex-date already settled. Display only — the field that
+    #: actually prevents a double payment is :attr:`paid_dividends`.
     last_dividend_date: str = ""
+
+    #: The date this book started earning, as ISO. A portfolio cannot
+    #: collect income from before it existed, and ``entry_date`` alone
+    #: cannot say so: a seeded book carries synthetic entry dates that
+    #: may run years back, and settling from those would hand it a
+    #: decade of dividends it never owned. Stamped on the first
+    #: settlement and never moved.
+    inception_date: str = ""
+
+    #: Ex-dates already paid, per ticker: ``{"MRK": ["2026-06-15"]}``.
+    #:
+    #: A single high-water date cannot do this job. Settlement used to
+    #: run over a one-day window bounded by the previous run, so a
+    #: dividend whose row reached the local cache even a day late fell
+    #: behind the mark and was lost for good — 68 daily runs credited
+    #: $0.00 while eleven ex-dates passed on Neff's book alone.
+    #:
+    #: Recording the payments themselves lets settlement re-scan from
+    #: each position's entry date every run: anything the cache learned
+    #: late is picked up, and anything already paid is skipped. Entries
+    #: are dropped when a position closes, so the map stays the size of
+    #: the book rather than growing with its history; a name bought back
+    #: later carries a new entry date, which excludes the old ex-dates
+    #: on its own.
+    paid_dividends: dict[str, list[str]] = field(default_factory=dict)
 
     # ------------------------------------------------------------------
     # Derived metrics (computed against current_price on positions)
@@ -205,6 +230,11 @@ class LivePortfolio:
         remaining = round(pos.shares - sold, SHARE_PRECISION)
         if remaining <= 0:
             self.positions.pop(idx)
+            # Closing the line ends its dividend history too, so the map
+            # stays the size of the book. Buying the name back later
+            # carries a new entry date, and settlement never looks before
+            # that — so dropping these cannot resurrect an old payment.
+            self.paid_dividends.pop(ticker.upper(), None)
         else:
             pos.shares = remaining
 
@@ -227,9 +257,9 @@ class LivePortfolio:
     ) -> float:
         """Pay a cash dividend on the current holding of ``ticker``.
 
-        Returns the cash credited, 0.0 when the position is not held.
-        The caller is responsible for not replaying an ex-date — see
-        ``last_dividend_date``.
+        Idempotent: returns 0.0 for an ex-date already paid on this
+        ticker, so a caller may safely re-scan the whole holding period
+        every run. Also returns 0.0 when the position is not held.
         """
         if amount_per_share <= 0:
             raise LivePortfolioError(
@@ -238,9 +268,13 @@ class LivePortfolio:
         idx = self._index_of(ticker)
         if idx is None:
             return 0.0
+        key = ticker.upper()
+        if ex_date in self.paid_dividends.get(key, ()):
+            return 0.0
         cash = self.positions[idx].shares * amount_per_share
         self.cash += cash
         self.cumulative_dividends += cash
+        self.paid_dividends.setdefault(key, []).append(ex_date)
         if ex_date > self.last_dividend_date:
             self.last_dividend_date = ex_date
         return cash
@@ -369,6 +403,10 @@ class LivePortfolio:
             "cumulative_costs": round(self.cumulative_costs, 4),
             "cumulative_dividends": round(self.cumulative_dividends, 4),
             "last_dividend_date": self.last_dividend_date,
+            "inception_date": self.inception_date,
+            "paid_dividends": {
+                k: sorted(v) for k, v in sorted(self.paid_dividends.items())
+            },
             "positions": [_round_position(p) for p in self.positions],
             "watchlist": [asdict(w) for w in self.watchlist],
             "last_updated": self.last_updated,
@@ -427,6 +465,11 @@ class LivePortfolio:
             cumulative_costs=float(data.get("cumulative_costs", 0.0)),
             cumulative_dividends=float(data.get("cumulative_dividends", 0.0)),
             last_dividend_date=str(data.get("last_dividend_date", "")),
+            inception_date=str(data.get("inception_date", "")),
+            paid_dividends={
+                str(k).upper(): [str(d) for d in v]
+                for k, v in dict(data.get("paid_dividends", {})).items()
+            },
         )
 
     @classmethod

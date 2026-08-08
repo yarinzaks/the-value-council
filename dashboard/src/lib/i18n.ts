@@ -285,6 +285,14 @@ const en: Dict = {
   last_open_scan: "Last open scan",
   last_close_scan: "Last close",
   price_updated: "Price updated",
+  of_which_dividends: "of which dividends",
+  mark_undated: "Price date unavailable",
+  mark_undated_help:
+    "No price series has been published for this symbol yet, so the date of the bar behind this mark cannot be shown. It is not a claim that the price is out of date — only that its age cannot be checked here.",
+  mark_stale: "Last traded",
+  mark_stale_help:
+    "This price comes from the last bar the market produced for this symbol, not from today's run. The symbol may have been renamed, delisted or suspended — check before acting on the quote.",
+  days_ago: "{n} days ago",
   stale_warning:
     "⚠️ Data not refreshed in over 24 hours — check the daily runner.",
   next_us_update: "US",
@@ -571,6 +579,14 @@ const he: Dict = {
   last_open_scan: "סריקה אחרונה",
   last_close_scan: "סגירה",
   price_updated: "מחיר מעודכן",
+  of_which_dividends: "מזה דיבידנדים",
+  mark_undated: "תאריך המחיר לא זמין",
+  mark_undated_help:
+    "עדיין לא פורסמה סדרת מחירים לסימבול הזה, ולכן אי אפשר להציג את תאריך הנר שממנו נלקח הסימון. זו לא טענה שהמחיר לא מעודכן — רק שאי אפשר לבדוק כאן את גילו.",
+  mark_stale: "נסחר לאחרונה",
+  mark_stale_help:
+    "המחיר הזה מגיע מהנר האחרון שהשוק ייצר לסימבול הזה, לא מהריצה של היום. ייתכן שהסימבול שונה, נמחק מהמסחר או הושעה — בדוק לפני שאתה פועל לפי הציטוט.",
+  days_ago: "לפני {n} ימים",
   stale_warning:
     "⚠️ נתונים לא מעודכנים מעל 24 שעות — בדוק את הסריקה היומית.",
   next_us_update: "US",

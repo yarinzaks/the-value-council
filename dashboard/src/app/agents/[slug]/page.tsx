@@ -15,6 +15,7 @@ import { Term } from "@/components/Term";
 import {
   loadAgentLatest,
   loadCompanyNames,
+  loadMarkFreshness,
   loadJournal,
   loadLivePortfolio,
   loadSectors,
@@ -51,6 +52,13 @@ export default async function AgentDrillPage({
     loadSnapshots(slug),
     loadSectors(),
   ]);
+
+  // Depends on the book, so it cannot join the batch above. Reads the
+  // per-ticker series already published for the charts — no new export,
+  // no network.
+  const markFreshness = live
+    ? await loadMarkFreshness(live.positions.map((p) => p.ticker))
+    : {};
 
   // Weighted by market value, not by count: three 8% positions are a
   // bigger bet than five 1% ones, and a donut sized by name count would
@@ -133,6 +141,18 @@ export default async function AgentDrillPage({
               <div className="text-xs mt-1">
                 <PctCell value={live.cumulative_return_pct} />
               </div>
+              {/* Total return is price appreciation plus income, and the
+                  two are not the same claim: one is the market agreeing
+                  with the agent, the other is cash the company paid
+                  whatever the market did. Folding them into a single
+                  number makes a yield-heavy book look like a stock
+                  picker. Shown only when there is income to show. */}
+              {live.cumulative_dividends > 0 && (
+                <div className="text-xs text-muted mt-1">
+                  {t("of_which_dividends")}:{" "}
+                  <Money value={live.cumulative_dividends} digits={2} />
+                </div>
+              )}
             </Card>
           </div>
 
@@ -173,6 +193,7 @@ export default async function AgentDrillPage({
               agentSlug={slug}
               companyNames={companyNames}
               priceMarkedAt={live.last_updated}
+              markFreshness={markFreshness}
             />
           </Card>
 

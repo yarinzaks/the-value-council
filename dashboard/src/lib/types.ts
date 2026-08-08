@@ -159,6 +159,12 @@ export interface LivePortfolio {
   cumulative_return_pct: number;
   initial_cash: number;
   cumulative_costs: number;
+  /** Cash dividends received to date. NAV already contains this money;
+   *  the field exists so a total-return figure can be split into price
+   *  appreciation and income instead of asserted as one number.
+   *  Written by core/live/portfolio.py since the start and simply never
+   *  declared here, so no page could show it. */
+  cumulative_dividends: number;
   positions: LivePosition[];
   watchlist: LiveWatchEntry[];
   /** Most-recent run timestamp regardless of mode (open/close). */
@@ -224,4 +230,27 @@ export function isBuy(d: DecisionKind): boolean {
 
 export function isSell(d: DecisionKind): boolean {
   return (SELL_KINDS as DecisionKind[]).includes(d);
+}
+
+/**
+ * How stale a mark may be before the UI must stop calling it current.
+ *
+ * Mirrors MAX_CARRY_FORWARD_DAYS in core/backtest/data_loader.py, which
+ * carries the evidence: 99.94% of inter-bar gaps are five days or under
+ * — every routine exchange closure — and past that a missing bar is a
+ * hole in the data, not a closed market.
+ *
+ * Lives here rather than in data.ts because the positions table is a
+ * client component, and importing it from there drags node:fs into the
+ * browser bundle.
+ */
+export const MAX_MARK_AGE_DAYS = 5;
+
+/** When a position's mark was really struck, as opposed to when the run
+ *  that used it happened. */
+export interface MarkFreshness {
+  /** Date of the bar the mark actually came from. */
+  bar_date: string;
+  /** Days between that bar and the run that used it. */
+  days_stale: number;
 }

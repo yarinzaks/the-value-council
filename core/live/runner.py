@@ -465,6 +465,23 @@ class DailyRunner:
                         agent=adapter.name, portfolio=portfolio, error=str(exc)
                     )
                 )
+
+        # The close run marks every position and is the last word on the
+        # day, but it used to publish nothing — only ``run`` did. So the
+        # dashboard's charts, and the bar dates it reads to tell a fresh
+        # mark from a stale one, were always a session behind the book
+        # they described. 71 of 172 held positions had no published
+        # series at all on 2026-08-08.
+        try:
+            export_sectors([r.portfolio for r in results if r.portfolio is not None])
+            export_prices(
+                [r.portfolio for r in results if r.portfolio is not None],
+                as_of=as_of,
+                loader=self.price_loader,
+            )
+        except Exception as exc:  # presentation only; never fails a run
+            logger.warning(f"{as_of}: price export failed: {exc}")
+
         return results
 
     # ------------------------------------------------------------------
@@ -751,24 +768,36 @@ class DailyRunner:
         yield a year against Buffett and Fisher for no reason either
         investor would recognise.
 
-        Two watermarks stop a dividend being paid twice. The portfolio's
-        ``last_dividend_date`` bounds the whole book, and each position's
-        own ``entry_date`` bounds it individually — a name bought
-        yesterday must not collect on an ex-date from before it was
-        owned.
+        Each position is scanned over its **whole holding period**, from
+        its own ``entry_date`` — not over a window since the last run.
+        A one-day window was what made this silently pay nothing: the
+        floor came from ``last_open_run``, which the previous run had
+        already advanced to the current date, so the query asked for
+        dividends in an empty interval. 68 consecutive daily runs
+        credited $0.00 while eleven ex-dates passed on Neff's book.
+
+        Re-scanning is safe because :meth:`LivePortfolio.credit_dividend`
+        is idempotent per ``(ticker, ex_date)``, and it is what makes
+        settlement self-healing: a dividend whose row reaches the local
+        cache days after its ex-date is still picked up, where the old
+        window had already moved past it. ``entry_date`` remains the
+        lower bound, so a name bought yesterday never collects on an
+        ex-date from before it was owned.
         """
         if not portfolio.positions:
             return 0.0
 
-        floor = portfolio.last_dividend_date[:10] or portfolio.last_open_run[:10]
-        if not floor:
-            # First run for this book: settle from today only, so a
-            # freshly seeded portfolio does not harvest history.
-            floor = as_of.isoformat()
+        if not portfolio.inception_date:
+            # First settlement for this book. Stamp the floor and pay
+            # nothing before it: a seeded portfolio carries synthetic
+            # entry dates that may run years back, and it never owned
+            # those shares.
+            portfolio.inception_date = as_of.isoformat()
 
+        floor = portfolio.inception_date[:10]
         total = 0.0
         for pos in list(portfolio.positions):
-            since = max(floor, pos.entry_date[:10])
+            since = max(pos.entry_date[:10], floor)
             try:
                 payments = self.price_loader.dividends_between(
                     pos.ticker, since, as_of
@@ -792,8 +821,10 @@ class DailyRunner:
                         f"{as_of}: {portfolio.agent} received ${cash:,.2f} "
                         f"from {pos.ticker} (ex {ex_date}, ${amount:.4f}/sh)"
                     )
-        if total:
-            portfolio.last_dividend_date = as_of.isoformat()
+        # last_dividend_date is maintained by credit_dividend as the
+        # latest ex-date actually paid. Stamping it with as_of here would
+        # claim the book is settled through today on a run that paid
+        # nothing, which is the assumption that hid this bug.
         return total
 
     # ------------------------------------------------------------------
