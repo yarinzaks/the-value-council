@@ -100,9 +100,9 @@ const en: Dict = {
   drilldown_no_data: "No backtest run or live portfolio for this agent yet.",
 
   // ---- Backtest caveat ----
-  caveat_title: "These returns predate the data fixes — read them as an upper bound",
+  caveat_title: "One bias is left in these numbers, and it points up",
   caveat_body:
-    "Stored runs are from 2026-04-29 and report figures no value strategy produces: a 3,029% total return over five years and a best year of +476%. Three defects since fixed explain them — the universe holds only companies that survived to today, prices were carried forward across gaps of up to 4,021 days, and fundamentals were served a median seven fiscal years stale. Windows also differ between agents (one is measured against an S&P of 25.47%, another against 14.49%), so the ranking is partly a ranking of windows. Re-run the backtests to get comparable numbers.",
+    "Re-run on 2026-08-07 through the corrected pipeline: all ten agents now cover the same window (2019-12-30 to 2024-12-31), a price is no longer carried forward across a gap of more than five days, and fundamentals resolve by recency rather than by the order concepts happen to appear in. The correction was not small — Greenblatt fell from a 112.13% CAGR to 14.60%, Klarman from a 1,365% total return to 106.58%, and every agent now lands between 9.7% and 21.6% against an S&P that returned 14.49%. What is still not fixed is survivorship: the universe roster comes from the SEC's list of currently registered issuers, so a company acquired or wound up before the roster was built is missing at every historical date — and the missing names are disproportionately the ones that failed. Read every figure here as an upper bound.",
 
   // ---- Sectors ----
   sector_title: "Where the money sits",
@@ -386,9 +386,9 @@ const he: Dict = {
   drilldown_no_data: "אין ריצת בקטסט או תיק חי לסוכן זה עדיין.",
 
   // ---- Backtest caveat ----
-  caveat_title: "התשואות האלה קדמו לתיקוני הנתונים — קרא אותן כגבול עליון",
+  caveat_title: "נותרה הטיה אחת במספרים האלה, והיא מנפחת כלפי מעלה",
   caveat_body:
-    "הריצות השמורות הן מ-29/04/2026 ומדווחות מספרים ששום אסטרטגיית ערך לא מייצרת: 3,029% תשואה כוללת בחמש שנים, ושנה טובה של 476%+. שלושה פגמים שתוקנו מאז מסבירים אותם — היקום מכיל רק חברות ששרדו עד היום, מחירים נגררו קדימה על פני חורים של עד 4,021 ימים, ונתוני היסוד הוגשו באיחור חציוני של שבע שנות כספים. גם החלונות שונים בין הסוכנים (אחד נמדד מול S&P של 25.47%, אחר מול 14.49%), אז הדירוג הוא בחלקו דירוג של חלונות. הרץ את הבקטסטים מחדש כדי לקבל מספרים ברי-השוואה.",
+    "הורצו מחדש ב-07/08/2026 דרך הצינור המתוקן: כל עשרת הסוכנים מכסים עכשיו את אותו חלון (30/12/2019 עד 31/12/2024), מחיר כבר לא נגרר קדימה על פני חור של יותר מחמישה ימים, ונתוני היסוד נפתרים לפי עדכניות ולא לפי הסדר שבו המושגים מופיעים. התיקון לא היה קטן — גרינבלט ירד מ-CAGR של 112.13% ל-14.60%, קלרמן מ-1,365% תשואה כוללת ל-106.58%, וכל הסוכנים נוחתים עכשיו בין 9.7% ל-21.6% מול S&P שהחזיר 14.49%. מה שעדיין לא תוקן הוא הישרדות: רשימת היקום מגיעה מרשימת המנפיקים הרשומים כיום של ה-SEC, כך שחברה שנרכשה או פורקה לפני בניית הרשימה חסרה בכל תאריך היסטורי — והשמות החסרים הם באופן לא־פרופורציונלי אלה שנכשלו. קרא כל מספר כאן כגבול עליון.",
 
   // ---- Sectors ----
   sector_title: "איפה הכסף יושב",

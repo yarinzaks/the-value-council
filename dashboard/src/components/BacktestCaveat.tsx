@@ -1,38 +1,40 @@
 // A standing warning on every page that shows backtest returns.
 //
-// Why this is not optional
-// ------------------------
+// Why it still stands after the re-run
+// ------------------------------------
 //
-// The stored runs report figures no value strategy produces. Benjamin
-// Graham — whose entire method is buying at a discount with a margin of
-// safety — shows a 3,029% total return over five years, a 98.97% CAGR
-// and a best year of +476%. The heatmap carries +447% alpha for one
-// agent-year and +243% for another.
+// The 2026-08-07 campaign re-ran all ten agents through the corrected
+// pipeline, and three of the four defects this banner used to describe
+// are gone:
 //
-// Those are not results, they are symptoms, and this session identified
-// the causes:
-//
-//   * The full-market universe is not survivorship-bias-free. Of ten
-//     large caps acquired or failed while filing 10-Ks, none appears at
-//     any historical date. The missing names are the ones that failed,
-//     so returns are overstated in one direction.
-//   * get_price_on carried a price forward without limit. 307 of 395
-//     tickers have a gap over five days, median worst 367, maximum
-//     4,021 — and a stale price that suddenly catches up reads as a
+//   * A price is no longer carried forward past MAX_CARRY_FORWARD_DAYS,
+//     so a stale quote that suddenly catches up can no longer read as a
 //     gain that never happened.
-//   * Concept chains resolved by order rather than recency, serving
-//     revenue a median seven fiscal years stale on a quarter of the
-//     universe.
+//   * Concept chains resolve by recency, not by the order concepts
+//     appear in, so revenue is no longer served years stale.
+//   * Every agent runs core.backtest.validation_window. Schloss used to
+//     start in 2022 and Greenblatt in 2022-12, which meant the
+//     leaderboard was partly ranking windows.
 //
-// Every stored run predates those fixes. Presenting the numbers without
-// saying so would be the same failure as the docstring that claimed the
-// universe was bias-free: technically it is what the file contains,
-// and it is not true.
+// The size of the correction is the argument for having said so:
+// Greenblatt went from a 112.13% CAGR to 14.60%, Klarman from a 1,365%
+// total return to 106.58%, Lynch from 61.95% CAGR to 11.60%. The ten
+// now span 9.70% to 21.61% against an S&P that returned 14.49% — a
+// spread you can argue with, which the old one was not.
 //
-// The windows are also not comparable. One agent is measured over
-// 2022-12-30 to 2024-12-31 against an S&P of 25.47%; another over
-// 2019-12-30 to 2024-12-31 against 14.49%. Ranking them in one table
-// sorts partly by who caught a better two years.
+// What is NOT fixed, and why this component stays:
+//
+//   * FullMarketUniverse is not survivorship-bias-free. Its roster is
+//     the SEC's list of currently registered issuers, so a company
+//     acquired or wound up before the prefetch ran is absent at every
+//     historical date. Of ten large caps acquired or failed while
+//     filing 10-Ks, none appears at any historical date. The missing
+//     names are disproportionately the ones that failed, so the bias
+//     runs in one direction: up.
+//
+// Presenting the numbers without saying so would be the same failure as
+// the docstring that once claimed the universe was bias-free —
+// technically it is what the file contains, and it is not true.
 
 import { Card } from "@/components/Cards";
 
