@@ -39,6 +39,7 @@ for that; what this module governs is the runs the leaderboard shows.
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 #: Last trading day of 2019 — the baseline mark, before any position.
 VALIDATION_START: date = date(2019, 12, 30)
@@ -66,6 +67,12 @@ VALIDATION_END: date = date(2024, 12, 31)
 #: was Marks at t = 1.04 against the ~2 needed — and that will still be
 #: true here. Only a longer window moves it, and a longer window makes
 #: the surviving-companies bias worse, so it is not free either.
-VALIDATION_REBALANCE = "quarterly"
+#:
+#: Annotated as the literal rather than ``str`` so it satisfies
+#: ``RunnerConfig.rebalance_freq``'s ``RebalanceFreq`` without every
+#: caller needing a cast. Spelled out here rather than imported from
+#: :mod:`core.backtest.strategy_runner`, which would pull the whole
+#: engine in to carry one type.
+VALIDATION_REBALANCE: Literal["quarterly"] = "quarterly"
 
 __all__ = ["VALIDATION_END", "VALIDATION_REBALANCE", "VALIDATION_START"]

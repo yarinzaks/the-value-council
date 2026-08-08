@@ -649,3 +649,112 @@ class TestGetHistorySkipsKnownDeadSymbols:
         assert not loader.known_absent(
             "REAL", date(2024, 12, 31), today=date(2026, 8, 7)
         )
+
+
+class TestTrailingReturn:
+    """The momentum leg's input.
+
+    12-and-1 is the standard construction: the most recent month is
+    dropped because short-horizon returns reverse, so including it mixes
+    a signal of the opposite sign into the score.
+    """
+
+    @staticmethod
+    def _loader_with_series(tmp_path: Path, prices: dict[str, float]) -> PriceDataLoader:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        idx = pd.DatetimeIndex(list(prices.keys()))
+        n = len(prices)
+        loader._write_cache(
+            "X",
+            pd.DataFrame(
+                {
+                    "Open": list(prices.values()),
+                    "High": list(prices.values()),
+                    "Low": list(prices.values()),
+                    "Close": list(prices.values()),
+                    "Adj Close": list(prices.values()),
+                    "Volume": [1000] * n,
+                },
+                index=idx,
+            ),
+        )
+        return loader
+
+    def test_it_measures_the_window_not_the_whole_history(
+        self, tmp_path: Path
+    ) -> None:
+        # 100 a year ago, 150 a month ago, 300 today. 12-1 must read
+        # +50%, not the +200% the last month would add.
+        loader = self._loader_with_series(
+            tmp_path,
+            {"2023-12-29": 100.0, "2024-11-29": 150.0, "2024-12-31": 300.0},
+        )
+
+        r = loader.trailing_return(
+            "X", date(2024, 12, 31), lookback_months=12, skip_months=1
+        )
+
+        assert r == pytest.approx(50.0, abs=1.0)
+
+    def test_skipping_nothing_includes_the_last_month(
+        self, tmp_path: Path
+    ) -> None:
+        loader = self._loader_with_series(
+            tmp_path,
+            {"2023-12-29": 100.0, "2024-11-29": 150.0, "2024-12-31": 300.0},
+        )
+
+        r = loader.trailing_return(
+            "X", date(2024, 12, 31), lookback_months=12, skip_months=0
+        )
+
+        assert r == pytest.approx(200.0, abs=1.0)
+
+    def test_a_ticker_with_no_history_is_unknowable(self, tmp_path: Path) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+
+        assert (
+            loader.trailing_return(
+                "NOPE", date(2024, 12, 31), lookback_months=12, skip_months=1
+            )
+            is None
+        )
+
+    def test_a_hole_where_the_window_starts_is_unknowable(
+        self, tmp_path: Path
+    ) -> None:
+        # Only recent bars: the window's start has nothing within the
+        # carry-forward bound. Scoring it off whatever survived nearby
+        # would put an invented number into a ranking.
+        loader = self._loader_with_series(
+            tmp_path, {"2024-11-29": 150.0, "2024-12-31": 300.0}
+        )
+
+        assert (
+            loader.trailing_return(
+                "X", date(2024, 12, 31), lookback_months=12, skip_months=1
+            )
+            is None
+        )
+
+    def test_a_flat_series_returns_zero_not_none(self, tmp_path: Path) -> None:
+        # Zero momentum is a real answer and must rank as such, distinct
+        # from "cannot tell".
+        loader = self._loader_with_series(
+            tmp_path,
+            {"2023-12-29": 100.0, "2024-11-29": 100.0, "2024-12-31": 100.0},
+        )
+
+        r = loader.trailing_return(
+            "X", date(2024, 12, 31), lookback_months=12, skip_months=1
+        )
+
+        assert r == pytest.approx(0.0)
+
+    def test_an_inverted_window_raises(self, tmp_path: Path) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+
+        with pytest.raises(ValueError):
+            loader.trailing_return(
+                "X", date(2024, 12, 31), lookback_months=1, skip_months=12
+            )

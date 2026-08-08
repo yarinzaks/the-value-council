@@ -468,6 +468,52 @@ class PriceDataLoader:
             return None, None
         return float(closes.min()), float(closes.max())
 
+    def trailing_return(
+        self,
+        ticker: str,
+        as_of: date | datetime,
+        *,
+        lookback_months: int,
+        skip_months: int = 0,
+    ) -> float | None:
+        """Total return over a trailing window, or None when unknowable.
+
+        The window runs from ``lookback_months`` back to ``skip_months``
+        back, both measured from ``as_of``. The default 12-and-1 is the
+        standard construction: the most recent month is dropped because
+        short-horizon returns reverse, and including it mixes a reversal
+        effect into a momentum signal with the opposite sign.
+
+        Cache-only and deliberately so, for the same reason as
+        :meth:`price_extremes` — a momentum score is evaluated across
+        the whole universe at every rebalance, and one network call per
+        candidate is not affordable.
+
+        Returns None rather than a number whenever the answer cannot be
+        trusted: no bars at either end, or an endpoint whose nearest bar
+        is more than :data:`MAX_CARRY_FORWARD_DAYS` away. A name with a
+        hole in its history where the window starts would otherwise be
+        scored off whatever price happened to survive nearby, and a
+        ranking cannot tell an invented number from a real one.
+        """
+        if lookback_months <= skip_months:
+            raise ValueError(
+                f"lookback_months ({lookback_months}) must exceed "
+                f"skip_months ({skip_months})"
+            )
+        as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
+        start = as_of_d - timedelta(days=int(30.44 * lookback_months))
+        end = as_of_d - timedelta(days=int(30.44 * skip_months))
+
+        df = self._read_cached(ticker.upper(), start - timedelta(days=10), end)
+        if df.empty:
+            return None
+        first = self._fresh_close(df, start, max_carry_days=MAX_CARRY_FORWARD_DAYS)
+        last = self._fresh_close(df, end, max_carry_days=MAX_CARRY_FORWARD_DAYS)
+        if first is None or last is None or first <= 0:
+            return None
+        return (last / first - 1.0) * 100.0
+
     @staticmethod
     def _fresh_close(
         df: pd.DataFrame,
