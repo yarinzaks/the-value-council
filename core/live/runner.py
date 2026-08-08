@@ -465,6 +465,23 @@ class DailyRunner:
                         agent=adapter.name, portfolio=portfolio, error=str(exc)
                     )
                 )
+
+        # The close run marks every position and is the last word on the
+        # day, but it used to publish nothing — only ``run`` did. So the
+        # dashboard's charts, and the bar dates it reads to tell a fresh
+        # mark from a stale one, were always a session behind the book
+        # they described. 71 of 172 held positions had no published
+        # series at all on 2026-08-08.
+        try:
+            export_sectors([r.portfolio for r in results if r.portfolio is not None])
+            export_prices(
+                [r.portfolio for r in results if r.portfolio is not None],
+                as_of=as_of,
+                loader=self.price_loader,
+            )
+        except Exception as exc:  # presentation only; never fails a run
+            logger.warning(f"{as_of}: price export failed: {exc}")
+
         return results
 
     # ------------------------------------------------------------------

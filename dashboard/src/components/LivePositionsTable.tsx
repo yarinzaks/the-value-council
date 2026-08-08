@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useUI } from "./Providers";
 import { Money, PctCell } from "./Cards";
 import { Term } from "./Term";
-import type { LivePosition } from "@/lib/types";
+import type { LivePosition, MarkFreshness } from "@/lib/types";
+import { MAX_MARK_AGE_DAYS } from "@/lib/types";
 import { formatTimeOfDay } from "@/lib/timestamps";
 
 const TERM_PATTERN = /\b(P\/E|P\/B|P\/CF|P\/NCAV|D\/E|EY|ROC|NCAV|EBIT|EV|yield)\b/g;
@@ -50,6 +51,7 @@ export function LivePositionsTable({
   agentSlug,
   companyNames = {},
   priceMarkedAt = "",
+  markFreshness = {},
 }: {
   positions: LivePosition[];
   agentSlug: string;
@@ -57,6 +59,13 @@ export function LivePositionsTable({
   /** When the portfolio's prices were last marked. Shows as "מחיר
    *  מעודכן: HH:MM" / "Price updated: HH:MM" under each row. */
   priceMarkedAt?: string;
+  /** Per-ticker: the date of the bar each mark actually came from.
+   *
+   *  Without it every row printed the portfolio's run time, so a
+   *  position last traded seven weeks ago claimed to be priced minutes
+   *  ago. A reader copying that number would be acting on a quote the
+   *  market has moved past — and nothing on the page said so. */
+  markFreshness?: Record<string, MarkFreshness>;
 }) {
   const { locale, t } = useUI();
   if (positions.length === 0) {
@@ -86,6 +95,12 @@ export function LivePositionsTable({
           {sorted.map((p) => {
             const value = p.shares * p.current_price;
             const name = companyNames[p.ticker.toUpperCase()] ?? "";
+            const mark = markFreshness[p.ticker.toUpperCase()];
+            const stale = mark !== undefined && mark.days_stale > MAX_MARK_AGE_DAYS;
+            // No published series means nobody can date this mark. That
+            // is not the same as fresh, and printing the run's clock
+            // beside it would assert exactly the thing we cannot check.
+            const undated = mark === undefined;
             return (
               <tr
                 key={p.ticker}
@@ -112,10 +127,31 @@ export function LivePositionsTable({
                   <span className="block">
                     <Money value={p.current_price} digits={2} />
                   </span>
-                  {priceHm && (
-                    <span className="block text-[10px] text-muted mt-0.5">
-                      {t("price_updated")}: {priceHm}
+                  {/* A stale mark must never borrow the run's timestamp.
+                      The run did happen at priceHm; this price did not
+                      come from it, and saying otherwise is the one thing
+                      that would make a reader act on a dead quote. */}
+                  {stale && mark ? (
+                    <span
+                      className="block text-[10px] mt-0.5 text-amber-700 dark:text-amber-400"
+                      title={t("mark_stale_help")}
+                    >
+                      ⚠ {t("mark_stale")}: {mark.bar_date} (
+                      {t("days_ago").replace("{n}", String(mark.days_stale))})
                     </span>
+                  ) : undated ? (
+                    <span
+                      className="block text-[10px] text-muted mt-0.5 italic"
+                      title={t("mark_undated_help")}
+                    >
+                      {t("mark_undated")}
+                    </span>
+                  ) : (
+                    priceHm && (
+                      <span className="block text-[10px] text-muted mt-0.5">
+                        {t("price_updated")}: {priceHm}
+                      </span>
+                    )
                   )}
                 </td>
                 <td className="py-2 pr-3 text-right">

@@ -23,6 +23,7 @@ import type {
   DecisionKind,
   DecisionRow,
   LivePortfolio,
+  MarkFreshness,
   NavRow,
 } from "./types";
 
@@ -406,6 +407,41 @@ export interface PriceSeries {
  * unavailable — a ticker nobody holds, or one with no cached history —
  * and the caller should say so rather than draw a flat line.
  */
+/**
+ * When each ticker's mark was really struck.
+ *
+ * The positions table used to print the portfolio's last-updated
+ * timestamp under every row, so a position priced from a bar seven
+ * weeks old announced itself as updated minutes ago. A price with no
+ * date attached is a number nobody can check — which is exactly the
+ * thing a reader would act on and then discover was not real.
+ *
+ * Read from the per-ticker series `core.live.price_export` already
+ * writes, so this costs no new export and no network. A ticker with no
+ * published series is simply absent, and the caller shows nothing
+ * rather than inventing a date.
+ */
+export async function loadMarkFreshness(
+  tickers: string[],
+): Promise<Record<string, MarkFreshness>> {
+  const out: Record<string, MarkFreshness> = {};
+  await Promise.all(
+    tickers.map(async (t) => {
+      const series = await loadPriceSeries(t);
+      const last = series?.points.at(-1);
+      if (!series || !last) return;
+      const bar = Date.parse(`${last.d}T00:00:00Z`);
+      const asOf = Date.parse(`${series.as_of}T00:00:00Z`);
+      if (Number.isNaN(bar) || Number.isNaN(asOf)) return;
+      out[t.toUpperCase()] = {
+        bar_date: last.d,
+        days_stale: Math.max(0, Math.round((asOf - bar) / 86_400_000)),
+      };
+    }),
+  );
+  return out;
+}
+
 export async function loadPriceSeries(
   ticker: string,
 ): Promise<PriceSeries | null> {
