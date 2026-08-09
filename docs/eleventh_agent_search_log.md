@@ -102,15 +102,19 @@ effect?
 | ranks 101-125 | 10.67 | 1.064 |
 | ranks 201-225 | **12.07** | 0.990 |
 
-**No monotone premium.** Ranks 201-225, carrying much more volatility,
-returned the same 12.07%. So the 12.06% is not being produced by
-quietness.
+**No monotone premium across the bands.** Ranks 201-225, carrying much
+more volatility, returned the same 12.07%. So within the quiet half of
+the distribution, being quieter does not pay more.
 
 What *is* monotone is the Sharpe: 1.304 at the quiet end against 0.990
-in the middle of the distribution. Which is exactly the published
-finding — the low-volatility anomaly is a risk-adjusted effect, not a
-raw-return one. **For an objective stated as maximum return, low
-volatility offers nothing.**
+in the middle. Which is the published finding — the low-volatility
+anomaly is a risk-adjusted effect before it is a return effect.
+
+This looked at first like it emptied the result out. Round 6 shows it
+does not: every band here sits in the lower half of the volatility
+distribution, so all of them capture some of the effect, and all of
+them beat a book with no selection at all. The flatness is between
+bands, not between selection and none.
 
 ## Round 5 — regime switching
 
@@ -156,3 +160,40 @@ momentum bands, six volatility bands, two regime switches. **Twenty-three
 so far**, before the fundamental legs.
 
 Nothing here clears a t-statistic of 2. The best is 0.58.
+
+---
+
+## Round 6 — the control that had to be run
+
+Rounds 3 and 4 left a suspicion worth taking seriously. The quietest 25
+returned 12.06% and ranks 201-225 returned 12.07% — two bands with
+nothing in common, landing on the same number, both above the
+benchmark. That pattern is what a *mechanical* effect looks like: an
+equal-weighted book of liquid US stocks carries a mid-cap tilt against
+a cap-weighted index, and equal weight beat cap weight over much of
+this period. If that were the whole story, none of the factors would be
+contributing anything.
+
+So: equal-weight the entire investable universe, with no signal at all.
+
+| | CAGR% | vol% | Sharpe | maxDD% |
+|---|---|---|---|---|
+| equal-weight universe (1,517 names, no signal) | 10.02 | 15.75 | 0.636 | -20.18 |
+| low idiosyncratic vol, top 25 | **12.06** | **9.25** | **1.304** | **-8.09** |
+| benchmark (SPY, cap-weighted) | 10.75 | — | — | — |
+
+The suspicion was wrong. The naive equal-weight book **underperforms**
+the index and carries half again its volatility and a 20% drawdown.
+Selecting on idiosyncratic volatility adds two points of return over
+it while cutting volatility by 40% and drawdown by 60%.
+
+That reconciles round 4 as well: every band from 1 to 225 sits in the
+lower half of the volatility distribution, so all of them capture some
+of the effect. What separates them is the Sharpe, and that *is*
+monotone — 1.304 at the quiet end against 0.990 in the middle.
+
+**The selection is real.** Running the control was the only way to know
+that, and it is the single result in this file that a reader should
+check first.
+
+**Twenty-four designs scored.**
