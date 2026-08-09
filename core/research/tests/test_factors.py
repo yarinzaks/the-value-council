@@ -358,7 +358,7 @@ class TestImplausibleCapitalisationsAreRefused:
             },
             index=[0],
         )
-        return market_capitalisation(panel).iloc[0]
+        return float(market_capitalisation(panel).iloc[0])
 
     def test_a_normal_company_is_believed(self) -> None:
         # $10bn cap trading $70m a day — 0.7%, the median.

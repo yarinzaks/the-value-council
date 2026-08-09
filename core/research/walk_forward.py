@@ -193,7 +193,7 @@ def annualise(series: pd.Series, *, periods_per_year: int = 4) -> float:
     if growth <= 0:
         return -100.0
     years = len(clean) / periods_per_year
-    return (growth ** (1.0 / years) - 1.0) * 100.0
+    return float((growth ** (1.0 / years) - 1.0) * 100.0)
 
 
 def max_drawdown(series: pd.Series, *, periods_per_year: int = 4) -> float:
