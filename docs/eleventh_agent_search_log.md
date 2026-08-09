@@ -351,3 +351,96 @@ The finding is not that these particular factors are bad. It is that a
 single historical window has no demonstrated power to choose between
 them, and that every agent in this project — the ten named investors
 included — rests on exactly one window with no out-of-sample test.
+
+---
+
+# Correction: two bugs invalidated part of the above
+
+## The fundamentals panel covered only half the history
+
+It was built for 2011-2018 first, and the holdout run over 2019-2026
+was scored against it. The join forward-fills, correctly, so that the
+months between quarterly filings hold the last known numbers — and
+unbounded, it carried every 2018 filing forward for seven years without
+failing or warning. "Earnings yield" became 2018 EBIT over today's
+enterprise value: a long-horizon reversal signal wearing a value label.
+
+**Every value and quality figure in the first holdout table was void.**
+The price-only rows, including the chosen design's 3.55%, were not
+affected.
+
+Fixed by bounding the carry at 400 days — enough for a company to miss
+a quarter or file late, since a screen that drops the unpunctual is
+selecting on punctuality, and not enough to value a company nobody has
+heard from in years.
+
+## Market capitalisations that could not be true
+
+`PKG` files a share count a thousand times too large — 94.1 billion
+shares against an actual 95 million or so — which computes to a
+$6,276bn company. Being the largest thing in the universe, it took a
+41% weight in a capitalisation-weighted book and turned "hold the 25
+biggest US companies" into **-0.94% a year with a 42% drawdown**.
+`JAGX` computes to $1,649,620bn on a price of $9,627,188, which is what
+a series looks like after enough reverse splits.
+
+The tell is not the size but the trading: across 104,676 observations
+the median company turns over 0.72% of its value a day and the 1st
+percentile still manages 0.058%. A capitalisation contradicted by its
+own dollar volume is now refused. With the gate in place the same
+design returns **+11.33%** on the development window.
+
+---
+
+# Both windows, corrected, all twenty-one scoreable designs
+
+| design | dev CAGR% | holdout CAGR% | beat both? |
+|---|---|---|---|
+| **biggest 25 (cap-weighted)** | **11.33** | **20.74** | **yes** |
+| biggest 25 (equal) | 10.60 | 18.55 | no (dev by 0.15) |
+| quality + mom + low ivol | 12.39 | 15.14 | no |
+| value + quality + mom + low ivol | 11.49 | 15.97 | no |
+| mom + low ivol | 11.56 | 10.44 | no |
+| low ivol, cap-weighted | 10.14 | 15.57 | no |
+| low total vol | 9.27 | 3.81 | no |
+| quality | 8.70 | 7.36 | no |
+| value | 8.16 | 22.08 | no |
+| value + quality | 7.74 | 16.96 | no |
+| value + quality + mom | 5.35 | 21.91 | no |
+| value + mom | 2.80 | 20.11 | no |
+| momentum 6-1 | -1.29 | 3.34 | no |
+| **low idio vol** — *the one first chosen* | **12.06** | **3.55** | no |
+| momentum 12-1 | -4.52 | 17.04 | no |
+| *benchmark* | *10.75* | *16.01* | — |
+
+**One design out of twenty-one cleared the benchmark in both.**
+
+# Full period, 2011-2026, contaminated rows excluded
+
+| approach | CAGR% | maxDD% | t vs index |
+|---|---|---|---|
+| **biggest 25 (cap-weighted)** | **17.67** | -27.93 | **+1.82** |
+| quality + mom + low ivol | 15.25 | -25.38 | +0.39 |
+| *the index* | *14.44* | *-23.93* | — |
+| hold every design equally | 12.81 | -26.14 | -0.45 |
+| select the trailing winner | 7.81 | -42.66 | -1.40 |
+| low idio vol | 7.38 | -40.95 | -2.15 |
+
+The winner beat the index in 12 of 16 years, in 60.7% of quarters and
+in 70.4% of rolling two-year windows, with a median two-year excess of
++5.72% and turnover of 6% a quarter.
+
+## What it is, and what it is not
+
+It is not stock picking. It holds the largest companies and sizes them
+by what they are worth. Its edge over the S&P 500 is being *more*
+concentrated in the biggest names than the index is — the top five are
+around 59% of the book — and that paid because mega-caps led for
+fifteen years. There is no anomaly being harvested and no mispricing
+found. The documented size premium favours small over large; this is
+the opposite trade, justified only by the period it was measured in.
+
+And by the time it was identified, both windows had been read. It is
+not an out-of-sample result. The strongest true statement available is
+that it was consistent across two very different regimes and has no
+parameter fitted to either.
