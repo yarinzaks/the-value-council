@@ -169,3 +169,62 @@ class TestMomentumConstruction:
 
         mom = adj.shift(MOMENTUM_SKIP) / adj.shift(MOMENTUM_SKIP + MOMENTUM_LOOKBACK) - 1.0
         assert mom.iloc[-1, 0] == pytest.approx(0.0)
+
+
+class TestBadPrints:
+    """One misprinted bar was worth 46.84% a year until it was removed.
+
+    ``TIE`` in this database is two securities spliced together: a
+    foreign listing trading near $11,000 on a few thousand shares, with
+    a single bar at $16.51 — the real price Precision Castparts paid for
+    Titanium Metals — sitting inside it. That bar produces a -99.85%
+    move in and a +66,526% move out, and a reversal screen bought the
+    bottom of the first and held through the second.
+    """
+
+    @staticmethod
+    def _drop(prices: list[float]) -> tuple[pd.DataFrame, int]:
+        from core.research.price_panel import drop_bad_prints
+
+        idx = _sessions(len(prices))
+        return drop_bad_prints(_matrix({"X": np.array(prices)}, idx))
+
+    def test_a_spike_that_returns_is_blanked(self) -> None:
+        cleaned, n = self._drop([100.0, 100.0, 1.0, 100.0, 100.0])
+        assert n == 1
+        assert bool(np.isnan(cleaned.iloc[2, 0]))
+
+    def test_an_upward_spike_that_returns_is_blanked(self) -> None:
+        cleaned, n = self._drop([100.0, 100.0, 9_000.0, 100.0, 100.0])
+        assert n == 1
+        assert bool(np.isnan(cleaned.iloc[2, 0]))
+
+    def test_a_genuine_crash_is_kept(self) -> None:
+        # Down 60% and it stays down. That is a company, not a misprint,
+        # and blanking it would erase exactly the events a risk model
+        # exists to see.
+        cleaned, n = self._drop([100.0, 100.0, 40.0, 41.0, 39.0])
+        assert n == 0
+        assert cleaned.iloc[2, 0] == pytest.approx(40.0)
+
+    def test_a_genuine_spike_is_kept(self) -> None:
+        # A biotech quadrupling on a readout and holding the gain.
+        cleaned, n = self._drop([10.0, 10.0, 40.0, 41.0, 39.0])
+        assert n == 0
+        assert cleaned.iloc[2, 0] == pytest.approx(40.0)
+
+    def test_a_move_too_small_to_be_a_misprint_is_kept(self) -> None:
+        # Down 50% and back is violent but plausible, and below the
+        # factor-of-three gate on purpose.
+        cleaned, n = self._drop([100.0, 100.0, 50.0, 100.0, 100.0])
+        assert n == 0
+
+    def test_a_clean_series_is_untouched(self) -> None:
+        cleaned, n = self._drop([100.0, 101.0, 99.0, 102.0, 103.0])
+        assert n == 0
+        assert not cleaned.isna().to_numpy().any()
+
+    def test_the_tie_shape_is_caught(self) -> None:
+        cleaned, n = self._drop([11_000.0, 11_000.0, 16.51, 11_000.0, 11_000.0])
+        assert n == 1
+        assert bool(np.isnan(cleaned.iloc[2, 0]))

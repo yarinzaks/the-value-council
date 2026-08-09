@@ -139,9 +139,20 @@ def _share_history(cache: EdgarCache, ticker: str) -> pd.Series:
     return adjusted_shares(by_filing)
 
 
-def _measure_one(args: tuple[str, list[date]]) -> pd.DataFrame:
-    """Every field for one ticker across every sample date."""
-    ticker, dates = args
+#: Tickers handed to a worker in one task.
+#:
+#: Not a tuning knob — a fix. Submitting one ticker per task rebuilds
+#: :class:`EdgarCache` and :class:`FundamentalsFetcher` every time, and
+#: across 3,577 tickers that construction cost came to dominate the
+#: sweep: the measured rate implied three hours against the seventy-odd
+#: minutes the actual lookups account for. A worker now builds them
+#: once and reuses them for a whole chunk.
+CHUNK_SIZE = 40
+
+
+def _measure_chunk(args: tuple[tuple[str, ...], list[date]]) -> pd.DataFrame:
+    """Every field for a chunk of tickers across every sample date."""
+    tickers, dates = args
     cache = EdgarCache()
     fetcher = FundamentalsFetcher(
         cache=cache,
@@ -149,29 +160,30 @@ def _measure_one(args: tuple[str, list[date]]) -> pd.DataFrame:
         config=FundamentalsFetcherConfig(populate_cache_on_miss=False),
     )
 
-    shares = _share_history(cache, ticker)
     records: list[dict[str, object]] = []
-    for when in dates:
-        try:
-            values, meta = fetcher.get_all_fields(ticker, when)
-        # Same reasoning as _share_history: one unreadable ticker is a
-        # gap in the panel, not a failed build.
-        except Exception:
-            continue
-        if meta is None:
-            continue
+    for ticker in tickers:
+        shares = _share_history(cache, ticker)
+        for when in dates:
+            try:
+                values, meta = fetcher.get_all_fields(ticker, when)
+            # Same reasoning as _share_history: one unreadable ticker is
+            # a gap in the panel, not a failed build.
+            except Exception:
+                continue
+            if meta is None:
+                continue
 
-        row: dict[str, object] = {"date": when, "ticker": ticker}
-        for field in FIELDS:
-            row[field] = values.get(field)
-        row["filing_date"] = meta.filing_date
-        row["form_type"] = meta.form_type
+            row: dict[str, object] = {"date": when, "ticker": ticker}
+            for field in FIELDS:
+                row[field] = values.get(field)
+            row["filing_date"] = meta.filing_date
+            row["form_type"] = meta.form_type
 
-        known = shares[shares.index <= when] if len(shares) else shares
-        row["shares_split_adjusted"] = (
-            float(known.iloc[-1]) if len(known) else None
-        )
-        records.append(row)
+            known = shares[shares.index <= when] if len(shares) else shares
+            row["shares_split_adjusted"] = (
+                float(known.iloc[-1]) if len(known) else None
+            )
+            records.append(row)
 
     return pd.DataFrame.from_records(records)
 
@@ -184,22 +196,25 @@ def build_fundamentals_panel(spec: FundamentalsSpec) -> pd.DataFrame:
         f"({spec.start} → {spec.end}) on {spec.workers} workers"
     )
 
-    payloads = [(t, dates) for t in spec.tickers]
+    chunks = [
+        tuple(spec.tickers[i : i + CHUNK_SIZE])
+        for i in range(0, len(spec.tickers), CHUNK_SIZE)
+    ]
+    payloads = [(chunk, dates) for chunk in chunks]
     frames: list[pd.DataFrame] = []
     done = 0
     with ProcessPoolExecutor(max_workers=spec.workers) as pool:
-        futures = {pool.submit(_measure_one, p): p[0] for p in payloads}
+        futures = {pool.submit(_measure_chunk, p): p[0] for p in payloads}
         for future in as_completed(futures):
-            done += 1
+            done += len(futures[future])
             try:
                 frame = future.result()
             except Exception as exc:
-                logger.debug(f"{futures[future]}: {exc}")
+                logger.debug(f"{futures[future][:3]}...: {exc}")
                 continue
             if len(frame):
                 frames.append(frame)
-            if done % 250 == 0 or done == len(payloads):
-                logger.info(f"  {done}/{len(payloads)} tickers")
+            logger.info(f"  {done}/{len(spec.tickers)} tickers")
 
     if not frames:
         raise RuntimeError("no fundamentals resolved for any ticker")

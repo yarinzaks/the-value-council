@@ -234,6 +234,8 @@ def load_price_matrices(
             f"secondary listings removed)"
         )
 
+    adj, _ = drop_bad_prints(adj)
+
     dv = dv.reindex(index=adj.index, columns=adj.columns)
     logger.info(f"price matrix: {adj.shape[0]:,} dates x {adj.shape[1]:,} tickers")
     return adj, dv
@@ -256,6 +258,61 @@ def rebalance_dates(adj: pd.DataFrame, spec: PanelSpec) -> pd.DatetimeIndex:
         .max()
     )
     return pd.DatetimeIndex(period_ends.values)
+
+
+#: A one-day move by more than this factor, in either direction, is a
+#: candidate bad print — but only a candidate, because real stocks do
+#: triple on a trial readout. What condemns it is the round trip below.
+BAD_PRINT_FACTOR = 3.0
+
+#: ...and the price coming back to within this band of where it started,
+#: one day later. A genuine crash stays crashed; a genuine spike stays
+#: spiked. Only a misprint round-trips.
+BAD_PRINT_ROUND_TRIP = (0.5, 2.0)
+
+
+def drop_bad_prints(adj: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """Blank isolated price spikes that immediately reverse.
+
+    Why this is not paranoia
+    ~~~~~~~~~~~~~~~~~~~~~~~~
+
+    ``TIE`` in this database is two different securities spliced
+    together. Most of 2012-2013 it trades between $8,400 and $12,300 on
+    volumes of a few thousand shares — some foreign listing the vendor
+    returns for a symbol that was reused. Sitting inside that series is
+    a single bar on 2012-12-31 at $16.51, which is the real price at
+    which Precision Castparts acquired Titanium Metals.
+
+    One bar. It produces a -99.85% move in and a +66,526% move out, and
+    a short-term-reversal screen bought it at the bottom of the first
+    and held it through the second. That single position, at a 4%
+    weight, turned one quarter into +2,900% and the whole strategy into
+    46.84% a year with 1,030% volatility — the best-looking row in the
+    table, and entirely an artefact.
+
+    The discriminator is the round trip, not the size. A stock that
+    genuinely falls 70% stays down; a stock that genuinely triples
+    stays up. A price that leaps by a factor of three and is back where
+    it started the next day was never there.
+
+    Returns the cleaned matrix and how many bars were blanked.
+    """
+    prev = adj.shift(1)
+    nxt = adj.shift(-1)
+
+    ratio_in = adj / prev
+    round_trip = nxt / prev
+
+    low, high = BAD_PRINT_ROUND_TRIP
+    spiked = (ratio_in > BAD_PRINT_FACTOR) | (ratio_in < 1.0 / BAD_PRINT_FACTOR)
+    returned = (round_trip >= low) & (round_trip <= high)
+    bad = spiked & returned
+
+    count = int(bad.to_numpy().sum())
+    if count:
+        logger.info(f"blanked {count:,} bad prints (spike-and-return bars)")
+    return adj.mask(bad), count
 
 
 def benchmark_returns(adj: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.Series:
