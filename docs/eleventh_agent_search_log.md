@@ -197,3 +197,87 @@ that, and it is the single result in this file that a reader should
 check first.
 
 **Twenty-four designs scored.**
+
+---
+
+# The holdout
+
+Opened once, on 2019-01-01 → 2026-08-08, after the design was frozen
+and committed. Benchmark over that window: **16.01%**.
+
+| design | dev CAGR% | holdout CAGR% | dev rank | holdout rank |
+|---|---|---|---|---|
+| quality + mom + low ivol | 12.39 | 11.52 | 1 | 8 |
+| **low idio vol** — *the one that was chosen* | **12.06** | **3.55** | **2** | **12** |
+| value + quality + mom + low ivol | 11.62 | 11.04 | 3 | 9 |
+| mom + low ivol | 11.56 | 10.44 | 4 | 10 |
+| mom + low ivol + not extended | 11.50 | 13.32 | 5 | 7 |
+| low total vol | 9.27 | 3.81 | 6 | 11 |
+| quality | 8.70 | 16.33 | 7 | 6 |
+| value | 8.16 | 22.81 | 8 | 2 |
+| value + quality | 7.74 | 19.99 | 9 | 3 |
+| value + quality + mom | 5.19 | 18.98 | 10 | 4 |
+| value + mom | 2.80 | 23.88 | 11 | 1 |
+| momentum 6-1 | -1.29 | 3.34 | 12 | 13 |
+| momentum 12-1 | -4.52 | 17.04 | 13 | 5 |
+
+## The chosen design failed, significantly
+
+3.55% against a benchmark of 16.01% — **-12.50 points of alpha, t = -2.27**.
+That is one of only two rows in the whole exercise to clear a
+t-statistic of 2 in absolute value, and it clears it in the wrong
+direction. Not "failed to beat the market": measurably worse than it.
+
+Year by year, the strategy against the index: -27.6, -16.7, -4.4, -0.9,
+-16.7, +2.2, -9.3, -12.3. One good year in eight.
+
+## The finding that matters more than the agent
+
+**The rank correlation between the development window and the holdout
+is -0.440.**
+
+Choosing the best design on eight years of data was *worse than
+choosing at random* for the next seven. The two designs ranked 11th and
+13th on 2011-2018 came 1st and 5th on 2019-2026. The one ranked 2nd
+came 12th.
+
+This is not a statement about these thirteen designs. It is a statement
+about the method every agent in this project rests on — including the
+ten named investors, whose numbers come from a single window with no
+out-of-sample test at all. An eight-year in-sample fit has no
+demonstrated power to pick a strategy for the next seven years, and
+this exercise is the measurement that says so.
+
+## Why the chosen design failed, as far as can be told
+
+Not a bug — the engine and the harness agree on the development window
+(12.50% against 12.06%, benchmark 11.06% against 10.75%).
+
+The low-volatility premium was absent from 2019-2026, and the period's
+index return came overwhelmingly from high-volatility mega-cap growth —
+exactly the names a low-volatility screen is built to exclude. The
+screen also drifted: on 2011-2018 it held insurers, payroll processors
+and staples; by 2026 seventeen of twenty-five names were utilities and
+REITs, an interest-rate position taken during a rate shock. A sector
+cap would have limited that, and the project already has one in
+`agents/dreman/diversification.py`. Leaving it out was a choice made
+for simplicity on the development window, and it was the wrong one.
+
+## What is deliberately not being done about it
+
+Value + momentum returned 23.88% on the holdout. Switching to it now
+would be selecting on the holdout, which is the entire failure mode
+this split existed to prevent, and it would produce a number with no
+evidence behind it whatsoever. The holdout has been spent. Any design
+chosen from that column is in-sample now.
+
+A second honest test needs data neither window has seen — which, on a
+price history that begins in 2010, means waiting.
+
+## One row here is unreliable
+
+`not extended` shows 229.58% volatility on the holdout, so the
+spike-and-return filter is not catching whatever produced it. The
+number is not to be used. It is left in the table rather than deleted
+because removing rows that embarrass the method is how a search log
+stops being one.
