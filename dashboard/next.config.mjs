@@ -13,6 +13,25 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: [],
   },
+  // Static language build. Set NEXT_PUBLIC_SITE_LOCALE to "en" or "he"
+  // and this becomes a pure static export rooted at /en or /he — the
+  // two are built separately and published side by side, which is how
+  // the site keeps server-rendered Hebrew without a server to render
+  // it. Unset (the default, and what `next dev` sees) nothing here
+  // applies and the app behaves exactly as before.
+  //
+  // The fs reads in lib/data.ts then happen once, at build time, on a
+  // machine that has the data tree. What ships is HTML.
+  ...(process.env.NEXT_PUBLIC_SITE_LOCALE
+    ? {
+        output: "export",
+        basePath: `/${process.env.NEXT_PUBLIC_SITE_LOCALE}`,
+        // Emits `agents/index.html` rather than `agents.html`, which is
+        // what a static host resolves for `/en/agents` without needing
+        // per-host rewrite rules.
+        trailingSlash: true,
+      }
+    : {}),
 };
 
 export default nextConfig;

@@ -21,7 +21,7 @@ import {
   loadPriceSeries,
 } from "@/lib/data";
 import { PositionPriceChart } from "@/components/PositionPriceChart";
-import { metaLocalized } from "@/lib/agents";
+import { AGENTS, metaLocalized } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
 import {
@@ -30,7 +30,39 @@ import {
   translateRationale,
 } from "@/lib/translate-dynamic";
 
-export const dynamic = "force-dynamic";
+// Static in the two-language export, where "force-dynamic" is a hard
+// error; dynamic under a live server (next dev). NEXT_PUBLIC_* is
+// inlined at build time, so this folds to a constant.
+export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
+  ? "force-static"
+  : "force-dynamic";
+
+/**
+ * Every (agent, ticker) pair that is currently held.
+ *
+ * A static export has to know its routes up front, and these are the
+ * only ones anything links to — LivePositionsTable and
+ * PositionStoryCard both build their hrefs from the same portfolios.
+ *
+ * It follows that this page covers open positions only. A name sold
+ * last week has no page here and never did; the trade itself stays in
+ * the journal and in the agent's history. `dynamicParams` is left at
+ * its default so an unknown pair 404s rather than being generated on
+ * demand, which is also what `output: "export"` requires.
+ */
+export async function generateStaticParams(): Promise<
+  Array<{ slug: string; ticker: string }>
+> {
+  const params: Array<{ slug: string; ticker: string }> = [];
+  for (const agent of AGENTS) {
+    const portfolio = await loadLivePortfolio(agent.slug);
+    if (!portfolio) continue;
+    for (const position of portfolio.positions) {
+      params.push({ slug: agent.slug, ticker: position.ticker });
+    }
+  }
+  return params;
+}
 
 const TERM_PATTERN = /\b(P\/E|P\/B|P\/CF|P\/NCAV|D\/E|EY|ROC|NCAV|EBIT|EV|yield)\b/g;
 const TERM_TO_KEY: Record<string, string> = {

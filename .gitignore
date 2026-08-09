@@ -228,7 +228,17 @@ __marimo__/
 # Cache subtrees are intentionally never committed: they are large
 # (~2GB), they are regenerable from public APIs, and committing them
 # would inflate the repo to no benefit.
-data/cache/
+#
+# One exception, and it is deliberate. company_names.json (~376K) is the
+# ticker-to-company-name map every page renders, and the dashboard is
+# now built in the cloud from this repo rather than served from the Mac.
+# A build that cannot read it renders "AAPL" where "Apple Inc." belongs
+# on every screen. It is regenerable but not from a build container, so
+# it ships. The `data/cache/*` form is required over `data/cache/`:
+# git does not descend into an excluded directory, so a negation inside
+# one is never reached.
+data/cache/*
+!data/cache/company_names.json
 data/fundamentals_cache/
 
 # Local-only artifacts
@@ -239,6 +249,12 @@ data/fundamentals_cache/
 # Dashboard build artifacts
 dashboard/.next/
 dashboard/node_modules/
+# Per-language dist dirs and the merged static site, both produced by
+# scripts/build-static-site.sh. Cloudflare builds them on every push;
+# nothing here should ever be committed.
+dashboard/.next-*/
+dashboard/out/
+dashboard/site/
 
 # Lessons / scratch notes
 LESSONS.md

@@ -3,7 +3,12 @@ import { loadCompanyNames, loadWatchlist } from "@/lib/data";
 import { metaLocalized } from "@/lib/agents";
 import { getServerI18n } from "@/lib/locale-server";
 
-export const dynamic = "force-dynamic";
+// Static in the two-language export, where "force-dynamic" is a hard
+// error; dynamic under a live server (next dev). NEXT_PUBLIC_* is
+// inlined at build time, so this folds to a constant.
+export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
+  ? "force-static"
+  : "force-dynamic";
 
 export default async function WatchlistPage() {
   const { locale, t } = getServerI18n();

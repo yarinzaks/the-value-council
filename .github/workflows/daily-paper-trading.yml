@@ -205,7 +205,16 @@ jobs:
           # be claimed.
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/portfolios data/decisions data/snapshots data/cron_logs
+          # prices/ and sectors.json join the commit because the site is
+          # now built in the cloud from this repo, not served from the
+          # Mac. DailyRunner already writes both on every run (see
+          # export_prices / export_sectors in core/live/runner.py) — they
+          # were simply staying on the runner and being thrown away with
+          # it, so a cloud build had no position price charts and no
+          # sector donut. Everything here is small: 209 price series are
+          # 2.4M in total and sectors.json is 4K.
+          git add data/portfolios data/decisions data/snapshots data/cron_logs \
+                  data/prices data/sectors.json
           if git diff --cached --quiet; then
             echo "no data changes — nothing to commit"
             exit 0
