@@ -140,9 +140,29 @@ class TestPeriodReturns:
         assert periods["turnover"].iloc[0] == pytest.approx(1.0)
         assert periods["cost"].iloc[0] == pytest.approx(0.001)
 
-    def test_an_unchanged_book_costs_nothing_after_the_first_period(self) -> None:
+    def test_the_same_targets_still_pay_for_drift(self) -> None:
+        # Holding two names at 50% each, one returning +2% and the other
+        # +3%, leaves them at 49.76% and 50.24% by the next decision.
+        # Getting back to 50/50 is a real trade. Differencing the target
+        # weights calls it zero and makes the strategy cheaper than it is.
         design = Design(name="d", legs=(Leg("signal"),), portfolio_size=2)
         panel = _simple_panel(6)
+        periods = period_returns(panel, build_weights(panel, design), design)
+        assert periods["turnover"].iloc[1] == pytest.approx(0.002439, abs=1e-6)
+
+    def test_a_book_that_did_not_move_costs_nothing(self) -> None:
+        # The drift correction has to vanish when there is no drift,
+        # otherwise it is charging for arithmetic rather than trading.
+        rows = {}
+        for d in ("2020-01-31", "2020-02-29", "2020-03-31"):
+            for i in range(4):
+                rows[(d, f"T{i}")] = {
+                    "signal": float(i),
+                    "ivol_6m": 0.2,
+                    "fwd_next": 0.0,
+                }
+        panel = _panel(rows)
+        design = Design(name="d", legs=(Leg("signal"),), portfolio_size=2)
         periods = period_returns(panel, build_weights(panel, design), design)
         assert periods["turnover"].iloc[1] == pytest.approx(0.0)
 

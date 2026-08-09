@@ -182,10 +182,34 @@ def period_returns(
     )
 
     wide = weights["weight"].unstack(fill_value=0.0)
-    turnover = wide.diff().abs().sum(axis=1) / 2.0
-    # The opening book is bought outright.
+    returns = (
+        joined["fwd_next"].unstack(fill_value=0.0).reindex(columns=wide.columns).fillna(0.0)
+    )
+
+    # Turnover against the *drifted* book, not against the previous
+    # target. A position left at the same target weight two rebalances
+    # running still has to be traded, because its share of the book
+    # moved with its price in between; differencing the targets calls
+    # that zero and quietly makes the strategy cheaper than it is.
+    #
+    # drifted_i = w_i (1 + r_i) / (1 + r_portfolio), which is the weight
+    # the position actually carries into the next decision.
+    turnover_values: list[float] = []
+    drifted = pd.Series(0.0, index=wide.columns, dtype="float64")
+    for when in wide.index:
+        target = wide.loc[when]
+        turnover_values.append(float((target - drifted).abs().sum()) / 2.0)
+        period = returns.loc[when]
+        grown = target * (1.0 + period)
+        total = float(grown.sum())
+        drifted = grown / total if total > 0 else grown
+    turnover = pd.Series(turnover_values, index=wide.index)
+
+    # The opening book is bought outright: the first difference above is
+    # against an empty portfolio, so halving it would charge for one side
+    # of a trade that only has one side.
     if len(turnover):
-        turnover.iloc[0] = wide.iloc[0].abs().sum()
+        turnover.iloc[0] = float(wide.iloc[0].abs().sum())
     cost = turnover * (design.cost_bps / 10_000.0)
 
     out = pd.DataFrame({"gross": gross, "turnover": turnover, "cost": cost})
