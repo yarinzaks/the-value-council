@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from core.exceptions import ValueCouncilError
@@ -467,6 +468,147 @@ class PriceDataLoader:
         if closes.empty:
             return None, None
         return float(closes.min()), float(closes.max())
+
+    def median_dollar_volume(
+        self,
+        tickers: Iterable[str],
+        as_of: date | datetime,
+        *,
+        sessions: int = 63,
+    ) -> dict[str, float]:
+        """Median daily dollar volume over the trailing ``sessions`` bars.
+
+        Median rather than mean: one earnings-day spike should not make
+        an otherwise untradeable name look tradeable.
+
+        ``close * volume`` rather than a share count, because the product
+        is invariant to split adjustment. This database stores
+        split-adjusted prices in both price columns — NVDA reads $120.99
+        on 2024-06-06 where the tape said about $1,210 — so a historical
+        price is quoted in today's share terms and the matching volume
+        is divided by the same factor. Multiplying them back together
+        recovers the dollars that actually changed hands.
+
+        Cache-only and one query for the whole list, for the same reason
+        as :meth:`idiosyncratic_volatility`.
+        """
+        as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
+        start = as_of_d - timedelta(days=int(sessions * 1.6) + 10)
+
+        wanted = sorted({t.upper() for t in tickers})
+        if not wanted:
+            return {}
+        placeholders = ",".join("?" for _ in wanted)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT ticker, trade_date, close * volume AS dollars
+                FROM prices
+                WHERE trade_date >= ? AND trade_date <= ?
+                  AND close > 0 AND volume >= 0
+                  AND ticker IN ({placeholders})
+                """,
+                (start.isoformat(), as_of_d.isoformat(), *wanted),
+            ).fetchall()
+
+        if not rows:
+            return {}
+        frame = pd.DataFrame(rows, columns=["ticker", "trade_date", "dollars"])
+        recent = (
+            frame.sort_values("trade_date")
+            .groupby("ticker")
+            .tail(sessions)
+        )
+        medians = recent.groupby("ticker")["dollars"].median()
+        return {str(t): float(v) for t, v in medians.items() if pd.notna(v)}
+
+    def idiosyncratic_volatility(
+        self,
+        tickers: Iterable[str],
+        as_of: date | datetime,
+        *,
+        market: str = "SPY",
+        sessions: int = 126,
+        min_sessions: int = 63,
+    ) -> dict[str, float]:
+        """Annualised volatility of each ticker's return not explained by
+        the market, measured over the trailing ``sessions`` bars.
+
+        One query, not one per name. A screen that ranks the whole
+        universe on this at every rebalance cannot afford a round trip
+        per candidate — that is what makes a full-market backtest take
+        an hour — so the window is read for every ticker at once and the
+        regression is done in one vectorised pass.
+
+        Idiosyncratic rather than total volatility, and idiosyncratic
+        rather than beta, because that is where the low-risk evidence
+        actually sits: volatility-sorted portfolios carry the effect and
+        beta-sorted ones are the weakest form of it.
+
+        Cache-only, like :meth:`trailing_return` and
+        :meth:`price_extremes`. Names with fewer than ``min_sessions``
+        usable bars are absent from the result rather than present with
+        a number computed from too little data — a screen cannot tell an
+        undersampled estimate from a real one, and a name with six bars
+        of history would otherwise look like the calmest stock in the
+        market.
+        """
+        as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
+        # Calendar days generous enough to hold ``sessions`` trading
+        # days plus holidays.
+        start = as_of_d - timedelta(days=int(sessions * 1.6) + 10)
+
+        wanted = {t.upper() for t in tickers}
+        wanted.add(market.upper())
+        placeholders = ",".join("?" for _ in wanted)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT ticker, trade_date, adj_close
+                FROM prices
+                WHERE trade_date >= ? AND trade_date <= ?
+                  AND adj_close > 0
+                  AND ticker IN ({placeholders})
+                """,
+                (start.isoformat(), as_of_d.isoformat(), *sorted(wanted)),
+            ).fetchall()
+
+        if not rows:
+            return {}
+
+        frame = pd.DataFrame(rows, columns=["ticker", "trade_date", "adj_close"])
+        wide = frame.pivot_table(
+            index="trade_date", columns="ticker", values="adj_close", aggfunc="last"
+        ).sort_index()
+        wide = wide.tail(sessions + 1)
+
+        market_key = market.upper()
+        if market_key not in wide.columns:
+            logger.warning(f"{market_key} absent from cache at {as_of_d}")
+            return {}
+
+        returns = wide.pct_change(fill_method=None).iloc[1:]
+        m = returns[market_key]
+        usable = returns.notna().sum()
+
+        m_var = float(m.var())
+        if not m_var > 0:
+            return {}
+        beta = returns.apply(lambda col: col.cov(m)).div(m_var)
+        alpha = returns.mean() - beta * float(m.mean())
+        resid = returns.sub(m.to_numpy()[:, None] * beta.to_numpy(), axis=1).sub(alpha)
+        vol = resid.std() * np.sqrt(252.0)
+
+        out: dict[str, float] = {}
+        for ticker, value in vol.items():
+            if ticker == market_key:
+                continue
+            if int(usable.get(ticker, 0)) < min_sessions:
+                continue
+            if pd.isna(value) or value <= 0:
+                continue
+            out[str(ticker)] = float(value)
+        return out
 
     def trailing_return(
         self,
