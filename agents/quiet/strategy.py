@@ -43,18 +43,50 @@ idiosyncratic volatility returns 12.06% with 40% less volatility and a
 drawdown of 8.09% instead of 20.18%. That control is the one number in
 the log a sceptic should check first.
 
+It failed its out-of-sample test
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This has to come before anything else the docstring says, because
+everything above was measured on 2011-2018 and the design was then run
+once, frozen, on 2019-01-01 → 2026-08-08.
+
+**It returned 3.55% against a benchmark of 16.01%.** Alpha of -12.50
+points, t = -2.27 — one of only two results in the whole exercise to
+clear a t-statistic of 2, and it clears it in the wrong direction. One
+good year in eight.
+
+Two things went wrong, as far as can be told. The low-volatility
+premium was simply absent from that period, whose index return came
+overwhelmingly from high-volatility mega-cap growth — precisely the
+names this screen is built to exclude. And the screen drifted: on
+2011-2018 it held insurers, payroll processors and staples; by 2026,
+seventeen of its twenty-five names were utilities and REITs, which is
+an interest-rate position taken during a rate shock. A sector cap would
+have limited that, and this project already has one in
+``agents/dreman/diversification.py``. Leaving it out was a choice made
+for simplicity against the development window, and it was wrong.
+
+The number worth carrying away is neither of those. Across thirteen
+designs the rank correlation between the two windows was **-0.440** —
+picking the best design on eight years of data was worse than picking
+at random for the next seven. That applies to every agent in this
+project, all of which rest on a single window with no out-of-sample
+test at all.
+
 What this will not do
 ~~~~~~~~~~~~~~~~~~~~~
 
-Beat the market by a lot. On the development window it beat the index by
-1.31 points a year with a t-statistic of 0.45, which is indistinguishable
-from luck at this sample size. The low-volatility effect is documented
-as a *risk-adjusted* one, and the band tests here agree: bands from the
-quietest 25 out to rank 225 all return about the same, and what improves
-monotonically toward the quiet end is the Sharpe ratio, not the return.
+Beat the market. On the development window it beat the index by 1.31
+points a year at t = 0.45, which was already indistinguishable from
+luck; out of sample it lost by 12.50 at t = -2.27, which is not.
 
-An agent promising more than this on eight years of survivorship-biased
-data would be promising something it cannot have measured.
+The low-volatility effect is documented as a *risk-adjusted* one, and
+the band tests agree: bands from the quietest 25 out to rank 225 all
+returned about the same on the development window, and what improved
+monotonically toward the quiet end was the Sharpe ratio, not the
+return. An agent promising more than that on eight years of
+survivorship-biased data would be promising something it cannot have
+measured — and this one, promising only that, still did not deliver it.
 """
 
 from __future__ import annotations
