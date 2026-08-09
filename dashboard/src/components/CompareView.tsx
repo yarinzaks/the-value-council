@@ -119,6 +119,9 @@ export function CompareView({ agents }: { agents: AgentForCompare[] }) {
                   fill={metaFor(a.slug)?.color ?? "#999"}
                   fillOpacity={0.18}
                   strokeWidth={2}
+                  // Same reason as NavChart: an entry animation whose
+                  // frames never run leaves the shape drawn but unseen.
+                  isAnimationActive={false}
                 />
               ))}
               <Tooltip />
