@@ -444,3 +444,36 @@ And by the time it was identified, both windows had been read. It is
 not an out-of-sample result. The strongest true statement available is
 that it was consistent across two very different regimes and has no
 parameter fitted to either.
+
+---
+
+# What happened to the two agents that are in the tree but not on the council
+
+Three strategy packages sit under `agents/` from this work. Only one is
+wired into the runner and the dashboard. The other two are kept as
+record, and this section exists so that a reader who finds them does not
+mistake either for something the project stands behind.
+
+**`agents/market_core` — shipping.** The design that beat the index in
+both windows. Everything above is about it.
+
+**`agents/quiet` — measured, and it failed.** The low-idiosyncratic-
+volatility book. It won the development window at 12.06% against
+10.75%, was frozen, and returned 3.55% against 16.01% on data it had
+not seen: -12.50 points at t = -2.27. Its own docstring carries the
+number. It is the single most useful artefact of this exercise, because
+it is what choosing on one window looks like when the choice is wrong.
+
+**`agents/composite` — never measured.** A value-profitability-momentum
+composite written *before* `core.research` existed, and the reason this
+branch is called `feat/factor-composite-agent`. It was overtaken by the
+harness rather than beaten by it: no row in any table above is its
+result, and no backtest run of it exists. Its docstring now says so.
+Its factor-scoring code and tests pass and are left in place; the
+argument in its docstring — that an eleventh *value* investor would add
+a correlated opinion rather than information — is what motivated the
+whole search, and it still holds. What did not survive was the
+assumption that a three-factor composite would therefore be the answer.
+
+No further work is planned on either. Reviving one means running it
+through `core.research` on both windows first.

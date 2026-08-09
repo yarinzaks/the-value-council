@@ -1,4 +1,28 @@
-"""The eleventh seat, filled by evidence rather than by a biography.
+"""A value-profitability-momentum composite. Not a council member.
+
+Status: superseded, kept for the record
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This does **not** hold the eleventh seat. ``agents.market_core`` does.
+Nothing here is wired into ``core.live.runner``, into the dashboard, or
+into any backtest the site publishes, and it should not be read as a
+strategy this project stands behind.
+
+It was written first, before the research harness in ``core.research``
+existed, and its claim below that "every parameter was fixed before the
+first run" was made in good faith about a run that was never scored.
+Its name appears in none of the tables in
+``docs/eleventh_agent_search_log.md`` — the twenty-one designs measured
+there were built and evaluated afterwards, on a train/test split with a
+sealed holdout, and the seat went to the one design that beat the index
+in both windows.
+
+It stays in the tree because the factor-scoring code and its tests are
+working and tested, and because the reasoning below — why an eleventh
+value investor adds a correlated opinion rather than information — is
+the argument that started the search. Read it as the opening position,
+not the conclusion. The conclusion is in the log, and it is that
+nothing tested beat holding the index.
 
 What this is
 ~~~~~~~~~~~~
