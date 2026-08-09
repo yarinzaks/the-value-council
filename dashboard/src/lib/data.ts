@@ -124,9 +124,30 @@ async function readNavCsv(file: string): Promise<NavRow[]> {
 // Public API — composable functions used by pages
 // --------------------------------------------------------------------------
 
-/** Load the latest run for a given agent. Returns null if no run on disk. */
+/** The three files every usable run directory has. */
+const RUN_FILES = ["summary.json", "annual_returns.csv", "nav.csv"] as const;
+
+function isCompleteRun(dir: string): boolean {
+  return RUN_FILES.every((f) => existsSync(path.join(BACKTEST_DIR, dir, f)));
+}
+
+/** Load the latest run for a given agent. Returns null if no run on disk.
+ *
+ *  "Latest" means the newest directory that actually holds all three
+ *  files, not simply the newest name. The distinction is load-bearing
+ *  now that this build runs unattended four times a day: an incomplete
+ *  run directory used to abort the whole static export with ENOENT, so
+ *  one interrupted backtest — or, as happened here, eleven empty
+ *  directories a file sync left beside the real ones, each sorting
+ *  after its original — took down every page of the site rather than
+ *  one agent's numbers.
+ *
+ *  Falling back to the previous complete run shows slightly older
+ *  figures under their own run_id and date range, which the page
+ *  already displays. That is a far better failure than no site.
+ */
 export async function loadAgentLatest(slug: AgentSlug): Promise<AgentLatestRun | null> {
-  const runs = await listRunDirs();
+  const runs = (await listRunDirs()).filter(isCompleteRun);
   const latest = pickLatestForAgent(slug, runs);
   if (!latest) return null;
 
