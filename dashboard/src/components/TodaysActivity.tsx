@@ -73,9 +73,19 @@ export function TodaysActivity({
                       <span className="text-xs text-muted">—</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
-                        {buys.map((tk) => (
+                        {/* `buys` is a plain string[] and a ticker can
+                            appear in it more than once — one agent
+                            filling the same name twice in a day is a
+                            rotation, not a bug. Keying on the ticker
+                            alone made React treat the second PAYC as a
+                            duplicate of the first, which it warns about
+                            and which lets it drop or reorder chips. The
+                            index is what actually distinguishes them;
+                            the slug and action keep the key readable if
+                            these lists are ever merged. */}
+                        {buys.map((tk, i) => (
                           <span
-                            key={tk}
+                            key={`${slug}-buy-${tk}-${i}`}
                             className="text-[11px] px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 font-mono"
                           >
                             {tk}
@@ -89,9 +99,9 @@ export function TodaysActivity({
                       <span className="text-xs text-muted">—</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
-                        {sells.map((tk) => (
+                        {sells.map((tk, i) => (
                           <span
-                            key={tk}
+                            key={`${slug}-sell-${tk}-${i}`}
                             className="text-[11px] px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono"
                           >
                             {tk}
