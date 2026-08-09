@@ -216,7 +216,7 @@ class TestBadPrints:
     def test_a_move_too_small_to_be_a_misprint_is_kept(self) -> None:
         # Down 50% and back is violent but plausible, and below the
         # factor-of-three gate on purpose.
-        cleaned, n = self._drop([100.0, 100.0, 50.0, 100.0, 100.0])
+        _, n = self._drop([100.0, 100.0, 50.0, 100.0, 100.0])
         assert n == 0
 
     def test_a_clean_series_is_untouched(self) -> None:

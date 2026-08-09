@@ -55,9 +55,28 @@ def _latest_on_or_before(
     if fundamentals.empty or "ticker" not in (fundamentals.index.names or []):
         return pd.DataFrame()
 
+    # The two panels label dates differently — the fundamentals sweep
+    # writes `datetime.date` because that is what the point-in-time
+    # loader takes, while the price panel carries `pd.Timestamp` from
+    # the bar index. Unioning the two produces a mixed-type index that
+    # pandas will not reindex against, so they are made the same type
+    # once, here, rather than at each of the several places they meet.
+    fundamentals = fundamentals.copy()
+    fundamentals.index = pd.MultiIndex.from_arrays(
+        [
+            pd.to_datetime(fundamentals.index.get_level_values("date")),
+            fundamentals.index.get_level_values("ticker"),
+        ],
+        names=["date", "ticker"],
+    )
+
     out: list[pd.DataFrame] = []
     for ticker, group in fundamentals.groupby(level="ticker"):
         flat = group.droplevel("ticker").sort_index()
+        # A ticker filing twice against the same sample date would make
+        # the index non-unique and stop the reindex below; keep the
+        # later row, which is the fresher filing.
+        flat = flat[~flat.index.duplicated(keep="last")]
         # A filing is known from its filing date, not its period end.
         # The panel is already indexed on the quarter it was sampled at,
         # which was itself resolved point-in-time, so the index is safe

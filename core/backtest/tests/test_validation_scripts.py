@@ -59,12 +59,13 @@ class TestTheWindowItself:
 
 class TestEveryScriptIsFound:
     def test_every_agent_plus_the_council(self) -> None:
-        # Ten named investors and one factor composite. A new agent that
-        # forgets its validation script would silently shrink this list
-        # instead of failing anything — and an agent added without one
-        # never appears on the leaderboard at all.
-        assert len(AGENT_SCRIPTS) == 11
-        assert len(VALIDATION_SCRIPTS) == 12
+        # Ten named investors, one factor composite and one quiet
+        # compounder. A new agent that forgets its validation script
+        # would silently shrink this list instead of failing anything —
+        # and an agent added without one never appears on the
+        # leaderboard at all.
+        assert len(AGENT_SCRIPTS) == 12
+        assert len(VALIDATION_SCRIPTS) == 13
 
     def test_the_paths_exist(self) -> None:
         missing = [p for p in VALIDATION_SCRIPTS if not p.is_file()]
