@@ -37,6 +37,27 @@ logger = get_logger("core.research.factors")
 #: reported.
 MIN_EV_TO_MARKET_CAP = 0.05
 
+#: How long a filing may be carried forward before it stops counting.
+#:
+#: The join forward-fills, which is correct — a company files four times
+#: a year and the months in between should hold the last known numbers
+#: rather than dropping out of the universe. Without a bound it is also
+#: how a backtest silently prices 2026 on 2018 financials.
+#:
+#: That is not hypothetical. The fundamentals panel was built for
+#: 2011-2018 first, and a holdout run over 2019-2026 against it did not
+#: fail or warn: it carried every 2018 filing forward for seven years,
+#: so "earnings yield" became *2018 EBIT over today's enterprise value*
+#: — a long-horizon reversal signal wearing a value label — and the
+#: value designs came back at 22.81% and 23.88%. Both numbers were
+#: meaningless and neither announced itself.
+#:
+#: 400 days allows a company to miss a quarter or two, or to be late,
+#: without dropping out. Beyond that it is not a slow filer; it is a
+#: company that has stopped reporting, and it should leave the screen
+#: rather than be valued on numbers nobody has confirmed since.
+MAX_FILING_STALENESS_DAYS = 400
+
 
 def _latest_on_or_before(
     fundamentals: pd.DataFrame, dates: pd.DatetimeIndex
@@ -81,7 +102,21 @@ def _latest_on_or_before(
         # The panel is already indexed on the quarter it was sampled at,
         # which was itself resolved point-in-time, so the index is safe
         # to align on directly.
-        aligned = flat.reindex(flat.index.union(dates)).ffill().reindex(dates)
+        combined = flat.index.union(dates)
+        aligned = flat.reindex(combined).ffill().reindex(dates)
+
+        # Blank anything carried further than a filing can honestly
+        # reach. `age` is the gap between each rebalance and the most
+        # recent filing at or before it; where that exceeds the bound,
+        # the company has stopped reporting and every number here is
+        # stale rather than merely between quarters.
+        source = pd.Series(flat.index, index=flat.index).reindex(combined).ffill()
+        source = source.reindex(dates)
+        age = (pd.Series(dates, index=dates) - source).dt.days
+        aligned = aligned.mask(
+            (age > MAX_FILING_STALENESS_DAYS) | age.isna(), other=pd.NA
+        )
+
         aligned["ticker"] = ticker
         out.append(aligned.set_index("ticker", append=True))
     if not out:

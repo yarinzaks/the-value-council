@@ -259,3 +259,80 @@ class TestEmptyInput:
         merged = add_fundamental_factors(prices, pd.DataFrame())
         assert list(merged.columns) == list(prices.columns)
         assert len(merged) == len(prices)
+
+
+class TestStaleFilingsAreDropped:
+    """The bug this guards against did not raise, warn, or look wrong.
+
+    A holdout run over 2019-2026 was scored against a fundamentals panel
+    built only through 2018. Every filing was carried forward for seven
+    years, so "earnings yield" became 2018 EBIT over today's enterprise
+    value — a long-horizon reversal signal wearing a value label — and
+    the value designs came back at 22.81% and 23.88%. Nothing in the
+    output distinguished those numbers from real ones.
+    """
+
+    @staticmethod
+    def _panel(rebalances: list[str], filing: str = "2020-01-31") -> pd.DataFrame:
+        index = pd.MultiIndex.from_product(
+            [pd.to_datetime(rebalances), ["AAA"]], names=["date", "ticker"]
+        )
+        prices = pd.DataFrame({"price": 10.0, "mom_12_1": 0.1}, index=index)
+        fundamentals = _fundamentals(
+            [
+                (
+                    filing,
+                    "AAA",
+                    {
+                        "operating_income": 100.0,
+                        "total_assets": 1_000.0,
+                        "shares_split_adjusted": 1_000.0,
+                        "total_debt": 0.0,
+                        "cash_and_equivalents": 0.0,
+                    },
+                )
+            ]
+        )
+        return add_fundamental_factors(prices, fundamentals)
+
+    def test_a_filing_from_last_quarter_is_used(self) -> None:
+        merged = self._panel(["2020-04-30"])
+        assert merged.loc[(pd.Timestamp("2020-04-30"), "AAA"), "total_assets"] == (
+            pytest.approx(1_000.0)
+        )
+
+    def test_a_filing_from_a_year_ago_is_still_used(self) -> None:
+        # Companies are late, and a screen that drops anyone who missed
+        # a quarter is a screen that selects on punctuality.
+        merged = self._panel(["2021-01-29"])
+        assert merged.loc[(pd.Timestamp("2021-01-29"), "AAA"), "total_assets"] == (
+            pytest.approx(1_000.0)
+        )
+
+    def test_a_filing_from_two_years_ago_is_dropped(self) -> None:
+        merged = self._panel(["2022-01-31"])
+        assert bool(
+            np.isnan(merged.loc[(pd.Timestamp("2022-01-31"), "AAA"), "total_assets"])
+        )
+
+    def test_a_filing_from_seven_years_ago_is_dropped(self) -> None:
+        # The exact shape of the bug.
+        merged = self._panel(["2026-06-30"], filing="2019-01-31")
+        assert bool(
+            np.isnan(merged.loc[(pd.Timestamp("2026-06-30"), "AAA"), "total_assets"])
+        )
+        assert bool(
+            np.isnan(merged.loc[(pd.Timestamp("2026-06-30"), "AAA"), "earnings_yield"])
+        )
+
+    def test_the_usable_stretch_survives_and_the_stale_one_does_not(self) -> None:
+        merged = self._panel(["2020-04-30", "2020-10-30", "2023-04-28"])
+        assert merged.loc[(pd.Timestamp("2020-04-30"), "AAA"), "total_assets"] == (
+            pytest.approx(1_000.0)
+        )
+        assert merged.loc[(pd.Timestamp("2020-10-30"), "AAA"), "total_assets"] == (
+            pytest.approx(1_000.0)
+        )
+        assert bool(
+            np.isnan(merged.loc[(pd.Timestamp("2023-04-28"), "AAA"), "total_assets"])
+        )

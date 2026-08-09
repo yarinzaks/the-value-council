@@ -55,7 +55,7 @@ DEFAULT_PERIODS_PER_YEAR = PERIODS_PER_YEAR["Q"]
 #: agents pay, so a number here is comparable to theirs.
 DEFAULT_COST_BPS = 10.0
 
-Weighting = Literal["equal", "inverse_vol"]
+Weighting = Literal["equal", "inverse_vol", "cap"]
 
 
 @dataclass(frozen=True)
@@ -146,6 +146,32 @@ def _weights_for_date(
         # utility is not a diversified book.
         inv = 1.0 / picked["ivol_6m"].clip(lower=0.05)
         weights = inv / inv.sum()
+    elif design.weighting == "cap":
+        # Weight by market capitalisation, the way the index does.
+        #
+        # This is not a stylistic option. Every design tested here picks
+        # 25 names from ~1,500 and weights them equally, and every one
+        # of them lost to the index over 2011-2026 — a period whose
+        # index return came overwhelmingly from its very largest
+        # constituents. An equal-weighted book of 25 cannot express
+        # "hold more of the biggest company" at all, so the comparison
+        # was never testing the signals alone; it was testing the
+        # signals *and* a weighting scheme, against a benchmark that
+        # used the other one.
+        #
+        # Requires `market_cap`, which is only trustworthy because
+        # `core.research.splits` restates share counts into the price
+        # series' units first.
+        caps = picked["market_cap"].clip(lower=0.0)
+        total = float(caps.sum())
+        # No capitalisations at all means the filings are missing, not
+        # that the companies are worthless; fall back to equal weight
+        # rather than dividing by zero or holding nothing.
+        weights = (
+            caps / total
+            if total > 0
+            else pd.Series(1.0 / len(picked), index=picked.index)
+        )
     else:
         weights = pd.Series(1.0 / len(picked), index=picked.index)
     return weights
