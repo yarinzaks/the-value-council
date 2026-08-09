@@ -36,6 +36,7 @@ from agents.graham.net_net import BenjaminGraham
 from agents.greenblatt.magic_formula import MagicFormula
 from agents.klarman import SethKlarman
 from agents.lynch import PeterLynch
+from agents.market_core.strategy import MarketCore
 from agents.marks import HowardMarks
 from agents.neff.total_return import JohnNeff
 from agents.schloss.deep_value import WalterSchloss
@@ -61,6 +62,7 @@ from core.live.agent_adapter import (
     LiveTarget,
     LiveWatch,
     LynchLive,
+    MarketCoreLive,
     MarksLive,
     NeffLive,
     SchlossLive,
@@ -145,7 +147,7 @@ def build_default_adapters(
     edgar_cache: EdgarCache | None = None,
     price_loader: PriceDataLoader | None = None,
 ) -> list[AgentAdapter]:
-    """Construct the live adapters for all 10 council members.
+    """Construct the live adapters for all 11 council members.
 
     The 4 original quant agents (Greenblatt, Schloss, Graham, Dreman)
     don't need ``edgar_cache`` (they read fundamentals via the runner's
@@ -252,6 +254,18 @@ def build_default_adapters(
                 min_market_cap=1_000_000_000.0,
                 max_portfolio_size=15,
                 scuttlebutt_analyzer=None,
+                decision_logger=decision_logger,
+            )
+        ),
+        # The eleventh seat. Unlike the ten above it answers to a
+        # measurement rather than to a book, and it needs the EDGAR
+        # cache directly — its screen is price times filed share count,
+        # and the share count has to be restated into the price
+        # series' split units before the product means anything.
+        MarketCoreLive(
+            MarketCore(
+                price_loader=prices,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),

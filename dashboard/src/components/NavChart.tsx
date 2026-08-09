@@ -46,6 +46,17 @@ export function NavChart({
             labelFormatter={(d: string) => d}
           />
           <Legend />
+          {/* isAnimationActive={false} is load-bearing, not a preference.
+              Recharts draws its entry animation by animating
+              stroke-dasharray from "0, L" (nothing visible) to "L, 0"
+              (the whole line), driven by requestAnimationFrame. A tab
+              that is backgrounded, or restored from bfcache, never runs
+              those frames, so the path keeps a fully populated `d` and a
+              dasharray of "0px 1477px" — present in the DOM, invisible
+              on screen. That is the empty chart box. The charts that
+              never had the bug (SectorDonut, AgentPerformanceChart,
+              PositionPriceChart) are exactly the ones already opting
+              out. */}
           <Line
             type="monotone"
             dataKey="nav"
@@ -53,6 +64,7 @@ export function NavChart({
             stroke={agentColor}
             strokeWidth={2}
             dot={false}
+            isAnimationActive={false}
           />
           <Line
             type="monotone"
@@ -62,6 +74,7 @@ export function NavChart({
             strokeWidth={1.5}
             strokeDasharray="4 4"
             dot={false}
+            isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>

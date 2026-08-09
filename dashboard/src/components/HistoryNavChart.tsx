@@ -56,6 +56,10 @@ export function HistoryNavChart({
               strokeWidth={2}
               dot={{ r: 3 }}
               connectNulls
+              // See NavChart: the entry animation leaves the path with a
+              // "0, L" stroke-dasharray whenever its frames never run,
+              // which renders a fully-populated line invisibly.
+              isAnimationActive={false}
             />
           ))}
         </LineChart>

@@ -94,6 +94,43 @@ function dremanBuyHe(d: DecisionRow, opts: NarrativeOpts): string {
   ].join(" ");
 }
 
+/** Billions of dollars, from a raw USD figure. */
+function billions(v: unknown, locale: "en" | "he"): string {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return locale === "he" ? "לא ידוע" : "unknown";
+  return `${(n / 1e9).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
+function marketCoreBuyHe(d: DecisionRow, opts: NarrativeOpts): string {
+  const v = d.criteria_values ?? {};
+  const cap = billions(v.market_cap_usd, "he");
+  const weight = pct(
+    typeof v.weight_pct === "number" ? v.weight_pct / 100 : undefined,
+    1,
+  );
+  const subject = opts.companyName ? `את ${d.ticker} (${opts.companyName})` : `את ${d.ticker}`;
+  return [
+    `ליבת השוק מחזיקה ${subject} מסיבה אחת: היא מהגדולות בשוק, בשווי ${cap} מיליארד דולר.`,
+    `המשקל שלה בתיק, ${weight}, נקבע לפי השווי ולא לפי דעה — ככל שהחברה גדולה יותר, כך חלקה גדול יותר.`,
+    `זו אינה בחירת מניות אלא הימור מרוכז על כך שהגדולות ימשיכו להוביל.`,
+  ].join(" ");
+}
+
+function marketCoreBuyEn(d: DecisionRow, opts: NarrativeOpts): string {
+  const v = d.criteria_values ?? {};
+  const cap = billions(v.market_cap_usd, "en");
+  const weight = pct(
+    typeof v.weight_pct === "number" ? v.weight_pct / 100 : undefined,
+    1,
+  );
+  const subject = opts.companyName ? `${d.ticker} (${opts.companyName})` : d.ticker;
+  return [
+    `Market Core holds ${subject} for one reason: it is among the largest companies in the market, at $${cap}bn.`,
+    `Its ${weight} of the book follows from that size rather than from a view — the bigger the company, the bigger its share.`,
+    `This is not stock picking; it is a concentrated bet that the largest keep leading.`,
+  ].join(" ");
+}
+
 function genericSellHe(d: DecisionRow, opts: NarrativeOpts): string {
   const subject = opts.companyName ? `${d.ticker} (${opts.companyName})` : d.ticker;
   // The Python rationale is "Closed live position: entry $X.XX, exit $Y.YY (Z.ZZ%)"
@@ -186,6 +223,8 @@ export function narrative(
         return isHe ? grahamNetNetBuyHe(d, opts) : grahamNetNetBuyEn(d, opts);
       case "david_dreman":
         return isHe ? dremanBuyHe(d, opts) : dremanBuyEn(d, opts);
+      case "market_core":
+        return isHe ? marketCoreBuyHe(d, opts) : marketCoreBuyEn(d, opts);
     }
   }
   if (d.decision === "SELL") {

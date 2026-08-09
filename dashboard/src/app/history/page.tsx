@@ -145,9 +145,14 @@ export default async function HistoryPage() {
                           <span className="text-xs text-muted">—</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {r.buys.map((tk) => (
+                            {/* The ticker alone is not unique: a snapshot
+                                can list the same name twice when the day
+                                held more than one fill for it, which is
+                                what philip_fisher/2026-08-07 does with
+                                PAYC. Same shape as TodaysActivity. */}
+                            {r.buys.map((tk, i) => (
                               <span
-                                key={tk}
+                                key={`${h.slug}-${r.date}-buy-${tk}-${i}`}
                                 className="text-[11px] px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 font-mono"
                               >
                                 {tk}
@@ -161,9 +166,9 @@ export default async function HistoryPage() {
                           <span className="text-xs text-muted">—</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {r.sells.map((tk) => (
+                            {r.sells.map((tk, i) => (
                               <span
-                                key={tk}
+                                key={`${h.slug}-${r.date}-sell-${tk}-${i}`}
                                 className="text-[11px] px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono"
                               >
                                 {tk}

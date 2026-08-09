@@ -460,6 +460,74 @@ class FisherLive(AgentAdapter):
         return []
 
 
+# --------------------------------------------------------------------------
+# Market Core
+# --------------------------------------------------------------------------
+class MarketCoreLive(AgentAdapter):
+    """The eleventh seat: largest liquid companies, cap-weighted.
+
+    Simpler than every adapter above it, because the strategy it wraps
+    has no score object to translate — the reason a name is held *is*
+    its market capitalisation, and the strategy already publishes that
+    with the weight it produced.
+
+    The watchlist is the next thirty companies by size. For a screen
+    that ranks on one thing, "what would be bought next" is not a
+    judgement call.
+    """
+
+    name = "market_core"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = "market capitalisation enters the largest 25"
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        picks = getattr(self.strategy, "last_picks", [])
+        out: list[LiveTarget] = []
+        for rank, pick in enumerate(picks, start=1):
+            weight = weights.get(pick.ticker)
+            if weight is None:
+                continue
+            out.append(
+                LiveTarget(
+                    ticker=pick.ticker,
+                    weight=weight,
+                    rank=rank,
+                    why_en=pick.why_en,
+                    why_he=pick.why_he,
+                    score=pick,
+                )
+            )
+        return out
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        held = {t.ticker for t in targets}
+        ranking = getattr(self.strategy, "last_ranking", [])
+        out: list[LiveWatch] = []
+        for rank, pick in enumerate(ranking, start=1):
+            if pick.ticker in held:
+                continue
+            out.append(
+                LiveWatch(
+                    ticker=pick.ticker,
+                    rank=rank,
+                    entry_trigger=self.entry_trigger,
+                    why_en=(
+                        f"market capitalisation ${pick.market_cap / 1e9:,.0f}bn — "
+                        f"ranked {rank}, just below the book"
+                    ),
+                    why_he=(
+                        f"שווי שוק {pick.market_cap / 1e9:,.0f} מיליארד$ — "
+                        f"מקום {rank}, מעט מתחת לתיק"
+                    ),
+                )
+            )
+            if len(out) >= self.watchlist_size:
+                break
+        return out
+
+
 __all__ = [
     "AgentAdapter",
     "BuffettLive",
@@ -471,6 +539,7 @@ __all__ = [
     "LiveTarget",
     "LiveWatch",
     "LynchLive",
+    "MarketCoreLive",
     "MarksLive",
     "NeffLive",
     "ScanResult",
