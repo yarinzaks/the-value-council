@@ -48,6 +48,13 @@ def _latest_on_or_before(
     an investor could have read; the forward variant would hand a
     January rebalance the numbers published in April.
     """
+    # An empty frame has no index levels to group on, and a panel build
+    # that resolved nothing is a plausible state — it is what a missing
+    # or half-written parquet looks like. Crashing here would take down
+    # the price-only designs too, which need none of this.
+    if fundamentals.empty or "ticker" not in (fundamentals.index.names or []):
+        return pd.DataFrame()
+
     out: list[pd.DataFrame] = []
     for ticker, group in fundamentals.groupby(level="ticker"):
         flat = group.droplevel("ticker").sort_index()
