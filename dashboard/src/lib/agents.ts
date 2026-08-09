@@ -135,6 +135,26 @@ export const AGENTS: AgentMeta[] = [
     school_he: "צמיחה איכותית + סקאטלבאט",
     color: "#9333ea",
   },
+  {
+    // Not an investor, and the description says so. This one answers to
+    // a measurement rather than to a book: it holds the largest liquid
+    // US companies weighted by what they are worth, and it is here
+    // because it was the only one of twenty-one designs to beat the
+    // index in both halves of the research history. Its edge is being
+    // more concentrated in the biggest names than the index is, which
+    // is a bet on continued mega-cap leadership rather than a
+    // mispricing — 2022 is the demonstration, at -28.1% against -18.2%.
+    slug: "market_core",
+    display_name: "Market Core",
+    display_name_he: "ליבת השוק",
+    description:
+      "The 25 largest liquid US companies, capitalisation-weighted, quarterly. Not stock picking — a concentrated bet on mega-cap leadership.",
+    description_he:
+      "25 החברות האמריקאיות הגדולות והסחירות, במשקל שווי שוק, איזון רבעוני. לא בחירת מניות — הימור מרוכז על הובלת הענקיות.",
+    school: "Evidence, not biography",
+    school_he: "ראיות, לא ביוגרפיה",
+    color: "#0891b2",
+  },
 ];
 
 /** Locale-aware metadata accessor. */

@@ -12,7 +12,8 @@ export type AgentSlug =
   | "peter_lynch"
   | "howard_marks"
   | "seth_klarman"
-  | "philip_fisher";
+  | "philip_fisher"
+  | "market_core";
 
 export interface BacktestMetrics {
   cagr_pct: number;

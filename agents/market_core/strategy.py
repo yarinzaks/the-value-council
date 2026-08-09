@@ -102,6 +102,13 @@ MIN_DOLLAR_VOLUME = 1_000_000.0
 #: Sessions the liquidity test is measured over.
 LIQUIDITY_SESSIONS = 63
 
+#: How far down the ranking to keep, beyond what is held.
+#:
+#: The live dashboard shows a watchlist — the names ranked just below
+#: the buy threshold — so a reader can see what would be bought next.
+#: For this screen that is simply companies 26 through 55 by size.
+RANKING_DEPTH = 55
+
 #: Minimum daily dollar volume as a fraction of market capitalisation,
 #: below which the capitalisation is not believed.
 #:
@@ -166,6 +173,10 @@ class MarketCore(Strategy):
         self.min_dollar_volume = min_dollar_volume
         self.decision_logger = decision_logger
         self.last_picks: list[CorePick] = []
+        #: Held names plus the next few, for the live watchlist. Weights
+        #: on the entries beyond the book are what they *would* be, and
+        #: are not acted on.
+        self.last_ranking: list[CorePick] = []
 
     # ------------------------------------------------------------------
     def _capitalisations(
@@ -223,7 +234,8 @@ class MarketCore(Strategy):
             logger.warning(f"{as_of}: nothing measurable; holding")
             return {}
 
-        largest = sorted(caps.items(), key=lambda kv: -kv[1])[: self.portfolio_size]
+        ordered = sorted(caps.items(), key=lambda kv: -kv[1])
+        largest = ordered[: self.portfolio_size]
         total = sum(cap for _, cap in largest)
         if total <= 0:
             return {}
@@ -236,6 +248,15 @@ class MarketCore(Strategy):
                 weight_pct=weights[ticker] * 100.0,
             )
             for ticker, cap in largest
+        ]
+        # Everything the live watchlist might need, held or not.
+        self.last_ranking = [
+            CorePick(
+                ticker=ticker,
+                market_cap=cap,
+                weight_pct=weights.get(ticker, 0.0) * 100.0,
+            )
+            for ticker, cap in ordered[:RANKING_DEPTH]
         ]
         self._log_decisions(as_of, prices)
         return weights
