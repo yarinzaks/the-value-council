@@ -61,6 +61,7 @@ LOW_VOL = Leg("vol_6m", higher_is_better=False)
 NOT_EXTENDED = Leg("reversal_1m", higher_is_better=False)
 VALUE = Leg("earnings_yield")
 QUALITY = Leg("op_profitability")
+SIZE = Leg("market_cap")
 
 
 #: Designs needing nothing but the price series. These can be scored the
@@ -102,6 +103,35 @@ WITH_FUNDAMENTALS: tuple[Design, ...] = (
     ),
 )
 
+#: The dimension none of the above touches: how the twenty-five names
+#: are sized.
+#:
+#: Every design so far picks 25 from ~1,500 and weights them equally,
+#: and every one lost to an index whose return over 2011-2026 came
+#: overwhelmingly from its largest constituents. An equal-weighted book
+#: of 25 cannot express "hold more of the biggest company" at all — so
+#: the comparison was never testing the signals on their own. It was
+#: testing signals *and* equal weighting, against a benchmark that used
+#: capitalisation weighting, and attributing the whole difference to the
+#: signals.
+#:
+#: ``biggest 25`` is the control: no signal, just the largest companies
+#: that pass the liquidity floor. If it beats the signal designs, the
+#: weighting scheme was the story all along.
+SIZE_AWARE: tuple[Design, ...] = (
+    Design(name="biggest 25 (cap-weighted)", legs=(SIZE,), weighting="cap"),
+    Design(name="biggest 25 (equal)", legs=(SIZE,)),
+    Design(name="low ivol, cap-weighted", legs=(LOW_IVOL,), weighting="cap"),
+    Design(
+        name="quality + mom + low ivol, cap-weighted",
+        legs=(QUALITY, MOMENTUM, LOW_IVOL),
+        weighting="cap",
+    ),
+    Design(name="momentum 12-1, cap-weighted", legs=(MOMENTUM,), weighting="cap"),
+    Design(name="value, cap-weighted", legs=(VALUE,), weighting="cap"),
+    Design(name="quality, cap-weighted", legs=(QUALITY,), weighting="cap"),
+)
+
 #: Variations applied to whichever of the above wins, not searched over
 #: independently. Listed here so the count stays honest.
 VARIATIONS: tuple[str, ...] = (
@@ -113,11 +143,17 @@ VARIATIONS: tuple[str, ...] = (
 
 def total_registered() -> int:
     """How many distinct things get tried, for the multiple-testing note."""
-    return len(PRICE_ONLY) + len(WITH_FUNDAMENTALS) + len(VARIATIONS)
+    return (
+        len(PRICE_ONLY)
+        + len(WITH_FUNDAMENTALS)
+        + len(SIZE_AWARE)
+        + len(VARIATIONS)
+    )
 
 
 __all__ = [
     "PRICE_ONLY",
+    "SIZE_AWARE",
     "STANDARD_SIZE",
     "VARIATIONS",
     "WITH_FUNDAMENTALS",

@@ -23,6 +23,8 @@ import sqlite3
 import sys
 from datetime import date, datetime
 
+import pandas as pd
+
 from core.data.edgar_cache import EdgarCache
 from core.data.ticker_filter import is_common_equity, is_primary_listing
 from core.logger import get_logger
@@ -128,11 +130,49 @@ def _parse_date(text: str) -> date:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--which", choices=("prices", "fundamentals"), required=True)
+    parser.add_argument(
+        "--which",
+        choices=("prices", "fundamentals", "merge"),
+        required=True,
+        help=(
+            "merge concatenates saved panel slices into one file. Building "
+            "2011-2018 and 2019-2026 separately halves the wait, but the two "
+            "write to the same path, and a panel covering only the first "
+            "half does not fail when asked about the second — it carries "
+            "every 2018 filing forward instead."
+        ),
+    )
+    parser.add_argument(
+        "--parts",
+        nargs="+",
+        default=None,
+        help="panel names to merge, e.g. fundamentals_panel_2011_2018 ...",
+    )
     parser.add_argument("--start", type=_parse_date, default=PANEL_START)
     parser.add_argument("--end", type=_parse_date, default=PANEL_END)
     parser.add_argument("--workers", type=int, default=None)
     args = parser.parse_args()
+
+    if args.which == "merge":
+        if not args.parts:
+            parser.error("--which merge needs --parts")
+        frames = []
+        for name in args.parts:
+            path = panel_path(name)
+            if not path.exists():
+                parser.error(f"no panel at {path}")
+            part = pd.read_parquet(path)
+            logger.info(f"{name}: {len(part):,} rows")
+            frames.append(part)
+        panel = pd.concat(frames).sort_index()
+        before = len(panel)
+        panel = panel[~panel.index.duplicated(keep="last")]
+        if before != len(panel):
+            logger.info(f"dropped {before - len(panel):,} duplicate (date, ticker) rows")
+        out = panel_path("fundamentals_panel")
+        panel.to_parquet(out)
+        logger.info(f"wrote {len(panel):,} merged rows to {out}")
+        return 0
 
     if args.which == "prices":
         panel = build_price_panel(PanelSpec(start=args.start, end=args.end))

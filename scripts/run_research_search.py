@@ -38,6 +38,7 @@ from core.research.price_panel import (
 )
 from scripts.research_designs import (
     PRICE_ONLY,
+    SIZE_AWARE,
     WITH_FUNDAMENTALS,
     total_registered,
 )
@@ -138,7 +139,7 @@ def main() -> int:
 
     panel, bench, exposure = _load_panels(start, end, args.frequency)
     per_year = PERIODS_PER_YEAR[args.frequency]
-    rows = _score(panel, PRICE_ONLY + WITH_FUNDAMENTALS, bench, per_year)
+    rows = _score(panel, PRICE_ONLY + WITH_FUNDAMENTALS + SIZE_AWARE, bench, per_year)
     if not rows:
         logger.error("nothing could be scored")
         return 1

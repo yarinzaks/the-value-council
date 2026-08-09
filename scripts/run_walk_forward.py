@@ -44,7 +44,7 @@ from core.research.walk_forward import (
     max_drawdown,
     run,
 )
-from scripts.research_designs import PRICE_ONLY, WITH_FUNDAMENTALS
+from scripts.research_designs import PRICE_ONLY, SIZE_AWARE, WITH_FUNDAMENTALS
 
 logger = get_logger("scripts.run_walk_forward")
 
@@ -72,7 +72,7 @@ def main() -> int:
         logger.warning("no fundamentals panel — price-only designs")
         panel = prices
 
-    returns = design_returns(panel, PRICE_ONLY + WITH_FUNDAMENTALS)
+    returns = design_returns(panel, PRICE_ONLY + WITH_FUNDAMENTALS + SIZE_AWARE)
     logger.info(f"{returns.shape[1]} designs over {returns.shape[0]} quarters")
 
     result = run(returns, bench)
