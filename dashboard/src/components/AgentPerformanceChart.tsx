@@ -77,7 +77,7 @@ export function AgentPerformanceChart({
   const [period, setPeriod] = useState<Period>("1M");
 
   const data = useMemo(() => {
-    if (snapshots.length === 0) return { rows: [], stats: null };
+    if (snapshots.length === 0) return { rows: [], hasBenchmark: false, stats: null };
 
     // Apply period window from the most recent snapshot backwards.
     const all = [...snapshots].sort((a, b) => a.date.localeCompare(b.date));
@@ -89,7 +89,7 @@ export function AgentPerformanceChart({
       days === Number.POSITIVE_INFINITY
         ? all
         : all.filter((s) => new Date(s.date) >= cutoff);
-    if (windowed.length === 0) return { rows: [], stats: null };
+    if (windowed.length === 0) return { rows: [], hasBenchmark: false, stats: null };
 
     // Rebase benchmark to the starting NAV of the agent in this window.
     const startNav = windowed[0].nav;
@@ -115,6 +115,21 @@ export function AgentPerformanceChart({
       };
     });
 
+    // Whether the benchmark series overlaps this window at all.
+    //
+    // Load-bearing. `benchmark` is the *backtest* NAV series, which ends
+    // 2024-12-31, while `snapshots` are live and start 2026-04-01. The
+    // two date sets are disjoint by construction, so every lookup above
+    // misses and `benchmarkNav` is undefined on every row. Recharts then
+    // draws a <path> with an empty `d` — an invisible line claiming a
+    // comparison that was never computed. Rendering the line only when
+    // the data exists keeps the DOM honest; the stats row below already
+    // reports the same absence as "—".
+    //
+    // The comparison comes back the day the live runner records a
+    // benchmark NAV per snapshot. Nothing here needs to change then.
+    const hasBenchmark = rows.some((r) => r.benchmarkNav !== undefined);
+
     // Stats (best / worst day + cumulative).
     let best = { date: "", pct: -Infinity };
     let worst = { date: "", pct: Infinity };
@@ -136,6 +151,7 @@ export function AgentPerformanceChart({
 
     return {
       rows,
+      hasBenchmark,
       stats: {
         startNav,
         endNav: windowed[windowed.length - 1].nav,
@@ -252,17 +268,19 @@ export function AgentPerformanceChart({
               isAnimationActive={false}
               name={agentName}
             />
-            <Line
-              type="monotone"
-              dataKey="benchmarkNav"
-              stroke="#64748b"
-              strokeWidth={1.5}
-              strokeDasharray="4 4"
-              dot={false}
-              isAnimationActive={false}
-              name="S&P 500"
-              connectNulls
-            />
+            {data.hasBenchmark && (
+              <Line
+                type="monotone"
+                dataKey="benchmarkNav"
+                stroke="#64748b"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                dot={false}
+                isAnimationActive={false}
+                name="S&P 500"
+                connectNulls
+              />
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>
