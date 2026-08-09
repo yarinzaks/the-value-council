@@ -50,6 +50,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -131,6 +132,22 @@ class PanelSpec:
     #: One year plus the momentum skip, so every feature below has a
     #: full window rather than a partially-filled one.
     min_history: int = MOMENTUM_LOOKBACK + MOMENTUM_SKIP
+
+    #: How often the strategy is asked to decide: ``"M"`` for month-end,
+    #: ``"Q"`` for quarter-end.
+    #:
+    #: This has to match how the agent will actually be deployed, not
+    #: what is convenient to research with. The leaderboard runs every
+    #: doctrine quarterly (see
+    #: :data:`core.backtest.validation_window.VALIDATION_REBALANCE`), and
+    #: a design tuned monthly is a different strategy: it trades three
+    #: times as often, pays three times the cost, and acts on signals
+    #: while they are two months fresher. Designing at one frequency and
+    #: deploying at another is how a research result stops reproducing.
+    #:
+    #: ``fwd_next`` is always measured rebalance-to-rebalance, so it
+    #: follows this setting rather than assuming a month.
+    frequency: Literal["M", "Q"] = "Q"
 
     #: Restrict the roster to ordinary common stock, one listing per
     #: issuer. On by default, and it is not housekeeping.
@@ -223,7 +240,7 @@ def load_price_matrices(
 
 
 def rebalance_dates(adj: pd.DataFrame, spec: PanelSpec) -> pd.DatetimeIndex:
-    """Last trading day of each month inside the spec's window.
+    """Last trading day of each period inside the spec's window.
 
     Derived from the price index rather than a calendar, so every date
     is one the market actually traded and no feature is measured on a
@@ -233,10 +250,12 @@ def rebalance_dates(adj: pd.DataFrame, spec: PanelSpec) -> pd.DatetimeIndex:
     in_window = idx[
         (idx >= pd.Timestamp(spec.start)) & (idx <= pd.Timestamp(spec.end))
     ]
-    month_ends = (
-        pd.Series(in_window, index=in_window).groupby(in_window.to_period("M")).max()
+    period_ends = (
+        pd.Series(in_window, index=in_window)
+        .groupby(in_window.to_period(spec.frequency))
+        .max()
     )
-    return pd.DatetimeIndex(month_ends.values)
+    return pd.DatetimeIndex(period_ends.values)
 
 
 def benchmark_returns(adj: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.Series:

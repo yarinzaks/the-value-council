@@ -169,8 +169,31 @@ class TestSummarize:
 
     def test_a_steady_one_percent_a_month_compounds(self) -> None:
         r = pd.Series([0.01] * 12, index=pd.date_range("2020-01-31", periods=12, freq="ME"))
-        s = summarize(r, pd.Series(0.0, index=r.index), name="steady")
+        s = summarize(
+            r, pd.Series(0.0, index=r.index), name="steady", periods_per_year=12
+        )
         assert s.cagr_pct == pytest.approx(12.68, abs=0.05)
+
+    def test_the_same_returns_annualise_differently_by_frequency(self) -> None:
+        # Twelve periods of +1% is a year at monthly and three years at
+        # quarterly. Annualising one as the other is not a rounding
+        # difference — it is a different claim about the strategy.
+        r = pd.Series([0.01] * 12, index=pd.date_range("2020-01-31", periods=12, freq="ME"))
+        flat = pd.Series(0.0, index=r.index)
+        monthly = summarize(r, flat, name="m", periods_per_year=12).cagr_pct
+        quarterly = summarize(r, flat, name="q", periods_per_year=4).cagr_pct
+        assert monthly > quarterly
+        assert quarterly == pytest.approx(4.06, abs=0.05)
+
+    def test_volatility_scales_with_the_root_of_the_frequency(self) -> None:
+        r = pd.Series(
+            [0.05, -0.03, 0.04, -0.02] * 3,
+            index=pd.date_range("2020-01-31", periods=12, freq="ME"),
+        )
+        flat = pd.Series(0.0, index=r.index)
+        monthly = summarize(r, flat, name="m", periods_per_year=12).volatility_pct
+        quarterly = summarize(r, flat, name="q", periods_per_year=4).volatility_pct
+        assert monthly / quarterly == pytest.approx(np.sqrt(3.0), abs=1e-6)
 
     def test_drawdown_is_measured_from_the_peak(self) -> None:
         r = pd.Series(

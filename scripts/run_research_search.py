@@ -25,7 +25,7 @@ from datetime import date
 import pandas as pd
 
 from core.logger import get_logger
-from core.research.evaluate import Design, evaluate
+from core.research.evaluate import PERIODS_PER_YEAR, Design, evaluate
 from core.research.factors import add_fundamental_factors
 from core.research.fundamentals_panel import panel_path
 from core.research.price_panel import (
@@ -54,8 +54,10 @@ HOLDOUT_START = date(2019, 1, 1)
 HOLDOUT_END = date(2026, 8, 8)
 
 
-def _load_panels(start: date, end: date) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-    spec = PanelSpec(start=start, end=end)
+def _load_panels(
+    start: date, end: date, frequency: str
+) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    spec = PanelSpec(start=start, end=end, frequency=frequency)
     prices = build_price_panel(spec)
     adj, _ = load_price_matrices(spec)
     dates = rebalance_dates(adj, spec)
@@ -76,7 +78,10 @@ def _load_panels(start: date, end: date) -> tuple[pd.DataFrame, pd.Series, pd.Se
 
 
 def _score(
-    panel: pd.DataFrame, designs: tuple[Design, ...], bench: pd.Series
+    panel: pd.DataFrame,
+    designs: tuple[Design, ...],
+    bench: pd.Series,
+    periods_per_year: int,
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for design in designs:
@@ -87,7 +92,9 @@ def _score(
             logger.info(f"skipping '{design.name}': panel has no {missing}")
             continue
         try:
-            summary, _ = evaluate(panel, design, bench)
+            summary, _ = evaluate(
+                panel, design, bench, periods_per_year=periods_per_year
+            )
         except ValueError as exc:
             logger.warning(f"'{design.name}' could not be scored: {exc}")
             continue
@@ -101,6 +108,15 @@ def main() -> int:
         "--holdout",
         action="store_true",
         help="score on 2019-2026 instead of the development window",
+    )
+    parser.add_argument(
+        "--frequency",
+        choices=("M", "Q"),
+        default="Q",
+        help=(
+            "how often the strategy decides. Q by default, matching the "
+            "frequency every leaderboard agent is actually run at."
+        ),
     )
     parser.add_argument(
         "--i-am-done-designing",
@@ -120,15 +136,18 @@ def main() -> int:
     label = "HOLDOUT" if args.holdout else "development"
     logger.info(f"{label} window: {start} → {end}")
 
-    panel, bench, exposure = _load_panels(start, end)
-    rows = _score(panel, PRICE_ONLY + WITH_FUNDAMENTALS, bench)
+    panel, bench, exposure = _load_panels(start, end, args.frequency)
+    per_year = PERIODS_PER_YEAR[args.frequency]
+    rows = _score(panel, PRICE_ONLY + WITH_FUNDAMENTALS, bench, per_year)
     if not rows:
         logger.error("nothing could be scored")
         return 1
 
     table = pd.DataFrame(rows).sort_values("CAGR%", ascending=False)
     clean = bench.dropna()
-    bench_cagr = (float((1.0 + clean).prod()) ** (12 / len(clean)) - 1.0) * 100.0
+    bench_cagr = (
+        float((1.0 + clean).prod()) ** (per_year / len(clean)) - 1.0
+    ) * 100.0
 
     print()
     print("=" * 78)

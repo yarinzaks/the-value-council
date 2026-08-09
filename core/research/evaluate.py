@@ -41,8 +41,15 @@ from core.logger import get_logger
 
 logger = get_logger("core.research.evaluate")
 
-#: Rebalances per year on a month-end grid. Used to annualise.
-PERIODS_PER_YEAR = 12
+#: Rebalances per year, by :attr:`PanelSpec.frequency`. Annualising a
+#: quarterly series as though it were monthly overstates volatility by
+#: √3 and turns a real Sharpe into a flattering one, so this is passed
+#: explicitly rather than assumed.
+PERIODS_PER_YEAR: dict[str, int] = {"M": 12, "Q": 4}
+
+#: Used where a caller has not said. Quarterly, matching the frequency
+#: every leaderboard agent is actually run at.
+DEFAULT_PERIODS_PER_YEAR = PERIODS_PER_YEAR["Q"]
 
 #: Cost charged per side, in basis points. The same 10bp the leaderboard
 #: agents pay, so a number here is comparable to theirs.
@@ -214,7 +221,11 @@ class Summary:
 
 
 def summarize(
-    net: pd.Series, benchmark: pd.Series, *, name: str
+    net: pd.Series,
+    benchmark: pd.Series,
+    *,
+    name: str,
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
 ) -> Summary:
     """Annualised performance, and how confident one can be in it.
 
@@ -229,10 +240,10 @@ def summarize(
     if len(net) < 2:
         raise ValueError(f"{name}: need at least two periods, got {len(net)}")
 
-    years = len(net) / PERIODS_PER_YEAR
+    years = len(net) / periods_per_year
     growth = float((1.0 + net).prod())
     cagr = (growth ** (1.0 / years) - 1.0) * 100.0 if growth > 0 else -100.0
-    vol = float(net.std(ddof=1)) * np.sqrt(PERIODS_PER_YEAR) * 100.0
+    vol = float(net.std(ddof=1)) * np.sqrt(periods_per_year) * 100.0
     sharpe = (cagr / vol) if vol > 0 else 0.0
 
     curve = (1.0 + net).cumprod()
@@ -261,13 +272,22 @@ def summarize(
 
 
 def evaluate(
-    panel: pd.DataFrame, design: Design, benchmark: pd.Series
+    panel: pd.DataFrame,
+    design: Design,
+    benchmark: pd.Series,
+    *,
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
 ) -> tuple[Summary, pd.DataFrame]:
     """Run one design over the panel. Returns ``(summary, per-period)``."""
     weights = build_weights(panel, design)
     periods = period_returns(panel, weights, design)
     summary = replace(
-        summarize(periods["net"], benchmark, name=design.name),
+        summarize(
+            periods["net"],
+            benchmark,
+            name=design.name,
+            periods_per_year=periods_per_year,
+        ),
         turnover_per_period=float(periods["turnover"].mean()),
     )
     return summary, periods
@@ -275,6 +295,7 @@ def evaluate(
 
 __all__ = [
     "DEFAULT_COST_BPS",
+    "DEFAULT_PERIODS_PER_YEAR",
     "PERIODS_PER_YEAR",
     "Design",
     "Leg",
