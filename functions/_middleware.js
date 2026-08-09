@@ -54,14 +54,27 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
-/** Parse `Authorization: Basic base64(user:pass)`. Null if malformed. */
+/**
+ * Parse `Authorization: Basic base64(user:pass)`. Null if malformed.
+ *
+ * The UTF-8 step is load-bearing and was missing at first, which broke
+ * every password containing a character outside ASCII — Hebrew, an
+ * accent, an emoji. Browsers encode the credentials as UTF-8 bytes and
+ * then base64 them (we ask for exactly that with charset="UTF-8" in the
+ * challenge), but `atob` hands back a *binary string*: one character
+ * per byte, values 0-255. For ASCII that happens to equal the original.
+ * For anything else "סיסמה" arrives as "×¡××¡××" and never matches.
+ * Decoding the bytes properly is the fix.
+ */
 function readCredentials(header) {
   if (!header || !header.startsWith("Basic ")) return null;
   let decoded;
   try {
-    decoded = atob(header.slice(6));
+    const binary = atob(header.slice(6));
+    const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+    decoded = new TextDecoder("utf-8").decode(bytes);
   } catch {
-    // Not valid base64 — a probe, not a browser.
+    // Not valid base64, or not valid UTF-8 — a probe, not a browser.
     return null;
   }
   const separator = decoded.indexOf(":");
