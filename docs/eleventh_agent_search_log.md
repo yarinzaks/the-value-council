@@ -281,3 +281,73 @@ spike-and-return filter is not catching whatever produced it. The
 number is not to be used. It is left in the table rather than deleted
 because removing rows that embarrass the method is how a search log
 stops being one.
+
+---
+
+# Walk-forward: does *choosing* work?
+
+The single split condemned one design. It did not settle whether the
+method itself works, because one split is one draw. So the choice was
+made repeatedly across the whole history — rank every design on the
+trailing two years, hold the winner for one, repeat — which produces
+the track record of the procedure a person reading a leaderboard
+actually follows.
+
+Contaminated row excluded: `not extended` still carries a bad print in
+the 2019-2026 stretch (a 692% best window), and leaving it in let the
+procedure select a broken design. Both figures are given.
+
+| approach | CAGR% | maxDD% |
+|---|---|---|
+| select the trailing winner | **9.39** | **-45.82** |
+| hold all twelve designs equally | 12.08 | -30.25 |
+| **the index** | **14.44** | **-23.93** |
+
+*(with the contaminated design left in, selecting returns -1.10% with a
+-74.48% drawdown.)*
+
+**The index wins on both return and risk.** Selecting costs five points
+a year and doubles the drawdown. Diversifying across all twelve costs
+two and a half points and still carries more drawdown than the index.
+
+## And the overlay, one last time
+
+The trend rule was dismissed earlier for a specific reason — a book
+whose worst drawdown is 8% has nothing to protect. The diversified book
+draws down 30%, which is exactly the case the rule exists for. So it
+was worth one more test.
+
+| approach | CAGR% | maxDD% | vol% |
+|---|---|---|---|
+| diversified | 12.07 | -30.25 | 20.15 |
+| diversified + trend | 5.14 | **-33.51** | 16.29 |
+| index | 13.99 | -23.93 | 14.92 |
+| index + trend | 7.89 | -19.98 | 13.16 |
+
+It halves the return and makes the diversified book's drawdown *worse*.
+The cause is structural rather than bad luck: this project rebalances
+quarterly, so a ten-month trend rule is evaluated four times a year and
+can be up to three months late. It sells after the fall and buys after
+the recovery. The literature that supports trend following evaluates it
+monthly, and the deployment frequency here is what removes its edge.
+
+---
+
+# What the whole exercise concluded
+
+Nothing tested beats holding the index.
+
+* Thirteen designs on a sealed out-of-sample window: the chosen one lost
+  by 12.50 points at t = -2.27.
+* Rank correlation between the two windows: **-0.440**. Choosing on
+  eight years of history was worse than choosing at random.
+* Following the trailing winner across fifteen years: 9.39% against the
+  index's 14.44%, with twice the drawdown.
+* Diversifying across every design instead: 12.08%, still short.
+* A trend overlay at this rebalance frequency: destroys returns in every
+  configuration tried.
+
+The finding is not that these particular factors are bad. It is that a
+single historical window has no demonstrated power to choose between
+them, and that every agent in this project — the ten named investors
+included — rests on exactly one window with no out-of-sample test.
