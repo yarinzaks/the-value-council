@@ -32,6 +32,20 @@ function writeLocaleCookie(locale: Locale): void {
   document.cookie = `${COOKIE_LOCALE}=${locale}; expires=${expires}; path=/; SameSite=Lax`;
 }
 
+/**
+ * Set when this is one of the two static language builds (see
+ * lib/locale-server.ts). Those are published side by side under /en and
+ * /he, so switching language is a navigation between two sites rather
+ * than a cookie the server will read on the next request — there is no
+ * server to read it.
+ */
+const FIXED_LOCALE = process.env.NEXT_PUBLIC_SITE_LOCALE;
+
+/** `/en/agents/x` -> `/he/agents/x`; `/en` -> `/he`. */
+export function swapLocalePath(pathname: string, next: Locale): string {
+  return `/${next}${pathname.replace(/^\/(en|he)(?=\/|$)/, "")}`;
+}
+
 export function Providers({
   children,
   initialLocale = "en",
@@ -67,6 +81,15 @@ export function Providers({
   }, [theme, locale]);
 
   const setLocale = (l: Locale) => {
+    if (typeof window !== "undefined" && FIXED_LOCALE) {
+      // Static build: cross to the same page on the other language site,
+      // keeping any query and fragment. Deliberately does not set state
+      // first — the destination is already rendered in `l`, and a repaint
+      // here would only flash the new language through the old layout.
+      const { pathname, search, hash } = window.location;
+      window.location.href = `${swapLocalePath(pathname, l)}${search}${hash}`;
+      return;
+    }
     setLocaleState(l);
     try {
       localStorage.setItem(STORAGE_LOCALE, l);

@@ -249,6 +249,12 @@ data/fundamentals_cache/
 # Dashboard build artifacts
 dashboard/.next/
 dashboard/node_modules/
+# Per-language dist dirs and the merged static site, both produced by
+# scripts/build-static-site.sh. Cloudflare builds them on every push;
+# nothing here should ever be committed.
+dashboard/.next-*/
+dashboard/out/
+dashboard/site/
 
 # Lessons / scratch notes
 LESSONS.md

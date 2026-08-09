@@ -28,7 +28,12 @@ import { getServerI18n } from "@/lib/locale-server";
 import { translateRationale, translateTrigger } from "@/lib/translate-dynamic";
 import { decisionLabel, narrative } from "@/lib/narrative";
 
-export const dynamic = "force-dynamic";
+// Static in the two-language export, where "force-dynamic" is a hard
+// error; dynamic under a live server (next dev). NEXT_PUBLIC_* is
+// inlined at build time, so this folds to a constant.
+export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
+  ? "force-static"
+  : "force-dynamic";
 
 export function generateStaticParams() {
   return AGENTS.map((a) => ({ slug: a.slug }));
@@ -315,7 +320,7 @@ export default async function AgentDrillPage({
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold">{t("drilldown_recent_decisions")}</h3>
           <Link
-            href={`/journal?agent=${slug}`}
+            href={`/journal/${slug}/held`}
             className="text-xs text-muted hover:underline"
           >
             {t("view_all")}
