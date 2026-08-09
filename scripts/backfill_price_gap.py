@@ -143,7 +143,14 @@ def tickers_with_interior_gaps() -> list[str]:
     bars: dict[str, dict[int, int]] = {}
     for ticker, yr, n in rows:
         bars.setdefault(ticker, {})[yr] = n
+    return holed_tickers(bars)
 
+
+def holed_tickers(bars: dict[str, dict[int, int]]) -> list[str]:
+    """The decision rule, separated from the query so it can be tested.
+
+    ``bars`` maps ticker to ``{year: bar_count}``.
+    """
     holed: list[str] = []
     for ticker, by_year in bars.items():
         if len(by_year) < 2:
