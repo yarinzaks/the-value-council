@@ -6,7 +6,7 @@
 // loaders. The dashboard is a Next.js 14 app-router app, so most pages
 // are server components by default.
 
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { parse as parseCsvSync } from "csv-parse/sync";
 
@@ -33,8 +33,20 @@ import type {
 //
 // Resolution order:
 //   1. VALUE_COUNCIL_DATA_DIR env var (explicit override).
-//   2. ~/Library/Application Support/value-council/ (default — TCC-safe).
-//   3. <project_root>/data/ (legacy fallback for dev / CI).
+//   2. ~/Library/Application Support/value-council/ — if it exists.
+//   3. <project_root>/data/ — the repo tree.
+//
+// Step 2 tests for existence rather than assuming it, and that test is
+// load-bearing now that the site is built in the cloud rather than only
+// served from the Mac. A Linux build container has $HOME set, so the
+// previous version returned ~/Library/Application Support/value-council
+// unconditionally — a path that does not exist there. Every loader in
+// this file swallows its own read errors and returns [] or null, by
+// design, so nothing would have thrown: the build would have succeeded
+// and published a complete site with no numbers in it.
+//
+// Mirrors the same three-step resolution in core/paths.py, which has
+// checked for existence since it was written.
 function resolveDataRoot(): string {
   if (process.env.VALUE_COUNCIL_DATA_DIR) {
     return process.env.VALUE_COUNCIL_DATA_DIR;
@@ -42,7 +54,9 @@ function resolveDataRoot(): string {
   const home = process.env.HOME;
   if (home) {
     const lib = path.join(home, "Library", "Application Support", "value-council");
-    return lib;
+    if (existsSync(lib)) {
+      return lib;
+    }
   }
   return path.resolve(process.cwd(), "..", "data");
 }
