@@ -336,3 +336,51 @@ class TestStaleFilingsAreDropped:
         assert bool(
             np.isnan(merged.loc[(pd.Timestamp("2023-04-28"), "AAA"), "total_assets"])
         )
+
+
+class TestImplausibleCapitalisationsAreRefused:
+    """A fake giant takes most of a capitalisation-weighted book.
+
+    `PKG` computes to $6,276bn because its share count is filed a
+    thousand times too large, and at that size it drew a 41% weight and
+    turned "hold the 25 biggest US companies" into -0.94% a year with a
+    42% drawdown. The tell is not the size — it is that a $6trn company
+    was trading a few million dollars a day.
+    """
+
+    @staticmethod
+    def _cap(price: float, shares: float, dollar_volume: float) -> float:
+        panel = pd.DataFrame(
+            {
+                "price": [price],
+                "shares_split_adjusted": [shares],
+                "dollar_volume": [dollar_volume],
+            },
+            index=[0],
+        )
+        return market_capitalisation(panel).iloc[0]
+
+    def test_a_normal_company_is_believed(self) -> None:
+        # $10bn cap trading $70m a day — 0.7%, the median.
+        assert self._cap(10.0, 1e9, 70_000_000.0) == pytest.approx(1e10)
+
+    def test_a_quiet_company_is_still_believed(self) -> None:
+        # 0.05% a day is thin but real, and sits at the 1st percentile.
+        assert self._cap(10.0, 1e9, 5_000_000.0) == pytest.approx(1e10)
+
+    def test_a_share_count_off_by_a_thousand_is_refused(self) -> None:
+        # The PKG shape: a plausible price, a share count 1,000x too
+        # large, and volume that belongs to the real company.
+        assert bool(np.isnan(self._cap(66.68, 94.1e9, 200_000_000.0)))
+
+    def test_a_reverse_split_artefact_price_is_refused(self) -> None:
+        # The JAGX shape: $9.6m a share.
+        assert bool(np.isnan(self._cap(9_627_188.0, 171_000.0, 2_468_812.0)))
+
+    def test_a_missing_volume_column_leaves_the_cap_alone(self) -> None:
+        # The gate is a cross-check, not a requirement. A panel without
+        # volume should still produce capitalisations rather than none.
+        panel = pd.DataFrame(
+            {"price": [10.0], "shares_split_adjusted": [1e9]}, index=[0]
+        )
+        assert market_capitalisation(panel).iloc[0] == pytest.approx(1e10)

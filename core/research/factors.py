@@ -126,11 +126,43 @@ def _latest_on_or_before(
     return joined.sort_index()
 
 
+#: Minimum daily dollar volume, as a fraction of market cap, before the
+#: capitalisation is believed at all.
+#:
+#: A company's size and its trading are related: across 104,676 rows the
+#: median name turns over 0.72% of its capitalisation a day, and the 1st
+#: percentile still manages 0.058%. Nothing real sits far below that.
+#:
+#: What sits below it is arithmetic. `PKG` computes to $6,276bn because
+#: its share count is filed a thousand times too large — the company has
+#: about 95 million shares, not 94 billion. `JAGX` computes to
+#: $1,649,620bn on a price of $9,627,188, which is what a series looks
+#: like after enough reverse splits. Both are rare — 166 rows of 104,676
+#: fall below 0.001% — and both are fatal to a capitalisation-weighted
+#: book, because the fake giant takes most of it. `PKG` alone drew a 41%
+#: weight and turned "hold the 25 biggest US companies" into -0.94% a
+#: year with a 42% drawdown.
+#:
+#: 0.01% is roughly six times below the 1st percentile: far enough not to
+#: exclude a genuinely quiet company, close enough to catch a share count
+#: off by three orders of magnitude.
+MIN_DAILY_TURNOVER = 0.0001
+
+
 def market_capitalisation(panel: pd.DataFrame) -> pd.Series:
-    """Split-consistent market capitalisation, in dollars."""
+    """Split-consistent market capitalisation, in dollars.
+
+    Refuses to answer where the figure is contradicted by how much the
+    stock actually trades — see :data:`MIN_DAILY_TURNOVER`.
+    """
     shares = panel["shares_split_adjusted"]
     cap = panel["price"] * shares
-    return cap.where(cap > 0)
+    cap = cap.where(cap > 0)
+
+    if "dollar_volume" in panel.columns:
+        turnover = panel["dollar_volume"] / cap
+        cap = cap.where(turnover >= MIN_DAILY_TURNOVER)
+    return cap
 
 
 def enterprise_value(panel: pd.DataFrame) -> pd.Series:
