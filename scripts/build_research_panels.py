@@ -32,7 +32,11 @@ from core.research.fundamentals_panel import (
     build_fundamentals_panel,
     panel_path,
 )
-from core.research.price_panel import PanelSpec, build_price_panel
+from core.research.price_panel import (
+    MIN_DOLLAR_VOLUME,
+    PanelSpec,
+    build_price_panel,
+)
 
 logger = get_logger("scripts.build_research_panels")
 
@@ -69,6 +73,55 @@ def research_universe() -> tuple[str, ...]:
     return tuple(common)
 
 
+#: Sessions above :data:`MIN_DOLLAR_VOLUME` a ticker needs, anywhere in
+#: its life, to be worth measuring filings for.
+#:
+#: Half a trading year. One day is too weak a test — 4,992 tickers clear
+#: it, because a single squeeze does — and a full year is too strong at
+#: 3,385, since it starts asking that a company *stayed* liquid, which
+#: is survivorship in a smaller costume. Half a year (3,792) separates a
+#: name that was genuinely investable for a while from a shell that
+#: spiked once.
+MIN_LIQUID_SESSIONS = 126
+
+
+def tradeable_universe(start: date, end: date) -> tuple[str, ...]:
+    """Research universe, minus names never liquid enough to hold.
+
+    The fundamentals sweep is the expensive half of the build — roughly
+    ten seconds a ticker — and a name the panel's own per-date volume
+    filter always rejects contributes rows that are joined and then
+    discarded.
+
+    The test is "was liquid for a while", not "is liquid now" and not
+    "stayed liquid". A company that traded well for three years and then
+    faded belongs in the panel for those three years, and the per-date
+    filter decides which ones they were.
+    """
+    conn = sqlite3.connect(DATA_ROOT / "cache" / "prices.sqlite")
+    try:
+        rows = conn.execute(
+            """
+            SELECT ticker,
+                   SUM(CASE WHEN close * volume >= ? THEN 1 ELSE 0 END) AS sessions
+            FROM prices
+            WHERE trade_date >= ? AND trade_date <= ?
+            GROUP BY ticker
+            """,
+            (MIN_DOLLAR_VOLUME, start.isoformat(), end.isoformat()),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    liquid = {t for t, sessions in rows if sessions >= MIN_LIQUID_SESSIONS}
+    universe = tuple(t for t in research_universe() if t in liquid)
+    logger.info(
+        f"tradeable universe: {len(universe):,} tickers traded above "
+        f"${MIN_DOLLAR_VOLUME:,.0f} on at least {MIN_LIQUID_SESSIONS} sessions"
+    )
+    return universe
+
+
 def _parse_date(text: str) -> date:
     return datetime.strptime(text, "%Y-%m-%d").date()
 
@@ -85,7 +138,7 @@ def main() -> int:
         panel = build_price_panel(PanelSpec(start=args.start, end=args.end))
         out = panel_path("price_panel")
     else:
-        tickers = research_universe()
+        tickers = tradeable_universe(args.start, args.end)
         spec_kwargs = {"tickers": tickers, "start": args.start, "end": args.end}
         if args.workers:
             spec_kwargs["workers"] = args.workers
