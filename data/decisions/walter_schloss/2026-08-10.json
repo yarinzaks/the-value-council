@@ -1,0 +1,71 @@
+[
+  {
+    "ticker": "BUR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-10T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.395 (< 0.75)",
+      "D/E=0.87 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.3949,
+      "debt_to_equity": 0.8692,
+      "book_value_per_share": 11.183419961421203,
+      "market_cap": 913896853.7513733,
+      "net_income": 62572000.0,
+      "price": 4.175000190734863
+    },
+    "market_conditions": {},
+    "confidence": 0.6050578807834335,
+    "entry_price": 4.175000190734863,
+    "target_price": 11.183419961421203,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.395, D/E 0.87, BVPS 11.18"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-10T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.613 (< 0.75)",
+      "D/E=0.30 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.6131,
+      "debt_to_equity": 0.3009,
+      "book_value_per_share": 125.98787744331774,
+      "market_cap": 3471842821.53907,
+      "net_income": 503000000.0,
+      "price": 77.23999786376953
+    },
+    "market_conditions": {},
+    "confidence": 0.38692515953751183,
+    "entry_price": 77.23999786376953,
+    "target_price": 125.98787744331774,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.613, D/E 0.30, BVPS 125.99"
+  },
+  {
+    "ticker": "EFOR",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-08-10T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 21.02,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $21.02, exit $32.33 (+53.81%)"
+  }
+]
