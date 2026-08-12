@@ -1,0 +1,138 @@
+[
+  {
+    "ticker": "SEB",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-08-12T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=8.26 (\u2264 15.0)",
+      "P/B=0.78 (\u2264 1.5)",
+      "current ratio=2.40 (\u2265 2.0)",
+      "D/E=0.19 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 8.2611,
+      "pb": 0.781,
+      "current_ratio": 2.404,
+      "pe_times_pb": 6.452,
+      "graham_number": 7936.5766,
+      "margin_of_safety_pct": 46.45,
+      "debt_to_equity": 0.1875,
+      "net_income": 501000000.0,
+      "market_cap": 4070624500.0,
+      "price": 4250.0
+    },
+    "market_conditions": {},
+    "confidence": 0.71324471313076,
+    "entry_price": 4250.0,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 8.26, P/B 0.78, CR 2.40, Graham # 6.45"
+  },
+  {
+    "ticker": "HOG",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-08-12T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=9.29 (\u2264 15.0)",
+      "P/B=0.92 (\u2264 1.5)",
+      "current ratio=2.10 (\u2265 2.0)",
+      "D/E=0.94 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 9.295,
+      "pb": 0.9203,
+      "current_ratio": 2.1014,
+      "pe_times_pb": 8.5537,
+      "graham_number": 41.9088,
+      "margin_of_safety_pct": 38.34,
+      "debt_to_equity": 0.9447,
+      "net_income": 338738000.0,
+      "market_cap": 2890218564.9870415,
+      "price": 25.84000015258789
+    },
+    "market_conditions": {},
+    "confidence": 0.6198334911129946,
+    "entry_price": 25.84000015258789,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 9.29, P/B 0.92, CR 2.10, Graham # 8.55"
+  },
+  {
+    "ticker": "UVV",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-08-12T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=12.03 (\u2264 15.0)",
+      "P/B=0.77 (\u2264 1.5)",
+      "current ratio=2.87 (\u2265 2.0)",
+      "D/E=0.74 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 12.0291,
+      "pb": 0.7705,
+      "current_ratio": 2.8742,
+      "pe_times_pb": 9.2684,
+      "graham_number": 70.8456,
+      "margin_of_safety_pct": 35.82,
+      "debt_to_equity": 0.7356,
+      "net_income": 95047000.0,
+      "market_cap": 1123819498.9204407,
+      "price": 45.470001220703125
+    },
+    "market_conditions": {},
+    "confidence": 0.5880693540734614,
+    "entry_price": 45.470001220703125,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 12.03, P/B 0.77, CR 2.87, Graham # 9.27"
+  },
+  {
+    "ticker": "SFD",
+    "decision": "BUY",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-08-12T00:00:00+00:00",
+    "criteria_met": [
+      "P/E=9.30 (\u2264 15.0)",
+      "P/B=1.35 (\u2264 1.5)",
+      "current ratio=2.97 (\u2265 2.0)",
+      "D/E=0.29 (\u2264 1.0)",
+      "positive trailing net income",
+      "mode=DEFENSIVE"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "mode": "DEFENSIVE",
+      "pe": 9.2988,
+      "pb": 1.3504,
+      "current_ratio": 2.9673,
+      "pe_times_pb": 12.5567,
+      "graham_number": 31.2431,
+      "margin_of_safety_pct": 25.3,
+      "debt_to_equity": 0.2916,
+      "net_income": 987000000.0,
+      "market_cap": 9183759378.459866,
+      "price": 23.34000015258789
+    },
+    "market_conditions": {},
+    "confidence": 0.4419252974357305,
+    "entry_price": 23.34000015258789,
+    "target_price": null,
+    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    "rationale": "Graham Defensive: P/E 9.30, P/B 1.35, CR 2.97, Graham # 12.56"
+  }
+]
