@@ -85,8 +85,8 @@ export default async function CouncilPage() {
       <Card className="mb-4">
         <p className="text-sm leading-relaxed text-council-700 dark:text-council-300">
           {he
-            ? "הוא מציע, אדם מאשר. הוא צפוי להחזיק כלום במשך תקופות ארוכות — 0 עד 2 פוזיציות בשנה — וזו לא תקלה אלא האסטרטגיה. אין לו מספר בטבלת הליגה כי אי אפשר להריץ אותו על ההיסטוריה בלי שהמודל יידע איך היא נגמרה."
-            : "It proposes; a person approves. It expects to hold nothing for long stretches — 0 to 2 positions a year — and that is the strategy rather than a fault. It has no place on the leaderboard because it cannot be replayed over history without the model knowing how that history came out."}
+            ? "הוא סוחר לבד, בלי אישור אדם, כמו כל שאר הסוכנים. הוא קונה מה שהחברים שלו כבר מסכימים עליו — מניה ששלושה סוכנים עצמאיים הגיעו אליה בנפרד — ואחרי זה כל שאר הכללים הם וטו: משטר, הגשות, חדשות, כרטיס אגרוף ותקרות. הוא צפוי לפתוח מעט מאוד פוזיציות ולשבת במזומן לתקופות ארוכות, וזו האסטרטגיה ולא תקלה. אין לו מספר בטבלת הליגה כי אי אפשר להריץ אותו על ההיסטוריה בלי שהמודל יידע איך היא נגמרה."
+            : "It trades on its own, without human approval, on the same terms as the other eleven. It buys what its members already agree on — a name three independent doctrines reached separately — and every rule after that is a veto: regime, filings, news, punch card and position limits. It expects to open very few positions and to sit in cash for long stretches, which is the strategy rather than a fault. It has no place on the leaderboard because it cannot be replayed over history without the model knowing how that history came out."}
         </p>
       </Card>
 

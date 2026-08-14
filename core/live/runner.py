@@ -30,6 +30,8 @@ from datetime import date
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
+from agents.council.regime import read_regime
+from agents.council.strategy import TheCouncil
 from agents.dreman.contrarian import DavidDreman
 from agents.fisher import PhilipFisher
 from agents.graham.net_net import BenjaminGraham
@@ -51,9 +53,11 @@ from core.data.fundamentals_fetcher import (
     FundamentalsFetcher,
     FundamentalsFetcherConfig,
 )
+from core.data.news_service import NewsService
 from core.live.agent_adapter import (
     AgentAdapter,
     BuffettLive,
+    CouncilLive,
     DremanLive,
     FisherLive,
     GrahamLive,
@@ -269,7 +273,34 @@ def build_default_adapters(
                 decision_logger=decision_logger,
             )
         ),
+        # Last on purpose. It decides on what the others hold, so every
+        # book above has been written by the time it looks. It still
+        # reads them off disk rather than out of this list, so the
+        # ordering is an improvement to its inputs and not a dependency
+        # its correctness rests on.
+        CouncilLive(
+            TheCouncil(
+                news_service=_news_service(),
+                regime_reader=read_regime,
+            )
+        ),
     ]
+
+
+def _news_service() -> NewsService | None:
+    """The feed, or None when nothing is configured.
+
+    Built once per run and shared, so twelve agents asking about one
+    company cost one round of calls rather than twelve. Returns None
+    rather than raising: the Council treats an absent feed as no news,
+    which skips its news veto instead of blocking every entry.
+    """
+    try:
+        svc = NewsService.from_settings()
+    except Exception as exc:
+        logger.warning(f"news service unavailable — {type(exc).__name__}: {exc}")
+        return None
+    return svc if svc.available else None
 
 
 def _held_positions(

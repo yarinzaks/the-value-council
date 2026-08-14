@@ -528,9 +528,113 @@ class MarketCoreLive(AgentAdapter):
         return out
 
 
+
+# --------------------------------------------------------------------------
+# The Council
+# --------------------------------------------------------------------------
+class CouncilLive(AgentAdapter):
+    """The Council on the same rails as the eleven.
+
+    Every other adapter reads a ``selection_history`` of typed scores —
+    a Magic Formula rank, a P/NCAV, a discount to book — because every
+    other agent forms its own opinion about a company. This one does
+    not: it acts on agreement between agents that already did, so what
+    it has to explain is who agreed and what failed to stop it. The
+    proposal carries exactly that, and it is what the rationale says.
+
+    The watchlist is the candidates it did not open. That is a truer
+    watchlist than the other agents' — theirs is the tail of a ranked
+    list, names that nearly qualified; these are names that fully
+    qualified and are waiting only on the per-run entry cap.
+    """
+
+    name = "the_council"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        self.entry_trigger = "three or more agents hold it, and no gate objects"
+
+    def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
+        proposal = getattr(self.strategy, "last_proposal", None)
+        counts = _agreement_counts(self.strategy)
+        out: list[LiveTarget] = []
+        for rank, ticker in enumerate(
+            sorted(weights, key=lambda t: (-counts.get(t, 0), t)), start=1
+        ):
+            n = counts.get(ticker, 0)
+            out.append(
+                LiveTarget(
+                    ticker=ticker,
+                    weight=weights[ticker],
+                    rank=rank,
+                    why_en=(
+                        f"Held by {n} of the eleven independently; regime, "
+                        f"filings and news all clear."
+                    ),
+                    why_he=(
+                        f"מוחזקת על ידי {n} מתוך אחד-עשר הסוכנים באופן עצמאי; "
+                        f"המשטר, ההגשות והחדשות — כולם נקיים."
+                    ),
+                    score=proposal,
+                )
+            )
+        return out
+
+    def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
+        proposal = getattr(self.strategy, "last_proposal", None)
+        if proposal is None:
+            return []
+        opened = {t.ticker for t in targets}
+        vetoed = {v.ticker: v for v in proposal.vetoes}
+        out: list[LiveWatch] = []
+        counts = _agreement_counts(self.strategy)
+        for rank, ticker in enumerate(
+            (c for c in proposal.candidates if c not in opened), start=1
+        ):
+            if rank > self.watchlist_size:
+                break
+            veto = vetoed.get(ticker)
+            n = counts.get(ticker, 0)
+            if veto:
+                en = f"Qualified on agreement ({n} agents) but vetoed: {veto.detail}"
+                he = f"עברה את הסכמת {n} הסוכנים אך נפסלה: {veto.detail}"
+            else:
+                en = f"Held by {n} of the eleven; waiting on the entry cap."
+                he = f"מוחזקת על ידי {n} סוכנים; ממתינה לתקרת הכניסות."
+            out.append(
+                LiveWatch(
+                    ticker=ticker,
+                    rank=rank,
+                    entry_trigger=self.entry_trigger,
+                    why_en=en,
+                    why_he=he,
+                )
+            )
+        return out
+
+
+def _agreement_counts(strategy: Strategy) -> dict[str, int]:
+    """How many agents hold each name, for the rationale.
+
+    Recomputed from the same reader the strategy used rather than
+    threaded through the proposal, so a rationale can never quote a
+    different count from the one that made the decision.
+    """
+    from agents.council.selection import agreement
+
+    reader = getattr(strategy, "books_reader", None)
+    if reader is None:
+        return {}
+    try:
+        return agreement(reader())
+    except Exception:
+        return {}
+
+
 __all__ = [
     "AgentAdapter",
     "BuffettLive",
+    "CouncilLive",
     "DremanLive",
     "FisherLive",
     "GrahamLive",
