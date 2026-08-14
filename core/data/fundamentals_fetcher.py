@@ -356,7 +356,7 @@ class FundamentalsFetcher:
         ltd_noncurrent = self._debt_component(ticker, "LongTermDebtNoncurrent", as_of)
         ltd_current = self._debt_component(ticker, "LongTermDebtCurrent", as_of)
         ltd_rollup = self._debt_component(ticker, "LongTermDebt", as_of)
-        short_term = self._debt_component(ticker, "ShortTermBorrowings", as_of)
+        short_term, short_source = self._short_term_debt(ticker, as_of)
 
         if ltd_noncurrent is not None and ltd_current is not None:
             long_term: float | None = ltd_noncurrent + ltd_current
@@ -378,8 +378,39 @@ class FundamentalsFetcher:
             return None, "absent"
         total = (long_term or 0.0) + (short_term or 0.0)
         if short_term is not None:
-            source = f"{source}+short_term"
+            source = f"{source}+{short_source}"
         return total, source
+
+    def _short_term_debt(
+        self, ticker: str, as_of: date | datetime
+    ) -> tuple[float | None, str]:
+        """Short-term borrowings, from whichever tag the filer actually uses.
+
+        ``ShortTermBorrowings`` alone was not enough. Across 300 sampled
+        issuers it appears in 27.3%, while ``CommercialPaper`` appears in
+        4.7% and ``OtherShortTermBorrowings`` in 6.7% — and for 1.7% the
+        only short-term tag present is one of those two, so the figure
+        was silently dropped.
+
+        Apple is one of them. It has never tagged ``ShortTermBorrowings``:
+        on 2026-08-01 its commercial paper stood at $7.979bn against
+        $90.678bn of long-term debt, so total debt came back 8.1% light —
+        in a field whose whole purpose is feeding a leverage gate.
+
+        The roll-up is preferred over the components for the same reason
+        it is on the long-term side: ``ShortTermBorrowings`` is defined to
+        include commercial paper, so summing both would double-count a
+        filer that tags each.
+        """
+        rollup = self._debt_component(ticker, "ShortTermBorrowings", as_of)
+        if rollup is not None:
+            return rollup, "short_term"
+
+        commercial_paper = self._debt_component(ticker, "CommercialPaper", as_of)
+        other = self._debt_component(ticker, "OtherShortTermBorrowings", as_of)
+        if commercial_paper is None and other is None:
+            return None, "absent"
+        return (commercial_paper or 0.0) + (other or 0.0), "short_term_components"
 
     def get_all_fields(
         self,

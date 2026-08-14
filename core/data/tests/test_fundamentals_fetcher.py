@@ -661,6 +661,64 @@ class TestTotalDebt:
         assert total == 1_250.0
         assert source == "split+short_term"
 
+    def test_commercial_paper_counts_when_the_rollup_is_absent(
+        self, tmp_path: Path
+    ) -> None:
+        """Apple's case, and it was being dropped.
+
+        AAPL has never tagged ShortTermBorrowings. On 2026-08-01 it
+        reported $7.979bn of CommercialPaper against $90.678bn of
+        long-term debt, and total_debt came back as 90.678 — 8.1% light,
+        in the field that feeds the leverage gate. Across 300 sampled
+        issuers, 1.7% have short-term debt reachable only through this
+        tag or OtherShortTermBorrowings.
+        """
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebtNoncurrent", 800.0),
+            self._instant("LongTermDebtCurrent", 150.0),
+            self._instant("CommercialPaper", 75.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 1_025.0
+        assert source == "split+short_term_components"
+
+    def test_other_short_term_borrowings_count_too(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebt", 500.0),
+            self._instant("OtherShortTermBorrowings", 40.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 540.0
+        assert source == "rollup+short_term_components"
+
+    def test_components_are_summed_with_each_other(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebt", 500.0),
+            self._instant("CommercialPaper", 75.0),
+            self._instant("OtherShortTermBorrowings", 40.0),
+        )
+        total, _ = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 615.0
+
+    def test_rollup_wins_over_its_own_components(self, tmp_path: Path) -> None:
+        """ShortTermBorrowings is defined to include commercial paper.
+
+        A filer that tags both must not have it counted twice — the same
+        guard the long-term side already has.
+        """
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebt", 500.0),
+            self._instant("ShortTermBorrowings", 100.0),
+            self._instant("CommercialPaper", 75.0),
+        )
+        total, source = f._compute_total_debt("ACME", self.AS_OF)
+        assert total == 600.0
+        assert source == "rollup+short_term"
+
     def test_short_term_only_filer_is_no_longer_debt_free(
         self, tmp_path: Path
     ) -> None:
