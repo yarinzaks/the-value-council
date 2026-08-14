@@ -52,6 +52,15 @@ LIQUIDITY_SESSIONS = 63
 def load_book(as_of: date) -> Book:
     """The Council's own portfolio, with liquidity measured where it can be."""
     portfolio = LivePortfolio.load_or_seed(AGENT_SLUG, directory=portfolios_dir())
+    # Persisted, not just held in memory. load_or_seed happily invents a
+    # $10,000 book on every run and forgets it again, which left the
+    # Council the one agent with no file under data/portfolios — and the
+    # dashboard builds every live view by reading that directory, so it
+    # was absent from the cards, the ranking and the totals no matter
+    # what its state file said. Writing it here costs nothing when the
+    # book is unchanged and makes the agent visible on the same terms as
+    # the other eleven.
+    portfolio.save(directory=portfolios_dir())
     positions = [
         {
             "ticker": p.ticker,
