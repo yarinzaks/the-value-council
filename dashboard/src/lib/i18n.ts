@@ -74,6 +74,9 @@ const en: Dict = {
 
   // ---- Agents grid ----
   agents_subtitle: "Click a card to drill in",
+  not_backtested: "not backtested",
+  punch_card: "Punch card",
+  council_card_note: "Holds a real book on the same terms; carries no CAGR because it cannot be replayed over history.",
   alpha_vs_sp: "α vs S&P",
 
   // ---- Agent drilldown ----

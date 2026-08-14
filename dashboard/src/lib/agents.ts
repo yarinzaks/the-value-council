@@ -154,6 +154,27 @@ export const AGENTS: AgentMeta[] = [
     school: "Evidence, not biography",
     school_he: "ראיות, לא ביוגרפיה",
     color: "#0891b2",
+  },  {
+    // The twelfth, and the only one not answering to a backtest. The
+    // eleven above were each scored over the same five years and their
+    // CAGRs mean the same thing as each other; this one reads filings
+    // and reasons, so replaying it over history would let the model
+    // know how that history came out. It is listed here anyway because
+    // it holds a real book on the same terms as the rest — same seed,
+    // same marks, same rules — and hiding it from the roster made it
+    // look absent rather than unscored. What it has no place in is the
+    // backtest leaderboard, and it stays out of that on its own: it
+    // publishes no run for loadAgentLatest to find.
+    slug: "the_council",
+    display_name: "The Council",
+    display_name_he: "המועצה",
+    description:
+      "Answers to a written doctrine rather than a screen: a regime dial, hard position limits, a lifetime punch card, and the SEC filings of what it holds.",
+    description_he:
+      "פועל לפי דוקטרינה כתובה ולא לפי מסנן: חוגת משטר, תקרות פוזיציה קשיחות, כרטיס אגרוף לכל החיים, וההגשות ל-SEC של מה שהוא מחזיק.",
+    school: "Doctrine, not screen",
+    school_he: "דוקטרינה, לא מסנן",
+    color: "#c026d3",
   },
 ];
 

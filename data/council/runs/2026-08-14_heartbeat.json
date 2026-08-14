@@ -1,27 +1,12 @@
 {
- "agent": "the_council",
  "all_clear": true,
+ "at": "2026-08-14T18:05:34+00:00",
  "breaches": [],
- "cash": 10000.0,
- "cash_weight": 1.0,
  "circuit_breaker": false,
  "drawdown_from_peak": 0.0,
  "filings_flagged": [],
- "journal": {
-  "calibration": {
-   "brier": null,
-   "buckets": [],
-   "resolved": 0,
-   "shrinkage": 1.0
-  },
-  "entries": 0,
-  "open": 0,
-  "punch_card": {
-   "remaining": 20,
-   "total": 20,
-   "used": 0
-  }
- },
+ "forced_exits_proposed": [],
+ "kill_criteria": [],
  "limits": [
   {
    "cap": 0.2,
@@ -56,11 +41,6 @@
    "state": "pass"
   }
  ],
- "nav": 10000.0,
- "peak_nav": 10000.0,
- "positions": 0,
- "regime": null,
  "run": "heartbeat",
- "unknown_limits": [],
- "updated": "2026-08-14T18:05:34+00:00"
+ "unknown_limits": []
 }
