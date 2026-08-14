@@ -25,6 +25,12 @@ Usage::
     .venv/bin/python -m scripts.run_daily_paper_trading --mode open
     .venv/bin/python -m scripts.run_daily_paper_trading --mode close
     .venv/bin/python -m scripts.run_daily_paper_trading --as-of 2026-04-29
+    .venv/bin/python -m scripts.run_daily_paper_trading --agent the_council
+
+``--agent`` is repeatable and restricts the run to those agents. It exists
+for the case where one agent joined the roster after the others had already
+traded, and needs to catch up without moving eleven books on a day the
+schedule did not intend to touch them.
 """
 
 from __future__ import annotations
@@ -64,6 +70,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "US    = scan US stocks via SEC EDGAR (default)."
             " TASE  = scan Israeli stocks (placeholder — scanner not built yet)."
             " both  = run both back-to-back; useful on Mon-Thu when US and TASE overlap."
+        ),
+    )
+    p.add_argument(
+        "--agent",
+        action="append",
+        dest="agents",
+        metavar="SLUG",
+        help=(
+            "Run only this agent; repeatable. Default runs everyone."
+            " An unknown slug is an error, not an empty run."
         ),
     )
     return p.parse_args(argv)
@@ -153,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     all_results: list[AgentRunResult] = []
     any_error = False
     for market in _markets_to_run(args.market):
-        runner = DailyRunner(market=market)
+        runner = DailyRunner(market=market, only_agents=args.agents)
         if args.mode == "close":
             results = runner.run_mark_to_market(as_of=args.as_of)
         else:

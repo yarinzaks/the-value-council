@@ -25,6 +25,7 @@ the shortest of them two days.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -340,6 +341,35 @@ class _DictLookup:
         return self._data.get(ticker)
 
 
+def _filter_adapters(
+    adapters: list[AgentAdapter], only: Sequence[str]
+) -> list[AgentAdapter]:
+    """Keep only the named agents, preserving registration order.
+
+    Order is preserved rather than following the caller's argument order
+    because registration order is meaningful — an agent that reads the
+    others' published books must run after them.
+
+    Raises:
+        ValueError: If any name matches no adapter. Fail loud: a typo
+            that silently produced an empty run would write no
+            portfolios and report success, which is indistinguishable
+            from a day on which nothing qualified.
+    """
+    wanted = {name.strip().lower() for name in only if name.strip()}
+    if not wanted:
+        raise ValueError("only_agents was given but contained no names")
+
+    known = {a.name for a in adapters}
+    unknown = sorted(wanted - known)
+    if unknown:
+        raise ValueError(
+            f"unknown agent(s): {', '.join(unknown)}. "
+            f"Known: {', '.join(sorted(known))}"
+        )
+    return [a for a in adapters if a.name in wanted]
+
+
 class DailyRunner:
     """Run one day of paper-trading across all agents.
 
@@ -356,6 +386,11 @@ class DailyRunner:
         portfolio_dir: Where to persist portfolio JSON.
         cost_bps: Per-trade cost (default 10 bps).
         initial_cash: Seed cash for first run (default $10,000).
+        only_agents: Restrict the run to these agent slugs. ``None``
+            (default) runs everyone. An unknown slug raises rather than
+            silently running nothing — a filter that quietly matches
+            no-one looks exactly like a clean run that traded nothing,
+            which is also the normal outcome on a quiet day.
     """
 
     def __init__(
@@ -373,6 +408,7 @@ class DailyRunner:
         universe: FullMarketUniverse | None = None,
         pit_loader: PointInTimeLoader | None = None,
         decision_logger: DecisionLogger | None = None,
+        only_agents: Sequence[str] | None = None,
     ) -> None:
         if market not in ("US", "TASE"):
             raise ValueError(
@@ -389,6 +425,8 @@ class DailyRunner:
             edgar_cache=self.cache,
             price_loader=self.price_loader,
         )
+        if only_agents is not None:
+            self.adapters = _filter_adapters(self.adapters, only_agents)
         self.portfolio_dir = portfolio_dir
         self.cost_bps = cost_bps
         self.initial_cash = initial_cash

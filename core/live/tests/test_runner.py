@@ -18,8 +18,10 @@ from core.live.portfolio import LivePortfolio, Position
 from core.live.runner import (
     DEFAULT_MIN_HOLDING_DAYS,
     DailyRunner,
+    _filter_adapters,
     pos_age_days,
 )
+from scripts.run_daily_paper_trading import parse_args
 
 AS_OF = date(2026, 8, 5)
 
@@ -1099,3 +1101,112 @@ class TestTheHoldingFloor:
                      entry_date="2026-07-06", current_price=1.0),
             date(2026, 8, 5),
         ) == 30
+
+
+class TestAgentFilter:
+    """`--agent` restricts the run without silently running nothing.
+
+    Written because the Council joined the roster after the eleven had
+    already traded, and catching it up must not move eleven other books
+    on a day the schedule did not intend to touch them.
+    """
+
+    @staticmethod
+    def _adapters() -> list[_StubAdapter]:
+        return [
+            _StubAdapter("benjamin_graham", []),
+            _StubAdapter("walter_schloss", []),
+            _StubAdapter("the_council", []),
+        ]
+
+    def test_keeps_only_the_named_agent(self) -> None:
+        kept = _filter_adapters(self._adapters(), ["the_council"])  # type: ignore[arg-type]
+        assert [a.name for a in kept] == ["the_council"]
+
+    def test_keeps_several(self) -> None:
+        kept = _filter_adapters(
+            self._adapters(),  # type: ignore[arg-type]
+            ["the_council", "benjamin_graham"],
+        )
+        assert {a.name for a in kept} == {"the_council", "benjamin_graham"}
+
+    def test_registration_order_is_preserved_not_argument_order(self) -> None:
+        # The Council is registered last on purpose. Argument order must
+        # not be able to run it before an agent it reads.
+        kept = _filter_adapters(
+            self._adapters(),  # type: ignore[arg-type]
+            ["the_council", "benjamin_graham"],
+        )
+        assert [a.name for a in kept] == ["benjamin_graham", "the_council"]
+
+    def test_names_are_matched_case_insensitively_and_trimmed(self) -> None:
+        kept = _filter_adapters(self._adapters(), ["  The_Council "])  # type: ignore[arg-type]
+        assert [a.name for a in kept] == ["the_council"]
+
+    def test_an_unknown_name_raises_rather_than_running_nothing(self) -> None:
+        # The failure this guards: a typo produces an empty run, no
+        # portfolio is written, and the report says success — which is
+        # exactly what a quiet day looks like.
+        with pytest.raises(ValueError, match="unknown agent"):
+            _filter_adapters(self._adapters(), ["the_counsel"])  # type: ignore[arg-type]
+
+    def test_the_error_lists_the_valid_names(self) -> None:
+        with pytest.raises(ValueError, match="benjamin_graham"):
+            _filter_adapters(self._adapters(), ["nope"])  # type: ignore[arg-type]
+
+    def test_one_bad_name_among_good_ones_still_raises(self) -> None:
+        with pytest.raises(ValueError, match="nope"):
+            _filter_adapters(
+                self._adapters(),  # type: ignore[arg-type]
+                ["the_council", "nope"],
+            )
+
+    def test_an_empty_list_raises(self) -> None:
+        with pytest.raises(ValueError, match="no names"):
+            _filter_adapters(self._adapters(), [])  # type: ignore[arg-type]
+
+    def test_blank_strings_are_not_names(self) -> None:
+        with pytest.raises(ValueError, match="no names"):
+            _filter_adapters(self._adapters(), ["", "   "])  # type: ignore[arg-type]
+
+    def test_the_runner_applies_the_filter(self, tmp_path: Path) -> None:
+        runner = DailyRunner(
+            market="US",
+            adapters=self._adapters(),  # type: ignore[arg-type]
+            portfolio_dir=tmp_path / "portfolios",
+            price_loader=_StubPriceLoader({}),  # type: ignore[arg-type]
+            universe=object(),  # type: ignore[arg-type]
+            pit_loader=object(),  # type: ignore[arg-type]
+            cache=object(),  # type: ignore[arg-type]
+            decision_logger=DecisionLogger(root=tmp_path / "decisions"),
+            only_agents=["the_council"],
+        )
+        assert [a.name for a in runner.adapters] == ["the_council"]
+
+    def test_none_runs_everyone(self, tmp_path: Path) -> None:
+        runner = DailyRunner(
+            market="US",
+            adapters=self._adapters(),  # type: ignore[arg-type]
+            portfolio_dir=tmp_path / "portfolios",
+            price_loader=_StubPriceLoader({}),  # type: ignore[arg-type]
+            universe=object(),  # type: ignore[arg-type]
+            pit_loader=object(),  # type: ignore[arg-type]
+            cache=object(),  # type: ignore[arg-type]
+            decision_logger=DecisionLogger(root=tmp_path / "decisions"),
+            only_agents=None,
+        )
+        assert len(runner.adapters) == 3
+
+
+class TestAgentFlagParsing:
+    """The CLI flag must be repeatable and default to everyone."""
+
+    def test_absent_means_all(self) -> None:
+        assert parse_args([]).agents is None
+
+    def test_one(self) -> None:
+        assert parse_args(["--agent", "the_council"]).agents == ["the_council"]
+
+    def test_repeatable(self) -> None:
+        args = parse_args(["--agent", "the_council", "--agent", "john_neff"])
+        assert args.agents == ["the_council", "john_neff"]
