@@ -42,6 +42,7 @@ from core.backtest.point_in_time import (
     FilingMetadata,
 )
 from core.data.sic_codes import sic_for
+from core.data.ttm import TtmResult, trailing_twelve_months
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
@@ -310,6 +311,56 @@ class FundamentalsFetcher:
             if best is None or fact.period_end > best.period_end:
                 best = fact
         return best
+
+    def get_field_ttm(
+        self,
+        ticker: str,
+        field: str,
+        as_of: date | datetime,
+    ) -> TtmResult | None:
+        """Trailing twelve months for a flow field, or ``None``.
+
+        :meth:`get_field` answers with the newest *annual* period, which
+        is up to :data:`MAX_FACT_AGE_DAYS` old and stops moving between
+        10-Ks. This answers with the twelve months ending at the newest
+        period the filer had published by ``as_of``, rolling forward
+        every quarter. Every ratio in the doctrine's screen is
+        TTM-denominated, so this is the one the screen calls.
+
+        Raises:
+            FundamentalsError: If ``field`` is not a flow concept.
+                Asking for a trailing twelve months of total assets is
+                a category error, not a missing number, and returning
+                ``None`` would hide the mistake.
+        """
+        if field not in CONCEPT_MAP:
+            raise FundamentalsError(f"unknown field {field!r}")
+        if field not in _FLOW_CONCEPTS:
+            raise FundamentalsError(
+                f"{field!r} is a balance-sheet stock, not a flow; "
+                "it has no trailing twelve months. Use get_field."
+            )
+        if not self.cache.has_ticker(ticker) and self.config.populate_cache_on_miss:
+            self.ensure_cached(ticker)
+
+        chain = CONCEPT_MAP[field]
+        namespaces = {ns for ns, _ in chain}
+        if len(namespaces) > 1:
+            # Every flow chain is us-gaap today. If that changes, the
+            # per-namespace split has to be handled rather than silently
+            # dropping half the chain.
+            raise FundamentalsError(
+                f"{field!r} spans namespaces {sorted(namespaces)}; "
+                "TTM assembly handles one at a time"
+            )
+
+        return trailing_twelve_months(
+            self.cache.load_facts(ticker),
+            as_of.date() if isinstance(as_of, datetime) else as_of,
+            concepts=[concept for _, concept in chain],
+            namespace=namespaces.pop(),
+            units=expected_units(field),
+        )
 
     def _debt_component(
         self, ticker: str, concept: str, as_of: date | datetime
