@@ -279,7 +279,7 @@ const en: Dict = {
 
   // ---- Schedule banner ----
   schedule_banner:
-    "Market-open scan 09:35 ET (16:35 IL) · Market-close scan 16:00 ET (23:00 IL) · Prices live during market hours",
+    "Scan starts 10:00 ET (17:00 IL), lands by 17:45 · Marks refresh 19:00, 21:00, 23:30 IL · Prices live during market hours",
 
   // ---- Timestamps & freshness ----
   last_sync: "Last sync",
@@ -574,7 +574,7 @@ const he: Dict = {
 
   // ---- Schedule banner ----
   schedule_banner:
-    "סריקה בפתיחת שוק 16:35 · סריקה בסגירת שוק 23:00 (שעון ישראל) · מחירים בזמן אמת בשעות המסחר",
+    "הסריקה מתחילה 17:00 ונכנסת עד 17:45 · עדכון מחירים 19:00, 21:00, 23:30 (שעון ישראל) · מחירים בזמן אמת בשעות המסחר",
 
   // ---- Timestamps & freshness ----
   last_sync: "עודכן לאחרונה",

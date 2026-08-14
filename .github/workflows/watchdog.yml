@@ -10,6 +10,20 @@ name: Schedule Watchdog
 # a make-up workflow_dispatch run if the scheduled one didn't fire (or
 # failed). Self-healing.
 #
+# How it decides
+# --------------
+# It asks one question per schedule: did the run for this cron happen
+# today, and did it end healthily? That is a per-day question, not an
+# age-in-minutes one. The age test this replaced could not survive the
+# hold that daily-paper-trading.yml now performs — a run created at
+# 13:00 and working at 14:00 is "110 minutes old" by 14:50 and perfectly
+# healthy — nor could it tell a US run apart from a TASE one, since
+# every run in the list was titled "Daily Paper Trading".
+#
+# Both problems are solved by run-name in that workflow, which puts the
+# triggering cron expression in display_title. Matching it exactly
+# identifies the run precisely and needs no timing assumptions at all.
+#
 # What it does NOT do
 # -------------------
 # - Doesn't keep the repo "alive" — that 60-day inactivity rule is a
@@ -17,17 +31,18 @@ name: Schedule Watchdog
 # - Doesn't cover TASE schedules. The Israeli scanner is still WIP and
 #   produces zero trades, so a missed TASE run is harmless. Add a TASE
 #   branch here when the scanner ships.
-# - Doesn't dispatch back-to-back. The daily-paper-trading.yml workflow
-#   has a concurrency group keyed on (market, mode), so duplicate
-#   dispatches queue rather than racing.
+# - Doesn't dispatch back-to-back. daily-paper-trading.yml runs under a
+#   single concurrency group, so a duplicate dispatch queues rather
+#   than racing, and each cron is audited once a day.
 
 on:
   schedule:
-    # 25 min after US open schedule (13:35 UTC + 25). Long enough to give
-    # GitHub's scheduler its typical drift window, short enough to still
-    # catch the open before the market gets too far in.
-    - cron: '0 14 * * 1-5'
-    # 30 min after US close schedule (20:30 UTC + 30). Same logic.
+    # After the US open run should have finished: it is woken at 13:00,
+    # starts work at its 14:00 anchor and takes up to 45 min, so it is
+    # done by 14:45. 15:00 is the first honest moment to ask.
+    - cron: '0 15 * * 1-5'
+    # After the US close run: woken 19:30, works at 20:30, takes about a
+    # minute. 21:00 as before.
     - cron: '0 21 * * 1-5'
 
   workflow_dispatch:
@@ -48,82 +63,105 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Determine which mode to audit
+      - name: Determine which run to audit
         id: mode
         env:
           EVENT_SCHEDULE: ${{ github.event.schedule }}
         run: |
-          # The two schedules below align 1-to-1 with US open / close in
-          # daily-paper-trading.yml. workflow_dispatch is a manual trigger
-          # — pick a mode by wall-clock to keep the same behavior.
+          # Each schedule below audits exactly one cron of
+          # daily-paper-trading.yml. `audit` is that cron verbatim: it is
+          # what that workflow publishes as its run title, so it is the
+          # key this watchdog matches on. workflow_dispatch is a manual
+          # trigger — pick by wall-clock to keep the same behavior.
           case "$EVENT_SCHEDULE" in
-            "0 14 * * 1-5")
+            "0 15 * * 1-5")
               echo "mode=open" >> "$GITHUB_OUTPUT"
+              echo "audit=0 13 * * 1-5" >> "$GITHUB_OUTPUT"
               ;;
             "0 21 * * 1-5")
               echo "mode=close" >> "$GITHUB_OUTPUT"
+              echo "audit=30 19 * * 1-5" >> "$GITHUB_OUTPUT"
               ;;
             *)
               hour=$(date -u +%H)
               if [ "$hour" -ge 18 ]; then
                 echo "mode=close" >> "$GITHUB_OUTPUT"
+                echo "audit=30 19 * * 1-5" >> "$GITHUB_OUTPUT"
               else
                 echo "mode=open" >> "$GITHUB_OUTPUT"
+                echo "audit=0 13 * * 1-5" >> "$GITHUB_OUTPUT"
               fi
               ;;
           esac
 
-      - name: Inspect most recent scheduled run
+      - name: Inspect today's run for the audited cron
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          AUDIT: ${{ steps.mode.outputs.audit }}
         run: |
-          # Filter on event=schedule so the watchdog evaluates the actual
-          # cron health, not its own past dispatches.
-          response=$(gh api \
-            "repos/${GH_REPO}/actions/workflows/daily-paper-trading.yml/runs?event=schedule&per_page=1")
+          # Filter on event=schedule so this evaluates cron health rather
+          # than its own past dispatches: a make-up run that succeeded
+          # does not prove the schedule fired, and next weekday's audit
+          # must be free to catch the same cron failing again.
+          runs=$(gh api \
+            "repos/${GH_REPO}/actions/workflows/daily-paper-trading.yml/runs?event=schedule&per_page=50")
 
-          count=$(echo "$response" | jq '.workflow_runs | length')
-          if [ "$count" = "0" ]; then
-            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
-            echo "reason=no scheduled runs in history" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # Midnight UTC today. The audited cron fires once per weekday,
+          # so "created today" and "this cycle" are the same statement,
+          # and unlike an age threshold it stays true however long the
+          # run held before starting work.
+          since=$(date -u -d "$(date -u +%F)T00:00:00Z" +%s)
 
-          created_at=$(echo "$response" | jq -r '.workflow_runs[0].created_at')
-          conclusion=$(echo "$response" | jq -r '.workflow_runs[0].conclusion')
-          status=$(echo "$response"     | jq -r '.workflow_runs[0].status')
+          summary=$(echo "$runs" | jq -r \
+            --arg audit "$AUDIT" --argjson since "$since" '
+              [ .workflow_runs[]
+                | select(.display_title == $audit)
+                | select((.created_at | fromdateiso8601) >= $since) ]
+              | if length == 0 then "missing"
+                elif any(.[]; .status != "completed" or .conclusion == "success")
+                  then "healthy"
+                else "failed:" + (.[0].conclusion // "unknown")
+                end')
 
-          age_seconds=$(( $(date -u +%s) - $(date -u -d "$created_at" +%s) ))
-          age_minutes=$(( age_seconds / 60 ))
+          echo "audit=${AUDIT} since=$(date -u -d "@${since}" -Iseconds) -> ${summary}"
 
-          echo "latest scheduled run: $created_at" \
-               "(${age_minutes} min ago, status=${status}, conclusion=${conclusion})"
-
-          # Healthy = recent (≤ 90 min) AND either still running or
-          # completed successfully. Anything else is a make-up trigger.
-          if [ "$age_minutes" -gt 90 ]; then
-            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
-            echo "reason=last scheduled run is ${age_minutes}m old (>90)" >> "$GITHUB_OUTPUT"
-          elif [ "$status" = "completed" ] && [ "$conclusion" != "success" ]; then
-            echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
-            echo "reason=last scheduled run conclusion=${conclusion}" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_dispatch=false" >> "$GITHUB_OUTPUT"
-            echo "reason=last scheduled run is healthy" >> "$GITHUB_OUTPUT"
-          fi
+          case "$summary" in
+            healthy)
+              echo "should_dispatch=false" >> "$GITHUB_OUTPUT"
+              echo "reason=${AUDIT} ran today and is healthy" >> "$GITHUB_OUTPUT"
+              ;;
+            missing)
+              echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
+              echo "reason=${AUDIT} did not fire today" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "should_dispatch=true" >> "$GITHUB_OUTPUT"
+              echo "reason=${AUDIT} ran today but ended ${summary#failed:}" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
 
       - name: Dispatch make-up run
         if: steps.check.outputs.should_dispatch == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Load-bearing, and its absence is why this workflow has never
+          # once healed anything. `gh workflow run` resolves the target
+          # repository from the local git remote, and this job has no
+          # checkout step, so every dispatch it ever attempted died on
+          # "fatal: not a git repository" — including 2026-08-14T14:44Z,
+          # where it correctly detected the missing 14:00 run, correctly
+          # decided to re-run it, and then failed on this line. The check
+          # step below already set GH_REPO; this one did not.
+          GH_REPO: ${{ github.repository }}
           MODE: ${{ steps.mode.outputs.mode }}
           REASON: ${{ steps.check.outputs.reason }}
           REF: ${{ github.ref_name }}
         run: |
           echo "::warning::dispatching make-up run (mode=${MODE}): ${REASON}"
           gh workflow run daily-paper-trading.yml \
+            --repo "$GH_REPO" \
             --ref "$REF" \
             --field "mode=${MODE}" \
             --field "market=US"

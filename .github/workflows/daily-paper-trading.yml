@@ -2,12 +2,20 @@ name: Daily Paper Trading
 
 # Runs the paper-trading scanner on a multi-market schedule.
 #
+# Anchors, not crons
+# ------------------
+# What matters for each run is the moment the work actually happens —
+# the anchor, expressed in New York time. The cron is only a wake-up
+# call fired an hour or two early, and the "Hold until the anchor" step
+# parks the job until the anchor arrives. That step carries the
+# measurements and the reasoning.
+#
 # US market — Mon-Fri. Half an hour after the open, then every two
 # hours, then half an hour after the close:
-#   - 14:00 UTC -> 10:00 ET (17:00 IL) -> open  -> full scan + trades
-#   - 16:00 UTC -> 12:00 ET (19:00 IL) -> close -> mark-to-market only
-#   - 18:00 UTC -> 14:00 ET (21:00 IL) -> close -> mark-to-market only
-#   - 20:30 UTC -> 16:30 ET (23:30 IL) -> close -> mark-to-market only
+#   - anchor 10:00 ET (17:00 IL) -> open  -> full scan + trades
+#   - anchor 12:00 ET (19:00 IL) -> close -> mark-to-market only
+#   - anchor 14:00 ET (21:00 IL) -> close -> mark-to-market only
+#   - anchor 16:30 ET (23:30 IL) -> close -> mark-to-market only
 #     (30 min after the bell so Yahoo has published the settled daily
 #     bar; running at 16:00 ET re-read the morning's intraday quote)
 #
@@ -20,18 +28,41 @@ name: Daily Paper Trading
 # opening minutes carry the widest spreads of the day, and a doctrine
 # that holds for 30 days gains nothing by transacting into them.
 #
+# The scan takes 25-45 min — it fetches ~209 tickers one at a time — so
+# its data lands 17:25-17:45 IL rather than on the anchor. The three
+# mark-only runs take about a minute and do land on theirs. Nothing can
+# move the scan's arrival earlier without starting it before 10:00 ET.
+#
 # A run at 23:00 IL was requested and is not here. 23:00 IL is 16:00 ET
-# — the bell itself — and that is the exact bug the 20:30 cron exists
-# to avoid; see the parenthesis above.
+# — the bell itself — and that is the exact bug the 16:30 ET anchor
+# exists to avoid; see the parenthesis above.
 #
-# Cron is UTC and has no daylight-saving rule. Israel and the US shift
-# on different dates, so for a few weeks each spring and autumn these
-# land an hour earlier or later in local terms. All four stay inside
-# the 09:30-16:00 ET session in both offsets, which is what matters.
+# Cron is UTC and has no daylight-saving rule, so the anchors are New
+# York time and scripts/hold_until_anchor.py resolves them through
+# America/New_York. Fixed UTC anchors were wrong at both ends of the
+# day every winter: 14:00 UTC is 09:00 EST, half an hour before the
+# open, and 20:30 UTC is 15:30 EST, half an hour before the bell — the
+# two failures these anchors exist to prevent.
 #
-# TASE (Tel Aviv) — Sun-Thu:
+# Anchoring to ET holds all four at 10:00 / 12:00 / 14:00 / 16:30 ET
+# year-round. The Israeli clock times quoted above hold with them for
+# most of the year, because two zones both on summer time or both on
+# standard time stay exactly seven hours apart. They part only while
+# one has switched and the other has not: Israel leaves summer time on
+# the last Sunday of October and the US on the first Sunday of
+# November, and in spring the US moves first. Over the next 401 days
+# that is 18 of them, in two windows, and in those the runs land an
+# hour earlier in Israel — 16:00 rather than 17:00. The dashboard's
+# advertised times do not model this; see the note on SCHEDULE in
+# dashboard/src/lib/timestamps.ts.
+#
+# TASE (Tel Aviv) — Sun-Thu, and deliberately not held:
 #   - 06:00 UTC -> 09:00 IL -> open  -> placeholder (Israeli scanner WIP)
 #   - 14:30 UTC -> 17:30 IL -> close -> placeholder (Israeli scanner WIP)
+# They produce zero trades, so when they land changes no number
+# anywhere. Holding them would only park them in the concurrency queue
+# ahead of the US scan, which does change numbers. Give them anchors
+# when the Israeli scanner ships and starts moving a book.
 #
 # A few schedule notes:
 #   - Sun is a TASE trading day but NOT a US one (cron 0-4 = Sun-Thu).
@@ -46,20 +77,38 @@ name: Daily Paper Trading
 #   (US-only — refreshed weekly by Refresh EDGAR cache workflow).
 # - data/cache (price + universe-index): actions/cache, run-id keyed.
 
+# The cron expression as the run title. Every run in the Actions list
+# read "Daily Paper Trading" before this, which made them impossible to
+# tell apart at a glance and left the watchdog with no way to ask "did
+# the US open run happen today?" — the runs API exposes this string as
+# display_title, so it can now match on it exactly.
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('{0} {1} (manual)', inputs.market, inputs.mode)
+      || github.event.schedule }}
+
 on:
   schedule:
+    # TASE fires at its anchor — see the header for why it is not held.
     # TASE open  (Sun-Thu 06:00 UTC = 09:00 IL)
     - cron: '0 6 * * 0-4'
     # TASE close (Sun-Thu 14:30 UTC = 17:30 IL)
     - cron: '30 14 * * 0-4'
-    # US +30m open (Mon-Fri 14:00 UTC = 10:00 ET = 17:00 IL) -> scan + trade
-    - cron: '0 14 * * 1-5'
-    # US midday    (Mon-Fri 16:00 UTC = 12:00 ET = 19:00 IL) -> mark only
-    - cron: '0 16 * * 1-5'
-    # US afternoon (Mon-Fri 18:00 UTC = 14:00 ET = 21:00 IL) -> mark only
-    - cron: '0 18 * * 1-5'
-    # US +30m close (Mon-Fri 20:30 UTC = 16:30 ET = 23:30 IL) -> mark only
-    - cron: '30 20 * * 1-5'
+
+    # US fires before its anchor and holds. Anchors are New York time,
+    # so the lead is 60 min under EDT and 120 under EST. The anchor= on
+    # each line must match what the dispatch step emits for that cron;
+    # scripts/tests/test_workflow_schedule.py enforces it in both
+    # offsets, so a cron edited without its anchor fails the suite
+    # instead of quietly running outside the session.
+    # US +30m open  -> 10:00 ET (17:00 IL) -> scan + trade
+    - cron: '0 13 * * 1-5'    # anchor 10:00 ET
+    # US midday     -> 12:00 ET (19:00 IL) -> mark only
+    - cron: '0 15 * * 1-5'    # anchor 12:00 ET
+    # US afternoon  -> 14:00 ET (21:00 IL) -> mark only
+    - cron: '0 17 * * 1-5'    # anchor 14:00 ET
+    # US +30m close -> 16:30 ET (23:30 IL) -> mark only
+    - cron: '30 19 * * 1-5'   # anchor 16:30 ET
 
   workflow_dispatch:
     inputs:
@@ -103,21 +152,29 @@ concurrency:
   # eventually race on `git push` and one would fail.
   #
   # Blocking is the right behaviour here rather than something to
-  # avoid: these jobs take about two minutes at the median, and a run
-  # that waits its turn is strictly better than a run that fails on a
-  # non-fast-forward. cancel-in-progress stays false so the queued run
-  # still happens.
+  # avoid: a run that waits its turn is strictly better than a run that
+  # fails on a non-fast-forward. cancel-in-progress stays false so the
+  # queued run still happens.
+  #
+  # The hold makes the lock coarser — a US job now owns this group from
+  # the moment its cron fires until its scan finishes, up to three hours
+  # under EST. The only thing that can queue behind it is the TASE
+  # close, which is exactly why TASE is not held: it trades nothing, so
+  # arriving late costs nothing, and letting it hold the lock instead
+  # would delay the run that does move a book.
   group: daily-paper-trading
   cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    # 60 min absorbs normal yfinance variance (typical run 14-26 min,
-    # tail ~30 min when the price API is slow). The bottleneck is
-    # the per-ticker yfinance fetch loop in core.live.runner; batching
-    # is the proper fix and is tracked separately.
-    timeout-minutes: 60
+    # 60 min absorbed normal yfinance variance (measured 0.8 min for a
+    # mark-only run, 24.7 at p90, 45.2 at worst — the bottleneck is the
+    # per-ticker fetch loop in core.live.runner, and batching is the
+    # proper fix, tracked separately). "Hold until the anchor" now adds
+    # up to 120 on top of that under EST, so: 120 waiting plus 45
+    # working plus setup still leaves headroom inside 180.
+    timeout-minutes: 180
 
     env:
       TRIGGER_SCHEDULE: ${{ github.event.schedule }}
@@ -149,24 +206,32 @@ jobs:
       - name: Decide run mode + market
         id: dispatch
         run: |
-          # Map cron expression -> (mode, market). Each cron has a
-          # unique pair, so the dispatch is deterministic.
+          # Map cron expression -> (mode, market, anchor). Each cron has
+          # a unique triple, so the dispatch is deterministic.
+          #
+          # anchor is the UTC HH:MM the work should begin at. Empty means
+          # "start immediately" — the two TASE crons already fire at their
+          # anchor, and a manual run is a human asking for it now.
           case "$TRIGGER_NAME:$TRIGGER_SCHEDULE" in
             workflow_dispatch:*)
               echo "mode=$TRIGGER_INPUT_MODE" >> "$GITHUB_OUTPUT"
               echo "market=$TRIGGER_INPUT_MARKET" >> "$GITHUB_OUTPUT"
+              echo "anchor=" >> "$GITHUB_OUTPUT"
               ;;
             *":0 6 * * 0-4")
               echo "mode=open" >> "$GITHUB_OUTPUT"
               echo "market=TASE" >> "$GITHUB_OUTPUT"
+              echo "anchor=" >> "$GITHUB_OUTPUT"
               ;;
             *":30 14 * * 0-4")
               echo "mode=close" >> "$GITHUB_OUTPUT"
               echo "market=TASE" >> "$GITHUB_OUTPUT"
+              echo "anchor=" >> "$GITHUB_OUTPUT"
               ;;
-            *":0 14 * * 1-5")
+            *":0 13 * * 1-5")
               echo "mode=open" >> "$GITHUB_OUTPUT"
               echo "market=US" >> "$GITHUB_OUTPUT"
+              echo "anchor=10:00" >> "$GITHUB_OUTPUT"
               ;;
             # Midday and afternoon are mark-to-market only, deliberately.
             # The doctrines read quarterly filings and hold for at least
@@ -175,17 +240,20 @@ jobs:
             # same book from the same filings and buy nothing. What these
             # do change is the dashboard, which otherwise shows a mark
             # struck before the US session opened until it closes again.
-            *":0 16 * * 1-5")
+            *":0 15 * * 1-5")
               echo "mode=close" >> "$GITHUB_OUTPUT"
               echo "market=US" >> "$GITHUB_OUTPUT"
+              echo "anchor=12:00" >> "$GITHUB_OUTPUT"
               ;;
-            *":0 18 * * 1-5")
+            *":0 17 * * 1-5")
               echo "mode=close" >> "$GITHUB_OUTPUT"
               echo "market=US" >> "$GITHUB_OUTPUT"
+              echo "anchor=14:00" >> "$GITHUB_OUTPUT"
               ;;
-            *":30 20 * * 1-5")
+            *":30 19 * * 1-5")
               echo "mode=close" >> "$GITHUB_OUTPUT"
               echo "market=US" >> "$GITHUB_OUTPUT"
+              echo "anchor=16:30" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "::error::unrecognized trigger: $TRIGGER_NAME / $TRIGGER_SCHEDULE"
@@ -222,6 +290,42 @@ jobs:
           restore-keys: |
             prices-v2-${{ steps.dispatch.outputs.market }}-
             prices-v2-
+
+      - name: Hold until the anchor
+        # GitHub treats scheduled events as best-effort, and for this
+        # repository that is not a small effect. Measured over 51
+        # scheduled runs the delay was a median of 51 minutes, a minimum
+        # of 4 and a maximum of 109 — and on 2026-08-14 the 14:00 run
+        # did not fire at all.
+        #
+        # Moving the crons an hour earlier would drag the median onto
+        # the target and leave the spread untouched, and for two of the
+        # four it would be actively wrong: a punctual 13:00 fire would
+        # scan and trade before the 13:30 open, and a punctual 19:30
+        # fire would mark the book on an intraday quote instead of the
+        # settled close — the bug the 20:30 anchor exists to avoid.
+        #
+        # So the cron is demoted to a wake-up call an hour early and the
+        # job waits here. Whatever the scheduler did, the work starts at
+        # the anchor. The market correctness and the arrival time both
+        # stop being a lottery, and the only case still uncovered is a
+        # delay longer than the 60-minute lead, which lands where it
+        # would have landed anyway.
+        #
+        # Idling is free here because the repository is public and
+        # Actions minutes on public repositories are unmetered. On a
+        # private repository this step would be the wrong design — four
+        # holds a day would consume most of the free monthly allowance.
+        # A module rather than an inline script: the anchor has to be
+        # resolved through America/New_York, and putting that arithmetic
+        # somewhere scripts/tests/test_hold_until_anchor.py can reach it
+        # is worth more than saving a file. It also keeps the workflow
+        # free of GNU date's parsing dialect, which nothing on a Mac can
+        # check before it ships.
+        if: steps.dispatch.outputs.anchor != ''
+        env:
+          ANCHOR: ${{ steps.dispatch.outputs.anchor }}
+        run: python -m scripts.hold_until_anchor --anchor "$ANCHOR"
 
       - name: Run paper-trading scanner
         # `shell: bash` is load-bearing, not style. The default shell runs

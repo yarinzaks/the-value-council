@@ -120,20 +120,55 @@ interface ScheduleSlot {
   minute: number;
 }
 
+// Slots are the moment the data has LANDED, not the moment the runner
+// wakes up, because "next update" is read as "when will I see a new
+// number". They differ for the trading scan: it starts at its 17:00
+// anchor and takes 25-45 min to fetch every ticker, so 17:45 is the
+// honest ceiling. The three mark-only runs take about a minute, so for
+// those the two are the same time.
+//
+// Must stay in ascending order within each market — nextScheduled()
+// stops at the first future slot it finds.
+//
+// Mirrors the anchors in .github/workflows/daily-paper-trading.yml,
+// which are New York times — 10:00 / 12:00 / 14:00 / 16:30 ET. Those
+// convert to the Israeli times below whenever the two zones are both on
+// summer time or both on standard time, which is 383 of any 401 days.
+// The other 18 fall in the two windows where only one zone has switched
+// (Israel leaves summer time a week before the US in October; the US
+// springs forward before Israel in March), and in those the runs land an
+// hour earlier than stated here. Known and not modelled: these strings
+// label a footer, every number on the page carries its own timestamp,
+// and a DST-correct implementation would need the schedule expressed in
+// ET and converted per-render.
 const SCHEDULE: ScheduleSlot[] = [
   {
     market: "US",
     kind: "open",
     weekdays: new Set([1, 2, 3, 4, 5]),
-    hour: 16,
-    minute: 35,
+    hour: 17,
+    minute: 45,
+  },
+  {
+    market: "US",
+    kind: "close",
+    weekdays: new Set([1, 2, 3, 4, 5]),
+    hour: 19,
+    minute: 0,
+  },
+  {
+    market: "US",
+    kind: "close",
+    weekdays: new Set([1, 2, 3, 4, 5]),
+    hour: 21,
+    minute: 0,
   },
   {
     market: "US",
     kind: "close",
     weekdays: new Set([1, 2, 3, 4, 5]),
     hour: 23,
-    minute: 0,
+    minute: 30,
   },
   {
     market: "TASE",
