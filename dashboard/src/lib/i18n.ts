@@ -278,6 +278,13 @@ const en: Dict = {
   col_meaning: "Meaning",
 
   // ---- Schedule banner ----
+  // ---- Sector trend (beside the donut) ----
+  sector_trend_title: "How those sectors moved",
+  sector_trend_note:
+    "This agent's own holdings in each sector, weighted by today's position size and rebased to 100. Not its realised P&L — the book changed over the window; this rewinds what it holds now.",
+  sector_trend_empty: "No price history for these holdings yet.",
+  sector_trend_base: "100 = {d}",
+
   schedule_banner:
     "Scan starts 10:00 ET (17:00 IL), lands by 17:45 · Marks refresh 19:00, 21:00, 23:30 IL · Prices live during market hours",
 
@@ -573,6 +580,13 @@ const he: Dict = {
   col_meaning: "משמעות",
 
   // ---- Schedule banner ----
+  // ---- Sector trend (beside the donut) ----
+  sector_trend_title: "איך הסקטורים האלה נעו",
+  sector_trend_note:
+    "ההחזקות של הסוכן עצמו בכל סקטור, משוקללות לפי גודל הפוזיציה היום ומנורמלות ל-100. זה לא הרווח שהוא בפועל עשה — התיק השתנה לאורך התקופה, וזה מריץ אחורה את מה שהוא מחזיק עכשיו.",
+  sector_trend_empty: "עדיין אין היסטוריית מחירים להחזקות האלה.",
+  sector_trend_base: "100 = {d}",
+
   schedule_banner:
     "הסריקה מתחילה 17:00 ונכנסת עד 17:45 · עדכון מחירים 19:00, 21:00, 23:30 (שעון ישראל) · מחירים בזמן אמת בשעות המסחר",
 
