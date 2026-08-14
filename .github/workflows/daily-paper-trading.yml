@@ -2,11 +2,32 @@ name: Daily Paper Trading
 
 # Runs the paper-trading scanner on a multi-market schedule.
 #
-# US market — Mon-Fri:
-#   - 13:35 UTC -> 09:35 ET (16:35 IL) -> open  -> full scan + trades
+# US market — Mon-Fri. Half an hour after the open, then every two
+# hours, then half an hour after the close:
+#   - 14:00 UTC -> 10:00 ET (17:00 IL) -> open  -> full scan + trades
+#   - 16:00 UTC -> 12:00 ET (19:00 IL) -> close -> mark-to-market only
+#   - 18:00 UTC -> 14:00 ET (21:00 IL) -> close -> mark-to-market only
 #   - 20:30 UTC -> 16:30 ET (23:30 IL) -> close -> mark-to-market only
 #     (30 min after the bell so Yahoo has published the settled daily
 #     bar; running at 16:00 ET re-read the morning's intraday quote)
+#
+# Only the first scans and trades. The other three refresh the marks so
+# the dashboard tracks the session instead of showing a price struck
+# before the open until it closes again.
+#
+# The trading scan moved from 09:35 to 10:00 ET on the same reasoning
+# that put the closing one at 16:30: let the session settle first. The
+# opening minutes carry the widest spreads of the day, and a doctrine
+# that holds for 30 days gains nothing by transacting into them.
+#
+# A run at 23:00 IL was requested and is not here. 23:00 IL is 16:00 ET
+# — the bell itself — and that is the exact bug the 20:30 cron exists
+# to avoid; see the parenthesis above.
+#
+# Cron is UTC and has no daylight-saving rule. Israel and the US shift
+# on different dates, so for a few weeks each spring and autumn these
+# land an hour earlier or later in local terms. All four stay inside
+# the 09:30-16:00 ET session in both offsets, which is what matters.
 #
 # TASE (Tel Aviv) — Sun-Thu:
 #   - 06:00 UTC -> 09:00 IL -> open  -> placeholder (Israeli scanner WIP)
@@ -31,9 +52,13 @@ on:
     - cron: '0 6 * * 0-4'
     # TASE close (Sun-Thu 14:30 UTC = 17:30 IL)
     - cron: '30 14 * * 0-4'
-    # US open    (Mon-Fri 13:35 UTC = 09:35 ET = 16:35 IL)
-    - cron: '35 13 * * 1-5'
-    # US close   (Mon-Fri 20:30 UTC = 16:30 ET = 23:30 IL)
+    # US +30m open (Mon-Fri 14:00 UTC = 10:00 ET = 17:00 IL) -> scan + trade
+    - cron: '0 14 * * 1-5'
+    # US midday    (Mon-Fri 16:00 UTC = 12:00 ET = 19:00 IL) -> mark only
+    - cron: '0 16 * * 1-5'
+    # US afternoon (Mon-Fri 18:00 UTC = 14:00 ET = 21:00 IL) -> mark only
+    - cron: '0 18 * * 1-5'
+    # US +30m close (Mon-Fri 20:30 UTC = 16:30 ET = 23:30 IL) -> mark only
     - cron: '30 20 * * 1-5'
 
   workflow_dispatch:
@@ -67,9 +92,22 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 concurrency:
-  # Each (market, mode) pair has its own queue so US and TASE runs
-  # don't block each other on the Mon-Thu overlap days.
-  group: daily-paper-trading-${{ github.event.schedule || format('manual-{0}-{1}', inputs.market, inputs.mode) }}
+  # One queue for every run of this workflow, so no two can be inside
+  # the commit-and-push step at once.
+  #
+  # This was previously keyed per cron, on the reasoning that US and
+  # TASE runs should not block each other on the Mon-Thu overlap days.
+  # That held while they were 55 minutes apart. Moving the US scan to
+  # 14:00 UTC put it 30 minutes ahead of the TASE close, and the
+  # slowest run measured took 29.7 — close enough that two jobs would
+  # eventually race on `git push` and one would fail.
+  #
+  # Blocking is the right behaviour here rather than something to
+  # avoid: these jobs take about two minutes at the median, and a run
+  # that waits its turn is strictly better than a run that fails on a
+  # non-fast-forward. cancel-in-progress stays false so the queued run
+  # still happens.
+  group: daily-paper-trading
   cancel-in-progress: false
 
 jobs:
@@ -126,8 +164,23 @@ jobs:
               echo "mode=close" >> "$GITHUB_OUTPUT"
               echo "market=TASE" >> "$GITHUB_OUTPUT"
               ;;
-            *":35 13 * * 1-5")
+            *":0 14 * * 1-5")
               echo "mode=open" >> "$GITHUB_OUTPUT"
+              echo "market=US" >> "$GITHUB_OUTPUT"
+              ;;
+            # Midday and afternoon are mark-to-market only, deliberately.
+            # The doctrines read quarterly filings and hold for at least
+            # 30 days: across 67 days of logs Benjamin Graham traded on
+            # one. Re-running the scan mid-session would re-derive the
+            # same book from the same filings and buy nothing. What these
+            # do change is the dashboard, which otherwise shows a mark
+            # struck before the US session opened until it closes again.
+            *":0 16 * * 1-5")
+              echo "mode=close" >> "$GITHUB_OUTPUT"
+              echo "market=US" >> "$GITHUB_OUTPUT"
+              ;;
+            *":0 18 * * 1-5")
+              echo "mode=close" >> "$GITHUB_OUTPUT"
               echo "market=US" >> "$GITHUB_OUTPUT"
               ;;
             *":30 20 * * 1-5")
