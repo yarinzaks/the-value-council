@@ -217,3 +217,18 @@ def test_it_holds_nothing_when_nobody_agrees() -> None:
     p = propose(as_of=AS_OF, books=books(a=["AAA"], b=["BBB"]), risk_on_dials=4)
     assert p.weights == {}
     assert p.vetoes == []
+
+
+def test_a_single_run_cannot_spend_the_whole_punch_card() -> None:
+    """Legal under the lifetime budget, and out of character.
+
+    The first live proposal opened nine positions at once from a book
+    the eleven collectively held. The doctrine expects 0 to 2 a year.
+    """
+    from agents.council.selection import MAX_ENTRIES_PER_RUN
+
+    many = {f"agent{i}": [f"T{j}" for j in range(9)] for i in range(MIN_AGREEMENT)}
+    p = propose(as_of=AS_OF, books=many, risk_on_dials=4, entries_remaining=20)
+    assert len(p.candidates) == 9
+    assert p.entries_used == MAX_ENTRIES_PER_RUN
+    assert len(p.weights) == MAX_ENTRIES_PER_RUN

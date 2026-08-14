@@ -63,6 +63,14 @@ MIN_AGREEMENT: int = 3
 #: risk-on, so a FRED outage tightens this rather than loosening it.
 MIN_RISK_ON_DIALS: int = 2
 
+#: Entries a single run may open. The punch card is a lifetime budget
+#: and would happily let the first run spend nine of its twenty at once,
+#: which is legal and out of character: this doctrine expects 0 to 2
+#: positions a year. Agreement is not urgent — a name three agents hold
+#: today they will still hold next week — so the cap costs nothing real
+#: and keeps the agent from becoming a basket on its first day.
+MAX_ENTRIES_PER_RUN: int = 2
+
 #: How far back the news veto looks.
 NEWS_LOOKBACK = timedelta(days=7)
 
@@ -193,7 +201,7 @@ def propose(
             continue
         keep.append(t)
 
-    entries_allowed = max(0, entries_remaining)
+    entries_allowed = min(max(0, entries_remaining), MAX_ENTRIES_PER_RUN)
     if risk_on_dials is None:
         proposal.note = "regime unreadable — no new entries"
         entries_allowed = 0
