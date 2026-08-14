@@ -9,6 +9,8 @@ import {
 } from "@/components/Cards";
 import { NavChart } from "@/components/NavChart";
 import { SectorDonut, type SectorSlice } from "@/components/SectorDonut";
+import { SectorTrendChart } from "@/components/SectorTrendChart";
+import { buildSectorTrends, toChartRows } from "@/lib/sector-trend";
 import { LivePositionsTable } from "@/components/LivePositionsTable";
 import { AgentPerformanceChart } from "@/components/AgentPerformanceChart";
 import { Term } from "@/components/Term";
@@ -18,6 +20,7 @@ import {
   loadMarkFreshness,
   loadJournal,
   loadLivePortfolio,
+  loadPriceSeries,
   loadSectors,
   loadSnapshots,
 } from "@/lib/data";
@@ -94,6 +97,37 @@ export default async function AgentDrillPage({
       }))
       .sort((a, b) => b.pct - a.pct);
   })();
+
+  // How each of those sectors moved, from the same holdings the donut
+  // sized. Built here rather than in the component because it needs the
+  // price files, and every fs read happens at build time in the static
+  // export. Iterates sectorSlices in order so the colours line up.
+  const sectorTrends = await (async () => {
+    const positions = live?.positions ?? [];
+    if (sectorSlices.length === 0) return [];
+    const seriesByTicker = new Map(
+      await Promise.all(
+        positions.map(
+          async (p) => [p.ticker, await loadPriceSeries(p.ticker)] as const,
+        ),
+      ),
+    );
+    return buildSectorTrends(
+      sectorSlices.map((s) => ({
+        key: s.key,
+        label: s.label,
+        holdings: positions
+          .filter((p) => (sectorMap[p.ticker] ?? "unknown") === s.key)
+          .map((p) => ({
+            ticker: p.ticker,
+            value: p.shares * p.current_price,
+            series: seriesByTicker.get(p.ticker) ?? null,
+          })),
+      })),
+    );
+  })();
+  const sectorTrendRows = toChartRows(sectorTrends);
+  const sectorTrendBase = sectorTrends[0]?.points[0]?.d ?? "";
 
   if (!run && !live) {
     return (
@@ -180,11 +214,27 @@ export default async function AgentDrillPage({
           {/* Where the money sits, before the list of what it is
               in. A position table answers "what"; this answers "what
               is this investor actually doing". */}
-          <Card className="mb-6">
-            <h3 className="text-sm font-semibold mb-1">{t("sector_title")}</h3>
-            <p className="text-xs text-muted mb-3">{t("sector_note")}</p>
-            <SectorDonut slices={sectorSlices} emptyLabel={t("sector_empty")} />
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <Card>
+              <h3 className="text-sm font-semibold mb-1">{t("sector_title")}</h3>
+              <p className="text-xs text-muted mb-3">{t("sector_note")}</p>
+              <SectorDonut slices={sectorSlices} emptyLabel={t("sector_empty")} />
+            </Card>
+            {/* Beside it, not below: the two are one thought — where the
+                money is, and how that has gone. */}
+            <Card>
+              <h3 className="text-sm font-semibold mb-1">
+                {t("sector_trend_title")}
+              </h3>
+              <p className="text-xs text-muted mb-3">{t("sector_trend_note")}</p>
+              <SectorTrendChart
+                trends={sectorTrends}
+                rows={sectorTrendRows}
+                emptyLabel={t("sector_trend_empty")}
+                baseLabel={t("sector_trend_base").replace("{d}", sectorTrendBase)}
+              />
+            </Card>
+          </div>
 
           <Card className="mb-6">
             <div className="flex items-center justify-between mb-3">

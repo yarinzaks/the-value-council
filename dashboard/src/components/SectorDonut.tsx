@@ -28,6 +28,19 @@ const PALETTE = [
 ];
 const UNKNOWN_COLOR = "#94a3b8";
 
+/** The colour a sector wears, wherever it is drawn.
+ *
+ * Exported because the donut is no longer the only chart that draws
+ * these: SectorTrendChart sits beside it showing the same sectors over
+ * time, and the pair is only readable if a colour means the same sector
+ * in both. Keyed by the slice's position in the list, so both callers
+ * must iterate the same ordered slices — which they do, since the trend
+ * chart is built from the donut's own array.
+ */
+export function sectorColor(key: string, index: number): string {
+  return key === "unknown" ? UNKNOWN_COLOR : PALETTE[index % PALETTE.length];
+}
+
 export function SectorDonut({
   slices,
   emptyLabel,
@@ -38,9 +51,6 @@ export function SectorDonut({
   if (slices.length === 0) {
     return <p className="text-xs text-muted">{emptyLabel}</p>;
   }
-  const colorFor = (key: string, i: number) =>
-    key === "unknown" ? UNKNOWN_COLOR : PALETTE[i % PALETTE.length];
-
   return (
     <div className="flex flex-wrap items-center gap-4" dir="ltr">
       <div className="h-44 w-44 shrink-0">
@@ -57,7 +67,7 @@ export function SectorDonut({
               stroke="none"
             >
               {slices.map((s, i) => (
-                <Cell key={s.key} fill={colorFor(s.key, i)} />
+                <Cell key={s.key} fill={sectorColor(s.key, i)} />
               ))}
             </Pie>
             <Tooltip
@@ -79,7 +89,7 @@ export function SectorDonut({
           <li key={s.key} className="flex items-center gap-2 text-xs">
             <span
               className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-              style={{ backgroundColor: colorFor(s.key, i) }}
+              style={{ backgroundColor: sectorColor(s.key, i) }}
             />
             <span className="flex-1 text-council-700 dark:text-council-300">
               {s.label}
