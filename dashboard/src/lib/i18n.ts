@@ -24,6 +24,7 @@ const en: Dict = {
   nav_insights: "AI Insights",
   nav_history: "History",
   nav_backtest: "Backtests",
+  nav_council: "Council",
   nav_glossary: "Glossary",
 
   // ---- Toggles ----
@@ -318,6 +319,7 @@ const he: Dict = {
   nav_insights: "תובנות AI",
   nav_history: "היסטוריה",
   nav_backtest: "בקטסטים",
+  nav_council: "המועצה",
   nav_glossary: "מילון",
 
   // ---- Toggles ----

@@ -513,3 +513,95 @@ export async function loadSectors(): Promise<Record<string, string>> {
     return {};
   }
 }
+
+// --------------------------------------------------------------------------
+// The Council — a doctrine-driven agent, not a screen
+// --------------------------------------------------------------------------
+
+/** One Part 4 limit as the run recorded it. */
+export interface CouncilLimit {
+  limit: string;
+  observed: number | null;
+  cap: number;
+  /** "pass" | "breach" | "unknown". Unknown is never a pass. */
+  state: string;
+  forces_action: boolean;
+  note: string;
+}
+
+/** One flagged filing on something the Council holds. */
+export interface CouncilFiling {
+  ticker: string;
+  filed: string;
+  form: string;
+  /** "critical" | "investigate" | "note". */
+  severity: string;
+  code: string;
+  meaning: string;
+  accession: string;
+}
+
+export interface CouncilRegimeSignal {
+  series: string;
+  /** "risk_on" | "risk_off" | "unknown". */
+  stance: string;
+  value: number | null;
+  as_of: string | null;
+  threshold: number | null;
+  reason: string;
+}
+
+export interface CouncilState {
+  agent: string;
+  updated: string;
+  run: string;
+  nav: number;
+  cash: number;
+  cash_weight: number;
+  peak_nav: number;
+  positions: number;
+  drawdown_from_peak: number | null;
+  circuit_breaker: boolean;
+  /** Null on a close run, which does not compute it. */
+  all_clear: boolean | null;
+  limits: CouncilLimit[];
+  breaches: CouncilLimit[];
+  unknown_limits: CouncilLimit[];
+  filings_flagged: CouncilFiling[];
+  regime: {
+    as_of: string;
+    risk_on_count: number;
+    unknown_count: number;
+    signals: CouncilRegimeSignal[];
+  } | null;
+  journal: {
+    punch_card: { total: number; used: number; remaining: number };
+    entries: number;
+    open: number;
+    calibration: {
+      resolved: number;
+      brier: number | null;
+      shrinkage: number;
+      buckets: unknown[];
+    };
+  };
+}
+
+/**
+ * The Council's current state, or null before its first run.
+ *
+ * Deliberately not a LivePortfolio: this agent does not produce weights
+ * and is not comparable to the eleven that do. It proposes, a human
+ * approves, and it expects to hold nothing for long stretches — so
+ * ranking it beside agents measured on five years of backtest would be
+ * putting two different kinds of number in one column.
+ */
+export async function loadCouncilState(): Promise<CouncilState | null> {
+  try {
+    return await readJson<CouncilState>(
+      path.join(DATA_ROOT, "council", "state.json"),
+    );
+  } catch {
+    return null;
+  }
+}

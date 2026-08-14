@@ -1,0 +1,71 @@
+{
+ "agent": "the_council",
+ "all_clear": null,
+ "breaches": [],
+ "cash": 10000.0,
+ "cash_weight": 1.0,
+ "circuit_breaker": false,
+ "drawdown_from_peak": null,
+ "filings_flagged": [],
+ "journal": {
+  "calibration": {
+   "brier": null,
+   "buckets": [],
+   "resolved": 0,
+   "shrinkage": 1.0
+  },
+  "entries": 0,
+  "open": 0,
+  "punch_card": {
+   "remaining": 20,
+   "total": 20,
+   "used": 0
+  }
+ },
+ "limits": [],
+ "nav": 10000.0,
+ "peak_nav": 10000.0,
+ "positions": 0,
+ "regime": {
+  "as_of": "2026-08-14",
+  "risk_on_count": 4,
+  "signals": [
+   {
+    "as_of": "2026-08-12",
+    "reason": "2.71 vs 1y median 2.84 (below), vs 2.73 four weeks ago (tightening)",
+    "series": "BAMLH0A0HYM2",
+    "stance": "risk_on",
+    "threshold": 2.84,
+    "value": 2.71
+   },
+   {
+    "as_of": "2026-08-13",
+    "reason": "+0.76 \u2014 not inverted",
+    "series": "T10Y3M",
+    "stance": "risk_on",
+    "threshold": 0.0,
+    "value": 0.76
+   },
+   {
+    "as_of": "2026-08-13",
+    "reason": "7,798.99 vs 200d average 7,070.35 (above)",
+    "series": "SP500",
+    "stance": "risk_on",
+    "threshold": 7070.349300000001,
+    "value": 7798.99
+   },
+   {
+    "as_of": "2026-08-12",
+    "reason": "14.55 vs 1.5x 1y median 25.76 (below)",
+    "series": "VIXCLS",
+    "stance": "risk_on",
+    "threshold": 25.755000000000003,
+    "value": 14.55
+   }
+  ],
+  "unknown_count": 0
+ },
+ "run": "close",
+ "unknown_limits": [],
+ "updated": "2026-08-14T11:08:46+00:00"
+}

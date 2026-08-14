@@ -236,6 +236,20 @@ jobs:
             --mode "$MODE" --market "$MARKET" \
             2>&1 | tee "data/cron_logs/daily.${MARKET}.${MODE}.log"
 
+      # The Council is a separate step because it is a separate kind of
+      # agent: it produces no weights, trades nothing, and its failure
+      # must not take the eleven down with it. `|| true` is deliberate
+      # for exactly that reason — a FRED outage or an SEC 403 should
+      # leave the dashboard's council page stale, not fail the run that
+      # actually moved the books.
+      - name: Run the Council (US only, never trades)
+        if: steps.dispatch.outputs.market != 'TASE'
+        env:
+          MODE: ${{ steps.dispatch.outputs.mode }}
+        run: |
+          python -m scripts.run_council --mode "$MODE" \
+            2>&1 | tee "data/cron_logs/council.${MODE}.log" || true
+
       - name: Verify run produced real trading state (US only)
         if: steps.dispatch.outputs.market != 'TASE'
         env:
@@ -267,7 +281,7 @@ jobs:
           # sector donut. Everything here is small: 209 price series are
           # 2.4M in total and sectors.json is 4K.
           git add data/portfolios data/decisions data/snapshots data/cron_logs \
-                  data/prices data/sectors.json
+                  data/prices data/sectors.json data/council
           if git diff --cached --quiet; then
             echo "no data changes — nothing to commit"
             exit 0

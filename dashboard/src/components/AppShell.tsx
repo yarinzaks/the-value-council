@@ -7,6 +7,10 @@ import { useUI } from "./Providers";
 const NAV = [
   { href: "/", key: "nav_overview" },
   { href: "/agents", key: "nav_agents" },
+  // Its own entry rather than a twelfth row under /agents: it produces
+  // no weights and carries no comparable return, so listing it beside
+  // the eleven would invite exactly the comparison it cannot support.
+  { href: "/council", key: "nav_council" },
   { href: "/history", key: "nav_history" },
   { href: "/backtest", key: "nav_backtest" },
   { href: "/watchlist", key: "nav_watchlist" },
