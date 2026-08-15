@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
+from agents.evidence_rules import with_evidence_rules
 from agents.marks.second_level import (
+    _MARKS_SYSTEM_PROMPT,
     MarksMemo,
     SecondLevelAnalyzer,
 )
@@ -158,18 +160,14 @@ class TestMarksMemoSchema:
 class TestAnalyze:
     def test_happy_path(self, fake_client: MagicMock) -> None:
         analyzer = SecondLevelAnalyzer(client=fake_client, playbook="PB")
-        fake_model = MagicMock()
-        fake_model.generate_content.return_value = _build_response(
+        fake_client._sdk.models.generate_content.return_value = _build_response(
             json.dumps(SAMPLE_MEMO_JSON)
         )
 
-        with patch(
-            "google.generativeai.GenerativeModel", return_value=fake_model
-        ):
-            memo = analyzer.analyze(
-                stock_data={"ticker": "ENERGY-BOND-X"},
-                portfolio_state={"posture": "Cool"},
-            )
+        memo = analyzer.analyze(
+            stock_data={"ticker": "ENERGY-BOND-X"},
+            portfolio_state={"posture": "Cool"},
+        )
 
         assert memo.ticker == "ENERGY-BOND-X"
         assert memo.decision == "BUY"
@@ -177,34 +175,42 @@ class TestAnalyze:
 
     def test_empty_response_raises(self, fake_client: MagicMock) -> None:
         analyzer = SecondLevelAnalyzer(client=fake_client, playbook="PB")
-        fake_model = MagicMock()
-        fake_model.generate_content.return_value = _build_response("")
+        fake_client._sdk.models.generate_content.return_value = _build_response("")
 
-        with patch(
-            "google.generativeai.GenerativeModel", return_value=fake_model
-        ), pytest.raises(LLMError, match="empty"):
+        with pytest.raises(LLMError, match="empty"):
             analyzer.analyze(stock_data={}, portfolio_state={})
 
     def test_invalid_schema_raises(self, fake_client: MagicMock) -> None:
         analyzer = SecondLevelAnalyzer(client=fake_client, playbook="PB")
         bad = dict(SAMPLE_MEMO_JSON)
         bad["decision"] = "GARBAGE"
-        fake_model = MagicMock()
-        fake_model.generate_content.return_value = _build_response(
-            json.dumps(bad)
-        )
+        fake_client._sdk.models.generate_content.return_value = _build_response(json.dumps(bad))
 
-        with patch(
-            "google.generativeai.GenerativeModel", return_value=fake_model
-        ), pytest.raises(LLMError, match="schema"):
+        with pytest.raises(LLMError, match="schema"):
             analyzer.analyze(stock_data={}, portfolio_state={})
 
     def test_sdk_error_wrapped(self, fake_client: MagicMock) -> None:
         analyzer = SecondLevelAnalyzer(client=fake_client, playbook="PB")
-        fake_model = MagicMock()
-        fake_model.generate_content.side_effect = RuntimeError("API down")
+        fake_client._sdk.models.generate_content.side_effect = RuntimeError("API down")
 
-        with patch(
-            "google.generativeai.GenerativeModel", return_value=fake_model
-        ), pytest.raises(LLMError, match="failed"):
+        with pytest.raises(LLMError, match="failed"):
             analyzer.analyze(stock_data={}, portfolio_state={})
+
+    def test_request_carries_the_persona_and_sampling(self, fake_client: MagicMock) -> None:
+        """What makes this call Marks's rather than the generic memo.
+
+        The system instruction and temperature are set per request now;
+        before, they were bound when the model object was built.
+        """
+        analyzer = SecondLevelAnalyzer(client=fake_client, playbook="PB")
+        fake_client._sdk.models.generate_content.return_value = _build_response(
+            json.dumps(SAMPLE_MEMO_JSON)
+        )
+
+        analyzer.analyze(stock_data={}, portfolio_state={})
+
+        kwargs = fake_client._sdk.models.generate_content.call_args.kwargs
+        assert kwargs["model"] == fake_client._model_name
+        assert kwargs["config"].system_instruction == with_evidence_rules(_MARKS_SYSTEM_PROMPT)
+        assert kwargs["config"].temperature == 0.4
+        assert kwargs["config"].response_mime_type == "application/json"
