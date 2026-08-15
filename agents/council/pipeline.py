@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from agents.council.assemble import Assembled
-from agents.council.exits import Sleeve
+from agents.council.exits import DEFAULT_RANK_BUFFER, Sleeve
 from agents.council.filings import OpinionIndex, gate_d_flags
 from agents.council.rank import Ranked, rank_universe, select_basket
 from agents.council.screen import FilingFlags, ScreenResult, screen
@@ -174,6 +174,24 @@ def run_selection(
 
     size = basket_size if basket_size is not None else STATISTICAL_NAMES
     basket = select_basket(selection.ranked, eligible=eligible, size=size)
+
+    # E8's buffer: bought into the top 20, held until rank 40. Without
+    # this a name that drifts to rank 21 is sold and re-bought when it
+    # drifts back, which is pure cost -- the buffer exists precisely to
+    # stop names oscillating around the boundary from generating
+    # turnover. select_basket answers "what would I buy today", so the
+    # holds have to be added back here rather than inside it.
+    if held:
+        kept = {b.ticker for b in basket}
+        held_upper = {h.upper() for h in held}
+        by_rank = {r.ticker: i + 1 for i, r in enumerate(selection.ranked)}
+        for entry in selection.ranked:
+            if entry.ticker not in held_upper or entry.ticker in kept:
+                continue
+            if by_rank.get(entry.ticker, 10**9) <= DEFAULT_RANK_BUFFER:
+                basket.append(entry)
+                kept.add(entry.ticker)
+
     selection.basket = basket
 
     # Section 5.

@@ -253,3 +253,55 @@ class TestSummary:
         s = run_selection(rows, AS_OF, risk_on_dials=4, gate_d=clean_gate_d)
         text = s.summary()
         assert "tradeable" in text and "basket" in text
+
+
+class TestRankBuffer:
+    """E8: bought into the top 20, held until rank 40.
+
+    Without the buffer a name drifting to rank 21 is sold and re-bought
+    when it drifts back, which is pure cost — the buffer exists to stop
+    names oscillating around the boundary from generating turnover.
+    """
+
+    @staticmethod
+    def _graded(n: int) -> list[Assembled]:
+        # Distinct sectors so the sector cap never binds, and a value
+        # gradient so the rank order is exactly T00, T01, ... T29.
+        rows = []
+        for i in range(n):
+            row = company(f"T{i:02d}", sic=100 * (i + 3))
+            row.rank.__dict__["ebit_to_ev"] = 1.0 - i / 100.0
+            rows.append(row)
+        return rows
+
+    def test_a_held_name_outside_the_top_twenty_is_kept(self) -> None:
+        rows = self._graded(30)
+        s = run_selection(
+            rows, AS_OF, risk_on_dials=4, held=["T24"], gate_d=clean_gate_d,
+            basket_size=20,
+        )
+        assert "T24" in s.weights
+
+    def test_a_held_name_past_the_buffer_is_dropped(self) -> None:
+        rows = self._graded(60)
+        s = run_selection(
+            rows, AS_OF, risk_on_dials=4, held=["T55"], gate_d=clean_gate_d,
+            basket_size=20,
+        )
+        assert "T55" not in s.weights
+
+    def test_an_unheld_name_outside_the_top_twenty_is_not_bought(self) -> None:
+        """The buffer holds; it does not buy."""
+        rows = self._graded(30)
+        s = run_selection(
+            rows, AS_OF, risk_on_dials=4, gate_d=clean_gate_d, basket_size=20
+        )
+        assert "T24" not in s.weights
+
+    def test_the_buffer_does_not_duplicate_a_name_already_bought(self) -> None:
+        rows = self._graded(30)
+        s = run_selection(
+            rows, AS_OF, risk_on_dials=4, held=["T01"], gate_d=clean_gate_d,
+            basket_size=20,
+        )
+        assert [b.ticker for b in s.basket].count("T01") == 1
