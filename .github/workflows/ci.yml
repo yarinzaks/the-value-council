@@ -53,6 +53,32 @@ jobs:
       - name: Run test suite
         run: pytest
 
+  # The assistant endpoint is JavaScript and is deployed straight to
+  # Cloudflare's edge without passing through pytest, so it needs its own
+  # gate. Blocking, like the Python suite: the logic under test is what
+  # decides whether a source is acceptable, and a regression there would
+  # ship silently.
+  functions:
+    name: Edge function tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # No `npm ci`: this suite runs on node:test, which is built in, and
+      # imports the function directly. Installing the dashboard's
+      # dependencies would only slow it down.
+      - name: Run function tests
+        working-directory: dashboard
+        run: npm test
+
   lint:
     name: Lint and types (non-blocking)
     runs-on: ubuntu-latest
