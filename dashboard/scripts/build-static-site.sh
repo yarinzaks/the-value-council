@@ -74,6 +74,16 @@ for locale in he en; do
   echo "    -> site/$locale ($(find "$SITE_DIR/$locale" -type f | wc -l | tr -d ' ') files)"
 done
 
+# The assistant's view of this site, as data rather than HTML.
+#
+# The pages are a static export, so every number in them is only
+# readable by a browser. /api/chat runs on the edge and needs the same
+# facts, so they are published once here, from the same tree the pages
+# were just built from. A failure is fatal: an assistant that answers
+# questions about a dashboard it cannot read would make things up.
+echo "=== chat context ==="
+node "$DASHBOARD_DIR/scripts/export-chat-context.mjs" "$SITE_DIR/chat-context.json"
+
 # Hebrew is the default: this dashboard has one reader and that is the
 # language they use. Cloudflare Pages reads this file; other static
 # hosts ignore it harmlessly, and the index.html below covers them.
