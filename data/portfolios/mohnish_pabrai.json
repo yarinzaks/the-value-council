@@ -1,20 +1,109 @@
 {
   "agent": "mohnish_pabrai",
-  "cash": 10000.0,
-  "invested": 0,
-  "total_nav": 10000.0,
-  "cumulative_return_pct": 0.0,
+  "cash": 5000.0,
+  "invested": 4995.0,
+  "total_nav": 9995.0,
+  "cumulative_return_pct": -0.05,
   "initial_cash": 10000.0,
-  "cumulative_costs": 0.0,
+  "cumulative_costs": 4.995,
   "cumulative_dividends": 0.0,
   "last_dividend_date": "",
   "inception_date": "",
   "paid_dividends": {},
-  "positions": [],
-  "watchlist": [],
-  "last_updated": "",
-  "last_open_run": "",
-  "last_close_run": "",
-  "last_open_date": "",
-  "last_close_date": ""
+  "positions": [
+    {
+      "ticker": "CALM",
+      "shares": 30.799144,
+      "entry_price": 81.09,
+      "entry_date": "2026-08-15",
+      "current_price": 81.09,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 24.99,
+      "why_en": "Held by 6 of the eleven independently; regime, filings and news all clear.",
+      "why_he": "מוחזקת על ידי 6 מתוך אחד-עשר הסוכנים באופן עצמאי; המשטר, ההגשות והחדשות — כולם נקיים."
+    },
+    {
+      "ticker": "UVV",
+      "shares": 55.785179,
+      "entry_price": 44.77,
+      "entry_date": "2026-08-15",
+      "current_price": 44.77,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 24.99,
+      "why_en": "Held by 4 of the eleven independently; regime, filings and news all clear.",
+      "why_he": "מוחזקת על ידי 4 מתוך אחד-עשר הסוכנים באופן עצמאי; המשטר, ההגשות והחדשות — כולם נקיים."
+    }
+  ],
+  "watchlist": [
+    {
+      "ticker": "COLL",
+      "identified_date": "2026-08-15",
+      "current_rank": 1,
+      "entry_trigger": "three or more agents hold it, and no gate objects",
+      "entry_price_target": null,
+      "why_en": "Held by 3 of the eleven; waiting on the entry cap.",
+      "why_he": "מוחזקת על ידי 3 סוכנים; ממתינה לתקרת הכניסות."
+    },
+    {
+      "ticker": "CRTO",
+      "identified_date": "2026-08-15",
+      "current_rank": 2,
+      "entry_trigger": "three or more agents hold it, and no gate objects",
+      "entry_price_target": null,
+      "why_en": "Held by 3 of the eleven; waiting on the entry cap.",
+      "why_he": "מוחזקת על ידי 3 סוכנים; ממתינה לתקרת הכניסות."
+    },
+    {
+      "ticker": "EBF",
+      "identified_date": "2026-08-15",
+      "current_rank": 3,
+      "entry_trigger": "three or more agents hold it, and no gate objects",
+      "entry_price_target": null,
+      "why_en": "Held by 3 of the eleven; waiting on the entry cap.",
+      "why_he": "מוחזקת על ידי 3 סוכנים; ממתינה לתקרת הכניסות."
+    },
+    {
+      "ticker": "FISV",
+      "identified_date": "2026-08-15",
+      "current_rank": 4,
+      "entry_trigger": "three or more agents hold it, and no gate objects",
+      "entry_price_target": null,
+      "why_en": "Held by 3 of the eleven; waiting on the entry cap.",
+      "why_he": "מוחזקת על ידי 3 סוכנים; ממתינה לתקרת הכניסות."
+    },
+    {
+      "ticker": "KSS",
+      "identified_date": "2026-08-15",
+      "current_rank": 5,
+      "entry_trigger": "three or more agents hold it, and no gate objects",
+      "entry_price_target": null,
+      "why_en": "Held by 3 of the eleven; waiting on the entry cap.",
+      "why_he": "מוחזקת על ידי 3 סוכנים; ממתינה לתקרת הכניסות."
+    },
+    {
+      "ticker": "PIPR",
+      "identified_date": "2026-08-15",
+      "current_rank": 6,
+      "entry_trigger": "three or more agents hold it, and no gate objects",
+      "entry_price_target": null,
+      "why_en": "Held by 3 of the eleven; waiting on the entry cap.",
+      "why_he": "מוחזקת על ידי 3 סוכנים; ממתינה לתקרת הכניסות."
+    },
+    {
+      "ticker": "SFD",
+      "identified_date": "2026-08-15",
+      "current_rank": 7,
+      "entry_trigger": "three or more agents hold it, and no gate objects",
+      "entry_price_target": null,
+      "why_en": "Held by 3 of the eleven; waiting on the entry cap.",
+      "why_he": "מוחזקת על ידי 3 סוכנים; ממתינה לתקרת הכניסות."
+    }
+  ],
+  "last_updated": "2026-08-15T10:31:59+00:00",
+  "last_open_run": "2026-08-15T10:31:59+00:00",
+  "last_close_run": "2026-08-14T20:30:40+00:00",
+  "last_open_date": "2026-08-15",
+  "last_close_date": "2026-08-14"
 }
