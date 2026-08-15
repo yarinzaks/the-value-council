@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from google.genai import types
 from pydantic import SecretStr, ValidationError
 
 from core.exceptions import LLMError
@@ -78,8 +79,6 @@ class _SdkRecorder:
     # exception to raise. A single remaining entry is reused, so the
     # common case needs no bookkeeping.
     responses: list[Any] = field(default_factory=list)
-    # Construction-time arguments, wherever the SDK happens to take them.
-    _construction: dict[str, Any] = field(default_factory=dict)
 
     # --- Vendor-neutral view of the last request ---------------------------
     @property
@@ -95,23 +94,23 @@ class _SdkRecorder:
     # the vendor's to decide — the assertions are what pin it.
     @property
     def model_name(self) -> Any:
-        return self._construction["model_name"]
+        return self._last["model"]
 
     @property
     def system_instruction(self) -> Any:
-        return self._construction["system_instruction"]
+        return self._last["config"].system_instruction
 
     @property
     def prompt(self) -> Any:
-        return self._last["prompt"]
+        return self._last["contents"]
 
     @property
     def temperature(self) -> Any:
-        return self._last["generation_config"]["temperature"]
+        return self._last["config"].temperature
 
     @property
     def response_mime_type(self) -> Any:
-        return self._last["generation_config"]["response_mime_type"]
+        return self._last["config"].response_mime_type
 
 
 @pytest.fixture
@@ -125,23 +124,23 @@ def sdk(monkeypatch: pytest.MonkeyPatch) -> _SdkRecorder:
     rec = _SdkRecorder(responses=[_Response(json.dumps(VALID_MEMO))])
     outcomes = rec.responses
 
-    class _FakeModel:
-        def __init__(self, **kwargs: Any) -> None:
-            rec._construction = kwargs
-
-        def generate_content(self, prompt: str, generation_config: dict[str, Any]) -> _Response:
-            rec.calls.append({"prompt": prompt, "generation_config": generation_config})
+    class _FakeModels:
+        def generate_content(
+            self, *, model: str, contents: str, config: types.GenerateContentConfig
+        ) -> _Response:
+            rec.calls.append({"model": model, "contents": contents, "config": config})
             outcome = outcomes[0] if len(outcomes) == 1 else outcomes.pop(0)
             if isinstance(outcome, BaseException):
                 raise outcome
             assert isinstance(outcome, _Response), "queue a _Response or an exception"
             return outcome
 
-    def _configure(api_key: str) -> None:
-        rec.api_key = api_key
+    class _FakeClient:
+        def __init__(self, *, api_key: str) -> None:
+            rec.api_key = api_key
+            self.models = _FakeModels()
 
-    monkeypatch.setattr("core.llm.gemini_client.genai.configure", _configure)
-    monkeypatch.setattr("core.llm.gemini_client.genai.GenerativeModel", _FakeModel)
+    monkeypatch.setattr("core.llm.gemini_client.genai.Client", _FakeClient)
     monkeypatch.setattr(
         "core.llm.gemini_client.get_settings",
         lambda: _FakeSettings(SecretStr(API_KEY)),

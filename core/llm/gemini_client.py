@@ -1,8 +1,13 @@
 """Gemini API client wrapper.
 
-Wraps :mod:`google.generativeai` with retry logic, rate limiting, and
+Wraps :mod:`google.genai` with retry logic, rate limiting, and
 JSON-output parsing. The free tier (1500 RPD, ~1 RPM) is the default
 target; the limiter throttles to stay safely inside that envelope.
+
+The SDK does no retrying of its own: ``HttpOptions.retry_options``
+defaults to ``None``, which the client reads as "never retry". Every
+attempt you see here is one this module asked for, so the tenacity
+policy below remains the whole story.
 """
 
 from __future__ import annotations
@@ -13,7 +18,8 @@ import threading
 import time
 from typing import Any, Literal
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field
 from tenacity import (
     RetryCallState,
@@ -76,11 +82,10 @@ class GeminiClient:
         self.logger = get_logger("core.llm.gemini_client")
         self._model_name = model
         api_key = get_settings().gemini_api_key.get_secret_value()
-        genai.configure(api_key=api_key)
-        self._model = genai.GenerativeModel(
-            model_name=model,
-            system_instruction=INVESTMENT_MEMO_SYSTEM,
-        )
+        # The key is held on the client rather than configured globally,
+        # and the model and system instruction are named per request.
+        # Constructing this opens no connection.
+        self._sdk = genai.Client(api_key=api_key)
 
     # --- Rate limit ----------------------------------------------------------
     def _throttle(self) -> None:
@@ -123,12 +128,14 @@ class GeminiClient:
 
         self.logger.debug(f"Gemini call: model={self._model_name}, prompt_len={len(prompt)}")
         try:
-            response = self._model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.4,
-                    "response_mime_type": "application/json",
-                },
+            response = self._sdk.models.generate_content(
+                model=self._model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=INVESTMENT_MEMO_SYSTEM,
+                    temperature=0.4,
+                    response_mime_type="application/json",
+                ),
             )
         except Exception as exc:
             raise LLMError(f"Gemini API call failed: {exc}") from exc
