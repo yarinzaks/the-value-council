@@ -32,6 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from google.genai import types
 from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
@@ -177,9 +178,10 @@ class MoatAnalyzer:
     and BuffettMemo parsing.
 
     The ``client`` may be either the real :class:`GeminiClient` or a
-    test-time stand-in that exposes a compatible ``_model`` and
-    ``_throttle()`` shape — but in tests the simpler path is to
-    monkeypatch ``analyze`` to return a pre-built memo.
+    test-time stand-in exposing the three members used below —
+    ``_sdk``, ``_model_name`` and ``_throttle()`` — but in tests the
+    simpler path is to monkeypatch ``analyze`` to return a pre-built
+    memo.
     """
 
     client: GeminiClient
@@ -208,20 +210,14 @@ class MoatAnalyzer:
         # prompt baked into GeminiClient).
         self.client._throttle()
         try:
-            # Late-bind to avoid hard-importing google.generativeai
-            # at module load (tests monkeypatch the SDK).
-            import google.generativeai as genai
-
-            model = genai.GenerativeModel(
-                model_name=self.client._model_name,
-                system_instruction=with_evidence_rules(_BUFFETT_SYSTEM_PROMPT),
-            )
-            response = model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.3,
-                    "response_mime_type": "application/json",
-                },
+            response = self.client._sdk.models.generate_content(
+                model=self.client._model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=with_evidence_rules(_BUFFETT_SYSTEM_PROMPT),
+                    temperature=0.3,
+                    response_mime_type="application/json",
+                ),
             )
         except Exception as exc:
             raise LLMError(f"Gemini Buffett call failed: {exc}") from exc

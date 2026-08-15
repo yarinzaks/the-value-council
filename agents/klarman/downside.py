@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from google.genai import types
 from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
@@ -204,18 +205,14 @@ class DownsideAnalyzer:
 
         self.client._throttle()
         try:
-            import google.generativeai as genai
-
-            model = genai.GenerativeModel(
-                model_name=self.client._model_name,
-                system_instruction=with_evidence_rules(_KLARMAN_SYSTEM_PROMPT),
-            )
-            response = model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.3,
-                    "response_mime_type": "application/json",
-                },
+            response = self.client._sdk.models.generate_content(
+                model=self.client._model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=with_evidence_rules(_KLARMAN_SYSTEM_PROMPT),
+                    temperature=0.3,
+                    response_mime_type="application/json",
+                ),
             )
         except Exception as exc:
             raise LLMError(f"Gemini Klarman call failed: {exc}") from exc
