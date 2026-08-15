@@ -6,9 +6,13 @@ Usage::
     .venv/bin/python -m scripts.run_council --mode close
 
 Both modes read the book, check Part 4, and watch the filings of what is
-held. Neither trades. The Council's own portfolio is seeded like every
-other agent's and stays in cash until a human approves a position, which
-is what its doctrine requires and not a limitation of this script.
+held. Neither trades, because the doctrine's cadence table forbids a
+heartbeat or a close run from opening a position.
+
+Trading happens elsewhere and autonomously: the agent is registered as
+a live adapter in :mod:`core.live.runner` and executes through the same
+daily runner as the other eleven. This script is the deterministic
+reporting half, not a gate the agent waits behind.
 
 What it writes
 ~~~~~~~~~~~~~~
