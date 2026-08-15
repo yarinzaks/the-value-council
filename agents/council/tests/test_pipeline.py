@@ -305,3 +305,42 @@ class TestRankBuffer:
             basket_size=20,
         )
         assert [b.ticker for b in s.basket].count("T01") == 1
+
+
+class TestGateDOutage:
+    """An outage at the SEC fails the gate, not the agent.
+
+    Section 2's rule is that a gate which cannot be computed fails. A
+    Gate D that raises all the way out ends the run with an error and no
+    marks, which is strictly worse than buying nothing: the book stops
+    being valued because a screen could not be completed.
+    """
+
+    def test_an_outage_buys_nothing_rather_than_raising(self) -> None:
+        def broken(tickers, as_of, *, opinions=None):
+            raise RuntimeError("HTTP Error 500: Internal Server Error")
+
+        rows = [company(f"T{i:02d}", sic=3500 + i * 100) for i in range(4)]
+        s = run_selection(rows, AS_OF, risk_on_dials=4, gate_d=broken)
+        assert s.weights == {}
+        assert "Gate D unavailable" in s.note
+
+    def test_an_outage_does_not_disturb_what_is_held(self) -> None:
+        def broken(tickers, as_of, *, opinions=None):
+            raise RuntimeError("HTTP Error 500")
+
+        rows = [company(f"T{i:02d}", sic=3500 + i * 100) for i in range(4)]
+        s = run_selection(
+            rows, AS_OF, risk_on_dials=4, held=["T01"], gate_d=broken
+        )
+        assert set(s.weights) == {"T01"}
+
+    def test_the_names_that_cleared_a_to_c_are_still_recorded(self) -> None:
+        """The run log must show the screen worked and only D failed."""
+
+        def broken(tickers, as_of, *, opinions=None):
+            raise RuntimeError("HTTP Error 500")
+
+        rows = [company(f"T{i:02d}", sic=3500 + i * 100) for i in range(4)]
+        s = run_selection(rows, AS_OF, risk_on_dials=4, gate_d=broken)
+        assert len(s.provisional) == 4

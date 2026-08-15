@@ -144,7 +144,23 @@ def run_selection(
     # Section 2, Gate D, paid for only on the survivors.
     candidates: list[str] = []
     if provisional:
-        flags = gate_d(provisional, as_of, opinions=opinions)  # type: ignore[operator]
+        try:
+            flags = gate_d(provisional, as_of, opinions=opinions)  # type: ignore[operator]
+        except Exception as exc:
+            # An outage at the SEC must fail the GATE, not the agent.
+            # Section 2's rule is that a gate which cannot be computed
+            # fails, so every candidate arrives with unknown flags and
+            # none of them pass -- the sleeve buys nothing today and
+            # holds what it has. Letting this propagate instead ends the
+            # run with an error and no marks, which is strictly worse:
+            # the book stops being valued because a screen could not be
+            # completed.
+            logger.warning(
+                f"{as_of}: Gate D unavailable — {type(exc).__name__}: {exc}. "
+                "No new entries today; holdings are unaffected."
+            )
+            selection.note = f"Gate D unavailable ({type(exc).__name__})"
+            flags = {t: FilingFlags(ticker=t) for t in provisional}
         selection.flags = flags
         for ticker in provisional:
             row = by_ticker[ticker]
