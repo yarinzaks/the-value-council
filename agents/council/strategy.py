@@ -33,7 +33,7 @@ from core.paths import portfolios_dir
 
 logger = get_logger("agents.council.strategy")
 
-AGENT_SLUG = "the_council"
+AGENT_SLUG = "mohnish_pabrai"
 
 #: Entries already spent, derived from the journal rather than stored.
 PUNCH_CARD_TOTAL = 20
@@ -65,7 +65,7 @@ def read_books(directory: Path | None = None) -> dict[str, list[str]]:
     return books
 
 
-class TheCouncil(Strategy):
+class MohnishPabrai(Strategy):
     """Buys what its members agree on, subject to its own vetoes."""
 
     name = AGENT_SLUG

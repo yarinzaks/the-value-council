@@ -56,9 +56,9 @@ def test_counts_each_agent_once_per_ticker() -> None:
     assert counts["AAA"] == 2
 
 
-def test_the_council_does_not_vote_for_itself() -> None:
+def test_mohnish_pabrai_does_not_vote_for_itself() -> None:
     """Otherwise its own book manufactures the consensus that justifies it."""
-    counts = agreement(books(the_council=["AAA"], benjamin_graham=["AAA"]))
+    counts = agreement(books(mohnish_pabrai=["AAA"], benjamin_graham=["AAA"]))
     assert counts["AAA"] == 1
 
 

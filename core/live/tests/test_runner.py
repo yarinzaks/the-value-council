@@ -1116,32 +1116,32 @@ class TestAgentFilter:
         return [
             _StubAdapter("benjamin_graham", []),
             _StubAdapter("walter_schloss", []),
-            _StubAdapter("the_council", []),
+            _StubAdapter("mohnish_pabrai", []),
         ]
 
     def test_keeps_only_the_named_agent(self) -> None:
-        kept = _filter_adapters(self._adapters(), ["the_council"])  # type: ignore[arg-type]
-        assert [a.name for a in kept] == ["the_council"]
+        kept = _filter_adapters(self._adapters(), ["mohnish_pabrai"])  # type: ignore[arg-type]
+        assert [a.name for a in kept] == ["mohnish_pabrai"]
 
     def test_keeps_several(self) -> None:
         kept = _filter_adapters(
             self._adapters(),  # type: ignore[arg-type]
-            ["the_council", "benjamin_graham"],
+            ["mohnish_pabrai", "benjamin_graham"],
         )
-        assert {a.name for a in kept} == {"the_council", "benjamin_graham"}
+        assert {a.name for a in kept} == {"mohnish_pabrai", "benjamin_graham"}
 
     def test_registration_order_is_preserved_not_argument_order(self) -> None:
         # The Council is registered last on purpose. Argument order must
         # not be able to run it before an agent it reads.
         kept = _filter_adapters(
             self._adapters(),  # type: ignore[arg-type]
-            ["the_council", "benjamin_graham"],
+            ["mohnish_pabrai", "benjamin_graham"],
         )
-        assert [a.name for a in kept] == ["benjamin_graham", "the_council"]
+        assert [a.name for a in kept] == ["benjamin_graham", "mohnish_pabrai"]
 
     def test_names_are_matched_case_insensitively_and_trimmed(self) -> None:
-        kept = _filter_adapters(self._adapters(), ["  The_Council "])  # type: ignore[arg-type]
-        assert [a.name for a in kept] == ["the_council"]
+        kept = _filter_adapters(self._adapters(), ["  Mohnish_Pabrai "])  # type: ignore[arg-type]
+        assert [a.name for a in kept] == ["mohnish_pabrai"]
 
     def test_an_unknown_name_raises_rather_than_running_nothing(self) -> None:
         # The failure this guards: a typo produces an empty run, no
@@ -1158,7 +1158,7 @@ class TestAgentFilter:
         with pytest.raises(ValueError, match="nope"):
             _filter_adapters(
                 self._adapters(),  # type: ignore[arg-type]
-                ["the_council", "nope"],
+                ["mohnish_pabrai", "nope"],
             )
 
     def test_an_empty_list_raises(self) -> None:
@@ -1179,9 +1179,9 @@ class TestAgentFilter:
             pit_loader=object(),  # type: ignore[arg-type]
             cache=object(),  # type: ignore[arg-type]
             decision_logger=DecisionLogger(root=tmp_path / "decisions"),
-            only_agents=["the_council"],
+            only_agents=["mohnish_pabrai"],
         )
-        assert [a.name for a in runner.adapters] == ["the_council"]
+        assert [a.name for a in runner.adapters] == ["mohnish_pabrai"]
 
     def test_none_runs_everyone(self, tmp_path: Path) -> None:
         runner = DailyRunner(
@@ -1205,8 +1205,8 @@ class TestAgentFlagParsing:
         assert parse_args([]).agents is None
 
     def test_one(self) -> None:
-        assert parse_args(["--agent", "the_council"]).agents == ["the_council"]
+        assert parse_args(["--agent", "mohnish_pabrai"]).agents == ["mohnish_pabrai"]
 
     def test_repeatable(self) -> None:
-        args = parse_args(["--agent", "the_council", "--agent", "john_neff"])
-        assert args.agents == ["the_council", "john_neff"]
+        args = parse_args(["--agent", "mohnish_pabrai", "--agent", "john_neff"])
+        assert args.agents == ["mohnish_pabrai", "john_neff"]

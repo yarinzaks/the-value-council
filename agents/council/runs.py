@@ -44,7 +44,7 @@ from core.logger import get_logger
 logger = get_logger("agents.council.runs")
 
 #: What the doctrine calls the agent's own book on the dashboard.
-AGENT_SLUG: Final[str] = "the_council"
+AGENT_SLUG: Final[str] = "mohnish_pabrai"
 
 
 def _now() -> str:

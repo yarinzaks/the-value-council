@@ -532,7 +532,7 @@ class MarketCoreLive(AgentAdapter):
 # --------------------------------------------------------------------------
 # The Council
 # --------------------------------------------------------------------------
-class CouncilLive(AgentAdapter):
+class PabraiLive(AgentAdapter):
     """The Council on the same rails as the eleven.
 
     Every other adapter reads a ``selection_history`` of typed scores —
@@ -548,7 +548,7 @@ class CouncilLive(AgentAdapter):
     qualified and are waiting only on the per-run entry cap.
     """
 
-    name = "the_council"
+    name = "mohnish_pabrai"
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
@@ -634,7 +634,6 @@ def _agreement_counts(strategy: Strategy) -> dict[str, int]:
 __all__ = [
     "AgentAdapter",
     "BuffettLive",
-    "CouncilLive",
     "DremanLive",
     "FisherLive",
     "GrahamLive",
@@ -646,6 +645,7 @@ __all__ = [
     "MarketCoreLive",
     "MarksLive",
     "NeffLive",
+    "PabraiLive",
     "ScanResult",
     "SchlossLive",
 ]

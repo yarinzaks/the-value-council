@@ -165,15 +165,15 @@ export const AGENTS: AgentMeta[] = [
     // look absent rather than unscored. What it has no place in is the
     // backtest leaderboard, and it stays out of that on its own: it
     // publishes no run for loadAgentLatest to find.
-    slug: "the_council",
-    display_name: "The Council",
-    display_name_he: "המועצה",
+    slug: "mohnish_pabrai",
+    display_name: "Mohnish Pabrai",
+    display_name_he: "מוניש פבראי",
     description:
-      "Answers to a written doctrine rather than a screen: a regime dial, hard position limits, a lifetime punch card, and the SEC filings of what it holds.",
+      "Buys what forced sellers dump and what is too small or too tangled for professionals to read; sizes small where it trusts statistics and big where it has done the reading; sells only on rules written before it bought.",
     description_he:
-      "פועל לפי דוקטרינה כתובה ולא לפי מסנן: חוגת משטר, תקרות פוזיציה קשיחות, כרטיס אגרוף לכל החיים, וההגשות ל-SEC של מה שהוא מחזיק.",
-    school: "Doctrine, not screen",
-    school_he: "דוקטרינה, לא מסנן",
+      "קונה את מה שמוכרים מאולצים זורקים, ואת מה שקטן או מסובך מכדי שמקצוענים יטרחו לקרוא; מקצה קטן היכן שהוא סומך על סטטיסטיקה וגדול היכן שקרא לעומק; מוכר רק לפי כללים שנכתבו לפני הקנייה.",
+    school: "Asymmetry, forced selling, no deadline",
+    school_he: "אסימטריה, מכירה מאולצת, בלי דדליין",
     color: "#c026d3",
   },
 ];

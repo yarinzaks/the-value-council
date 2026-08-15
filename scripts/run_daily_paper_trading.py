@@ -25,7 +25,7 @@ Usage::
     .venv/bin/python -m scripts.run_daily_paper_trading --mode open
     .venv/bin/python -m scripts.run_daily_paper_trading --mode close
     .venv/bin/python -m scripts.run_daily_paper_trading --as-of 2026-04-29
-    .venv/bin/python -m scripts.run_daily_paper_trading --agent the_council
+    .venv/bin/python -m scripts.run_daily_paper_trading --agent mohnish_pabrai
 
 ``--agent`` is repeatable and restricts the run to those agents. It exists
 for the case where one agent joined the roster after the others had already

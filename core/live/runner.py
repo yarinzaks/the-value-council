@@ -32,7 +32,7 @@ from pathlib import Path
 
 from agents.buffett import WarrenBuffett
 from agents.council.regime import read_regime
-from agents.council.strategy import TheCouncil
+from agents.council.strategy import MohnishPabrai
 from agents.dreman.contrarian import DavidDreman
 from agents.fisher import PhilipFisher
 from agents.graham.net_net import BenjaminGraham
@@ -58,7 +58,6 @@ from core.data.news_service import NewsService
 from core.live.agent_adapter import (
     AgentAdapter,
     BuffettLive,
-    CouncilLive,
     DremanLive,
     FisherLive,
     GrahamLive,
@@ -70,6 +69,7 @@ from core.live.agent_adapter import (
     MarketCoreLive,
     MarksLive,
     NeffLive,
+    PabraiLive,
     SchlossLive,
 )
 from core.live.portfolio import (
@@ -279,8 +279,8 @@ def build_default_adapters(
         # reads them off disk rather than out of this list, so the
         # ordering is an improvement to its inputs and not a dependency
         # its correctness rests on.
-        CouncilLive(
-            TheCouncil(
+        PabraiLive(
+            MohnishPabrai(
                 news_service=_news_service(),
                 regime_reader=read_regime,
             )

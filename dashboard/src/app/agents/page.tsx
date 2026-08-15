@@ -22,7 +22,7 @@ export default async function AgentsPage() {
     loadCouncilOverview(),
     loadCouncilState(),
   ]);
-  const councilMeta = metaLocalized("the_council", locale);
+  const councilMeta = metaLocalized("mohnish_pabrai", locale);
   if (overview.agents.length === 0) {
     return (
       <>
