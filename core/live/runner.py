@@ -31,6 +31,7 @@ from datetime import date
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
+from agents.council.nav_history import drawdown_from_peak
 from agents.council.regime import read_regime
 from agents.council.strategy import MohnishPabrai
 from agents.dreman.contrarian import DavidDreman
@@ -283,6 +284,11 @@ def build_default_adapters(
                 edgar_cache=cache,
                 price_loader=prices,
                 regime_reader=read_regime,
+                # E1's input. Without it the breaker reads "unreadable",
+                # which blocks every entry -- so the agent screened two
+                # thousand names, found a hundred and eleven candidates,
+                # and bought none of them.
+                drawdown_reader=lambda: drawdown_from_peak("mohnish_pabrai"),
             )
         ),
     ]
