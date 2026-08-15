@@ -24,9 +24,15 @@ read a 10-K, diff its risk factors against three years earlier, and
 argue six seats against each other. They are not implemented here, and
 pretending otherwise by stubbing them would be worse than their absence.
 
-Nothing in this package trades. The doctrine is explicit that the agent
-proposes and a person approves, and every run type above is forbidden
-from opening a position regardless.
+The run types above do not trade — heartbeat and close are forbidden
+from opening a position by the doctrine's own cadence table. The agent
+itself does: :class:`~agents.council.strategy.MohnishPabrai` is
+registered as the twelfth live adapter and executes on the same rails as
+the other eleven, autonomously.
+
+That is not a departure from the doctrine, it is its scoping. Part 10
+puts a human in front of **real money**; this is a paper book, and the
+journal rather than an approval step is what makes the record auditable.
 """
 
 from agents.council.events import Event, Severity, scan

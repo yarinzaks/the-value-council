@@ -42,6 +42,7 @@ from core.backtest.point_in_time import (
     FilingMetadata,
 )
 from core.data.sic_codes import sic_for
+from core.data.ttm import TtmResult, trailing_twelve_months
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
@@ -90,6 +91,18 @@ CONCEPT_MAP: dict[str, list[tuple[str, str]]] = {
         ("us-gaap", "CashAndCashEquivalentsAtCarryingValue"),
         ("us-gaap", "Cash"),
         ("us-gaap", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"),
+    ],
+    # Marketable securities held as a cash equivalent in everything but
+    # the tag. A net-cash screen that reads only the cash line
+    # understates exactly the companies it exists to find: a small cap
+    # sitting on treasuries and commercial paper parks most of the
+    # balance here, not in "Cash". Ordered from the narrow current-asset
+    # concepts to the broader rollups.
+    "short_term_investments": [
+        ("us-gaap", "ShortTermInvestments"),
+        ("us-gaap", "MarketableSecuritiesCurrent"),
+        ("us-gaap", "AvailableForSaleSecuritiesDebtSecuritiesCurrent"),
+        ("us-gaap", "OtherShortTermInvestments"),
     ],
     "long_term_debt": [
         ("us-gaap", "LongTermDebtNoncurrent"),
@@ -148,6 +161,7 @@ _STOCK_CONCEPTS: frozenset[str] = frozenset(
         "total_liabilities",
         "total_equity",
         "cash_and_equivalents",
+        "short_term_investments",
         "long_term_debt",
         "current_assets",
         "current_liabilities",
@@ -310,6 +324,121 @@ class FundamentalsFetcher:
             if best is None or fact.period_end > best.period_end:
                 best = fact
         return best
+
+    def get_field_ttm(
+        self,
+        ticker: str,
+        field: str,
+        as_of: date | datetime,
+    ) -> TtmResult | None:
+        """Trailing twelve months for a flow field, or ``None``.
+
+        :meth:`get_field` answers with the newest *annual* period, which
+        is up to :data:`MAX_FACT_AGE_DAYS` old and stops moving between
+        10-Ks. This answers with the twelve months ending at the newest
+        period the filer had published by ``as_of``, rolling forward
+        every quarter. Every ratio in the doctrine's screen is
+        TTM-denominated, so this is the one the screen calls.
+
+        Raises:
+            FundamentalsError: If ``field`` is not a flow concept.
+                Asking for a trailing twelve months of total assets is
+                a category error, not a missing number, and returning
+                ``None`` would hide the mistake.
+        """
+        if field not in CONCEPT_MAP:
+            raise FundamentalsError(f"unknown field {field!r}")
+        if field not in _FLOW_CONCEPTS:
+            raise FundamentalsError(
+                f"{field!r} is a balance-sheet stock, not a flow; "
+                "it has no trailing twelve months. Use get_field."
+            )
+        if not self.cache.has_ticker(ticker) and self.config.populate_cache_on_miss:
+            self.ensure_cached(ticker)
+
+        chain = CONCEPT_MAP[field]
+        namespaces = {ns for ns, _ in chain}
+        if len(namespaces) > 1:
+            # Every flow chain is us-gaap today. If that changes, the
+            # per-namespace split has to be handled rather than silently
+            # dropping half the chain.
+            raise FundamentalsError(
+                f"{field!r} spans namespaces {sorted(namespaces)}; "
+                "TTM assembly handles one at a time"
+            )
+
+        return trailing_twelve_months(
+            self.cache.load_facts(ticker),
+            as_of.date() if isinstance(as_of, datetime) else as_of,
+            concepts=[concept for _, concept in chain],
+            namespace=namespaces.pop(),
+            units=expected_units(field),
+        )
+
+    def net_cash(self, ticker: str, as_of: date | datetime) -> float | None:
+        """Cash plus short-term investments minus all interest-bearing debt.
+
+        This is Gate A's second path — a structural floor you can verify
+        from the balance sheet rather than infer from a multiple.
+
+        The three inputs are not treated alike, and deliberately so:
+
+        * **Cash** is required. Every operating company tags it, so its
+          absence means the balance sheet could not be read, not that
+          the company holds none. ``None`` propagates.
+        * **Short-term investments** default to zero when absent. A
+          company with no marketable securities does not tag the
+          concept, and the error direction is safe: assuming zero
+          understates net cash, which fails a name that might have
+          passed rather than passing one that should have failed.
+        * **Debt** is required. Assuming zero debt because nothing was
+          tagged would turn a levered company into a cash box, which is
+          the one error this gate cannot survive.
+        """
+        cash = self.get_field(ticker, "cash_and_equivalents", as_of)
+        if cash is None:
+            return None
+        debt, _source = self.debt_with_zero_evidence(ticker, as_of)
+        if debt is None:
+            return None
+        sti = self.get_field(ticker, "short_term_investments", as_of)
+        return cash.value + (sti.value if sti is not None else 0.0) - debt
+
+    def debt_with_zero_evidence(
+        self, ticker: str, as_of: date | datetime
+    ) -> tuple[float | None, str]:
+        """Total debt, distinguishing "none" from "could not read".
+
+        :meth:`_compute_total_debt` answers ``None`` whenever no debt tag
+        survives the age bound, which is the right answer for a leverage
+        gate: unknown leverage is not safe leverage. It is the wrong
+        answer for a net-cash screen, and wrong in the direction that
+        matters most — because a company that **repays** its debt stops
+        tagging the concept, so the debt-free balance sheets the screen
+        exists to find are exactly the ones that come back unreadable.
+
+        Cal-Maine is the case that made this visible. Its last tagged
+        ``LongTermDebt`` has a period end of 2019-06-01, and its
+        ``LongTermDebtCurrent`` was reported as literally zero in 2020
+        before it stopped tagging altogether — while its balance sheet
+        is current to 2026-02-28.
+
+        So absence is read as zero only against evidence that the
+        balance sheet itself is current: if total assets are readable
+        within the same age bound and no debt concept is, the filer is
+        not hiding debt, it has none. If the balance sheet is stale too,
+        the answer stays ``None``.
+
+        Returns:
+            ``(value, source)``, where source names the branch taken so
+            an assumed zero is never mistaken for a reported one.
+        """
+        debt, source = self._compute_total_debt(ticker, as_of)
+        if debt is not None:
+            return debt, source
+        if self.get_field(ticker, "total_assets", as_of) is not None:
+            return 0.0, "assumed_zero_balance_sheet_current"
+        return None, "absent"
 
     def _debt_component(
         self, ticker: str, concept: str, as_of: date | datetime

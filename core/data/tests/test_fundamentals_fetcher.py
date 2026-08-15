@@ -862,3 +862,144 @@ class TestSicCodePopulation:
         from agents.greenblatt.filters import is_excluded_sector
 
         assert not is_excluded_sector(str(sic_for("AAPL")))
+
+
+class TestNetCash:
+    """Gate A's second path: a floor you read off the balance sheet.
+
+    The three inputs are treated differently on purpose, and the reason
+    is Cal-Maine: a company that repays its debt stops tagging the
+    concept, so the debt-free balance sheets this screen exists to find
+    are exactly the ones a strict reading calls unreadable.
+    """
+
+    @staticmethod
+    def _cache(tmp_path: Path, facts: list[XbrlFact]) -> EdgarCache:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("NC", facts)
+        return cache
+
+    @staticmethod
+    def _fetcher(cache: EdgarCache) -> FundamentalsFetcher:
+        from core.data.fundamentals_fetcher import FundamentalsFetcherConfig
+
+        return FundamentalsFetcher(
+            cache=cache,
+            config=FundamentalsFetcherConfig(populate_cache_on_miss=False),
+        )
+
+    AS_OF = date(2021, 3, 1)
+
+    def test_short_term_investments_are_counted(self, tmp_path: Path) -> None:
+        # Without the concept chain this reads 300m instead of 800m, and
+        # a net-cash-rich small cap fails the gate it was built for.
+        cache = self._cache(
+            tmp_path,
+            [
+                _fact(concept="CashAndCashEquivalentsAtCarryingValue", value=300.0),
+                _fact(concept="ShortTermInvestments", value=500.0),
+                _fact(concept="Assets", value=5_000.0),
+            ],
+        )
+        assert self._fetcher(cache).net_cash("NC", self.AS_OF) == 800.0
+
+    def test_debt_is_subtracted(self, tmp_path: Path) -> None:
+        cache = self._cache(
+            tmp_path,
+            [
+                _fact(concept="CashAndCashEquivalentsAtCarryingValue", value=300.0),
+                _fact(concept="ShortTermInvestments", value=500.0),
+                _fact(concept="LongTermDebtNoncurrent", value=200.0),
+                _fact(concept="Assets", value=5_000.0),
+            ],
+        )
+        assert self._fetcher(cache).net_cash("NC", self.AS_OF) == 600.0
+
+    def test_absent_investments_default_to_zero(self, tmp_path: Path) -> None:
+        """Understating net cash fails a name; overstating buys one."""
+        cache = self._cache(
+            tmp_path,
+            [
+                _fact(concept="CashAndCashEquivalentsAtCarryingValue", value=300.0),
+                _fact(concept="Assets", value=5_000.0),
+            ],
+        )
+        assert self._fetcher(cache).net_cash("NC", self.AS_OF) == 300.0
+
+    def test_absent_cash_is_unreadable_not_zero(self, tmp_path: Path) -> None:
+        cache = self._cache(tmp_path, [_fact(concept="Assets", value=5_000.0)])
+        assert self._fetcher(cache).net_cash("NC", self.AS_OF) is None
+
+
+class TestDebtWithZeroEvidence:
+    _cache = staticmethod(TestNetCash._cache)
+    _fetcher = staticmethod(TestNetCash._fetcher)
+    AS_OF = date(2021, 3, 1)
+
+    def test_a_reported_figure_is_returned_unchanged(self, tmp_path: Path) -> None:
+        cache = self._cache(
+            tmp_path,
+            [
+                _fact(concept="LongTermDebtNoncurrent", value=200.0),
+                _fact(concept="Assets", value=5_000.0),
+            ],
+        )
+        debt, source = self._fetcher(cache).debt_with_zero_evidence("NC", self.AS_OF)
+        assert debt == 200.0
+        assert source != "assumed_zero_balance_sheet_current"
+
+    def test_a_current_balance_sheet_with_no_debt_tag_means_zero(
+        self, tmp_path: Path
+    ) -> None:
+        """Cal-Maine: last debt tag 2019, balance sheet current to 2026."""
+        stale = self.AS_OF - timedelta(days=MAX_FACT_AGE_DAYS + 400)
+        cache = self._cache(
+            tmp_path,
+            [
+                _fact(
+                    concept="LongTermDebtNoncurrent",
+                    value=999.0,
+                    period_end=stale,
+                    filed=stale + timedelta(days=45),
+                ),
+                _fact(concept="Assets", value=5_000.0),
+            ],
+        )
+        debt, source = self._fetcher(cache).debt_with_zero_evidence("NC", self.AS_OF)
+        assert debt == 0.0
+        assert source == "assumed_zero_balance_sheet_current"
+
+    def test_a_stale_balance_sheet_stays_unknown(self, tmp_path: Path) -> None:
+        """No evidence either way is not evidence of no debt."""
+        stale = self.AS_OF - timedelta(days=MAX_FACT_AGE_DAYS + 400)
+        cache = self._cache(
+            tmp_path,
+            [
+                _fact(
+                    concept="Assets",
+                    value=5_000.0,
+                    period_end=stale,
+                    filed=stale + timedelta(days=45),
+                )
+            ],
+        )
+        debt, source = self._fetcher(cache).debt_with_zero_evidence("NC", self.AS_OF)
+        assert debt is None
+        assert source == "absent"
+
+    def test_an_assumed_zero_is_named_so_it_is_never_mistaken(
+        self, tmp_path: Path
+    ) -> None:
+        cache = self._cache(tmp_path, [_fact(concept="Assets", value=5_000.0)])
+        _debt, source = self._fetcher(cache).debt_with_zero_evidence("NC", self.AS_OF)
+        assert "assumed" in source
+
+    def test_the_leverage_path_is_left_alone(self, tmp_path: Path) -> None:
+        """_compute_total_debt must keep answering None for the eleven.
+
+        Unknown leverage is not safe leverage, and the other agents rely
+        on that reading. Only the net-cash path resolves the ambiguity.
+        """
+        cache = self._cache(tmp_path, [_fact(concept="Assets", value=5_000.0)])
+        fetcher = self._fetcher(cache)
+        assert fetcher._compute_total_debt("NC", self.AS_OF)[0] is None

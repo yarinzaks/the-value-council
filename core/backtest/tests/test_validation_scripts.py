@@ -58,7 +58,7 @@ class TestTheWindowItself:
 
 
 class TestEveryScriptIsFound:
-    def test_every_agent_plus_the_council(self) -> None:
+    def test_every_agent_plus_mohnish_pabrai(self) -> None:
         # Ten named investors, one factor composite, one quiet
         # compounder and one market core. A new agent that forgets its
         # validation script would silently shrink this list instead of

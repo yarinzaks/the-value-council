@@ -114,7 +114,7 @@ class Proposal:
 
 
 def agreement(
-    books: Mapping[str, Sequence[str]], *, exclude: str = "the_council"
+    books: Mapping[str, Sequence[str]], *, exclude: str = "mohnish_pabrai"
 ) -> dict[str, int]:
     """How many agents hold each ticker.
 
