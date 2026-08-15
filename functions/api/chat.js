@@ -189,6 +189,62 @@ function correctionFor(domains) {
   );
 }
 
+/**
+ * The Gemini key, whatever this project happened to call it.
+ *
+ * GEMINI_API_KEY is the name to use and the one checked first. The
+ * search that follows exists because the name a key is given where it
+ * is *issued* — "Gemini2 API Key" in Google AI Studio, say — is a label
+ * with spaces in it, and nothing like the identifier a binding needs.
+ * Guessing which of the two ended up in the Pages project is a job for
+ * this function, not for the person reading a 503.
+ *
+ * Only a single unambiguous match is accepted. Two candidates is a
+ * question, and picking one of them silently would be the wrong answer
+ * half the time.
+ */
+export function readApiKey(env) {
+  const usable = (name) =>
+    typeof env?.[name] === "string" && env[name].trim().length > 0;
+
+  if (usable("GEMINI_API_KEY")) {
+    return { key: env.GEMINI_API_KEY.trim(), name: "GEMINI_API_KEY", candidates: [] };
+  }
+
+  const candidates = Object.keys(env ?? {})
+    .filter((name) => /gemini/i.test(name))
+    .filter(usable);
+
+  if (candidates.length === 1) {
+    return { key: env[candidates[0]].trim(), name: candidates[0], candidates };
+  }
+  return { key: null, name: null, candidates };
+}
+
+/**
+ * What to tell the reader when no key could be resolved.
+ *
+ * Names only, never values, and only names that already announced
+ * themselves as Gemini-related — enough to close the gap between "I set
+ * it" and "it isn't arriving" without turning a 503 into an inventory
+ * of the project's secrets.
+ */
+export function keyProblem(candidates) {
+  if (candidates.length > 1) {
+    return (
+      `More than one Gemini key is bound to this site (${candidates.join(", ")}), ` +
+      `so it is not clear which to use. Keep one, and name it GEMINI_API_KEY.`
+    );
+  }
+  return (
+    "The assistant is not configured: no variable whose name contains " +
+    "\"gemini\" reaches this Function. Add the key in the Pages project " +
+    "(Settings → Variables and Secrets) as GEMINI_API_KEY, to Production " +
+    "and Preview, and redeploy — variables added after a build only reach " +
+    "the next one."
+  );
+}
+
 /** A message the browser sent, reduced to something safe to forward. */
 export function sanitizeMessage(message) {
   if (!message || typeof message !== "object") return null;
@@ -403,18 +459,12 @@ async function askGemini(apiKey, systemText, contents) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!env.GEMINI_API_KEY) {
-    // Said plainly rather than as a generic 500: the fix is one setting
-    // in the Cloudflare dashboard, and the reader is the person who can
-    // apply it.
-    return json(
-      {
-        error:
-          "The assistant is not configured. Add GEMINI_API_KEY as a secret " +
-          "in the Pages project (Settings → Variables and Secrets).",
-      },
-      503,
-    );
+  // Said plainly rather than as a generic 500: the fix is one setting in
+  // the Cloudflare dashboard, and the reader is the person who can apply
+  // it.
+  const { key: apiKey, candidates } = readApiKey(env);
+  if (!apiKey) {
+    return json({ error: keyProblem(candidates) }, 503);
   }
 
   let payload;
@@ -444,7 +494,7 @@ export async function onRequestPost({ request, env }) {
   const systemText = `${SYSTEM}\n\nDASHBOARD DATA (JSON):\n${context}`;
   const contents = toGeminiContents(messages);
 
-  let upstream = await askGemini(env.GEMINI_API_KEY, systemText, contents);
+  let upstream = await askGemini(apiKey, systemText, contents);
   if (!upstream.ok) {
     const detail = await upstream.text();
     // 429 on this tier is almost always the free grounding cap rather
@@ -471,7 +521,7 @@ export async function onRequestPost({ request, env }) {
   if (usedOnlyUntrusted) {
     retried = true;
     const offenders = sources.map((s) => s.domain ?? "an unidentified site");
-    const secondAttempt = await askGemini(env.GEMINI_API_KEY, systemText, [
+    const secondAttempt = await askGemini(apiKey, systemText, [
       ...contents,
       { role: "user", parts: [{ text: correctionFor(offenders) }] },
     ]);

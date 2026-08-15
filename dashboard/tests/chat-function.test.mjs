@@ -23,11 +23,59 @@ import {
   TRUSTED_DOMAINS,
   hostOf,
   isTrusted,
+  keyProblem,
+  readApiKey,
   readReply,
   readSources,
   sanitizeMessage,
   toGeminiContents,
 } from "../../functions/api/chat.js";
+
+test("readApiKey prefers the documented name", () => {
+  const found = readApiKey({ GEMINI_API_KEY: "abc", GEMINI2_API_KEY: "xyz" });
+  assert.equal(found.key, "abc");
+  assert.equal(found.name, "GEMINI_API_KEY");
+});
+
+test("readApiKey finds a single differently-named Gemini binding", () => {
+  // The case this exists for: a key labelled where it was issued rather
+  // than where it is read.
+  const found = readApiKey({ SITE_PASSWORD: "s", GEMINI2_API_KEY: "xyz" });
+  assert.equal(found.key, "xyz");
+  assert.equal(found.name, "GEMINI2_API_KEY");
+});
+
+test("readApiKey trims surrounding whitespace", () => {
+  // A key pasted into a web form arrives with a trailing newline often
+  // enough that this is worth handling rather than debugging as a 401.
+  assert.equal(readApiKey({ GEMINI_API_KEY: "  abc\n" }).key, "abc");
+});
+
+test("readApiKey refuses to choose between two candidates", () => {
+  const found = readApiKey({ GEMINI_ONE: "a", GEMINI_TWO: "b" });
+  assert.equal(found.key, null);
+  assert.deepEqual(found.candidates, ["GEMINI_ONE", "GEMINI_TWO"]);
+});
+
+test("readApiKey ignores bindings that are present but empty", () => {
+  // Cloudflare will happily hold a variable set to "". Treating that as
+  // configured produces a 401 from Google instead of a usable message.
+  assert.equal(readApiKey({ GEMINI_API_KEY: "   " }).key, null);
+  assert.equal(readApiKey({ GEMINI_API_KEY: undefined }).key, null);
+  assert.equal(readApiKey({}).key, null);
+});
+
+test("keyProblem names competing candidates but never a value", () => {
+  const message = keyProblem(["GEMINI_ONE", "GEMINI_TWO"]);
+  assert.match(message, /GEMINI_ONE, GEMINI_TWO/);
+  assert.match(message, /name it GEMINI_API_KEY/);
+});
+
+test("keyProblem tells the reader a redeploy is needed", () => {
+  // A variable added after the last build is bound to the next one, and
+  // "I already added it" is the likeliest thing the reader is thinking.
+  assert.match(keyProblem([]), /redeploy/);
+});
 
 test("sanitizeMessage keeps a well-formed turn", () => {
   assert.deepEqual(sanitizeMessage({ role: "user", content: "  hello  " }), {
