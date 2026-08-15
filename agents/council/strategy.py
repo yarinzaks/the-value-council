@@ -33,11 +33,17 @@ announcements are not built, and it is 0-15% of the book.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from agents.council.assemble import assemble_universe
-from agents.council.exits import entries_blocked
+from agents.council.exits import (
+    PositionState,
+    Sleeve,
+    StatisticalExit,
+    entries_blocked,
+    evaluate_book,
+)
 from agents.council.pipeline import Selection, run_selection
 from core.backtest.strategy_runner import HeldPosition, Strategy
 from core.logger import get_logger
@@ -93,6 +99,11 @@ class MohnishPabrai(Strategy):
         self.drawdown_reader = drawdown_reader
         self.news_service = news_service
         self.last_selection: Selection | None = None
+        #: Tickers E2 wants out regardless of the runner's holding
+        #: floor. Read by :class:`PabraiLive` into the scan result.
+        self.last_forced_exits: list[str] = []
+        #: Why each of them, for the run log and the decision record.
+        self.last_exit_reasons: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     def _cache(self) -> Any:
@@ -163,6 +174,80 @@ class MohnishPabrai(Strategy):
                 momentum[t] = None
         return last, volumes, momentum
 
+    def _evaluate_exits(
+        self,
+        holding: Sequence[str],
+        rows: Sequence[Any],
+        as_of: date,
+        *,
+        held: Mapping[str, HeldPosition] | None,
+    ) -> None:
+        """Run E2 over what is held and record what must go.
+
+        Only E2 fires here — a terminal filing, or filings gone past the
+        400-day staleness bound. The rest of the table is either the
+        Core sleeve's (E4-E7), the Event sleeve's (E3), or already
+        expressed by the basket itself: E8's rank buffer decides
+        membership in :mod:`agents.council.pipeline`, and a name that
+        leaves the target list is sold by the runner in the ordinary way.
+
+        The filings check costs one request per held name, which is
+        twenty at most. That is the same reasoning that puts Gate D last
+        in the screen: an expensive check is affordable exactly when it
+        runs on a short list.
+        """
+        self.last_forced_exits = []
+        self.last_exit_reasons = {}
+        if not holding:
+            return
+
+        by_ticker = {r.ticker: r for r in rows}
+        terminal: dict[str, str] = {}
+        try:
+            from agents.council.events import Severity, scan
+
+            for event in scan(holding, since=as_of - timedelta(days=10)):
+                if event.severity is Severity.CRITICAL:
+                    terminal.setdefault(
+                        event.ticker, f"{event.form} {event.code} — {event.meaning}"
+                    )
+        except Exception as exc:
+            # A filings outage must not invent an exit, and must not
+            # silently read as "nothing happened" either -- it is said
+            # out loud so a quiet run is distinguishable from a blind one.
+            logger.warning(f"{as_of}: filings unread — {type(exc).__name__}: {exc}")
+
+        states: list[PositionState] = []
+        for ticker in holding:
+            row = by_ticker.get(ticker)
+            latest = row.universe.latest_filing if row is not None else None
+            position = (held or {}).get(ticker)
+            states.append(
+                PositionState(
+                    ticker=ticker,
+                    sleeve=Sleeve.STATISTICAL,
+                    opened=(
+                        position.entry_date if position is not None else as_of
+                    ),
+                    weight=0.0,
+                    exit_block=StatisticalExit(),
+                    terminal_filing=terminal.get(ticker),
+                    filing_age_days=(
+                        None if latest is None else (as_of - latest).days
+                    ),
+                )
+            )
+
+        for verdict in evaluate_book(states, as_of):
+            if verdict.sells:
+                self.last_forced_exits.append(verdict.ticker)
+                self.last_exit_reasons[verdict.ticker] = (
+                    f"{verdict.rule}: {verdict.reason}"
+                )
+                logger.info(
+                    f"{as_of}: forcing {verdict.ticker} out — {verdict.reason}"
+                )
+
     # ------------------------------------------------------------------
     def select(
         self,
@@ -205,6 +290,7 @@ class MohnishPabrai(Strategy):
             opinions=self.opinion_index,
         )
         self.last_selection = selection
+        self._evaluate_exits(holding, rows, as_of, held=held)
 
         # The universe is the runner's answer on what is tradeable
         # today, and it is applied again here even though section 1

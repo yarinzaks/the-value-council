@@ -120,8 +120,15 @@ class AgentAdapter:
         # Derive ordered targets from the strategy's last selection_history.
         targets = self._collect_targets(weights)
         watchlist = self._collect_watchlist(targets)
+        # A strategy that names positions it wants out regardless of the
+        # holding floor says so here. Most do not, and an absent
+        # attribute means "no opinion" rather than "nothing to exit".
+        forced = list(getattr(self.strategy, "last_forced_exits", []) or [])
         return ScanResult(
-            targets=targets, watchlist=watchlist, universe_size=len(universe)
+            targets=targets,
+            watchlist=watchlist,
+            universe_size=len(universe),
+            forced_exits=forced,
         )
 
     # -- subclass hooks -------------------------------------------------
