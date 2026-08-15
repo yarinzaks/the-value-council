@@ -68,7 +68,7 @@ pytest
 ## Tech Stack
 
 - **Python 3.12** with type hints throughout
-- **Gemini 2.5 Flash** for LLM reasoning (`google-generativeai`)
+- **Gemini 2.5 Flash** for LLM reasoning (`google-genai`)
 - **yfinance** for global market data
 - **Financial Modeling Prep** for fundamentals + screener + transcripts
 - **edgartools** for SEC filings (10-K, 10-Q, 8-K, 13F, Form 4)
