@@ -82,6 +82,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             " An unknown slug is an error, not an empty run."
         ),
     )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Re-run an agent that already completed this date. The"
+            " once-a-day guard exists so a retried schedule cannot trade"
+            " a book twice; this is the override for the case where the"
+            " decision rule itself changed between the two runs."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -173,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode == "close":
             results = runner.run_mark_to_market(as_of=args.as_of)
         else:
-            results = runner.run(as_of=args.as_of)
+            results = runner.run(as_of=args.as_of, force=args.force)
         print(f"\n[mode={args.mode}, market={market}]")
         print_report(results)
         all_results.extend(results)

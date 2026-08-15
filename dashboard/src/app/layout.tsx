@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
+import { ChatWidget } from "@/components/ChatWidget";
 import { Providers } from "@/components/Providers";
 import { loadCouncilLive } from "@/lib/data";
 import { readLocale } from "@/lib/locale-server";
@@ -51,6 +52,7 @@ export default async function RootLayout({
           >
             {children}
           </AppShell>
+          <ChatWidget />
         </Providers>
       </body>
     </html>

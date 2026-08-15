@@ -71,6 +71,29 @@ CONCEPT_MAP: dict[str, list[tuple[str, str]]] = {
         ("us-gaap", "OperatingIncomeLoss"),
         ("us-gaap", "IncomeLossFromContinuingOperationsBeforeInterestExpenseInterestIncomeIncomeTaxesExtraordinaryItemsNoncontrollingInterestsNet"),
     ],
+    # Two of Piotroski's nine criteria are gross-margin ones, and the
+    # F-score cannot be computed without this chain.
+    "gross_profit": [
+        ("us-gaap", "GrossProfit"),
+    ],
+    # ROIC's two halves. NOPAT needs an effective tax rate, which is
+    # tax expense over pre-tax income; neither is derivable from the
+    # other, and neither was mapped. The pre-tax chain carries both
+    # spellings because filers split on whether equity-method income
+    # sits above or below the line.
+    "income_tax_expense": [
+        ("us-gaap", "IncomeTaxExpenseBenefit"),
+    ],
+    "pretax_income": [
+        (
+            "us-gaap",
+            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+        ),
+        (
+            "us-gaap",
+            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
+        ),
+    ],
     "eps_basic": [
         ("us-gaap", "EarningsPerShareBasic"),
     ],
@@ -117,8 +140,19 @@ CONCEPT_MAP: dict[str, list[tuple[str, str]]] = {
         ("us-gaap", "NetCashProvidedByUsedInOperatingActivities"),
         ("us-gaap", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"),
     ],
+    # Measured across 300 random cached filers: the first tag alone
+    # covers 65.3%, and adding the second reaches 82.6%. The remainder
+    # are mostly financials and asset-light businesses that genuinely
+    # report no capital spending line. Ordered by observed frequency,
+    # and these are ALTERNATIVES rather than components -- a filer that
+    # tags a roll-up and a detail line resolves to the roll-up because
+    # the chain is evaluated in order, per period.
     "capex": [
         ("us-gaap", "PaymentsToAcquirePropertyPlantAndEquipment"),
+        ("us-gaap", "PaymentsToAcquireProductiveAssets"),
+        ("us-gaap", "PaymentsToAcquireMachineryAndEquipment"),
+        ("us-gaap", "PaymentsToAcquireOtherPropertyPlantAndEquipment"),
+        ("us-gaap", "PaymentsForCapitalImprovements"),
     ],
     "dividends_paid": [
         ("us-gaap", "PaymentsOfDividends"),
@@ -180,6 +214,9 @@ _FLOW_CONCEPTS: frozenset[str] = frozenset(
         "revenue",
         "net_income",
         "operating_income",
+        "gross_profit",
+        "income_tax_expense",
+        "pretax_income",
         "eps_basic",
         "eps_diluted",
         "operating_cash_flow",

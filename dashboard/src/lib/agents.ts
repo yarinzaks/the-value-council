@@ -155,16 +155,21 @@ export const AGENTS: AgentMeta[] = [
     school_he: "ראיות, לא ביוגרפיה",
     color: "#0891b2",
   },  {
-    // The twelfth, and the only one not answering to a backtest. The
-    // eleven above were each scored over the same five years and their
-    // CAGRs mean the same thing as each other; this one reads filings
-    // and reasons, so replaying it over history would let the model
-    // know how that history came out. It is listed here anyway because
-    // it holds a real book on the same terms as the rest — same seed,
-    // same marks, same rules — and hiding it from the roster made it
-    // look absent rather than unscored. What it has no place in is the
-    // backtest leaderboard, and it stays out of that on its own: it
-    // publishes no run for loadAgentLatest to find.
+    // The twelfth, and the only one not answering to a backtest. That
+    // used to be because it read the other eleven's books and could not
+    // be replayed without replaying them; its rule is mechanical now —
+    // a screen, a rank and an exit table over point-in-time filings —
+    // so the obstacle is different and smaller. Two things still stand
+    // in the way: the full-market universe is not survivorship-bias
+    // free, which makes any five-year CAGR from it an upper bound
+    // rather than an estimate, and the backtest runner does not pass a
+    // strategy its own holdings, so the exit table would be inert.
+    //
+    // It is listed here anyway because it holds a real book on the same
+    // terms as the rest — same seed, same marks, same rules — and
+    // hiding it made it look absent rather than unscored. It stays out
+    // of the backtest leaderboard on its own: it publishes no run for
+    // loadAgentLatest to find.
     slug: "mohnish_pabrai",
     display_name: "Mohnish Pabrai",
     display_name_he: "מוניש פבראי",

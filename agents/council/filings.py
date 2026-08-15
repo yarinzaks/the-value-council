@@ -39,6 +39,7 @@ would turn this gate into decoration.
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -101,6 +102,13 @@ LATE_FORMS: Final[frozenset[str]] = frozenset({"NT 10-K", "NT 10-Q"})
 #: statements. The Accountant's hard veto.
 RESTATEMENT_ITEM: Final[str] = "4.02"
 
+#: The endpoint answers 500 under load rather than 429, so a first
+#: failure says nothing about whether a second would succeed. Three
+#: attempts with a widening pause costs seconds and saves a day of
+#: entries; beyond that it is a real outage and the gate should say so.
+FETCH_ATTEMPTS: Final[int] = 3
+FETCH_BACKOFF_SECONDS: Final[float] = 2.0
+
 
 class FullTextUnavailableError(RuntimeError):
     """The phrase index could not be built, so Gate D cannot be run."""
@@ -151,12 +159,25 @@ def ciks_using_phrase(
     total: int | None = None
 
     while True:
-        try:
-            payload = fetch(phrase, forms, start, end, offset)
-        except (urllib.error.URLError, OSError, ValueError) as exc:
+        payload = None
+        last_error: Exception | None = None
+        for attempt in range(FETCH_ATTEMPTS):
+            try:
+                payload = fetch(phrase, forms, start, end, offset)
+                break
+            except (urllib.error.URLError, OSError, ValueError) as exc:
+                last_error = exc
+                if attempt + 1 < FETCH_ATTEMPTS:
+                    # The endpoint answers 500 under load rather than
+                    # 429, so a transient failure is indistinguishable
+                    # from a real one on the first try. Backing off is
+                    # cheaper than losing the day's entries.
+                    time.sleep(FETCH_BACKOFF_SECONDS * (attempt + 1))
+        if payload is None:
             raise FullTextUnavailableError(
-                f"full-text search failed for {phrase!r}: {exc}"
-            ) from exc
+                f"full-text search failed for {phrase!r} after "
+                f"{FETCH_ATTEMPTS} attempts: {last_error}"
+            ) from last_error
 
         hits = payload.get("hits", {})
         if total is None:
