@@ -699,9 +699,20 @@ class DailyRunner:
         # ---- SELLs: positions that left the target list ---------------
         # Skip if no targets — that's a "no-trade" signal (e.g. universe
         # produced no candidates) and we'd otherwise liquidate everything.
-        if scan.targets:
+        forced_exits = {t.upper() for t in scan.forced_exits}
+        # A forced exit runs even on a no-trade day. The `scan.targets`
+        # guard below exists so an empty target list is not read as
+        # "liquidate everything", but a doctrine that has named the
+        # positions it wants out has not gone quiet — it has been
+        # specific, and specificity is the opposite of the ambiguity the
+        # guard protects against.
+        if scan.targets or forced_exits:
             for pos in list(portfolio.positions):
-                if pos.ticker in target_tickers:
+                # Forced first: a name can be both a current target and
+                # under a terminal filing, and the filing wins.
+                if pos.ticker in target_tickers and pos.ticker not in forced_exits:
+                    continue
+                if not scan.targets and pos.ticker not in forced_exits:
                     continue
                 # A name can leave the target list for a day because a
                 # price moved and it slipped a rank, then come straight
@@ -716,13 +727,27 @@ class DailyRunner:
                 # thesis genuinely broke inside a month the exit is
                 # merely late; if it slipped a rank, the exit never
                 # happens and the round-trip costs nothing.
+                #
+                # A forced exit is exempt. The floor is aimed at names
+                # that slipped a rank and will slip back; it was never
+                # meant to sit on an 8-K item 4.02, a delisting notice
+                # or a trailing stop for the remainder of a month. Under
+                # COUNCIL_SELECTION E2 those sell next session, "no
+                # council, no discussion", and a floor that outranked
+                # them would make the rule decorative.
+                forced = pos.ticker in forced_exits
                 age = pos_age_days(pos, as_of)
-                if age is not None and age < self.min_holding_days:
+                if not forced and age is not None and age < self.min_holding_days:
                     logger.info(
                         f"{as_of}: {adapter.name} keeping {pos.ticker} — "
                         f"held {age}d, floor is {self.min_holding_days}d"
                     )
                     continue
+                if forced and age is not None and age < self.min_holding_days:
+                    logger.info(
+                        f"{as_of}: {adapter.name} forcing {pos.ticker} out at "
+                        f"{age}d, inside the {self.min_holding_days}d floor"
+                    )
                 # No fallback to pos.current_price. mark_to_market keeps the
                 # last known mark when a price is missing, which is right for
                 # valuing a position but wrong for executing a sale: a

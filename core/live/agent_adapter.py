@@ -16,7 +16,7 @@ heavy work happens in :meth:`run_scan`.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -77,6 +77,12 @@ class ScanResult:
     targets: list[LiveTarget]
     watchlist: list[LiveWatch]
     universe_size: int
+    #: Tickers a doctrine wants out regardless of how recently they were
+    #: bought. The runner honours these ahead of its minimum-holding
+    #: floor, which exists to stop rank-oscillation churn and has no
+    #: business delaying an 8-K item 4.02 or a delisting notice by three
+    #: more weeks. Every other exit still waits out the floor.
+    forced_exits: list[str] = field(default_factory=list)
 
 
 class AgentAdapter:

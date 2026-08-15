@@ -7,7 +7,7 @@ that no longer existed.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -1210,3 +1210,164 @@ class TestAgentFlagParsing:
     def test_repeatable(self) -> None:
         args = parse_args(["--agent", "mohnish_pabrai", "--agent", "john_neff"])
         assert args.agents == ["mohnish_pabrai", "john_neff"]
+
+
+class TestForcedExits:
+    """A terminal filing must not wait out the churn floor.
+
+    The minimum-holding floor was written against 246 round-trips of
+    rank oscillation and is doing real work. It was never meant to sit
+    on an 8-K item 4.02 for the remainder of a month, and under
+    COUNCIL_SELECTION E2 those sell next session, "no council, no
+    discussion".
+    """
+
+    @staticmethod
+    def _adapter(name: str, targets: list[LiveTarget], forced: list[str]):
+        class _Forcing(_StubAdapter):
+            def run_scan(self, as_of, universe, prices, fundamentals, *, held=None):
+                result = super().run_scan(
+                    as_of, universe, prices, fundamentals, held=held
+                )
+                result.forced_exits = forced
+                return result
+
+        return _Forcing(name, targets)
+
+    def _run(self, runner: DailyRunner, adapter, prices: dict[str, float | None]):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,
+            AS_OF,
+            list(prices),
+            dict(prices),
+            dict.fromkeys(prices),
+        )
+
+    def test_a_forced_exit_beats_the_holding_floor(
+        self, runner: DailyRunner
+    ) -> None:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="BAD", shares=10.0, entry_price=50.0,
+                # Twelve days old, well inside the thirty-day floor.
+                entry_date=(AS_OF - timedelta(days=12)).isoformat(),
+                current_price=50.0, why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        adapter = self._adapter("stub_agent", [_target("KEEP")], ["BAD"])
+        result = self._run(runner, adapter, {"KEEP": 20.0, "BAD": 45.0})
+
+        sells = [t for t in result.trades if t.side == "SELL"]
+        assert [s.ticker for s in sells] == ["BAD"]
+        assert not result.portfolio.has("BAD")
+
+    def test_an_ordinary_exit_still_waits_out_the_floor(
+        self, runner: DailyRunner
+    ) -> None:
+        """The churn guard must survive the exemption."""
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="SLIP", shares=10.0, entry_price=50.0,
+                entry_date=(AS_OF - timedelta(days=12)).isoformat(),
+                current_price=50.0, why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        adapter = self._adapter("stub_agent", [_target("KEEP")], [])
+        result = self._run(runner, adapter, {"KEEP": 20.0, "SLIP": 45.0})
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("SLIP")
+
+    def test_a_forced_exit_runs_on_a_no_trade_day(
+        self, runner: DailyRunner
+    ) -> None:
+        """An empty target list is ambiguous; a named exit is not."""
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="BAD", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        adapter = self._adapter("stub_agent", [], ["BAD"])
+        result = self._run(runner, adapter, {"BAD": 45.0})
+
+        assert [t.ticker for t in result.trades if t.side == "SELL"] == ["BAD"]
+
+    def test_an_empty_target_list_still_never_liquidates(
+        self, runner: DailyRunner
+    ) -> None:
+        """With nothing forced, the no-trade signal keeps its meaning."""
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="HOLD", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        adapter = self._adapter("stub_agent", [], [])
+        result = self._run(runner, adapter, {"HOLD": 45.0})
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("HOLD")
+
+    def test_a_forced_exit_outranks_being_a_current_target(
+        self, runner: DailyRunner
+    ) -> None:
+        """Delisting and still-cheap at once exits for the delisting."""
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="BAD", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        adapter = self._adapter("stub_agent", [_target("BAD")], ["BAD"])
+        result = self._run(runner, adapter, {"BAD": 45.0})
+
+        assert [t.ticker for t in result.trades if t.side == "SELL"] == ["BAD"]
+
+    def test_a_forced_exit_still_needs_a_fresh_price(
+        self, runner: DailyRunner
+    ) -> None:
+        """Forcing an exit must not book fabricated proceeds."""
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DEAD", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        adapter = self._adapter("stub_agent", [], ["DEAD"])
+        result = self._run(runner, adapter, {"DEAD": None})
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("DEAD")
+
+    def test_the_default_is_no_forced_exits(self) -> None:
+        assert ScanResult(targets=[], watchlist=[], universe_size=0).forced_exits == []
