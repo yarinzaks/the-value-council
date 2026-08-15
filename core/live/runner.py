@@ -274,14 +274,14 @@ def build_default_adapters(
                 decision_logger=decision_logger,
             )
         ),
-        # Last on purpose. It decides on what the others hold, so every
-        # book above has been written by the time it looks. It still
-        # reads them off disk rather than out of this list, so the
-        # ordering is an improvement to its inputs and not a dependency
-        # its correctness rests on.
+        # The twelfth. It reads filings rather than the other books, so
+        # its position in this list carries no meaning any more — it did
+        # when the rule was "buy what three of the eleven hold", and
+        # that rule is gone.
         PabraiLive(
             MohnishPabrai(
-                news_service=_news_service(),
+                edgar_cache=cache,
+                price_loader=prices,
                 regime_reader=read_regime,
             )
         ),

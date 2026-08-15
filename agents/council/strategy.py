@@ -1,35 +1,46 @@
-"""The Council as a Strategy, so it trades on the same rails as the rest.
+"""Mohnish Pabrai as a Strategy, on the same rails as the other eleven.
 
-``selection.propose`` decides; this hands that decision to the runner in
-the shape every other agent uses. Going through ``Strategy`` rather than
-a bespoke path in scripts/run_council.py is the whole point: the same
-execution, the same cost model, the same marks, the same snapshots and
-the same rebalancing band as the eleven. An agent with its own execution
-path would be incomparable to them no matter what the dashboard showed.
+``COUNCIL_SELECTION.md`` is the doctrine; :mod:`agents.council.pipeline`
+runs it; this hands the result to the runner in the shape every other
+agent uses. Going through :class:`Strategy` rather than a bespoke path
+is the whole point — same execution, same cost model, same marks, same
+snapshots, same rebalancing band as the eleven. An agent with its own
+execution path would be incomparable to them no matter what the
+dashboard showed.
 
-Where the inputs come from
---------------------------
+What it replaced
+----------------
 
-``Strategy.select`` is handed a universe, prices and fundamentals — not
-the other agents' books, which is what this one needs. It reads them off
-disk, from the portfolios the runner has already published. That means
-it acts on the roster as of the previous close rather than the current
-one, which is deliberate: depending on within-run ordering would make
-the Council's decision a function of which agent happened to run first.
+Until now this file bought whatever three of the other eleven agents
+already held. That rule made the twelfth agent a linear combination of
+the other eleven — it could not outperform them by construction — and
+it is the one trade section 8 of the doctrine explicitly assigns
+elsewhere: *"a proposed trade that cannot be tied to one of its three
+edges — forced selling, complexity, time — belongs to one of the other
+eleven, not to this one."* The books-off-disk reader went with it.
+
+The statistical sleeve only, for now
+------------------------------------
+
+What runs here is section 1 to 5's mechanical path: universe, screen,
+rank, basket, equal weight. The Core sleeve is the Council's own, and it
+answers to a written thesis with kill criteria rather than to a screen,
+so it opens through the journal rather than through this method. The
+Event sleeve is deferred — ATR, Form 10 detection and index-deletion
+announcements are not built, and it is 0-15% of the book.
 """
 
 from __future__ import annotations
 
-import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
-from pathlib import Path
 from typing import Any
 
-from agents.council.selection import Proposal, propose
+from agents.council.assemble import assemble_universe
+from agents.council.exits import entries_blocked
+from agents.council.pipeline import Selection, run_selection
 from core.backtest.strategy_runner import HeldPosition, Strategy
 from core.logger import get_logger
-from core.paths import portfolios_dir
 
 logger = get_logger("agents.council.strategy")
 
@@ -39,64 +50,120 @@ AGENT_SLUG = "mohnish_pabrai"
 PUNCH_CARD_TOTAL = 20
 
 
-def read_books(directory: Path | None = None) -> dict[str, list[str]]:
-    """Every agent's holdings, keyed by slug.
-
-    A portfolio that cannot be read is skipped rather than raised on: a
-    corrupt or half-written file should cost that agent its vote, not
-    stop the Council from running.
-    """
-    directory = directory or portfolios_dir()
-    books: dict[str, list[str]] = {}
-    try:
-        paths = sorted(directory.glob("*.json"))
-    except OSError as exc:
-        logger.warning(f"cannot list {directory} — {exc}")
-        return books
-
-    for path in paths:
-        try:
-            data = json.loads(path.read_text())
-            books[data.get("agent", path.stem)] = [
-                p["ticker"] for p in data.get("positions", [])
-            ]
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            logger.warning(f"skipping {path.name} — {type(exc).__name__}: {exc}")
-    return books
-
-
 class MohnishPabrai(Strategy):
-    """Buys what its members agree on, subject to its own vetoes."""
+    """Buys from forced sellers, below a floor it can verify."""
 
     name = AGENT_SLUG
 
     def __init__(
         self,
         *,
+        edgar_cache: Any = None,
+        price_loader: Any = None,
+        regime_reader: Any = None,
+        opinion_index: Any = None,
+        drawdown_reader: Any = None,
         news_service: Any | None = None,
-        regime_reader=None,
-        filings_reader=None,
-        books_reader=read_books,
-        entries_used: int = 0,
     ) -> None:
         """
         Args:
-            news_service: Anything with ``news_for(ticker, as_of)``.
-                ``None`` skips the news gate rather than blocking every
-                entry — an unconfigured feed must not look like a veto.
+            edgar_cache: Where the filings are. Constructed on first use
+                when omitted.
+            price_loader: Supplies the 63-session dollar volume and the
+                12-1 momentum window, neither of which the runner's
+                per-day price lookup can answer.
             regime_reader: ``(as_of) -> Regime``. Injected so tests and
-                offline runs need no FRED call.
-            filings_reader: ``(tickers, as_of) -> {ticker: reason}``.
-            books_reader: ``() -> {slug: [ticker]}``.
-            entries_used: Punches already spent in this agent's life.
+                offline runs need no FRED call. ``None`` leaves the dial
+                unread, which takes section 9.1's tightest row.
+            opinion_index: Prebuilt Gate D phrase index. Built inside
+                the pipeline when omitted.
+            drawdown_reader: ``() -> float | None``, the drawdown from
+                peak NAV. Feeds E1. ``None`` reads as unreadable, which
+                blocks entries — an unreadable NAV is not a safe one.
+            news_service: Accepted and unused. The doctrine's section 10
+                rules sentiment and news-flow scores out explicitly, and
+                the 8-K stream is the event feed; the parameter stays so
+                the runner's wiring does not have to special-case this
+                agent.
         """
-        self.news_service = news_service
+        self.edgar_cache = edgar_cache
+        self.price_loader = price_loader
         self.regime_reader = regime_reader
-        self.filings_reader = filings_reader
-        self.books_reader = books_reader
-        self.entries_used = entries_used
-        self.last_proposal: Proposal | None = None
+        self.opinion_index = opinion_index
+        self.drawdown_reader = drawdown_reader
+        self.news_service = news_service
+        self.last_selection: Selection | None = None
 
+    # ------------------------------------------------------------------
+    def _cache(self) -> Any:
+        if self.edgar_cache is None:
+            from core.data.edgar_cache import EdgarCache
+
+            self.edgar_cache = EdgarCache()
+        return self.edgar_cache
+
+    def _loader(self) -> Any:
+        if self.price_loader is None:
+            from core.backtest.data_loader import PriceDataLoader
+
+            self.price_loader = PriceDataLoader()
+        return self.price_loader
+
+    def _risk_on_dials(self, as_of: date) -> int | None:
+        if self.regime_reader is None:
+            return None
+        try:
+            return int(self.regime_reader(as_of).risk_on_count)
+        except Exception as exc:
+            # Left as None, which takes the tightest ceilings. An
+            # unreadable regime is not a green one.
+            logger.warning(f"regime unreadable — {type(exc).__name__}: {exc}")
+            return None
+
+    def _drawdown(self) -> float | None:
+        if self.drawdown_reader is None:
+            return None
+        try:
+            value = self.drawdown_reader()
+        except Exception as exc:
+            logger.warning(f"drawdown unreadable — {type(exc).__name__}: {exc}")
+            return None
+        return None if value is None else float(value)
+
+    def _price_inputs(
+        self, tickers: Sequence[str], as_of: date, prices: Any
+    ) -> tuple[dict[str, float | None], dict[str, float], dict[str, float | None]]:
+        """Last close, 63-session dollar volume, and 12-1 momentum.
+
+        The close comes from the runner's own lookup, which has already
+        fetched it once for every agent. The other two need the loader's
+        history and are asked for here.
+        """
+        loader = self._loader()
+        last: dict[str, float | None] = {}
+        for t in tickers:
+            try:
+                last[t] = prices.get(t)
+            except Exception:
+                last[t] = None
+
+        try:
+            volumes = loader.median_dollar_volume(tickers, as_of, sessions=63)
+        except Exception as exc:
+            logger.warning(f"dollar volume unavailable — {exc}")
+            volumes = {}
+
+        momentum: dict[str, float | None] = {}
+        for t in tickers:
+            try:
+                momentum[t] = loader.trailing_return(
+                    t, as_of, lookback_months=12, skip_months=1
+                )
+            except Exception:
+                momentum[t] = None
+        return last, volumes, momentum
+
+    # ------------------------------------------------------------------
     def select(
         self,
         as_of: date,
@@ -106,55 +173,46 @@ class MohnishPabrai(Strategy):
         *,
         held: Mapping[str, HeldPosition] | None = None,
     ) -> dict[str, float]:
-        books = self.books_reader()
+        """Target weights for the statistical sleeve.
+
+        ``fundamentals`` is ignored: the runner supplies one vendor-shaped
+        scalar per ticker, and every ratio in sections 2 and 3 is
+        trailing-twelve-month and point-in-time. Those are assembled from
+        the filings themselves rather than from a snapshot whose
+        as-of date nobody recorded.
+        """
         holding = sorted(held or {})
+        blocked, reason = entries_blocked(self._drawdown())
+        if blocked:
+            logger.info(f"{as_of}: {reason}")
 
-        risk_on = None
-        if self.regime_reader is not None:
-            try:
-                risk_on = self.regime_reader(as_of).risk_on_count
-            except Exception as exc:
-                # Left as None, which blocks entries. An unreadable
-                # regime is not a green one.
-                logger.warning(f"regime unreadable — {type(exc).__name__}: {exc}")
-
-        flagged: dict[str, str] = {}
-        if self.filings_reader is not None:
-            watched = sorted(set(holding) | set(books.get("__candidates__", [])))
-            try:
-                flagged = self.filings_reader(watched or holding, as_of)
-            except Exception as exc:
-                logger.warning(f"filings unreadable — {type(exc).__name__}: {exc}")
-
-        news_for = None
-        if self.news_service is not None:
-            def news_for(ticker: str, when: date):
-                try:
-                    return self.news_service.news_for(ticker, when)
-                except Exception as exc:
-                    # A source failure must not read as "no bad news".
-                    # It reads as no news, which is what an unconfigured
-                    # feed reads as too — the gate is a veto, not a
-                    # requirement, and this is stated in the run log.
-                    logger.warning(f"news unavailable for {ticker} — {exc}")
-                    return []
-
-        proposal = propose(
-            as_of=as_of,
-            books=books,
-            held=holding,
-            risk_on_dials=risk_on,
-            entries_remaining=max(0, PUNCH_CARD_TOTAL - self.entries_used),
-            filings_flagged=flagged,
-            news_for=news_for,
+        last, volumes, momentum = self._price_inputs(universe, as_of, prices)
+        rows = assemble_universe(
+            universe,
+            as_of,
+            cache=self._cache(),
+            prices=last,
+            dollar_volumes=volumes,
+            momentum=momentum,
         )
-        self.last_proposal = proposal
-        # Universe is respected even though agreement already implies
-        # it: a name every agent held yesterday can be suspended today,
-        # and the roster is the runner's answer on what is tradeable.
+
+        selection = run_selection(
+            rows,
+            as_of,
+            risk_on_dials=self._risk_on_dials(as_of),
+            entries_blocked=blocked,
+            held=holding,
+            opinions=self.opinion_index,
+        )
+        self.last_selection = selection
+
+        # The universe is the runner's answer on what is tradeable
+        # today, and it is applied again here even though section 1
+        # already consumed it: a name every gate passed yesterday can be
+        # suspended this morning.
         tradeable = {t.upper() for t in universe}
         return {
             t: w
-            for t, w in proposal.weights.items()
+            for t, w in selection.weights.items()
             if not tradeable or t.upper() in tradeable
         }

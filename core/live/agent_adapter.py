@@ -533,74 +533,90 @@ class MarketCoreLive(AgentAdapter):
 # The Council
 # --------------------------------------------------------------------------
 class PabraiLive(AgentAdapter):
-    """The Council on the same rails as the eleven.
+    """Mohnish Pabrai on the same rails as the eleven.
 
     Every other adapter reads a ``selection_history`` of typed scores —
-    a Magic Formula rank, a P/NCAV, a discount to book — because every
-    other agent forms its own opinion about a company. This one does
-    not: it acts on agreement between agents that already did, so what
-    it has to explain is who agreed and what failed to stop it. The
-    proposal carries exactly that, and it is what the rationale says.
+    a Magic Formula rank, a P/NCAV, a discount to book. This one reads
+    the :class:`~agents.council.pipeline.Selection` the engine produced,
+    because what it has to explain is not a single number but which
+    structural floor let a name in: net cash against market cap, a price
+    below tangible book, or an earnings yield on the whole firm. That
+    sentence is Gate A's own verdict, quoted verbatim.
 
-    The watchlist is the candidates it did not open. That is a truer
-    watchlist than the other agents' — theirs is the tail of a ranked
-    list, names that nearly qualified; these are names that fully
-    qualified and are waiting only on the per-run entry cap.
+    The watchlist is the names that cleared gates A to C and then failed
+    Gate D, the knife guard or the sector cap. That is a truer watchlist
+    than the other agents' — theirs is the tail of a ranked list, names
+    that nearly qualified; these fully qualified on the numbers and were
+    stopped by something nameable.
     """
 
     name = "mohnish_pabrai"
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
-        self.entry_trigger = "three or more agents hold it, and no gate objects"
+        self.entry_trigger = (
+            "clears all four gates and enters the top of the composite rank"
+        )
 
     def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
-        proposal = getattr(self.strategy, "last_proposal", None)
-        counts = _agreement_counts(self.strategy)
+        selection = getattr(self.strategy, "last_selection", None)
+        composites = (
+            {b.ticker: b for b in selection.basket} if selection else {}
+        )
+        screened = selection.screened if selection else {}
         out: list[LiveTarget] = []
         for rank, ticker in enumerate(
-            sorted(weights, key=lambda t: (-counts.get(t, 0), t)), start=1
+            sorted(
+                weights,
+                key=lambda t: (
+                    -(composites[t].composite if t in composites else 0.0),
+                    t,
+                ),
+            ),
+            start=1,
         ):
-            n = counts.get(ticker, 0)
+            result = screened.get(ticker)
+            floor = (result.floor if result else None) or "held from a prior rebalance"
+            entry = composites.get(ticker)
+            score = f"{entry.composite:.3f}" if entry else ""
             out.append(
                 LiveTarget(
                     ticker=ticker,
                     weight=weights[ticker],
                     rank=rank,
                     why_en=(
-                        f"Held by {n} of the eleven independently; regime, "
-                        f"filings and news all clear."
+                        f"Structural floor: {floor}."
+                        + (f" Composite {score}." if score else "")
                     ),
                     why_he=(
-                        f"מוחזקת על ידי {n} מתוך אחד-עשר הסוכנים באופן עצמאי; "
-                        f"המשטר, ההגשות והחדשות — כולם נקיים."
+                        f"רצפה מבנית: {floor}."
+                        + (f" ציון משוקלל {score}." if score else "")
                     ),
-                    score=proposal,
+                    score=entry.composite if entry else None,
                 )
             )
         return out
 
     def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
-        proposal = getattr(self.strategy, "last_proposal", None)
-        if proposal is None:
+        selection = getattr(self.strategy, "last_selection", None)
+        if selection is None:
             return []
         opened = {t.ticker for t in targets}
-        vetoed = {v.ticker: v for v in proposal.vetoes}
         out: list[LiveWatch] = []
-        counts = _agreement_counts(self.strategy)
         for rank, ticker in enumerate(
-            (c for c in proposal.candidates if c not in opened), start=1
+            (t for t in selection.provisional if t not in opened), start=1
         ):
             if rank > self.watchlist_size:
                 break
-            veto = vetoed.get(ticker)
-            n = counts.get(ticker, 0)
-            if veto:
-                en = f"Qualified on agreement ({n} agents) but vetoed: {veto.detail}"
-                he = f"עברה את הסכמת {n} הסוכנים אך נפסלה: {veto.detail}"
+            result = selection.screened.get(ticker)
+            failures = result.failures if result else []
+            if failures:
+                reason = f"{failures[0].gate}: {failures[0].detail}"
+                en = f"Cleared the numbers, stopped by Gate {reason}"
+                he = f"עברה את המספרים, נעצרה בשער {reason}"
             else:
-                en = f"Held by {n} of the eleven; waiting on the entry cap."
-                he = f"מוחזקת על ידי {n} סוכנים; ממתינה לתקרת הכניסות."
+                en = "Cleared every gate; waiting on the rank or the sector cap."
+                he = "עברה את כל השערים; ממתינה לדירוג או לתקרת הסקטור."
             out.append(
                 LiveWatch(
                     ticker=ticker,
@@ -611,24 +627,6 @@ class PabraiLive(AgentAdapter):
                 )
             )
         return out
-
-
-def _agreement_counts(strategy: Strategy) -> dict[str, int]:
-    """How many agents hold each name, for the rationale.
-
-    Recomputed from the same reader the strategy used rather than
-    threaded through the proposal, so a rationale can never quote a
-    different count from the one that made the decision.
-    """
-    from agents.council.selection import agreement
-
-    reader = getattr(strategy, "books_reader", None)
-    if reader is None:
-        return {}
-    try:
-        return agreement(reader())
-    except Exception:
-        return {}
 
 
 __all__ = [
