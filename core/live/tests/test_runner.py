@@ -1371,3 +1371,18 @@ class TestForcedExits:
 
     def test_the_default_is_no_forced_exits(self) -> None:
         assert ScanResult(targets=[], watchlist=[], universe_size=0).forced_exits == []
+
+
+class TestForceFlagParsing:
+    """The once-a-day guard has an override, and it defaults to off."""
+
+    def test_absent_means_no_force(self) -> None:
+        assert parse_args([]).force is False
+
+    def test_the_flag_sets_it(self) -> None:
+        assert parse_args(["--force"]).force is True
+
+    def test_it_composes_with_agent(self) -> None:
+        args = parse_args(["--agent", "mohnish_pabrai", "--force"])
+        assert args.agents == ["mohnish_pabrai"]
+        assert args.force is True
