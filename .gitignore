@@ -274,13 +274,23 @@ logs/
 # deleting them is still a manual step, since ignoring only hides them.
 # The pattern is literally "<name><space><digit>.<ext>". Anchoring on
 # the space matters: a bare "*[0-9].py" would also swallow sp500.py.
+#
+# One extension per tracked file type, because an extension left off the
+# list is not merely untidy: "export-chat-context 2.mjs" sat untracked
+# in git status for days precisely because .mjs was missing here.
 * [0-9].py
 * [0-9].yml
 * [0-9].yaml
 * [0-9].json
 * [0-9].ts
 * [0-9].tsx
+* [0-9].js
+* [0-9].mjs
+* [0-9].css
 * [0-9].md
+* [0-9].txt
+* [0-9].csv
+* [0-9].sh
 * [0-9].toml
 * [0-9].sqlite
 * [0-9].plist
