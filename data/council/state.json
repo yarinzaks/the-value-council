@@ -1,11 +1,11 @@
 {
- "agent": "the_council",
- "all_clear": true,
+ "agent": "mohnish_pabrai",
+ "all_clear": null,
  "breaches": [],
- "cash": 10000.0,
- "cash_weight": 1.0,
+ "cash": 5044.98,
+ "cash_weight": 0.5087354822928629,
  "circuit_breaker": false,
- "drawdown_from_peak": 0.0,
+ "drawdown_from_peak": null,
  "filings_flagged": [],
  "journal": {
   "calibration": {
@@ -22,45 +22,50 @@
    "used": 0
   }
  },
- "limits": [
-  {
-   "cap": 0.2,
-   "forces_action": false,
-   "limit": "illiquid_aggregate",
-   "note": "",
-   "observed": 0,
-   "state": "pass"
-  },
-  {
-   "cap": 0.05,
-   "forces_action": false,
-   "limit": "cash_floor",
-   "note": "",
-   "observed": 1.0,
-   "state": "pass"
-  },
-  {
-   "cap": 1.0,
-   "forces_action": false,
-   "limit": "leverage",
-   "note": "",
-   "observed": 0,
-   "state": "pass"
-  },
-  {
-   "cap": -0.25,
-   "forces_action": false,
-   "limit": "drawdown_circuit_breaker",
-   "note": "",
-   "observed": 0.0,
-   "state": "pass"
-  }
- ],
- "nav": 10000.0,
+ "limits": [],
+ "nav": 9916.7055878673,
  "peak_nav": 10000.0,
- "positions": 0,
- "regime": null,
- "run": "heartbeat",
+ "positions": 22,
+ "regime": {
+  "as_of": "2026-08-17",
+  "risk_on_count": 0,
+  "signals": [
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "BAMLH0A0HYM2",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "T10Y3M",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "SP500",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "VIXCLS",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   }
+  ],
+  "unknown_count": 4
+ },
+ "run": "close",
  "unknown_limits": [],
- "updated": "2026-08-14T18:05:21+00:00"
+ "updated": "2026-08-17T16:03:21+00:00"
 }
