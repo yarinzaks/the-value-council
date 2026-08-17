@@ -1,0 +1,38 @@
+[
+  {
+    "ticker": "HOG",
+    "decision": "FILL",
+    "agent": "mohnish_pabrai",
+    "timestamp": "2026-08-17T00:00:00+00:00",
+    "criteria_met": [
+      "rank #19",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 27.104999542236328,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Structural floor: EV/EBIT 6.23 <= 8.00. Composite 0.739."
+  },
+  {
+    "ticker": "CLMB",
+    "decision": "FILL",
+    "agent": "mohnish_pabrai",
+    "timestamp": "2026-08-17T00:00:00+00:00",
+    "criteria_met": [
+      "rank #20",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 27.790000915527344,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Structural floor: EV/EBIT 3.13 <= 8.00. Composite 0.734."
+  }
+]
