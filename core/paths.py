@@ -129,6 +129,15 @@ def fiscal_calendar_path() -> Path:
     return cache_dir() / "fiscal_calendar.json"
 
 
+def council_published_dir() -> Path:
+    """Ranks written on one run for a later run to execute.
+
+    §7's cooling-off rule for the mechanical sleeve: the quarterly
+    rebalance trades from a list published at least one run earlier.
+    """
+    return data_root() / "council" / "published"
+
+
 def ensure_dirs() -> None:
     """Create all known subdirectories. Idempotent — safe to call from
     any entry point."""

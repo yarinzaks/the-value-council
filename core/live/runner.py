@@ -31,8 +31,14 @@ from datetime import date
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
-from agents.council.cadence import RunType, is_first_run_of_week, permissions_for
+from agents.council.cadence import (
+    RunType,
+    is_first_run_of_week,
+    is_rebalance_run,
+    permissions_for,
+)
 from agents.council.nav_history import drawdown_from_peak
+from agents.council.published_list import PublishedList, executable_list, publish
 from agents.council.regime import read_regime
 from agents.council.strategy import MohnishPabrai
 from agents.dreman.contrarian import DavidDreman
@@ -72,6 +78,7 @@ from core.live.agent_adapter import (
     MarksLive,
     NeffLive,
     PabraiLive,
+    ScanResult,
     SchlossLive,
 )
 from core.live.portfolio import (
@@ -89,6 +96,7 @@ from core.live.price_export import export_prices
 from core.live.sector_export import export_sectors
 from core.live.snapshots import make_snapshot, save_snapshot
 from core.logger import get_logger
+from core.paths import council_published_dir
 
 logger = get_logger("core.live.runner")
 
@@ -130,6 +138,16 @@ def pos_age_days(pos: Position, as_of: date) -> int | None:
     except (ValueError, TypeError):
         return None
     return max(0, (as_of - entry).days)
+
+
+def _parse_date(value: str) -> date | None:
+    """An ISO date, or ``None`` when the field is empty or unreadable."""
+    if not value:
+        return None
+    try:
+        return _to_date(value)
+    except (ValueError, TypeError):
+        return None
 
 
 def _derive_run_type(as_of: date, last_open_date: str) -> RunType:
@@ -426,6 +444,7 @@ class DailyRunner:
         market: str = "US",
         adapters: list[AgentAdapter] | None = None,
         portfolio_dir: Path = DEFAULT_PORTFOLIO_DIR,
+        published_dir: Path | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
         initial_cash: float = DEFAULT_INITIAL_CASH,
         rebalance_band: float = DEFAULT_REBALANCE_BAND,
@@ -455,6 +474,9 @@ class DailyRunner:
         if only_agents is not None:
             self.adapters = _filter_adapters(self.adapters, only_agents)
         self.portfolio_dir = portfolio_dir
+        # Where the cooling-off lists live. Resolved once here rather
+        # than per call so a test can point it at a tmp_path.
+        self.published_dir = published_dir or council_published_dir()
         self.cost_bps = cost_bps
         self.initial_cash = initial_cash
         self.rebalance_band = rebalance_band
@@ -727,6 +749,22 @@ class DailyRunner:
         # see one and not act would be worse than no run at all.
         if run_type is None:
             run_type = _derive_run_type(as_of, portfolio.last_open_date)
+
+        # ---- COOLING-OFF: publish now, execute what was published ----
+        # §7 wires the statistical rebalance to a list published at least
+        # one run earlier, "the cooling-off rule holds even for the
+        # machine". So every Council scan writes its would-be list, and
+        # a rebalance run trades from whatever was written before today
+        # rather than from the rank computed a second ago.
+        if getattr(adapter, "honours_run_types", False):
+            self._publish_would_be_list(adapter, scan, as_of)
+            if is_rebalance_run(
+                as_of,
+                previous_run=_parse_date(portfolio.last_open_date),
+                last_rebalance=_parse_date(portfolio.last_rebalance_date),
+            ):
+                scan = self._rebalance_from_published(adapter, scan, portfolio, as_of)
+                portfolio.last_rebalance_date = as_of.isoformat()
         if getattr(adapter, "honours_run_types", False) and not permissions_for(
             run_type
         ).may_open:
@@ -929,6 +967,89 @@ class DailyRunner:
         )
 
     # ------------------------------------------------------------------
+    def _publish_would_be_list(
+        self, adapter: AgentAdapter, scan: ScanResult, as_of: date
+    ) -> None:
+        """Write today's rank for a later run to trade from.
+
+        Publication never fails a run. The list is an input to a future
+        rebalance, not to this one, so a disk problem here costs the
+        next quarter its freshest list — which the cooling-off rule then
+        handles by falling back to an older one or refusing to rebalance.
+        Letting it take down a run that has already moved eleven other
+        books would be the wrong trade by a wide margin.
+        """
+        try:
+            publish(
+                PublishedList(
+                    published_on=as_of,
+                    as_of=as_of,
+                    tickers=tuple(t.ticker for t in scan.targets),
+                    weights={t.ticker: t.weight for t in scan.targets},
+                    note=f"{adapter.name} would-be list",
+                ),
+                directory=self.published_dir,
+            )
+        except Exception as exc:
+            logger.warning(f"{as_of}: could not publish {adapter.name}'s list: {exc}")
+
+    def _rebalance_from_published(
+        self,
+        adapter: AgentAdapter,
+        scan: ScanResult,
+        portfolio: LivePortfolio,
+        as_of: date,
+    ) -> ScanResult:
+        """Swap today's rank for the one published on an earlier run.
+
+        With nothing published in time the book is held rather than
+        traded: the fallback of "rank now, execute now" is the exact
+        breach §7 forbids, and it would arrive looking like resilience.
+        """
+        published = executable_list(self.published_dir, as_of=as_of)
+        if published is None:
+            logger.info(
+                f"{as_of}: {adapter.name} rebalance skipped — nothing published "
+                "before today, and today's rank has not cooled off"
+            )
+            held = {p.ticker for p in portfolio.positions}
+            scan.targets = [t for t in scan.targets if t.ticker in held]
+            return scan
+
+        logger.info(
+            f"{as_of}: {adapter.name} rebalancing from the list published "
+            f"{published.published_on} ({len(published.tickers)} names)"
+        )
+        by_ticker = {t.ticker: t for t in scan.targets}
+        rebalanced: list[LiveTarget] = []
+        for rank, ticker in enumerate(published.tickers, start=1):
+            existing = by_ticker.get(ticker)
+            if existing is not None:
+                existing.weight = published.weights[ticker]
+                rebalanced.append(existing)
+                continue
+            # On the published list and no longer in today's scan. It is
+            # still what the cooled-off decision named, so it is bought —
+            # with the published weight and a reason that says where the
+            # instruction came from rather than inventing one.
+            rebalanced.append(
+                LiveTarget(
+                    ticker=ticker,
+                    weight=published.weights[ticker],
+                    rank=rank,
+                    why_en=(
+                        f"quarterly rebalance, from the list published "
+                        f"{published.published_on}"
+                    ),
+                    why_he=(
+                        f"איזון רבעוני, מהרשימה שפורסמה ב-{published.published_on}"
+                    ),
+                    score=None,
+                )
+            )
+        scan.targets = rebalanced
+        return scan
+
     def _settle_dividends(self, portfolio: LivePortfolio, as_of: date) -> float:
         """Credit cash for every unpaid dividend on the current holdings.
 
