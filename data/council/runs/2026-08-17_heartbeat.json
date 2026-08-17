@@ -1,27 +1,12 @@
 {
- "agent": "mohnish_pabrai",
  "all_clear": false,
+ "at": "2026-08-17T16:36:49+00:00",
  "breaches": [],
- "cash": 4598.69,
- "cash_weight": 0.46371425546158,
  "circuit_breaker": false,
  "drawdown_from_peak": -0.008292295128499938,
  "filings_flagged": [],
- "journal": {
-  "calibration": {
-   "brier": null,
-   "buckets": [],
-   "resolved": 0,
-   "shrinkage": 1.0
-  },
-  "entries": 0,
-  "open": 0,
-  "punch_card": {
-   "remaining": 20,
-   "total": 20,
-   "used": 0
-  }
- },
+ "forced_exits_proposed": [],
+ "kill_criteria": [],
  "limits": [
   {
    "cap": 0.35,
@@ -256,10 +241,6 @@
    "state": "pass"
   }
  ],
- "nav": 9917.077048715,
- "peak_nav": 10000.0,
- "positions": 24,
- "regime": null,
  "run": "heartbeat",
  "unknown_limits": [
   {
@@ -278,6 +259,5 @@
    "observed": 0,
    "state": "unknown"
   }
- ],
- "updated": "2026-08-17T16:36:49+00:00"
+ ]
 }
