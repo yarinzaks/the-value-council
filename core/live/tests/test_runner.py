@@ -1667,6 +1667,107 @@ class TestRunTypesGateWhatMayOpen:
         assert AgentAdapter.honours_run_types is False
 
 
+class TestTheRunTypeIsDerivedFromTheCalendar:
+    """§7 puts the COUNCIL weekly, and this is where that becomes true.
+
+    The derivation is per agent, from that agent's own ``last_open_date``
+    rather than a shared clock, because the runner can be invoked for one
+    agent at a time and a book that missed a week must still get its
+    council on the next run rather than waiting for the fleet.
+
+    This is the commit that changes live behaviour: before it, the
+    twelfth agent could open a position on any day the scan ran. Part 7
+    is explicit that this is the failure the table exists to prevent —
+    *"an agent initiating many discretionary trades is malfunctioning,
+    not working"*.
+    """
+
+    @staticmethod
+    def _council(targets: list[LiveTarget]):
+        class _Council(_StubAdapter):
+            honours_run_types = True
+
+        return _Council("stub_agent", targets)
+
+    def _run(self, runner: DailyRunner, adapter, prices, **kw):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter, AS_OF, list(prices), dict(prices), dict.fromkeys(prices), **kw
+        )
+
+    @staticmethod
+    def _book(last_open: str | None) -> LivePortfolio:
+        p = LivePortfolio(agent="stub_agent", cash=10_000)
+        if last_open is not None:
+            p.last_open_date = last_open
+        return p
+
+    def test_the_first_run_ever_is_a_council_run(self, runner: DailyRunner) -> None:
+        self._book(None).save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_second_run_in_the_same_week_is_a_heartbeat(
+        self, runner: DailyRunner
+    ) -> None:
+        """AS_OF is Wednesday 2026-08-05; Monday the 3rd is its week."""
+        self._book("2026-08-03").save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t for t in result.trades if t.side == "BUY"] == []
+
+    def test_the_first_run_of_a_new_week_is_a_council_run(
+        self, runner: DailyRunner
+    ) -> None:
+        """Last ran Friday the 31st; AS_OF opens the following week."""
+        self._book("2026-07-31").save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_book_that_missed_a_week_still_gets_its_council(
+        self, runner: DailyRunner
+    ) -> None:
+        self._book("2026-06-01").save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_an_explicit_run_type_overrides_the_calendar(
+        self, runner: DailyRunner
+    ) -> None:
+        """A manual dispatch must be able to say what it is."""
+        self._book("2026-07-31").save(directory=runner.portfolio_dir)
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            run_type=RunType.HEARTBEAT,
+        )
+        assert [t for t in result.trades if t.side == "BUY"] == []
+
+    def test_the_eleven_trade_on_any_day_of_the_week(
+        self, runner: DailyRunner
+    ) -> None:
+        """Mid-week, and Graham buys anyway. Part 7 is not his."""
+        self._book("2026-08-03").save(directory=runner.portfolio_dir)
+        plain = _StubAdapter("stub_agent", [_target("NEW")])
+        result = self._run(runner, plain, {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_an_unreadable_last_open_date_opens_a_week(
+        self, runner: DailyRunner
+    ) -> None:
+        """Garbage in the field must not freeze the book forever.
+
+        Treating it as "no previous run" makes the next run a COUNCIL,
+        which is the direction that keeps the agent working rather than
+        silently idle.
+        """
+        p = self._book(None)
+        p.last_open_date = "not-a-date"
+        p.save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+
 class TestForceFlagParsing:
     """The once-a-day guard has an override, and it defaults to off."""
 

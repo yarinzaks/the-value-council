@@ -31,7 +31,7 @@ from datetime import date
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
-from agents.council.cadence import RunType, permissions_for
+from agents.council.cadence import RunType, is_first_run_of_week, permissions_for
 from agents.council.nav_history import drawdown_from_peak
 from agents.council.regime import read_regime
 from agents.council.strategy import MohnishPabrai
@@ -130,6 +130,26 @@ def pos_age_days(pos: Position, as_of: date) -> int | None:
     except (ValueError, TypeError):
         return None
     return max(0, (as_of - entry).days)
+
+
+def _derive_run_type(as_of: date, last_open_date: str) -> RunType:
+    """Which run of §7 this invocation is, for one book.
+
+    Per agent rather than per fleet, and from that book's own
+    ``last_open_date``: the runner can be pointed at a single agent, and
+    a book that missed a week has to get its council on the next run it
+    sees rather than waiting for everyone else.
+
+    An empty or unparseable field reads as "no previous run", which makes
+    this a COUNCIL. That is the direction that keeps an agent working:
+    the opposite reading would leave a book with one corrupt field
+    unable to open a position ever again, silently.
+    """
+    try:
+        previous: date | None = _to_date(last_open_date) if last_open_date else None
+    except (ValueError, TypeError):
+        previous = None
+    return RunType.COUNCIL if is_first_run_of_week(as_of, previous) else RunType.HEARTBEAT
 
 
 @dataclass
@@ -644,7 +664,7 @@ class DailyRunner:
         fundamentals: dict[str, PointInTimeFinancials | None],
         *,
         force: bool = False,
-        run_type: RunType = RunType.COUNCIL,
+        run_type: RunType | None = None,
     ) -> AgentRunResult:
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
@@ -705,6 +725,8 @@ class DailyRunner:
         # Exits are untouched on purpose. The heartbeat exists to catch
         # a kill trigger or a breaking 8-K, and a run type that could
         # see one and not act would be worse than no run at all.
+        if run_type is None:
+            run_type = _derive_run_type(as_of, portfolio.last_open_date)
         if getattr(adapter, "honours_run_types", False) and not permissions_for(
             run_type
         ).may_open:
