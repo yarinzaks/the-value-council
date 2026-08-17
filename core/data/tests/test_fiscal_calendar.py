@@ -19,6 +19,7 @@ inventing it.
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 import pandas as pd
@@ -30,7 +31,10 @@ from core.data.fiscal_calendar import (
     build_profile,
     due_for_refresh,
     filings_from_facts,
+    load_calendar,
     next_expected,
+    refresh_order,
+    save_calendar,
 )
 
 
@@ -214,6 +218,24 @@ class TestDueForRefresh:
         assert expected.period_end == date(2026, 9, 30)
         assert due_for_refresh(profile, as_of=date(2026, 12, 1))
 
+    def test_a_profile_that_models_nothing_is_also_always_due(self) -> None:
+        """The rule applied to a profile that exists but says nothing.
+
+        A profile can be built and still produce no expectation — the
+        forms it has history for may not be schedulable, or the horizon
+        may not reach. The first version returned False there, dropping
+        a company from the refresh for exactly the reason it should have
+        kept it: the calendar not understanding it. Same position as
+        having no profile at all, so the same answer.
+        """
+        mute = FiscalProfile(
+            ticker="MUTE",
+            fiscal_year_end=(12, 31),
+            median_lag_days={},  # no form has a lag, so nothing is schedulable
+            last_period_end={},
+        )
+        assert due_for_refresh(mute, as_of=date(2026, 8, 15))
+
     def test_a_profile_that_could_not_be_built_is_always_due(self) -> None:
         """Unknown rhythm means fall back to refreshing it.
 
@@ -311,6 +333,68 @@ class TestFilingsFromFacts:
             ]
         )
         assert filings_from_facts("AAA", facts) == []
+
+
+class TestCalendarPersistence:
+    def test_a_calendar_round_trips(self, tmp_path) -> None:
+        profile = build_profile("AAA", _quarterly_history())
+        assert profile is not None
+        path = tmp_path / "fiscal_calendar.json"
+        save_calendar({"AAA": profile}, path=path, built_on=date(2026, 1, 5))
+        built_on, loaded = load_calendar(path)
+        assert built_on == date(2026, 1, 5)
+        assert loaded == {"AAA": profile}
+
+    def test_a_missing_file_is_not_an_error(self, tmp_path) -> None:
+        """Absent calendar means every company is due — the old schedule.
+
+        The refresh must degrade to what it did before this existed, not
+        stop.
+        """
+        built_on, loaded = load_calendar(tmp_path / "nope.json")
+        assert built_on is None
+        assert loaded == {}
+
+    def test_one_unreadable_profile_does_not_lose_the_rest(
+        self, tmp_path
+    ) -> None:
+        profile = build_profile("AAA", _quarterly_history())
+        assert profile is not None
+        path = tmp_path / "fiscal_calendar.json"
+        save_calendar({"AAA": profile}, path=path, built_on=date(2026, 1, 5))
+        payload = json.loads(path.read_text())
+        payload["profiles"]["BAD"] = {"ticker": "BAD"}  # no fiscal_year_end
+        path.write_text(json.dumps(payload))
+        _, loaded = load_calendar(path)
+        assert set(loaded) == {"AAA"}
+
+    def test_the_build_date_is_recorded(self, tmp_path) -> None:
+        """A calendar ages, and a reader has to be able to see how much."""
+        path = tmp_path / "fiscal_calendar.json"
+        save_calendar({}, path=path, built_on=date(2026, 1, 5))
+        assert json.loads(path.read_text())["built_on"] == "2026-01-05"
+
+
+class TestRefreshOrder:
+    def test_the_most_overdue_comes_first(self) -> None:
+        early = build_profile("EARLY", _quarterly_history(lag_days=20))
+        late = build_profile("LATE", _quarterly_history(lag_days=40))
+        assert early is not None and late is not None
+        order = refresh_order(
+            [("LATE", late), ("EARLY", early)], as_of=date(2026, 12, 1)
+        )
+        assert order[0] == "EARLY"  # expected sooner, so more days overdue
+
+    def test_a_company_not_due_is_absent(self) -> None:
+        profile = build_profile("AAA", _quarterly_history(lag_days=35))
+        assert profile is not None
+        assert refresh_order([("AAA", profile)], as_of=date(2026, 8, 15)) == []
+
+    def test_an_unmodellable_company_is_included(self) -> None:
+        """Never dropped for being unmodellable — see due_for_refresh."""
+        assert refresh_order([("MYSTERY", None)], as_of=date(2026, 8, 15)) == [
+            "MYSTERY"
+        ]
 
 
 class TestFiscalProfileValue:

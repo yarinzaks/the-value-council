@@ -124,6 +124,11 @@ def universe_index() -> Path:
     return cache_dir() / "full_market_universe_index.json"
 
 
+def fiscal_calendar_path() -> Path:
+    """When each company is next expected to file. Rebuilt annually."""
+    return cache_dir() / "fiscal_calendar.json"
+
+
 def ensure_dirs() -> None:
     """Create all known subdirectories. Idempotent — safe to call from
     any entry point."""

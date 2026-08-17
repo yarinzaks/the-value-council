@@ -27,11 +27,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 
 from core.data.edgar_cache import EdgarCache
 from core.data.edgar_facts import EdgarFactsClient
+from core.data.fiscal_calendar import FiscalProfile, due_for_refresh, load_calendar
 from core.logger import get_logger
+from core.paths import fiscal_calendar_path
 
 logger = get_logger("scripts.prefetch_full_us_market")
 
@@ -99,6 +103,8 @@ def is_due(
     ticker: str,
     *,
     max_age_days: float = DEFAULT_MAX_AGE_DAYS,
+    calendar: Mapping[str, FiscalProfile] | None = None,
+    as_of: date | None = None,
 ) -> bool:
     """True when ``ticker`` should be fetched.
 
@@ -109,9 +115,26 @@ def is_due(
     same April 28 mtime when this was found, against an August 5 run
     date: the agents had been screening on 99-day-old fundamentals
     while a green workflow republished the same tarball every week.
+
+    The fiscal calendar, when supplied, can only *add* to that. A
+    company whose filing window has opened is fetched even if its file
+    is younger than the age bar, so a Tuesday filing is not read from a
+    cache that stays six days stale. It never subtracts: a company the
+    calendar has never heard of, or cannot model, still falls through to
+    the age rule exactly as before. The calendar is allowed to make the
+    refresh timelier and is not allowed to make it thinner.
     """
     age = cache_age_days(cache, ticker)
-    return age is None or age > max_age_days
+    if age is None or age > max_age_days:
+        return True
+    if calendar is None:
+        return False
+    profile = calendar.get(ticker.upper())
+    if profile is None:
+        # Unknown to the calendar: say nothing, leave the age rule's
+        # answer standing rather than inventing a reason to fetch.
+        return False
+    return due_for_refresh(profile, as_of=as_of or date.today())
 
 
 def shard_of(ticker: str, shards: int) -> int:
@@ -135,9 +158,27 @@ def prefetch_full_market(
     shard: int = 0,
     cache: EdgarCache | None = None,
     client: EdgarFactsClient | None = None,
+    use_calendar: bool = False,
+    as_of: date | None = None,
 ) -> PrefetchStats:
     cache = cache or EdgarCache()
     client = client or EdgarFactsClient()
+    as_of = as_of or date.today()
+
+    calendar: Mapping[str, FiscalProfile] | None = None
+    if use_calendar:
+        built_on, profiles = load_calendar(fiscal_calendar_path())
+        if profiles:
+            calendar = profiles
+            logger.info(
+                f"fiscal calendar: {len(profiles)} profiles, built {built_on}"
+            )
+        else:
+            # Not fatal, and deliberately so: without it the age rule
+            # alone decides, which is what ran before the calendar
+            # existed. A missing calendar makes the refresh less timely,
+            # never less complete.
+            logger.warning("no fiscal calendar available — falling back to age only")
 
     # Load the full SEC company tickers map. EdgarFactsClient caches it.
     client._ensure_cik_map()
@@ -180,7 +221,13 @@ def prefetch_full_market(
     total_facts = 0
 
     for i, (ticker, title) in enumerate(candidates, start=1):
-        if not force and not is_due(cache, ticker, max_age_days=max_age_days):
+        if not force and not is_due(
+            cache,
+            ticker,
+            max_age_days=max_age_days,
+            calendar=calendar,
+            as_of=as_of,
+        ):
             skipped_cached += 1
             continue
         try:
@@ -258,6 +305,16 @@ def main() -> None:
         default=0,
         help="Which shard (0-based) this run covers",
     )
+    parser.add_argument(
+        "--use-calendar",
+        action="store_true",
+        help=(
+            "Also fetch any company whose filing window has opened, even "
+            "if its cache file is younger than --max-age-days. Adds to the "
+            "age rule, never subtracts from it; a missing calendar is a "
+            "warning, not a failure."
+        ),
+    )
     args = parser.parse_args()
 
     if args.shards < 1:
@@ -271,6 +328,7 @@ def main() -> None:
         max_age_days=args.max_age_days,
         shards=args.shards,
         shard=args.shard,
+        use_calendar=args.use_calendar,
     )
 
     cache = EdgarCache()

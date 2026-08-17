@@ -33,10 +33,12 @@ the refresh because the calendar failed to understand it.
 
 from __future__ import annotations
 
+import json
 import statistics
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Final
 
 import pandas as pd
@@ -348,13 +350,71 @@ def due_for_refresh(profile: FiscalProfile | None, *, as_of: date) -> bool:
     """
     if profile is None:
         return True
+
+    modelled = False
     for form in SCHEDULED_FORMS:
         expected = next_expected(profile, form, after=as_of)
         if expected is None:
             continue
+        modelled = True
         if as_of >= expected.expected_filing:
             return True
-    return False
+
+    # No form produced an expectation at all: the profile exists but
+    # says nothing usable about what comes next. That is the same
+    # position as having no profile, and it gets the same answer.
+    # Returning False here was the original behaviour and it dropped a
+    # company from the refresh for precisely the reason it should have
+    # kept it — the calendar not understanding it.
+    return not modelled
+
+
+def save_calendar(
+    profiles: Mapping[str, FiscalProfile], *, path: Path, built_on: date
+) -> Path:
+    """Write the whole calendar as one artefact.
+
+    ``built_on`` is recorded because the calendar ages: a company that
+    changed its fiscal year, or listed after the build, is described
+    wrongly or not at all until the next one. A reader that cannot see
+    how old the file is cannot judge how much to trust it.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "built_on": built_on.isoformat(),
+        "profiles": {t: p.to_dict() for t, p in sorted(profiles.items())},
+    }
+    path.write_text(json.dumps(payload, indent=1, sort_keys=True))
+    logger.info(f"wrote {len(profiles)} fiscal profiles to {path}")
+    return path
+
+
+def load_calendar(path: Path) -> tuple[date | None, dict[str, FiscalProfile]]:
+    """Read the calendar, or ``(None, {})`` when there is not one.
+
+    A missing or unreadable file is not an error. Every caller treats an
+    absent profile as "always due", so the worst a failure here can do
+    is fall back to the schedule that ran before the calendar existed.
+    """
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        logger.warning(f"no usable fiscal calendar at {path}: {exc}")
+        return None, {}
+
+    built_on: date | None
+    try:
+        built_on = date.fromisoformat(str(payload["built_on"]))
+    except (KeyError, ValueError, TypeError):
+        built_on = None
+
+    out: dict[str, FiscalProfile] = {}
+    for ticker, raw in (payload.get("profiles") or {}).items():
+        try:
+            out[str(ticker).upper()] = FiscalProfile.from_dict(raw)
+        except (KeyError, ValueError, TypeError) as exc:
+            logger.debug(f"skipping unreadable profile for {ticker}: {exc}")
+    return built_on, out
 
 
 def refresh_order(
