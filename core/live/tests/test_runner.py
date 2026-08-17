@@ -13,6 +13,11 @@ from pathlib import Path
 import pytest
 
 from agents.council.cadence import RunType
+from agents.council.published_list import (
+    PublishedList,
+    executable_list,
+    publish,
+)
 from core.backtest.decision_logger import DecisionLogger
 from core.live.agent_adapter import AgentAdapter, LiveTarget, ScanResult
 from core.live.portfolio import LivePortfolio, Position
@@ -88,12 +93,29 @@ def runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> DailyRunner:
         market="US",
         adapters=[],
         portfolio_dir=tmp_path / "portfolios",
+        # Without this the cooling-off lists are written into the real
+        # data root, so a test run would leave artefacts the live
+        # rebalance could later trade from.
+        published_dir=tmp_path / "published",
         price_loader=_StubPriceLoader({}),  # type: ignore[arg-type]
         universe=object(),  # type: ignore[arg-type]
         pit_loader=object(),  # type: ignore[arg-type]
         cache=object(),  # type: ignore[arg-type]
         decision_logger=DecisionLogger(root=tmp_path / "decisions"),
     )
+
+
+def _not_a_rebalance_book() -> LivePortfolio:
+    """A book whose quarterly rebalance is already behind it.
+
+    AS_OF is 2026-08-05 and August is a rebalance month, so without
+    this every test about opening a position would instead be
+    testing the cooling-off rule — which correctly refuses to trade
+    when nothing was published on an earlier run.
+    """
+    p = LivePortfolio(agent="stub_agent", cash=10_000)
+    p.last_rebalance_date = "2026-08-03"
+    return p
 
 
 def _seed_holding(
@@ -1527,9 +1549,7 @@ class TestRunTypesGateWhatMayOpen:
         )
 
     def test_a_council_run_opens(self, runner: DailyRunner) -> None:
-        LivePortfolio(agent="stub_agent", cash=10_000).save(
-            directory=runner.portfolio_dir
-        )
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
         result = self._run(
             runner,
             self._council([_target("NEW")]),
@@ -1540,9 +1560,7 @@ class TestRunTypesGateWhatMayOpen:
 
     def test_a_heartbeat_does_not_open(self, runner: DailyRunner) -> None:
         """'may not open, add to, or resize anything' — Part 7, verbatim."""
-        LivePortfolio(agent="stub_agent", cash=10_000).save(
-            directory=runner.portfolio_dir
-        )
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
         result = self._run(
             runner,
             self._council([_target("NEW")]),
@@ -1553,9 +1571,7 @@ class TestRunTypesGateWhatMayOpen:
         assert not result.portfolio.has("NEW")
 
     def test_a_reading_run_does_not_open(self, runner: DailyRunner) -> None:
-        LivePortfolio(agent="stub_agent", cash=10_000).save(
-            directory=runner.portfolio_dir
-        )
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
         result = self._run(
             runner,
             self._council([_target("NEW")]),
@@ -1566,9 +1582,7 @@ class TestRunTypesGateWhatMayOpen:
 
     def test_the_other_eleven_are_not_gated(self, runner: DailyRunner) -> None:
         """Graham's doctrine is chapter 14, not Part 7."""
-        LivePortfolio(agent="stub_agent", cash=10_000).save(
-            directory=runner.portfolio_dir
-        )
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
         plain = _StubAdapter(
             "stub_agent",
             [_target("NEW")],
@@ -1647,9 +1661,7 @@ class TestRunTypesGateWhatMayOpen:
 
     def test_the_default_run_type_still_trades(self, runner: DailyRunner) -> None:
         """Omitting it must not silently freeze the live book."""
-        LivePortfolio(agent="stub_agent", cash=10_000).save(
-            directory=runner.portfolio_dir
-        )
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
         runner.price_loader = _StubPriceLoader({"NEW": 50.0})  # type: ignore[assignment]
         result = runner._run_one(
             self._council(
@@ -1697,7 +1709,7 @@ class TestTheRunTypeIsDerivedFromTheCalendar:
 
     @staticmethod
     def _book(last_open: str | None) -> LivePortfolio:
-        p = LivePortfolio(agent="stub_agent", cash=10_000)
+        p = _not_a_rebalance_book()
         if last_open is not None:
             p.last_open_date = last_open
         return p
@@ -1766,6 +1778,120 @@ class TestTheRunTypeIsDerivedFromTheCalendar:
         p.save(directory=runner.portfolio_dir)
         result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
         assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+
+class TestTheQuarterlyRebalanceTradesACooledOffList:
+    """§7's cooling-off rule, reaching the path that actually trades.
+
+    Every Council scan writes its would-be list; the quarterly rebalance
+    trades from whatever was written *before* today. The rank computed
+    a second ago is never the one executed, which is the whole point —
+    "the cooling-off rule holds even for the machine".
+    """
+
+    @staticmethod
+    def _council(targets: list[LiveTarget]):
+        class _Council(_StubAdapter):
+            honours_run_types = True
+
+        return _Council("stub_agent", targets)
+
+    def _run(self, runner: DailyRunner, adapter, prices):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter, AS_OF, list(prices), dict(prices), dict.fromkeys(prices)
+        )
+
+    @staticmethod
+    def _fresh_book() -> LivePortfolio:
+        """No prior rebalance, so AS_OF in August is the quarterly one."""
+        return LivePortfolio(agent="stub_agent", cash=10_000)
+
+    def test_every_council_scan_publishes_its_list(
+        self, runner: DailyRunner
+    ) -> None:
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
+
+        self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+
+        published = executable_list(runner.published_dir, as_of=AS_OF + timedelta(days=1))
+        assert published is not None
+        assert published.tickers == ("NEW",)
+
+    def test_a_rebalance_with_nothing_published_holds(
+        self, runner: DailyRunner
+    ) -> None:
+        """Refusing to trade is the correct answer, not a degraded one.
+
+        The alternative is ranking now and executing now, which is the
+        exact breach the rule forbids and would arrive looking like
+        resilience.
+        """
+        self._fresh_book().save(directory=runner.portfolio_dir)
+
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+
+        assert [t for t in result.trades if t.side == "BUY"] == []
+
+    def test_a_rebalance_trades_the_list_published_earlier(
+        self, runner: DailyRunner
+    ) -> None:
+        """And not today's scan, even where the two disagree."""
+        self._fresh_book().save(directory=runner.portfolio_dir)
+        publish(
+            PublishedList(
+                published_on=AS_OF - timedelta(days=30),
+                as_of=AS_OF - timedelta(days=30),
+                tickers=("COOLED",),
+                weights={"COOLED": 0.5},
+                note="last quarter's rank",
+            ),
+            directory=runner.published_dir,
+        )
+
+        result = self._run(
+            runner,
+            self._council([_target("FRESH")]),
+            {"FRESH": 50.0, "COOLED": 25.0},
+        )
+
+        bought = [t.ticker for t in result.trades if t.side == "BUY"]
+        assert bought == ["COOLED"]
+        assert "FRESH" not in bought
+
+    def test_the_rebalance_is_stamped_so_it_happens_once(
+        self, runner: DailyRunner
+    ) -> None:
+        """Four Mondays in February must not rebalance four times."""
+        self._fresh_book().save(directory=runner.portfolio_dir)
+
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+
+        assert result.portfolio.last_rebalance_date == AS_OF.isoformat()
+
+    def test_a_book_already_rebalanced_this_month_scans_normally(
+        self, runner: DailyRunner
+    ) -> None:
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
+
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_the_eleven_are_not_published_or_rebalanced(
+        self, runner: DailyRunner
+    ) -> None:
+        """Part 7 and §7 both belong to the twelfth agent alone."""
+        self._fresh_book().save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner, _StubAdapter("stub_agent", [_target("NEW")]), {"NEW": 50.0}
+        )
+
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+        assert executable_list(
+            runner.published_dir, as_of=AS_OF + timedelta(days=1)
+        ) is None
 
 
 class TestForceFlagParsing:

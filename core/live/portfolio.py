@@ -17,7 +17,7 @@ import json
 import tempfile
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field, replace
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +112,13 @@ class LivePortfolio:
     #: the safe direction.
     last_open_date: str = ""
     last_close_date: str = ""
+    #: The last quarterly statistical rebalance, as an ISO date.
+    #:
+    #: Read by the Feb/May/Aug/Nov calendar to answer "already done this
+    #: month?". Without it, four consecutive Mondays in February would
+    #: each rebalance the sleeve — the turnover the calendar exists to
+    #: prevent, arriving four times over.
+    last_rebalance_date: str = ""
     initial_cash: float = DEFAULT_INITIAL_CASH
     cumulative_costs: float = 0.0
     #: Cash dividends received to date. NAV already contains this money
@@ -513,6 +520,7 @@ class LivePortfolio:
             "last_close_run": self.last_close_run,
             "last_open_date": self.last_open_date,
             "last_close_date": self.last_close_date,
+            "last_rebalance_date": self.last_rebalance_date,
         }
 
     @classmethod
@@ -560,6 +568,7 @@ class LivePortfolio:
             last_close_run=str(data.get("last_close_run", "")),
             last_open_date=str(data.get("last_open_date", "")),
             last_close_date=str(data.get("last_close_date", "")),
+            last_rebalance_date=str(data.get("last_rebalance_date", "")),
             initial_cash=float(data.get("initial_cash", DEFAULT_INITIAL_CASH)),
             cumulative_costs=float(data.get("cumulative_costs", 0.0)),
             cumulative_dividends=float(data.get("cumulative_dividends", 0.0)),
@@ -638,7 +647,7 @@ def _round_position(p: Position) -> dict[str, Any]:
 
 def now_iso() -> str:
     """Timestamp string used for ``last_updated``. UTC, second-precision."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def today_iso() -> str:

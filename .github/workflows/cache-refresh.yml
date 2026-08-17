@@ -85,6 +85,29 @@ jobs:
             echo "no previous cache — building from cold"
           fi
 
+      - name: Rebuild the fiscal calendar if it is missing or a year old
+        # When each company is next expected to file, derived from the
+        # cache already on disk — no network, but a full pass over
+        # several thousand parquet files, so it is not worth repeating
+        # weekly. A fiscal year end changes when a company reorganises,
+        # which is rare; the part that moves every quarter is re-read
+        # from the cache at refresh time and not stored here.
+        #
+        # Rebuilt on age rather than on its own cron on purpose: a
+        # separate annual schedule is a job that can quietly never fire
+        # and leave the calendar frozen with nothing saying so. This
+        # cannot go stale by more than a week past its year.
+        shell: bash
+        run: |
+          CAL=data/cache/fiscal_calendar.json
+          if [ -f "$CAL" ] && [ -z "$(find "$CAL" -mtime +365)" ]; then
+            echo "::notice::fiscal calendar is current, leaving it alone"
+          else
+            echo "::notice::rebuilding the fiscal calendar"
+            python -m scripts.build_fiscal_calendar 2>&1 \
+              | tee data/cron_logs/fiscal_calendar.log
+          fi
+
       - name: Refresh fundamentals from SEC
         timeout-minutes: 75
         # `shell: bash` for pipefail — without it the step's exit code
@@ -102,8 +125,13 @@ jobs:
           # zero as octal, so weeks 08 and 09 would abort the step.
           SHARD=$(( 10#$(date -u +%V) % SHARDS ))
           echo "::notice::refreshing shard ${SHARD} of ${SHARDS}"
+          # --use-calendar adds anyone whose filing window has opened,
+          # even inside the age bar, so a company that reported on
+          # Tuesday is not screened on last quarter's numbers until its
+          # file ages out. It only ever adds: a company the calendar
+          # cannot model keeps the age rule's answer.
           python -m scripts.prefetch_full_us_market \
-            --shards "$SHARDS" --shard "$SHARD" \
+            --shards "$SHARDS" --shard "$SHARD" --use-calendar \
             2>&1 | tee data/cron_logs/prefetch.log
 
       - name: Verify cache is substantial
