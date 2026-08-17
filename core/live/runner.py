@@ -31,6 +31,7 @@ from datetime import date
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
+from agents.council.cadence import RunType, permissions_for
 from agents.council.nav_history import drawdown_from_peak
 from agents.council.regime import read_regime
 from agents.council.strategy import MohnishPabrai
@@ -643,6 +644,7 @@ class DailyRunner:
         fundamentals: dict[str, PointInTimeFinancials | None],
         *,
         force: bool = False,
+        run_type: RunType = RunType.COUNCIL,
     ) -> AgentRunResult:
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
@@ -693,6 +695,29 @@ class DailyRunner:
             _DictLookup(fundamentals),
             held=_held_positions(portfolio, held_prices),
         )
+        # ---- RUN TYPE: what Part 7 lets this run do -------------------
+        # Only the twelfth agent is bound by the table; see
+        # AgentAdapter.honours_run_types. A run that may not open keeps
+        # every name already held and refuses the rest, which is the
+        # single rule the cooling-off depends on: a position is opened
+        # in a COUNCIL run or not at all.
+        #
+        # Exits are untouched on purpose. The heartbeat exists to catch
+        # a kill trigger or a breaking 8-K, and a run type that could
+        # see one and not act would be worse than no run at all.
+        if getattr(adapter, "honours_run_types", False) and not permissions_for(
+            run_type
+        ).may_open:
+            held_now = {p.ticker for p in portfolio.positions}
+            refused = [t for t in scan.targets if t.ticker not in held_now]
+            if refused:
+                logger.info(
+                    f"{as_of}: {adapter.name} {run_type} may not open — "
+                    f"holding off {len(refused)} name(s): "
+                    f"{', '.join(sorted(t.ticker for t in refused))}"
+                )
+            scan.targets = [t for t in scan.targets if t.ticker in held_now]
+
         target_tickers = {t.ticker for t in scan.targets}
         trades: list[TradeRecord] = []
 

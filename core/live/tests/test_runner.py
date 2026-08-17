@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 
+from agents.council.cadence import RunType
 from core.backtest.decision_logger import DecisionLogger
-from core.live.agent_adapter import LiveTarget, ScanResult
+from core.live.agent_adapter import AgentAdapter, LiveTarget, ScanResult
 from core.live.portfolio import LivePortfolio, Position
 from core.live.runner import (
     DEFAULT_MIN_HOLDING_DAYS,
@@ -1490,6 +1491,180 @@ class TestGoingFlatIsExpressible:
             ).flat_is_intentional
             is False
         )
+
+
+class TestRunTypesGateWhatMayOpen:
+    """Part 7 reaches the only path that trades.
+
+    The table is the twelfth agent's doctrine, not the eleven's. Graham
+    runs his own screen every session and Part 7 has nothing to say
+    about it, so the gate is opt-in per adapter: the Council sets
+    ``honours_run_types`` and everyone else is untouched.
+
+    What the gate enforces is the single rule the cooling-off depends
+    on — a position is opened in a COUNCIL run or not at all. Exits are
+    deliberately left alone: the heartbeat exists to catch a delisting
+    notice, and a run type that could see one and not act would be worse
+    than no run.
+    """
+
+    @staticmethod
+    def _council(targets: list[LiveTarget]):
+        class _Council(_StubAdapter):
+            honours_run_types = True
+
+        return _Council("stub_agent", targets)
+
+    def _run(self, runner: DailyRunner, adapter, prices, run_type):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,
+            AS_OF,
+            list(prices),
+            dict(prices),
+            dict.fromkeys(prices),
+            run_type=run_type,
+        )
+
+    def test_a_council_run_opens(self, runner: DailyRunner) -> None:
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            RunType.COUNCIL,
+        )
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_heartbeat_does_not_open(self, runner: DailyRunner) -> None:
+        """'may not open, add to, or resize anything' — Part 7, verbatim."""
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            RunType.HEARTBEAT,
+        )
+        assert [t for t in result.trades if t.side == "BUY"] == []
+        assert not result.portfolio.has("NEW")
+
+    def test_a_reading_run_does_not_open(self, runner: DailyRunner) -> None:
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            RunType.READING,
+        )
+        assert [t for t in result.trades if t.side == "BUY"] == []
+
+    def test_the_other_eleven_are_not_gated(self, runner: DailyRunner) -> None:
+        """Graham's doctrine is chapter 14, not Part 7."""
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        plain = _StubAdapter(
+            "stub_agent",
+            [_target("NEW")],
+        )
+        result = self._run(runner, plain, {"NEW": 50.0}, RunType.HEARTBEAT)
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_gated_run_still_takes_a_forced_exit(self, runner: DailyRunner) -> None:
+        """The heartbeat's whole purpose is catching what must be sold.
+
+        A kill trigger or a breaking 8-K is exactly what Part 7 puts in
+        its "may do" column, so the gate on opening must not reach it.
+        """
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="BAD", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        class _ForcingCouncil(_StubAdapter):
+            honours_run_types = True
+
+            def run_scan(self, as_of, universe, prices, fundamentals, *, held=None):
+                result = super().run_scan(
+                    as_of, universe, prices, fundamentals, held=held
+                )
+                result.forced_exits = ["BAD"]
+                return result
+
+        result = self._run(
+            runner,
+            _ForcingCouncil("stub_agent", [_target("KEEP", weight=1.0)]),
+            {"BAD": 50.0, "KEEP": 25.0},
+            RunType.HEARTBEAT,
+        )
+
+        assert [t.ticker for t in result.trades if t.side == "SELL"] == ["BAD"]
+        assert not result.portfolio.has("KEEP")
+
+    def test_a_gated_run_does_not_sell_on_rank_drift(
+        self, runner: DailyRunner
+    ) -> None:
+        """Only forced exits, though — not an ordinary departure.
+
+        Part 7 gives the heartbeat kill triggers and breaking filings.
+        A name that merely fell out of the target list is a rebalance
+        decision, and belongs to the run that may rebalance. Selling it
+        here would turn every intraday invocation into a trading run,
+        which is the exact failure the table exists to prevent.
+        """
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFTED", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner,
+            self._council([_target("KEEP", weight=1.0)]),
+            {"DRIFTED": 50.0, "KEEP": 25.0},
+            RunType.HEARTBEAT,
+        )
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("DRIFTED")
+
+    def test_the_default_run_type_still_trades(self, runner: DailyRunner) -> None:
+        """Omitting it must not silently freeze the live book."""
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        runner.price_loader = _StubPriceLoader({"NEW": 50.0})  # type: ignore[assignment]
+        result = runner._run_one(
+            self._council(
+                [_target("NEW")]
+            ),
+            AS_OF,
+            ["NEW"],
+            {"NEW": 50.0},
+            {"NEW": None},
+        )
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_adapters_do_not_honour_run_types_by_default(self) -> None:
+        assert _StubAdapter("x", []).__class__.__dict__.get("honours_run_types") is None
+        assert AgentAdapter.honours_run_types is False
 
 
 class TestForceFlagParsing:

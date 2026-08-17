@@ -114,6 +114,16 @@ class AgentAdapter:
 
     name: str  # set by subclass — must equal Strategy.name
 
+    #: Whether doctrine Part 7's run-type table binds this adapter.
+    #:
+    #: Off for the eleven, and that is not an omission. Part 7 belongs
+    #: to the twelfth agent; Graham runs his screen every session under
+    #: chapter 14 and owes nothing to a table about council cadence.
+    #: Switching this on for all of them would freeze ten books on any
+    #: run type that may not open, which would be a doctrine change
+    #: wearing the clothes of a bug fix.
+    honours_run_types: bool = False
+
     def __init__(self, strategy: Strategy, *, watchlist_size: int = DEFAULT_WATCHLIST_SIZE):
         self.strategy = strategy
         self.watchlist_size = watchlist_size
@@ -578,6 +588,9 @@ class PabraiLive(AgentAdapter):
     """
 
     name = "mohnish_pabrai"
+
+    #: This is the agent Part 7 was written for.
+    honours_run_types = True
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
