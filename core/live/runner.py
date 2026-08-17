@@ -901,14 +901,14 @@ class DailyRunner:
         if not portfolio.positions:
             return 0.0
 
-        if not portfolio.inception_date:
+        if not portfolio.dividend_floor_date:
             # First settlement for this book. Stamp the floor and pay
             # nothing before it: a seeded portfolio carries synthetic
             # entry dates that may run years back, and it never owned
             # those shares.
-            portfolio.inception_date = as_of.isoformat()
+            portfolio.dividend_floor_date = as_of.isoformat()
 
-        floor = portfolio.inception_date[:10]
+        floor = portfolio.dividend_floor_date[:10]
         total = 0.0
         for pos in list(portfolio.positions):
             since = max(pos.entry_date[:10], floor)

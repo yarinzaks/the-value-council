@@ -123,13 +123,21 @@ class LivePortfolio:
     #: actually prevents a double payment is :attr:`paid_dividends`.
     last_dividend_date: str = ""
 
-    #: The date this book started earning, as ISO. A portfolio cannot
-    #: collect income from before it existed, and ``entry_date`` alone
-    #: cannot say so: a seeded book carries synthetic entry dates that
-    #: may run years back, and settling from those would hand it a
-    #: decade of dividends it never owned. Stamped on the first
-    #: settlement and never moved.
-    inception_date: str = ""
+    #: The earliest ex-date this book may be paid for, as ISO.
+    #:
+    #: Not an inception date, though it was called one until the name
+    #: misled a reader into treating it as the start of the track
+    #: record. It is stamped on the first settlement that sees
+    #: positions, so on the eleven books seeded 2026-05-05 it reads
+    #: 2026-08-10 — the day dividend settlement shipped, three months
+    #: into their lives. Anything computing a book's age from this is
+    #: wrong by that gap.
+    #:
+    #: The floor exists because ``entry_date`` cannot do the job alone:
+    #: a seeded book carries synthetic entry dates that may run years
+    #: back, and settling from those would hand it a decade of
+    #: dividends it never owned. Stamped once, never moved.
+    dividend_floor_date: str = ""
 
     #: Ex-dates already paid, per ticker: ``{"MRK": ["2026-06-15"]}``.
     #:
@@ -494,7 +502,7 @@ class LivePortfolio:
             "cumulative_costs": round(self.cumulative_costs, 4),
             "cumulative_dividends": round(self.cumulative_dividends, 4),
             "last_dividend_date": self.last_dividend_date,
-            "inception_date": self.inception_date,
+            "dividend_floor_date": self.dividend_floor_date,
             "paid_dividends": {
                 k: sorted(v) for k, v in sorted(self.paid_dividends.items())
             },
@@ -556,7 +564,13 @@ class LivePortfolio:
             cumulative_costs=float(data.get("cumulative_costs", 0.0)),
             cumulative_dividends=float(data.get("cumulative_dividends", 0.0)),
             last_dividend_date=str(data.get("last_dividend_date", "")),
-            inception_date=str(data.get("inception_date", "")),
+            # Books written before the rename carry "inception_date".
+            # Reading only the new key would blank the floor and let the
+            # next settlement stamp today, which pays nothing for the
+            # gap and erases the evidence of where the gap was.
+            dividend_floor_date=str(
+                data.get("dividend_floor_date") or data.get("inception_date", "")
+            ),
             paid_dividends={
                 str(k).upper(): [str(d) for d in v]
                 for k, v in dict(data.get("paid_dividends", {})).items()

@@ -598,7 +598,7 @@ class TestDividends:
         # test. Without an inception the first settlement stamps today
         # and pays nothing earlier, which is the correct default for a
         # book of unknown age but not what these tests are about.
-        p.inception_date = "2026-07-01"
+        p.dividend_floor_date = "2026-07-01"
         p.save(directory=runner.portfolio_dir)
 
     def _run(self, runner: DailyRunner, loader) -> object:  # type: ignore[no-untyped-def]
@@ -790,7 +790,7 @@ class TestDividends:
 
         result = self._run(runner, _StubPriceLoaderWithDividends({"DIV": 50.0}, {}))
 
-        assert result.portfolio.inception_date == "2026-07-01"
+        assert result.portfolio.dividend_floor_date == "2026-07-01"
 
     def test_a_book_of_unknown_age_stamps_today_and_pays_nothing_earlier(
         self, runner: DailyRunner
@@ -809,7 +809,7 @@ class TestDividends:
                 why_he="",
             )
         )
-        p.cash = 1_000.0  # no inception_date
+        p.cash = 1_000.0  # no dividend_floor_date
         p.save(directory=runner.portfolio_dir)
         loader = _StubPriceLoaderWithDividends(
             {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
@@ -818,7 +818,7 @@ class TestDividends:
         result = self._run(runner, loader)
 
         assert result.portfolio.cumulative_dividends == 0.0
-        assert result.portfolio.inception_date == AS_OF.isoformat()
+        assert result.portfolio.dividend_floor_date == AS_OF.isoformat()
 
     def test_a_freshly_seeded_book_does_not_harvest_history(
         self, runner: DailyRunner
