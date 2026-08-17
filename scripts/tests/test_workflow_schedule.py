@@ -313,3 +313,53 @@ def test_watchdog_can_actually_dispatch() -> None:
     text = WATCHDOG.read_text()
     dispatch = text.split("Dispatch make-up run", 1)[1]
     assert "--repo" in dispatch, "gh has no repository to dispatch into"
+
+
+# ------------------------------------------------- the Council's mode
+
+#: The Council step is handed the scanner's mode, but the two vocabularies
+#: were never the same: the scanner runs "open" or "close", the Council
+#: "heartbeat" or "close". Nothing linked them, and the step's `|| true`
+#: turned the resulting argparse error into silence — so on every open run
+#: from the day the Council was wired in, it exited 2 without doing any
+#: work and the dashboard's council page simply kept yesterday's figures.
+COUNCIL = Path(__file__).resolve().parents[1] / "run_council.py"
+
+COUNCIL_CASE = re.compile(r"^\s*(?P<from>\w+)\)\s*COUNCIL_MODE=(?P<to>\w+)\s*;;", re.M)
+
+
+def _council_choices() -> set[str]:
+    """The ``--mode`` values scripts/run_council.py will accept."""
+    match = re.search(
+        r'add_argument\(\s*"--mode",\s*choices=\(([^)]*)\)', COUNCIL.read_text()
+    )
+    assert match, "run_council no longer declares --mode choices"
+    return set(re.findall(r'"(\w+)"', match.group(1)))
+
+
+def _council_translation() -> dict[str, str]:
+    """Scanner mode -> the mode the Council step actually passes on."""
+    step = DAILY_TEXT.split("Run the Council", 1)[1].split("- name:", 1)[0]
+    return {m["from"]: m["to"] for m in COUNCIL_CASE.finditer(step)}
+
+
+def test_the_council_is_handed_a_mode_it_accepts() -> None:
+    """Every mode the dispatch emits must survive the trip to the Council.
+
+    This is the same class of drift the rest of this file guards: two
+    parts of one pipeline naming the same concept differently, with no
+    parser to object. It is worth an assertion precisely because the
+    failure is invisible — the run stays green either way.
+    """
+    choices = _council_choices()
+    translation = _council_translation()
+
+    for cron, outputs in sorted(CASES.items()):
+        if outputs.get("market") == "TASE":
+            continue  # the Council step does not run for TASE
+        mode = outputs["mode"]
+        effective = translation.get(mode, mode)
+        assert effective in choices, (
+            f"cron {cron!r} dispatches mode={mode!r}, which reaches "
+            f"run_council as {effective!r}; it accepts only {sorted(choices)}"
+        )

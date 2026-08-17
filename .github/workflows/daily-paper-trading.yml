@@ -351,8 +351,19 @@ jobs:
         env:
           MODE: ${{ steps.dispatch.outputs.mode }}
         run: |
-          python -m scripts.run_council --mode "$MODE" \
-            2>&1 | tee "data/cron_logs/council.${MODE}.log" || true
+          # The scanner's modes are open and close; the Council's are
+          # heartbeat and close. Handing it "open" raised argparse error
+          # 2, and the `|| true` below swallowed it — so the Council did
+          # no work on any open run and the page kept the previous day's
+          # figures with nothing anywhere saying so.
+          #
+          # heartbeat is the intraday read, which is what an open run is.
+          case "$MODE" in
+            open) COUNCIL_MODE=heartbeat ;;
+            *) COUNCIL_MODE="$MODE" ;;
+          esac
+          python -m scripts.run_council --mode "$COUNCIL_MODE" \
+            2>&1 | tee "data/cron_logs/council.${COUNCIL_MODE}.log" || true
 
       - name: Verify run produced real trading state (US only)
         if: steps.dispatch.outputs.market != 'TASE'
