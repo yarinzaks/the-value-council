@@ -39,6 +39,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Final
 
+import pandas as pd
+
 from core.logger import get_logger
 
 logger = get_logger("core.data.fiscal_calendar")
@@ -130,6 +132,79 @@ class FiscalProfile:
                 for k, v in (data.get("last_period_end") or {}).items()
             },
         )
+
+
+#: Duration concepts whose FY period is the fiscal year itself.
+#:
+#: The period a report *covers* is not recoverable from the parquet by
+#: any shortcut. Taking the latest ``period_end`` on a 10-K row gives a
+#: cover-page date — Microsoft read 24 July against a 30 June year end,
+#: JPMorgan 31 January against 31 December — because the dei facts on
+#: the cover are measured near the filing, not at the year end. Taking
+#: the maximum per accession gives the same wrong answer for the same
+#: reason.
+#:
+#: An income-statement fact tagged ``FY`` has no such ambiguity: its
+#: duration *is* the fiscal year, so its end is the year end. Checked
+#: against five known filers, including two 52/53-week ones.
+_FY_DURATION_CONCEPTS: Final[tuple[str, ...]] = (
+    "NetIncomeLoss",
+    "Revenues",
+    "RevenueFromContractWithCustomerExcludingAssessedTax",
+    "OperatingIncomeLoss",
+)
+
+
+def filings_from_facts(ticker: str, facts: pd.DataFrame) -> list[Filing]:
+    """Reduce a ticker's XBRL facts to one :class:`Filing` per report.
+
+    ``period_end`` here is the period the report covers, taken from a
+    duration fact rather than from the row's own ``period_end`` — see
+    :data:`_FY_DURATION_CONCEPTS` for why the obvious readings are all
+    wrong. ``filed`` is the latest filing date on the accession.
+
+    Reports whose covered period cannot be established are dropped
+    rather than approximated. A calendar built on a guessed year end is
+    worse than no calendar: it would schedule confidently and wrongly.
+    """
+    if facts.empty:
+        return []
+
+    wanted = facts[
+        facts["form"].isin(SCHEDULED_FORMS)
+        & facts["concept"].isin(_FY_DURATION_CONCEPTS)
+        & facts["period_start"].notna()
+    ]
+    if wanted.empty:
+        return []
+
+    out: list[Filing] = []
+    for accession, rows in wanted.groupby("accession_number"):
+        forms = set(rows["form"])
+        form = "10-K" if "10-K" in forms else "10-Q"
+        if form == "10-K":
+            # Only the FY-tagged durations; a 10-K also carries quarterly
+            # and segment periods, and the annual one is the report.
+            rows = rows[rows["fiscal_period"] == "FY"]
+            if rows.empty:
+                continue
+        # The period that ends *latest*, not the one that lasts longest.
+        # Longest was the first attempt and it read every 10-Q as 396
+        # days late: a quarterly report tags the prior-year twelve-month
+        # comparative too, and that span is the longest in the file
+        # while ending a year before the quarter being reported.
+        row = rows.loc[rows["period_end"].idxmax()]
+        try:
+            out.append(
+                Filing(
+                    form=form,
+                    period_end=row["period_end"].date(),
+                    filed=rows["filed"].max().date(),
+                )
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            logger.debug(f"{ticker}: skipping accession {accession}: {exc}")
+    return out
 
 
 def build_profile(ticker: str, filings: Sequence[Filing]) -> FiscalProfile | None:

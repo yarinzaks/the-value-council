@@ -21,12 +21,15 @@ from __future__ import annotations
 
 from datetime import date
 
+import pandas as pd
+
 from core.data.fiscal_calendar import (
     QUARTERLY_DEADLINE_DAYS,
     Filing,
     FiscalProfile,
     build_profile,
     due_for_refresh,
+    filings_from_facts,
     next_expected,
 )
 
@@ -218,6 +221,96 @@ class TestDueForRefresh:
         keep being fetched on the old schedule, never dropped.
         """
         assert due_for_refresh(None, as_of=date(2026, 8, 15))
+
+
+class TestFilingsFromFacts:
+    """Reducing XBRL facts to one filing per report.
+
+    Every obvious way to read the covered period from this parquet is
+    wrong, and each was tried against five filers with known year ends
+    before this settled. Taking the row's own ``period_end`` on a 10-K
+    gives a cover-page date: Microsoft read 24 July against a 30 June
+    year end, JPMorgan 31 January against 31 December, because the dei
+    facts on the cover are measured near the filing. Taking the maximum
+    per accession gives the same answer for the same reason. Taking the
+    longest duration reads every 10-Q as 396 days late, because a
+    quarterly report tags the prior-year twelve-month comparative and
+    that span is the longest in the file while ending a year earlier.
+
+    What works: an income-statement duration, and within an accession
+    the period that ends latest.
+    """
+
+    @staticmethod
+    def _facts(rows: list[dict]) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                {
+                    "concept": r.get("concept", "NetIncomeLoss"),
+                    "form": r["form"],
+                    "fiscal_period": r.get("fiscal_period", "FY"),
+                    "period_start": pd.Timestamp(r["start"]) if r.get("start") else pd.NaT,
+                    "period_end": pd.Timestamp(r["end"]),
+                    "filed": pd.Timestamp(r["filed"]),
+                    "accession_number": r["accession"],
+                }
+                for r in rows
+            ]
+        )
+
+    def test_a_quarterly_comparative_does_not_become_the_period(self) -> None:
+        """The 396-day bug, as a test."""
+        facts = self._facts(
+            [
+                # The quarter being reported.
+                {"form": "10-Q", "fiscal_period": "Q1", "start": "2026-01-01",
+                 "end": "2026-03-31", "filed": "2026-05-05", "accession": "a1"},
+                # Its prior-year twelve-month comparative — longer, older.
+                {"form": "10-Q", "fiscal_period": "Q1", "start": "2025-01-01",
+                 "end": "2025-12-31", "filed": "2026-05-05", "accession": "a1"},
+            ]
+        )
+        filings = filings_from_facts("AAA", facts)
+        assert len(filings) == 1
+        assert filings[0].period_end == date(2026, 3, 31)
+        assert filings[0].lag_days == 35
+
+    def test_an_annual_report_reads_only_its_fy_durations(self) -> None:
+        """A 10-K carries quarterly periods too; the year is the report."""
+        facts = self._facts(
+            [
+                {"form": "10-K", "fiscal_period": "FY", "start": "2025-01-01",
+                 "end": "2025-12-31", "filed": "2026-02-20", "accession": "k1"},
+                {"form": "10-K", "fiscal_period": "Q4", "start": "2025-10-01",
+                 "end": "2026-01-15", "filed": "2026-02-20", "accession": "k1"},
+            ]
+        )
+        filings = filings_from_facts("AAA", facts)
+        assert len(filings) == 1
+        assert filings[0].form == "10-K"
+        assert filings[0].period_end == date(2025, 12, 31)
+
+    def test_instant_facts_are_ignored(self) -> None:
+        """A balance-sheet fact has no duration and no period to report."""
+        facts = self._facts(
+            [
+                {"form": "10-K", "start": None, "end": "2026-02-18",
+                 "filed": "2026-02-20", "accession": "k1"},
+            ]
+        )
+        assert filings_from_facts("AAA", facts) == []
+
+    def test_no_facts_is_empty_not_an_error(self) -> None:
+        assert filings_from_facts("AAA", pd.DataFrame()) == []
+
+    def test_an_unrelated_form_is_skipped(self) -> None:
+        facts = self._facts(
+            [
+                {"form": "8-K", "start": "2026-01-01", "end": "2026-03-31",
+                 "filed": "2026-04-01", "accession": "e1"},
+            ]
+        )
+        assert filings_from_facts("AAA", facts) == []
 
 
 class TestFiscalProfileValue:
