@@ -72,12 +72,12 @@ def main() -> int:
         agent = path.stem
         portfolio = LivePortfolio.load_or_seed(agent, directory=portfolios_dir())
 
-        inception = portfolio.inception_date[:10] or _inception_of(agent)
+        inception = portfolio.dividend_floor_date[:10] or _inception_of(agent)
         if inception is None:
             print(f"{agent:26} {'—':>10} {'—':>9}  no snapshots; skipped")
             continue
-        if not portfolio.inception_date:
-            portfolio.inception_date = inception
+        if not portfolio.dividend_floor_date:
+            portfolio.dividend_floor_date = inception
 
         credited = 0.0
         payments = 0

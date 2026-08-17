@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 
+from agents.council.cadence import RunType
 from core.backtest.decision_logger import DecisionLogger
-from core.live.agent_adapter import LiveTarget, ScanResult
+from core.live.agent_adapter import AgentAdapter, LiveTarget, ScanResult
 from core.live.portfolio import LivePortfolio, Position
 from core.live.runner import (
     DEFAULT_MIN_HOLDING_DAYS,
@@ -598,7 +599,7 @@ class TestDividends:
         # test. Without an inception the first settlement stamps today
         # and pays nothing earlier, which is the correct default for a
         # book of unknown age but not what these tests are about.
-        p.inception_date = "2026-07-01"
+        p.dividend_floor_date = "2026-07-01"
         p.save(directory=runner.portfolio_dir)
 
     def _run(self, runner: DailyRunner, loader) -> object:  # type: ignore[no-untyped-def]
@@ -790,7 +791,7 @@ class TestDividends:
 
         result = self._run(runner, _StubPriceLoaderWithDividends({"DIV": 50.0}, {}))
 
-        assert result.portfolio.inception_date == "2026-07-01"
+        assert result.portfolio.dividend_floor_date == "2026-07-01"
 
     def test_a_book_of_unknown_age_stamps_today_and_pays_nothing_earlier(
         self, runner: DailyRunner
@@ -809,7 +810,7 @@ class TestDividends:
                 why_he="",
             )
         )
-        p.cash = 1_000.0  # no inception_date
+        p.cash = 1_000.0  # no dividend_floor_date
         p.save(directory=runner.portfolio_dir)
         loader = _StubPriceLoaderWithDividends(
             {"DIV": 50.0}, {"DIV": [(date(2026, 8, 4), 1.00)]}
@@ -818,7 +819,7 @@ class TestDividends:
         result = self._run(runner, loader)
 
         assert result.portfolio.cumulative_dividends == 0.0
-        assert result.portfolio.inception_date == AS_OF.isoformat()
+        assert result.portfolio.dividend_floor_date == AS_OF.isoformat()
 
     def test_a_freshly_seeded_book_does_not_harvest_history(
         self, runner: DailyRunner
@@ -1371,6 +1372,400 @@ class TestForcedExits:
 
     def test_the_default_is_no_forced_exits(self) -> None:
         assert ScanResult(targets=[], watchlist=[], universe_size=0).forced_exits == []
+
+
+class TestGoingFlatIsExpressible:
+    """A doctrine that wants 100% cash has to be able to say so.
+
+    An empty target list means "no trade" — the universe produced no
+    candidates, the data was thin, something upstream gave up — and the
+    runner is right to hold everything when it sees one. But under the
+    circuit breaker, or a regime row whose entry scale is zero, wanting
+    to be entirely in cash is a real and legitimate position, and it
+    produces exactly the same empty list. The two were indistinguishable,
+    so the safe reading won and going flat could not be expressed at all.
+
+    The flag separates them. Silence still means hold; saying so means
+    sell.
+    """
+
+    @staticmethod
+    def _adapter(name: str, *, flat: bool):
+        class _Flat(_StubAdapter):
+            def run_scan(self, as_of, universe, prices, fundamentals, *, held=None):
+                result = super().run_scan(
+                    as_of, universe, prices, fundamentals, held=held
+                )
+                result.targets = []
+                result.flat_is_intentional = flat
+                return result
+
+        return _Flat(name, [])
+
+    def _run(self, runner: DailyRunner, adapter, prices: dict[str, float | None]):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter, AS_OF, list(prices), dict(prices), dict.fromkeys(prices)
+        )
+
+    @staticmethod
+    def _book(*tickers: str, entry_date: str = "2026-01-05") -> LivePortfolio:
+        p = LivePortfolio(agent="stub_agent")
+        for t in tickers:
+            p.positions.append(
+                Position(
+                    ticker=t, shares=10.0, entry_price=50.0,
+                    entry_date=entry_date, current_price=50.0,
+                    why_en="s", why_he="s",
+                )
+            )
+        p.cash = 1_000.0
+        return p
+
+    def test_an_intentional_flat_sells_everything(self, runner: DailyRunner) -> None:
+        self._book("AAA", "BBB").save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner,
+            self._adapter("stub_agent", flat=True),
+            {"AAA": 45.0, "BBB": 55.0},
+        )
+
+        assert sorted(t.ticker for t in result.trades if t.side == "SELL") == [
+            "AAA",
+            "BBB",
+        ]
+        assert result.portfolio.positions == []
+
+    def test_it_beats_the_holding_floor(self, runner: DailyRunner) -> None:
+        """For the same reason a forced exit does.
+
+        The floor is aimed at a name that slipped a rank and will slip
+        back. "Hold no equities" is not oscillation — it is the most
+        specific instruction the doctrine can give, and a floor that
+        outranked it would leave the book part-invested against an
+        explicit decision to be in cash.
+        """
+        self._book("NEW", entry_date=AS_OF.isoformat()).save(
+            directory=runner.portfolio_dir
+        )
+
+        result = self._run(runner, self._adapter("stub_agent", flat=True), {"NEW": 45.0})
+
+        assert [t.ticker for t in result.trades if t.side == "SELL"] == ["NEW"]
+
+    def test_without_the_flag_an_empty_list_still_holds(
+        self, runner: DailyRunner
+    ) -> None:
+        """The no-trade signal keeps the meaning it has always had."""
+        self._book("HOLD").save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner, self._adapter("stub_agent", flat=False), {"HOLD": 45.0}
+        )
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("HOLD")
+
+    def test_a_flat_book_still_will_not_sell_at_a_stale_mark(
+        self, runner: DailyRunner
+    ) -> None:
+        """Going flat is a decision about weight, not about price.
+
+        Nothing about wanting to hold cash makes it acceptable to book a
+        sale at a price the loader could not produce today.
+        """
+        self._book("NOPRICE").save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner, self._adapter("stub_agent", flat=True), {"NOPRICE": None}
+        )
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("NOPRICE")
+
+    def test_the_default_is_not_flat(self) -> None:
+        assert (
+            ScanResult(
+                targets=[], watchlist=[], universe_size=0
+            ).flat_is_intentional
+            is False
+        )
+
+
+class TestRunTypesGateWhatMayOpen:
+    """Part 7 reaches the only path that trades.
+
+    The table is the twelfth agent's doctrine, not the eleven's. Graham
+    runs his own screen every session and Part 7 has nothing to say
+    about it, so the gate is opt-in per adapter: the Council sets
+    ``honours_run_types`` and everyone else is untouched.
+
+    What the gate enforces is the single rule the cooling-off depends
+    on — a position is opened in a COUNCIL run or not at all. Exits are
+    deliberately left alone: the heartbeat exists to catch a delisting
+    notice, and a run type that could see one and not act would be worse
+    than no run.
+    """
+
+    @staticmethod
+    def _council(targets: list[LiveTarget]):
+        class _Council(_StubAdapter):
+            honours_run_types = True
+
+        return _Council("stub_agent", targets)
+
+    def _run(self, runner: DailyRunner, adapter, prices, run_type):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,
+            AS_OF,
+            list(prices),
+            dict(prices),
+            dict.fromkeys(prices),
+            run_type=run_type,
+        )
+
+    def test_a_council_run_opens(self, runner: DailyRunner) -> None:
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            RunType.COUNCIL,
+        )
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_heartbeat_does_not_open(self, runner: DailyRunner) -> None:
+        """'may not open, add to, or resize anything' — Part 7, verbatim."""
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            RunType.HEARTBEAT,
+        )
+        assert [t for t in result.trades if t.side == "BUY"] == []
+        assert not result.portfolio.has("NEW")
+
+    def test_a_reading_run_does_not_open(self, runner: DailyRunner) -> None:
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            RunType.READING,
+        )
+        assert [t for t in result.trades if t.side == "BUY"] == []
+
+    def test_the_other_eleven_are_not_gated(self, runner: DailyRunner) -> None:
+        """Graham's doctrine is chapter 14, not Part 7."""
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        plain = _StubAdapter(
+            "stub_agent",
+            [_target("NEW")],
+        )
+        result = self._run(runner, plain, {"NEW": 50.0}, RunType.HEARTBEAT)
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_gated_run_still_takes_a_forced_exit(self, runner: DailyRunner) -> None:
+        """The heartbeat's whole purpose is catching what must be sold.
+
+        A kill trigger or a breaking 8-K is exactly what Part 7 puts in
+        its "may do" column, so the gate on opening must not reach it.
+        """
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="BAD", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        class _ForcingCouncil(_StubAdapter):
+            honours_run_types = True
+
+            def run_scan(self, as_of, universe, prices, fundamentals, *, held=None):
+                result = super().run_scan(
+                    as_of, universe, prices, fundamentals, held=held
+                )
+                result.forced_exits = ["BAD"]
+                return result
+
+        result = self._run(
+            runner,
+            _ForcingCouncil("stub_agent", [_target("KEEP", weight=1.0)]),
+            {"BAD": 50.0, "KEEP": 25.0},
+            RunType.HEARTBEAT,
+        )
+
+        assert [t.ticker for t in result.trades if t.side == "SELL"] == ["BAD"]
+        assert not result.portfolio.has("KEEP")
+
+    def test_a_gated_run_does_not_sell_on_rank_drift(
+        self, runner: DailyRunner
+    ) -> None:
+        """Only forced exits, though — not an ordinary departure.
+
+        Part 7 gives the heartbeat kill triggers and breaking filings.
+        A name that merely fell out of the target list is a rebalance
+        decision, and belongs to the run that may rebalance. Selling it
+        here would turn every intraday invocation into a trading run,
+        which is the exact failure the table exists to prevent.
+        """
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFTED", shares=10.0, entry_price=50.0,
+                entry_date="2026-01-05", current_price=50.0,
+                why_en="s", why_he="s",
+            )
+        )
+        p.cash = 1_000.0
+        p.save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner,
+            self._council([_target("KEEP", weight=1.0)]),
+            {"DRIFTED": 50.0, "KEEP": 25.0},
+            RunType.HEARTBEAT,
+        )
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("DRIFTED")
+
+    def test_the_default_run_type_still_trades(self, runner: DailyRunner) -> None:
+        """Omitting it must not silently freeze the live book."""
+        LivePortfolio(agent="stub_agent", cash=10_000).save(
+            directory=runner.portfolio_dir
+        )
+        runner.price_loader = _StubPriceLoader({"NEW": 50.0})  # type: ignore[assignment]
+        result = runner._run_one(
+            self._council(
+                [_target("NEW")]
+            ),
+            AS_OF,
+            ["NEW"],
+            {"NEW": 50.0},
+            {"NEW": None},
+        )
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_adapters_do_not_honour_run_types_by_default(self) -> None:
+        assert _StubAdapter("x", []).__class__.__dict__.get("honours_run_types") is None
+        assert AgentAdapter.honours_run_types is False
+
+
+class TestTheRunTypeIsDerivedFromTheCalendar:
+    """§7 puts the COUNCIL weekly, and this is where that becomes true.
+
+    The derivation is per agent, from that agent's own ``last_open_date``
+    rather than a shared clock, because the runner can be invoked for one
+    agent at a time and a book that missed a week must still get its
+    council on the next run rather than waiting for the fleet.
+
+    This is the commit that changes live behaviour: before it, the
+    twelfth agent could open a position on any day the scan ran. Part 7
+    is explicit that this is the failure the table exists to prevent —
+    *"an agent initiating many discretionary trades is malfunctioning,
+    not working"*.
+    """
+
+    @staticmethod
+    def _council(targets: list[LiveTarget]):
+        class _Council(_StubAdapter):
+            honours_run_types = True
+
+        return _Council("stub_agent", targets)
+
+    def _run(self, runner: DailyRunner, adapter, prices, **kw):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter, AS_OF, list(prices), dict(prices), dict.fromkeys(prices), **kw
+        )
+
+    @staticmethod
+    def _book(last_open: str | None) -> LivePortfolio:
+        p = LivePortfolio(agent="stub_agent", cash=10_000)
+        if last_open is not None:
+            p.last_open_date = last_open
+        return p
+
+    def test_the_first_run_ever_is_a_council_run(self, runner: DailyRunner) -> None:
+        self._book(None).save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_second_run_in_the_same_week_is_a_heartbeat(
+        self, runner: DailyRunner
+    ) -> None:
+        """AS_OF is Wednesday 2026-08-05; Monday the 3rd is its week."""
+        self._book("2026-08-03").save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t for t in result.trades if t.side == "BUY"] == []
+
+    def test_the_first_run_of_a_new_week_is_a_council_run(
+        self, runner: DailyRunner
+    ) -> None:
+        """Last ran Friday the 31st; AS_OF opens the following week."""
+        self._book("2026-07-31").save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_a_book_that_missed_a_week_still_gets_its_council(
+        self, runner: DailyRunner
+    ) -> None:
+        self._book("2026-06-01").save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_an_explicit_run_type_overrides_the_calendar(
+        self, runner: DailyRunner
+    ) -> None:
+        """A manual dispatch must be able to say what it is."""
+        self._book("2026-07-31").save(directory=runner.portfolio_dir)
+        result = self._run(
+            runner,
+            self._council([_target("NEW")]),
+            {"NEW": 50.0},
+            run_type=RunType.HEARTBEAT,
+        )
+        assert [t for t in result.trades if t.side == "BUY"] == []
+
+    def test_the_eleven_trade_on_any_day_of_the_week(
+        self, runner: DailyRunner
+    ) -> None:
+        """Mid-week, and Graham buys anyway. Part 7 is not his."""
+        self._book("2026-08-03").save(directory=runner.portfolio_dir)
+        plain = _StubAdapter("stub_agent", [_target("NEW")])
+        result = self._run(runner, plain, {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
+
+    def test_an_unreadable_last_open_date_opens_a_week(
+        self, runner: DailyRunner
+    ) -> None:
+        """Garbage in the field must not freeze the book forever.
+
+        Treating it as "no previous run" makes the next run a COUNCIL,
+        which is the direction that keeps the agent working rather than
+        silently idle.
+        """
+        p = self._book(None)
+        p.last_open_date = "not-a-date"
+        p.save(directory=runner.portfolio_dir)
+        result = self._run(runner, self._council([_target("NEW")]), {"NEW": 50.0})
+        assert [t.ticker for t in result.trades if t.side == "BUY"] == ["NEW"]
 
 
 class TestForceFlagParsing:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -257,6 +258,62 @@ class TestPersistence:
             "watchlist", "last_updated", "initial_cash",
         ):
             assert key in d, f"missing {key}"
+
+    def test_the_dividend_floor_is_written_under_its_real_name(self) -> None:
+        """It is a settlement floor, and the key has to say so.
+
+        It was called ``inception_date`` and it is not one: it is stamped
+        the first time settlement runs over a book with positions, so
+        every one of the eleven agents seeded on 2026-05-05 carries
+        2026-08-10 — the day the dividend code shipped. Read as an
+        inception, it understates a book's life by three months, which
+        is exactly the misreading it invited.
+        """
+        p = LivePortfolio(agent="floor")
+        p.dividend_floor_date = "2026-08-10"
+        d = p.to_dict()
+        assert d["dividend_floor_date"] == "2026-08-10"
+        assert "inception_date" not in d
+
+    def test_a_book_written_under_the_old_key_still_loads(self, tmp_path: Path) -> None:
+        """The twelve live books on disk predate the rename.
+
+        Dropping the old key on read would silently reset the floor to
+        empty, and the next settlement would stamp today — paying
+        nothing for the gap and losing the record of where the gap was.
+        """
+        (tmp_path / "legacy.json").write_text(
+            json.dumps(
+                {
+                    "agent": "legacy",
+                    "cash": 10_000.0,
+                    "initial_cash": 10_000.0,
+                    "inception_date": "2026-08-10",
+                    "positions": [],
+                    "watchlist": [],
+                }
+            )
+        )
+        loaded = LivePortfolio.load_or_seed("legacy", directory=tmp_path)
+        assert loaded.dividend_floor_date == "2026-08-10"
+
+    def test_the_new_key_wins_when_a_book_carries_both(self, tmp_path: Path) -> None:
+        """A half-migrated file must not resurrect the stale value."""
+        (tmp_path / "both.json").write_text(
+            json.dumps(
+                {
+                    "agent": "both",
+                    "cash": 10_000.0,
+                    "initial_cash": 10_000.0,
+                    "inception_date": "2026-08-10",
+                    "dividend_floor_date": "2026-05-05",
+                    "positions": [],
+                    "watchlist": [],
+                }
+            )
+        )
+        loaded = LivePortfolio.load_or_seed("both", directory=tmp_path)
+        assert loaded.dividend_floor_date == "2026-05-05"
 
     def test_corrupt_file_raises(self, tmp_path: Path) -> None:
         path = tmp_path / "broken.json"

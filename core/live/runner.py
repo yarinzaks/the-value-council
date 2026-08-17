@@ -31,6 +31,7 @@ from datetime import date
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
+from agents.council.cadence import RunType, is_first_run_of_week, permissions_for
 from agents.council.nav_history import drawdown_from_peak
 from agents.council.regime import read_regime
 from agents.council.strategy import MohnishPabrai
@@ -129,6 +130,26 @@ def pos_age_days(pos: Position, as_of: date) -> int | None:
     except (ValueError, TypeError):
         return None
     return max(0, (as_of - entry).days)
+
+
+def _derive_run_type(as_of: date, last_open_date: str) -> RunType:
+    """Which run of §7 this invocation is, for one book.
+
+    Per agent rather than per fleet, and from that book's own
+    ``last_open_date``: the runner can be pointed at a single agent, and
+    a book that missed a week has to get its council on the next run it
+    sees rather than waiting for everyone else.
+
+    An empty or unparseable field reads as "no previous run", which makes
+    this a COUNCIL. That is the direction that keeps an agent working:
+    the opposite reading would leave a book with one corrupt field
+    unable to open a position ever again, silently.
+    """
+    try:
+        previous: date | None = _to_date(last_open_date) if last_open_date else None
+    except (ValueError, TypeError):
+        previous = None
+    return RunType.COUNCIL if is_first_run_of_week(as_of, previous) else RunType.HEARTBEAT
 
 
 @dataclass
@@ -643,6 +664,7 @@ class DailyRunner:
         fundamentals: dict[str, PointInTimeFinancials | None],
         *,
         force: bool = False,
+        run_type: RunType | None = None,
     ) -> AgentRunResult:
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
@@ -693,6 +715,31 @@ class DailyRunner:
             _DictLookup(fundamentals),
             held=_held_positions(portfolio, held_prices),
         )
+        # ---- RUN TYPE: what Part 7 lets this run do -------------------
+        # Only the twelfth agent is bound by the table; see
+        # AgentAdapter.honours_run_types. A run that may not open keeps
+        # every name already held and refuses the rest, which is the
+        # single rule the cooling-off depends on: a position is opened
+        # in a COUNCIL run or not at all.
+        #
+        # Exits are untouched on purpose. The heartbeat exists to catch
+        # a kill trigger or a breaking 8-K, and a run type that could
+        # see one and not act would be worse than no run at all.
+        if run_type is None:
+            run_type = _derive_run_type(as_of, portfolio.last_open_date)
+        if getattr(adapter, "honours_run_types", False) and not permissions_for(
+            run_type
+        ).may_open:
+            held_now = {p.ticker for p in portfolio.positions}
+            refused = [t for t in scan.targets if t.ticker not in held_now]
+            if refused:
+                logger.info(
+                    f"{as_of}: {adapter.name} {run_type} may not open — "
+                    f"holding off {len(refused)} name(s): "
+                    f"{', '.join(sorted(t.ticker for t in refused))}"
+                )
+            scan.targets = [t for t in scan.targets if t.ticker in held_now]
+
         target_tickers = {t.ticker for t in scan.targets}
         trades: list[TradeRecord] = []
 
@@ -712,13 +759,18 @@ class DailyRunner:
         # positions it wants out has not gone quiet — it has been
         # specific, and specificity is the opposite of the ambiguity the
         # guard protects against.
-        if scan.targets or forced_exits:
+        # An intentional flat is the third way the sell loop may run. It
+        # is the case the `scan.targets` guard cannot serve: the doctrine
+        # wants no equities at all, which produces the same empty list a
+        # failed scan does. The flag is how the two are told apart.
+        going_flat = scan.flat_is_intentional
+        if scan.targets or forced_exits or going_flat:
             for pos in list(portfolio.positions):
                 # Forced first: a name can be both a current target and
                 # under a terminal filing, and the filing wins.
                 if pos.ticker in target_tickers and pos.ticker not in forced_exits:
                     continue
-                if not scan.targets and pos.ticker not in forced_exits:
+                if not scan.targets and not going_flat and pos.ticker not in forced_exits:
                     continue
                 # A name can leave the target list for a day because a
                 # price moved and it slipped a rank, then come straight
@@ -741,7 +793,13 @@ class DailyRunner:
                 # COUNCIL_SELECTION E2 those sell next session, "no
                 # council, no discussion", and a floor that outranked
                 # them would make the rule decorative.
-                forced = pos.ticker in forced_exits
+                # Going flat is exempt from the floor for the same reason
+                # a forced exit is. The floor stops a name that slipped a
+                # rank from being sold before it slips back; "hold no
+                # equities" is not oscillation, and a floor that outranked
+                # it would leave the book part-invested against an explicit
+                # decision to be in cash.
+                forced = pos.ticker in forced_exits or going_flat
                 age = pos_age_days(pos, as_of)
                 if not forced and age is not None and age < self.min_holding_days:
                     logger.info(
@@ -901,14 +959,14 @@ class DailyRunner:
         if not portfolio.positions:
             return 0.0
 
-        if not portfolio.inception_date:
+        if not portfolio.dividend_floor_date:
             # First settlement for this book. Stamp the floor and pay
             # nothing before it: a seeded portfolio carries synthetic
             # entry dates that may run years back, and it never owned
             # those shares.
-            portfolio.inception_date = as_of.isoformat()
+            portfolio.dividend_floor_date = as_of.isoformat()
 
-        floor = portfolio.inception_date[:10]
+        floor = portfolio.dividend_floor_date[:10]
         total = 0.0
         for pos in list(portfolio.positions):
             since = max(pos.entry_date[:10], floor)

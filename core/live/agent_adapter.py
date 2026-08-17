@@ -83,6 +83,20 @@ class ScanResult:
     #: business delaying an 8-K item 4.02 or a delisting notice by three
     #: more weeks. Every other exit still waits out the floor.
     forced_exits: list[str] = field(default_factory=list)
+    #: The empty target list above is deliberate: hold no equities.
+    #:
+    #: Without this, an empty list has two meanings that cannot be told
+    #: apart — "the scan produced nothing" and "be entirely in cash" —
+    #: and the runner has to assume the first, because reading a thin
+    #: data day as an instruction to liquidate would be catastrophic.
+    #: That assumption is right, and it left the second unsayable: under
+    #: the circuit breaker, or a regime row whose entry scale is zero,
+    #: 100% cash is a position the doctrine can genuinely hold and had
+    #: no way to express.
+    #:
+    #: Setting this says the emptiness is the decision. Silence still
+    #: means hold everything.
+    flat_is_intentional: bool = False
 
 
 class AgentAdapter:
@@ -99,6 +113,16 @@ class AgentAdapter:
     """
 
     name: str  # set by subclass — must equal Strategy.name
+
+    #: Whether doctrine Part 7's run-type table binds this adapter.
+    #:
+    #: Off for the eleven, and that is not an omission. Part 7 belongs
+    #: to the twelfth agent; Graham runs his screen every session under
+    #: chapter 14 and owes nothing to a table about council cadence.
+    #: Switching this on for all of them would freeze ten books on any
+    #: run type that may not open, which would be a doctrine change
+    #: wearing the clothes of a bug fix.
+    honours_run_types: bool = False
 
     def __init__(self, strategy: Strategy, *, watchlist_size: int = DEFAULT_WATCHLIST_SIZE):
         self.strategy = strategy
@@ -564,6 +588,9 @@ class PabraiLive(AgentAdapter):
     """
 
     name = "mohnish_pabrai"
+
+    #: This is the agent Part 7 was written for.
+    honours_run_types = True
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
