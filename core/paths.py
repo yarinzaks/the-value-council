@@ -129,6 +129,15 @@ def fiscal_calendar_path() -> Path:
     return cache_dir() / "fiscal_calendar.json"
 
 
+def council_reviews_dir() -> Path:
+    """What each REVIEW run concluded about a holding.
+
+    §6's E7 counts consecutive no-progress reviews. Without a record on
+    disk there is nothing to count and the rule cannot fire.
+    """
+    return data_root() / "council" / "reviews"
+
+
 def council_published_dir() -> Path:
     """Ranks written on one run for a later run to execute.
 

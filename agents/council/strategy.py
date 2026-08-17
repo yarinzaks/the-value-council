@@ -45,8 +45,10 @@ from agents.council.exits import (
     evaluate_book,
 )
 from agents.council.pipeline import Selection, run_selection
+from agents.council.review import quarters_without_progress
 from core.backtest.strategy_runner import HeldPosition, Strategy
 from core.logger import get_logger
+from core.paths import council_reviews_dir
 
 logger = get_logger("agents.council.strategy")
 
@@ -70,6 +72,7 @@ class MohnishPabrai(Strategy):
         opinion_index: Any = None,
         drawdown_reader: Any = None,
         news_service: Any | None = None,
+        reviews_dir: Any = None,
     ) -> None:
         """
         Args:
@@ -98,6 +101,9 @@ class MohnishPabrai(Strategy):
         self.opinion_index = opinion_index
         self.drawdown_reader = drawdown_reader
         self.news_service = news_service
+        # Where the REVIEW records live. Injectable so a test can point
+        # it at a tmp_path rather than the real data root.
+        self._reviews_dir = reviews_dir or council_reviews_dir()
         self.last_selection: Selection | None = None
         #: Tickers E2 wants out regardless of the runner's holding
         #: floor. Read by :class:`PabraiLive` into the scan result.
@@ -231,6 +237,12 @@ class MohnishPabrai(Strategy):
                     ),
                     weight=0.0,
                     exit_block=StatisticalExit(),
+                    # E7's time stop, now countable. Supplying None
+                    # here was why the rule could never fire: the
+                    # REVIEW run wrote no record to count.
+                    quarterly_reviews_without_progress=quarters_without_progress(
+                        ticker, directory=self._reviews_dir
+                    ),
                     terminal_filing=terminal.get(ticker),
                     filing_age_days=(
                         None if latest is None else (as_of - latest).days
