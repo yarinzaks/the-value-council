@@ -1373,6 +1373,125 @@ class TestForcedExits:
         assert ScanResult(targets=[], watchlist=[], universe_size=0).forced_exits == []
 
 
+class TestGoingFlatIsExpressible:
+    """A doctrine that wants 100% cash has to be able to say so.
+
+    An empty target list means "no trade" — the universe produced no
+    candidates, the data was thin, something upstream gave up — and the
+    runner is right to hold everything when it sees one. But under the
+    circuit breaker, or a regime row whose entry scale is zero, wanting
+    to be entirely in cash is a real and legitimate position, and it
+    produces exactly the same empty list. The two were indistinguishable,
+    so the safe reading won and going flat could not be expressed at all.
+
+    The flag separates them. Silence still means hold; saying so means
+    sell.
+    """
+
+    @staticmethod
+    def _adapter(name: str, *, flat: bool):
+        class _Flat(_StubAdapter):
+            def run_scan(self, as_of, universe, prices, fundamentals, *, held=None):
+                result = super().run_scan(
+                    as_of, universe, prices, fundamentals, held=held
+                )
+                result.targets = []
+                result.flat_is_intentional = flat
+                return result
+
+        return _Flat(name, [])
+
+    def _run(self, runner: DailyRunner, adapter, prices: dict[str, float | None]):
+        runner.price_loader = _StubPriceLoader(prices)  # type: ignore[assignment]
+        return runner._run_one(
+            adapter, AS_OF, list(prices), dict(prices), dict.fromkeys(prices)
+        )
+
+    @staticmethod
+    def _book(*tickers: str, entry_date: str = "2026-01-05") -> LivePortfolio:
+        p = LivePortfolio(agent="stub_agent")
+        for t in tickers:
+            p.positions.append(
+                Position(
+                    ticker=t, shares=10.0, entry_price=50.0,
+                    entry_date=entry_date, current_price=50.0,
+                    why_en="s", why_he="s",
+                )
+            )
+        p.cash = 1_000.0
+        return p
+
+    def test_an_intentional_flat_sells_everything(self, runner: DailyRunner) -> None:
+        self._book("AAA", "BBB").save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner,
+            self._adapter("stub_agent", flat=True),
+            {"AAA": 45.0, "BBB": 55.0},
+        )
+
+        assert sorted(t.ticker for t in result.trades if t.side == "SELL") == [
+            "AAA",
+            "BBB",
+        ]
+        assert result.portfolio.positions == []
+
+    def test_it_beats_the_holding_floor(self, runner: DailyRunner) -> None:
+        """For the same reason a forced exit does.
+
+        The floor is aimed at a name that slipped a rank and will slip
+        back. "Hold no equities" is not oscillation — it is the most
+        specific instruction the doctrine can give, and a floor that
+        outranked it would leave the book part-invested against an
+        explicit decision to be in cash.
+        """
+        self._book("NEW", entry_date=AS_OF.isoformat()).save(
+            directory=runner.portfolio_dir
+        )
+
+        result = self._run(runner, self._adapter("stub_agent", flat=True), {"NEW": 45.0})
+
+        assert [t.ticker for t in result.trades if t.side == "SELL"] == ["NEW"]
+
+    def test_without_the_flag_an_empty_list_still_holds(
+        self, runner: DailyRunner
+    ) -> None:
+        """The no-trade signal keeps the meaning it has always had."""
+        self._book("HOLD").save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner, self._adapter("stub_agent", flat=False), {"HOLD": 45.0}
+        )
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("HOLD")
+
+    def test_a_flat_book_still_will_not_sell_at_a_stale_mark(
+        self, runner: DailyRunner
+    ) -> None:
+        """Going flat is a decision about weight, not about price.
+
+        Nothing about wanting to hold cash makes it acceptable to book a
+        sale at a price the loader could not produce today.
+        """
+        self._book("NOPRICE").save(directory=runner.portfolio_dir)
+
+        result = self._run(
+            runner, self._adapter("stub_agent", flat=True), {"NOPRICE": None}
+        )
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.has("NOPRICE")
+
+    def test_the_default_is_not_flat(self) -> None:
+        assert (
+            ScanResult(
+                targets=[], watchlist=[], universe_size=0
+            ).flat_is_intentional
+            is False
+        )
+
+
 class TestForceFlagParsing:
     """The once-a-day guard has an override, and it defaults to off."""
 

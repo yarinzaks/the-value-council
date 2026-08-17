@@ -712,13 +712,18 @@ class DailyRunner:
         # positions it wants out has not gone quiet — it has been
         # specific, and specificity is the opposite of the ambiguity the
         # guard protects against.
-        if scan.targets or forced_exits:
+        # An intentional flat is the third way the sell loop may run. It
+        # is the case the `scan.targets` guard cannot serve: the doctrine
+        # wants no equities at all, which produces the same empty list a
+        # failed scan does. The flag is how the two are told apart.
+        going_flat = scan.flat_is_intentional
+        if scan.targets or forced_exits or going_flat:
             for pos in list(portfolio.positions):
                 # Forced first: a name can be both a current target and
                 # under a terminal filing, and the filing wins.
                 if pos.ticker in target_tickers and pos.ticker not in forced_exits:
                     continue
-                if not scan.targets and pos.ticker not in forced_exits:
+                if not scan.targets and not going_flat and pos.ticker not in forced_exits:
                     continue
                 # A name can leave the target list for a day because a
                 # price moved and it slipped a rank, then come straight
@@ -741,7 +746,13 @@ class DailyRunner:
                 # COUNCIL_SELECTION E2 those sell next session, "no
                 # council, no discussion", and a floor that outranked
                 # them would make the rule decorative.
-                forced = pos.ticker in forced_exits
+                # Going flat is exempt from the floor for the same reason
+                # a forced exit is. The floor stops a name that slipped a
+                # rank from being sold before it slips back; "hold no
+                # equities" is not oscillation, and a floor that outranked
+                # it would leave the book part-invested against an explicit
+                # decision to be in cash.
+                forced = pos.ticker in forced_exits or going_flat
                 age = pos_age_days(pos, as_of)
                 if not forced and age is not None and age < self.min_holding_days:
                     logger.info(

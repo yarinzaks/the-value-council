@@ -83,6 +83,20 @@ class ScanResult:
     #: business delaying an 8-K item 4.02 or a delisting notice by three
     #: more weeks. Every other exit still waits out the floor.
     forced_exits: list[str] = field(default_factory=list)
+    #: The empty target list above is deliberate: hold no equities.
+    #:
+    #: Without this, an empty list has two meanings that cannot be told
+    #: apart — "the scan produced nothing" and "be entirely in cash" —
+    #: and the runner has to assume the first, because reading a thin
+    #: data day as an instruction to liquidate would be catastrophic.
+    #: That assumption is right, and it left the second unsayable: under
+    #: the circuit breaker, or a regime row whose entry scale is zero,
+    #: 100% cash is a position the doctrine can genuinely hold and had
+    #: no way to express.
+    #:
+    #: Setting this says the emptiness is the decision. Silence still
+    #: means hold everything.
+    flat_is_intentional: bool = False
 
 
 class AgentAdapter:
