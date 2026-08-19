@@ -1,0 +1,422 @@
+[
+  {
+    "ticker": "EFOR",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 72.9%",
+      "5yr avg FCF $299,820,000",
+      "D/E 0.65"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 4838394841.0,
+      "intrinsic_value_per_share": 117.15,
+      "margin_of_safety_pct": 72.89,
+      "avg_fcf_usd": 299820000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.65,
+      "net_income": 113500000.0,
+      "market_cap": 1311894474.7924805,
+      "price": 31.764999389648438
+    },
+    "market_conditions": {},
+    "confidence": 1.0,
+    "entry_price": 31.764999389648438,
+    "target_price": 117.1524174571845,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 72.9% discount to conservative DCF intrinsic, 5yr FCF $300M, D/E 0.65"
+  },
+  {
+    "ticker": "COLL",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 72.0%",
+      "5yr avg FCF $205,884,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 3322487104.0,
+      "intrinsic_value_per_share": 104.63,
+      "margin_of_safety_pct": 71.95,
+      "avg_fcf_usd": 205884000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 62870000.0,
+      "market_cap": 931956754.9628887,
+      "price": 29.350000381469727
+    },
+    "market_conditions": {},
+    "confidence": 1.0,
+    "entry_price": 29.350000381469727,
+    "target_price": 104.63468100064507,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 72.0% discount to conservative DCF intrinsic, 5yr FCF $206M, D/E 0.00"
+  },
+  {
+    "ticker": "YELP",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 63.0%",
+      "5yr avg FCF $239,256,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 3861033274.0,
+      "intrinsic_value_per_share": 64.87,
+      "margin_of_safety_pct": 63.0,
+      "avg_fcf_usd": 239256000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 145600000.0,
+      "market_cap": 1428408312.0,
+      "price": 24.0
+    },
+    "market_conditions": {},
+    "confidence": 0.9000643792177245,
+    "entry_price": 24.0,
+    "target_price": 64.87276627178632,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 63.0% discount to conservative DCF intrinsic, 5yr FCF $239M, D/E 0.00"
+  },
+  {
+    "ticker": "HRI",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 60.8%",
+      "5yr avg FCF $886,200,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 14301199080.0,
+      "intrinsic_value_per_share": 428.56,
+      "margin_of_safety_pct": 60.84,
+      "avg_fcf_usd": 886200000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 1000000.0,
+      "market_cap": 5600363447.012054,
+      "price": 167.8249969482422
+    },
+    "market_conditions": {},
+    "confidence": 0.869141469906685,
+    "entry_price": 167.8249969482422,
+    "target_price": 428.56123796549093,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 60.8% discount to conservative DCF intrinsic, 5yr FCF $886M, D/E 0.00"
+  },
+  {
+    "ticker": "FISV",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 54.5%",
+      "5yr avg FCF $3,829,600,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 61800803425.0,
+      "intrinsic_value_per_share": 115.56,
+      "margin_of_safety_pct": 54.48,
+      "avg_fcf_usd": 3829600000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 3480000000.0,
+      "market_cap": 28129296315.194275,
+      "price": 52.599998474121094
+    },
+    "market_conditions": {},
+    "confidence": 0.778341871763652,
+    "entry_price": 52.599998474121094,
+    "target_price": 115.56357931794874,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 54.5% discount to conservative DCF intrinsic, 5yr FCF $3830M, D/E 0.00"
+  },
+  {
+    "ticker": "SMPL",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 53.3%",
+      "5yr avg FCF $151,798,600",
+      "D/E 0.14"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 2449675015.0,
+      "intrinsic_value_per_share": 24.53,
+      "margin_of_safety_pct": 53.33,
+      "avg_fcf_usd": 151798600.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.14,
+      "net_income": 103614000.0,
+      "market_cap": 1143382374.2497444,
+      "price": 11.45009994506836
+    },
+    "market_conditions": {},
+    "confidence": 0.7617877199011556,
+    "entry_price": 11.45009994506836,
+    "target_price": 24.531621608500753,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 53.3% discount to conservative DCF intrinsic, 5yr FCF $152M, D/E 0.14"
+  },
+  {
+    "ticker": "GM",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 53.3%",
+      "5yr avg FCF $10,261,400,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 165595039761.0,
+      "intrinsic_value_per_share": 183.19,
+      "margin_of_safety_pct": 53.26,
+      "avg_fcf_usd": 10261400000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 2697000000.0,
+      "market_cap": 77397730056.68185,
+      "price": 85.62000274658203
+    },
+    "market_conditions": {},
+    "confidence": 0.7608691474245853,
+    "entry_price": 85.62000274658203,
+    "target_price": 183.1868679973471,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 53.3% discount to conservative DCF intrinsic, 5yr FCF $10261M, D/E 0.00"
+  },
+  {
+    "ticker": "RPD",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 53.0%",
+      "5yr avg FCF $103,422,800",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 1669002541.0,
+      "intrinsic_value_per_share": 25.33,
+      "margin_of_safety_pct": 53.02,
+      "avg_fcf_usd": 103422800.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 23381000.0,
+      "market_cap": 784128007.6637726,
+      "price": 11.899999618530273
+    },
+    "market_conditions": {},
+    "confidence": 0.7574023678236662,
+    "entry_price": 11.899999618530273,
+    "target_price": 25.328937892493464,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 53.0% discount to conservative DCF intrinsic, 5yr FCF $103M, D/E 0.00"
+  },
+  {
+    "ticker": "PCRX",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 52.7%",
+      "5yr avg FCF $129,990,200",
+      "D/E 0.54"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 2097738353.0,
+      "intrinsic_value_per_share": 51.81,
+      "margin_of_safety_pct": 52.7,
+      "avg_fcf_usd": 129990200.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.54,
+      "net_income": 7034000.0,
+      "market_cap": 992204818.4895287,
+      "price": 24.5049991607666
+    },
+    "market_conditions": {},
+    "confidence": 0.7528744557726769,
+    "entry_price": 24.5049991607666,
+    "target_price": 51.80893664986784,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 52.7% discount to conservative DCF intrinsic, 5yr FCF $130M, D/E 0.54"
+  },
+  {
+    "ticker": "CALM",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 50.6%",
+      "5yr avg FCF $495,309,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 7993130913.0,
+      "intrinsic_value_per_share": 164.82,
+      "margin_of_safety_pct": 50.62,
+      "avg_fcf_usd": 495309000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 1220048000.0,
+      "market_cap": 3947209623.429489,
+      "price": 81.38999938964844
+    },
+    "market_conditions": {},
+    "confidence": 0.7231068300189789,
+    "entry_price": 81.38999938964844,
+    "target_price": 164.81539674432472,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 50.6% discount to conservative DCF intrinsic, 5yr FCF $495M, D/E 0.00"
+  },
+  {
+    "ticker": "OPLN",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 43.9%",
+      "5yr avg FCF $398,033,333",
+      "D/E 0.43"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 6423328752.0,
+      "intrinsic_value_per_share": 60.43,
+      "margin_of_safety_pct": 43.87,
+      "avg_fcf_usd": 398033333.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.43,
+      "net_income": 177700000.0,
+      "market_cap": 3605601813.0439606,
+      "price": 33.91999816894531
+    },
+    "market_conditions": {},
+    "confidence": 0.6266726107643953,
+    "entry_price": 33.91999816894531,
+    "target_price": 60.427998103136055,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 43.9% discount to conservative DCF intrinsic, 5yr FCF $398M, D/E 0.43"
+  },
+  {
+    "ticker": "APOG",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 42.2%",
+      "5yr avg FCF $96,369,800",
+      "D/E 0.45"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 1542489667.0,
+      "intrinsic_value_per_share": 72.69,
+      "margin_of_safety_pct": 42.2,
+      "avg_fcf_usd": 96369800.0,
+      "growth_rate_pct": 4.88,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.45,
+      "net_income": 54131000.0,
+      "market_cap": 891483125.7516975,
+      "price": 42.0099983215332
+    },
+    "market_conditions": {},
+    "confidence": 0.6029274392772395,
+    "entry_price": 42.0099983215332,
+    "target_price": 72.68784620812158,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 42.2% discount to conservative DCF intrinsic, 5yr FCF $96M, D/E 0.45"
+  },
+  {
+    "ticker": "HRMY",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 31.6%",
+      "5yr avg FCF $205,637,000",
+      "D/E 0.19"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 3318501100.0,
+      "intrinsic_value_per_share": 57.37,
+      "margin_of_safety_pct": 31.64,
+      "avg_fcf_usd": 205637000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.19,
+      "net_income": 158687000.0,
+      "market_cap": 2268508951.6862183,
+      "price": 39.220001220703125
+    },
+    "market_conditions": {},
+    "confidence": 0.45200792118867344,
+    "entry_price": 39.220001220703125,
+    "target_price": 57.37319974467687,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 31.6% discount to conservative DCF intrinsic, 5yr FCF $206M, D/E 0.19"
+  },
+  {
+    "ticker": "EPAM",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-08-19T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 30.0%",
+      "5yr avg FCF $503,446,600",
+      "D/E 0.01"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 8124452779.0,
+      "intrinsic_value_per_share": 150.06,
+      "margin_of_safety_pct": 30.05,
+      "avg_fcf_usd": 503446600.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.01,
+      "net_income": 377678000.0,
+      "market_cap": 5683072612.018829,
+      "price": 104.97000122070312
+    },
+    "market_conditions": {},
+    "confidence": 0.42928256801227976,
+    "entry_price": 104.97000122070312,
+    "target_price": 150.063860931159,
+    "exit_trigger": "scaling out as price approaches intrinsic value; thesis break OR balance-sheet deterioration",
+    "rationale": "Klarman MoS: 30.0% discount to conservative DCF intrinsic, 5yr FCF $503M, D/E 0.01"
+  }
+]
