@@ -1,0 +1,255 @@
+{
+ "all_clear": false,
+ "at": "2026-08-20T15:56:19+00:00",
+ "breaches": [],
+ "circuit_breaker": false,
+ "drawdown_from_peak": -0.011871046749139857,
+ "filings_flagged": [],
+ "forced_exits_proposed": [],
+ "kill_criteria": [],
+ "limits": [
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:REPX",
+   "note": "",
+   "observed": 0.02405304082003359,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:COLM",
+   "note": "",
+   "observed": 0.023705408146312317,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SD",
+   "note": "",
+   "observed": 0.02337085416012214,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PRDO",
+   "note": "",
+   "observed": 0.0232831670196584,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UTMD",
+   "note": "",
+   "observed": 0.023084343646602026,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UVV",
+   "note": "",
+   "observed": 0.022985148051049918,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CLMB",
+   "note": "",
+   "observed": 0.02290585612934047,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:HOG",
+   "note": "",
+   "observed": 0.02286374448767356,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIGA",
+   "note": "",
+   "observed": 0.022650095076525902,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CALM",
+   "note": "",
+   "observed": 0.022627023613105063,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:TRN",
+   "note": "",
+   "observed": 0.022480078736606603,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:LEG",
+   "note": "",
+   "observed": 0.022408251116571284,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:MHO",
+   "note": "",
+   "observed": 0.02238954645212522,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:RMR",
+   "note": "",
+   "observed": 0.022254729850444098,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:GCO",
+   "note": "",
+   "observed": 0.022215663499971318,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UPBD",
+   "note": "",
+   "observed": 0.021718125634713377,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:STRT",
+   "note": "",
+   "observed": 0.02166509311823099,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NATR",
+   "note": "",
+   "observed": 0.021658694957364232,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:YELP",
+   "note": "",
+   "observed": 0.021603355138790862,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:ZUMZ",
+   "note": "",
+   "observed": 0.02133596245777413,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CRTO",
+   "note": "",
+   "observed": 0.021266608679833973,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PLAB",
+   "note": "",
+   "observed": 0.02075329522748417,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIG",
+   "note": "",
+   "observed": 0.020594282510446506,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NGVT",
+   "note": "",
+   "observed": 0.020523422133600304,
+   "state": "pass"
+  },
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "53.4% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.5343957906643804,
+   "state": "unknown"
+  },
+  {
+   "cap": 0.2,
+   "forces_action": false,
+   "limit": "illiquid_aggregate",
+   "note": "",
+   "observed": 0.157260536278173,
+   "state": "pass"
+  },
+  {
+   "cap": 0.05,
+   "forces_action": false,
+   "limit": "cash_floor",
+   "note": "",
+   "observed": 0.4656042093356195,
+   "state": "pass"
+  },
+  {
+   "cap": 1.0,
+   "forces_action": false,
+   "limit": "leverage",
+   "note": "",
+   "observed": 0.5343957906643805,
+   "state": "pass"
+  },
+  {
+   "cap": -0.25,
+   "forces_action": false,
+   "limit": "drawdown_circuit_breaker",
+   "note": "",
+   "observed": -0.011871046749139857,
+   "state": "pass"
+  }
+ ],
+ "run": "heartbeat",
+ "unknown_limits": [
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "53.4% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.5343957906643804,
+   "state": "unknown"
+  }
+ ]
+}
