@@ -1,31 +1,16 @@
 {
- "agent": "mohnish_pabrai",
- "all_clear": null,
- "breaches": [],
- "cash": 4600.77,
+ "at": "2026-08-20T18:02:57+00:00",
  "cash_weight": 0.46624374894392934,
- "circuit_breaker": false,
- "drawdown_from_peak": null,
  "filings_flagged": [],
- "journal": {
-  "calibration": {
-   "brier": null,
-   "buckets": [],
-   "resolved": 0,
-   "shrinkage": 1.0
-  },
-  "entries": 0,
-  "open": 0,
-  "punch_card": {
-   "remaining": 20,
-   "total": 20,
-   "used": 0
-  }
- },
- "limits": [],
+ "grounds_triggered": [],
  "nav": 9867.7355147839,
- "peak_nav": 10000.0,
+ "open_theses": 0,
  "positions": 24,
+ "punch_card": {
+  "remaining": 20,
+  "used": 0
+ },
+ "queued_for_reading": [],
  "regime": {
   "as_of": "2026-08-20",
   "risk_on_count": 0,
@@ -65,7 +50,5 @@
   ],
   "unknown_count": 4
  },
- "run": "close",
- "unknown_limits": [],
- "updated": "2026-08-20T18:02:57+00:00"
+ "run": "close"
 }
