@@ -3,10 +3,56 @@
  "all_clear": null,
  "breaches": [],
  "cash": 4601.94,
- "cash_weight": 0.46576066927021204,
+ "cash_weight": 0.4665229500305877,
  "circuit_breaker": false,
  "drawdown_from_peak": null,
- "filings_flagged": [],
+ "filings_flagged": [
+  {
+   "accession": "0001193125-26-366694",
+   "code": "3.01",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "delisting notice or failure to satisfy a listing rule",
+   "severity": "critical",
+   "ticker": "LEG"
+  },
+  {
+   "accession": "0001193125-26-366694",
+   "code": "2.01",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "completion of an acquisition or disposition \u2014 the security may be about to stop trading",
+   "severity": "critical",
+   "ticker": "LEG"
+  },
+  {
+   "accession": "0001193125-26-366694",
+   "code": "5.02",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "LEG"
+  },
+  {
+   "accession": "0000810136-26-000006",
+   "code": "2.02",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "PLAB"
+  },
+  {
+   "accession": "0000933034-26-000003",
+   "code": "2.02",
+   "filed": "2026-08-25",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "STRT"
+  }
+ ],
  "journal": {
   "calibration": {
    "brier": null,
@@ -23,11 +69,11 @@
   }
  },
  "limits": [],
- "nav": 9880.48219531,
+ "nav": 9864.3378631175,
  "peak_nav": 10000.0,
  "positions": 24,
  "regime": {
-  "as_of": "2026-08-25",
+  "as_of": "2026-08-26",
   "risk_on_count": 0,
   "signals": [
    {
@@ -67,5 +113,5 @@
  },
  "run": "close",
  "unknown_limits": [],
- "updated": "2026-08-25T20:33:12+00:00"
+ "updated": "2026-08-26T18:18:06+00:00"
 }
