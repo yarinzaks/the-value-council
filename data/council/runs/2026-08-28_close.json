@@ -1,0 +1,127 @@
+{
+ "at": "2026-08-28T00:39:11+00:00",
+ "cash_weight": 0.4681029840140117,
+ "filings_flagged": [
+  {
+   "accession": "0000876661-26-000712",
+   "code": "25-NSE",
+   "filed": "2026-08-27",
+   "form": "25-NSE",
+   "meaning": "exchange filed to delist the security",
+   "severity": "critical",
+   "ticker": "LEG"
+  },
+  {
+   "accession": "0001193125-26-366694",
+   "code": "3.01",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "delisting notice or failure to satisfy a listing rule",
+   "severity": "critical",
+   "ticker": "LEG"
+  },
+  {
+   "accession": "0001193125-26-366694",
+   "code": "2.01",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "completion of an acquisition or disposition \u2014 the security may be about to stop trading",
+   "severity": "critical",
+   "ticker": "LEG"
+  },
+  {
+   "accession": "0001193125-26-366694",
+   "code": "5.02",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "LEG"
+  },
+  {
+   "accession": "0000810136-26-000006",
+   "code": "2.02",
+   "filed": "2026-08-26",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "PLAB"
+  },
+  {
+   "accession": "0000933034-26-000003",
+   "code": "2.02",
+   "filed": "2026-08-25",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "STRT"
+  }
+ ],
+ "grounds_triggered": [
+  {
+   "ground": "holding_event",
+   "note": "25-NSE: exchange filed to delist the security",
+   "ticker": "LEG"
+  },
+  {
+   "ground": "holding_event",
+   "note": "3.01: delisting notice or failure to satisfy a listing rule",
+   "ticker": "LEG"
+  },
+  {
+   "ground": "holding_event",
+   "note": "2.01: completion of an acquisition or disposition \u2014 the security may be about to stop trading",
+   "ticker": "LEG"
+  }
+ ],
+ "nav": 9831.041794559998,
+ "open_theses": 0,
+ "positions": 24,
+ "punch_card": {
+  "remaining": 20,
+  "used": 0
+ },
+ "queued_for_reading": [
+  "LEG"
+ ],
+ "regime": {
+  "as_of": "2026-08-28",
+  "risk_on_count": 0,
+  "signals": [
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "BAMLH0A0HYM2",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "T10Y3M",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "SP500",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "VIXCLS",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   }
+  ],
+  "unknown_count": 4
+ },
+ "run": "close"
+}

@@ -3,10 +3,19 @@
  "all_clear": null,
  "breaches": [],
  "cash": 4601.94,
- "cash_weight": 0.4665924274574851,
+ "cash_weight": 0.4681029840140117,
  "circuit_breaker": false,
  "drawdown_from_peak": null,
  "filings_flagged": [
+  {
+   "accession": "0000876661-26-000712",
+   "code": "25-NSE",
+   "filed": "2026-08-27",
+   "form": "25-NSE",
+   "meaning": "exchange filed to delist the security",
+   "severity": "critical",
+   "ticker": "LEG"
+  },
   {
    "accession": "0001193125-26-366694",
    "code": "3.01",
@@ -69,11 +78,11 @@
   }
  },
  "limits": [],
- "nav": 9862.869024849999,
+ "nav": 9831.041794559998,
  "peak_nav": 10000.0,
  "positions": 24,
  "regime": {
-  "as_of": "2026-08-27",
+  "as_of": "2026-08-28",
   "risk_on_count": 0,
   "signals": [
    {
@@ -113,5 +122,5 @@
  },
  "run": "close",
  "unknown_limits": [],
- "updated": "2026-08-27T00:24:02+00:00"
+ "updated": "2026-08-28T00:39:11+00:00"
 }
