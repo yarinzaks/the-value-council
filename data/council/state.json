@@ -1,48 +1,12 @@
 {
  "agent": "mohnish_pabrai",
- "all_clear": null,
+ "all_clear": false,
  "breaches": [],
- "cash": 4601.94,
- "cash_weight": 0.46940045263274327,
+ "cash": 4815.59,
+ "cash_weight": 0.49240495730861655,
  "circuit_breaker": false,
- "drawdown_from_peak": null,
+ "drawdown_from_peak": -0.022026499017999912,
  "filings_flagged": [
-  {
-   "accession": "0000876661-26-000712",
-   "code": "25-NSE",
-   "filed": "2026-08-27",
-   "form": "25-NSE",
-   "meaning": "exchange filed to delist the security",
-   "severity": "critical",
-   "ticker": "LEG"
-  },
-  {
-   "accession": "0001193125-26-366694",
-   "code": "3.01",
-   "filed": "2026-08-26",
-   "form": "8-K",
-   "meaning": "delisting notice or failure to satisfy a listing rule",
-   "severity": "critical",
-   "ticker": "LEG"
-  },
-  {
-   "accession": "0001193125-26-366694",
-   "code": "2.01",
-   "filed": "2026-08-26",
-   "form": "8-K",
-   "meaning": "completion of an acquisition or disposition \u2014 the security may be about to stop trading",
-   "severity": "critical",
-   "ticker": "LEG"
-  },
-  {
-   "accession": "0001193125-26-366694",
-   "code": "5.02",
-   "filed": "2026-08-26",
-   "form": "8-K",
-   "meaning": "officer or director departure",
-   "severity": "note",
-   "ticker": "LEG"
-  },
   {
    "accession": "0000810136-26-000006",
    "code": "2.02",
@@ -77,50 +41,246 @@
    "used": 0
   }
  },
- "limits": [],
- "nav": 9803.86783649,
+ "limits": [
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:REPX",
+   "note": "",
+   "observed": 0.02489385833006133,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PRDO",
+   "note": "",
+   "observed": 0.02431759683275684,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIGA",
+   "note": "",
+   "observed": 0.02414819877203878,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UVV",
+   "note": "",
+   "observed": 0.02363730298294194,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:HOG",
+   "note": "",
+   "observed": 0.023265152872908743,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SD",
+   "note": "",
+   "observed": 0.02321551429635094,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CLMB",
+   "note": "",
+   "observed": 0.023179722781074857,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UTMD",
+   "note": "",
+   "observed": 0.022816307867845484,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CALM",
+   "note": "",
+   "observed": 0.022730123328678145,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:COLM",
+   "note": "",
+   "observed": 0.022717900578789734,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:MHO",
+   "note": "",
+   "observed": 0.022323302541509063,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:ZUMZ",
+   "note": "",
+   "observed": 0.02192091709537494,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:RMR",
+   "note": "",
+   "observed": 0.021862479939927865,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:TRN",
+   "note": "",
+   "observed": 0.02178231607462755,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:GCO",
+   "note": "",
+   "observed": 0.02159156641851449,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NATR",
+   "note": "",
+   "observed": 0.021519129125552188,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UPBD",
+   "note": "",
+   "observed": 0.02138189309322081,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CRTO",
+   "note": "",
+   "observed": 0.02102820822788173,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:YELP",
+   "note": "",
+   "observed": 0.020684244618783713,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIG",
+   "note": "",
+   "observed": 0.020667430366676176,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NGVT",
+   "note": "",
+   "observed": 0.020397063545147268,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:STRT",
+   "note": "",
+   "observed": 0.018842815667803225,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PLAB",
+   "note": "",
+   "observed": 0.018671997332917606,
+   "state": "pass"
+  },
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "50.8% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.5075950426913833,
+   "state": "unknown"
+  },
+  {
+   "cap": 0.2,
+   "forces_action": false,
+   "limit": "illiquid_aggregate",
+   "note": "",
+   "observed": 0.15866226987816506,
+   "state": "pass"
+  },
+  {
+   "cap": 0.05,
+   "forces_action": false,
+   "limit": "cash_floor",
+   "note": "",
+   "observed": 0.49240495730861655,
+   "state": "pass"
+  },
+  {
+   "cap": 1.0,
+   "forces_action": false,
+   "limit": "leverage",
+   "note": "",
+   "observed": 0.5075950426913834,
+   "state": "pass"
+  },
+  {
+   "cap": -0.25,
+   "forces_action": false,
+   "limit": "drawdown_circuit_breaker",
+   "note": "",
+   "observed": -0.022026499017999912,
+   "state": "pass"
+  }
+ ],
+ "nav": 9779.73500982,
  "peak_nav": 10000.0,
- "positions": 24,
- "regime": {
-  "as_of": "2026-08-31",
-  "risk_on_count": 0,
-  "signals": [
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "BAMLH0A0HYM2",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   },
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "T10Y3M",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   },
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "SP500",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   },
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "VIXCLS",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   }
-  ],
-  "unknown_count": 4
- },
- "run": "close",
- "unknown_limits": [],
- "updated": "2026-08-31T20:33:14+00:00"
+ "positions": 23,
+ "regime": null,
+ "run": "heartbeat",
+ "unknown_limits": [
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "50.8% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.5075950426913833,
+   "state": "unknown"
+  }
+ ],
+ "updated": "2026-09-01T15:20:10+00:00"
 }
