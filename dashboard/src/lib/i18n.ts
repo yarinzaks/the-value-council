@@ -273,6 +273,18 @@ const en: Dict = {
 
   // ---- 4-agent overview cards ----
   card_pnl_today: "P&L today",
+  card_return_total: "Total return",
+  rb_title: "Where the return came from",
+  rb_initial: "Started with",
+  rb_realized: "Closed trades",
+  rb_unrealized: "Open positions",
+  rb_dividends: "Dividends",
+  rb_costs: "Costs",
+  rb_nav: "Now",
+  rb_contributors: "Biggest closed trades",
+  rb_named_share: "{pct} of closed gains named",
+  rb_unattributed_note: "{amount} ({pct}) of the closed-trade result cannot be traced to a stock. Those trades closed before the trade ledger existed, so only the total survives. This shrinks on its own as new trades are recorded.",
+  rb_reconstructed_note: "The named trades were reconstructed from daily book snapshots rather than recorded at execution, so their amounts are approximate. Every trade from here on is recorded exactly.",
 
   // ---- Glossary page ----
   glossary_title: "Glossary",
@@ -575,6 +587,18 @@ const he: Dict = {
 
   // ---- 4-agent overview cards ----
   card_pnl_today: "רווח/הפסד היום",
+  card_return_total: "תשואה כוללת",
+  rb_title: "מאיפה הגיעה התשואה",
+  rb_initial: "התחלה",
+  rb_realized: "עסקאות סגורות",
+  rb_unrealized: "פוזיציות פתוחות",
+  rb_dividends: "דיבידנדים",
+  rb_costs: "עלויות",
+  rb_nav: "היום",
+  rb_contributors: "העסקאות הסגורות הגדולות",
+  rb_named_share: "{pct} מהרווח הסגור מזוהה בשם",
+  rb_unattributed_note: "{amount} ({pct}) מתוצאת העסקאות הסגורות לא ניתנים לשיוך למניה. העסקאות האלה נסגרו לפני שיומן העסקאות היה קיים, ולכן רק הסכום הכולל שרד. הפער הזה מצטמצם מעצמו ככל שנרשמות עסקאות חדשות.",
+  rb_reconstructed_note: "העסקאות ששמן מופיע שוחזרו מתמונות יומיות של התיק ולא נרשמו ברגע הביצוע, ולכן הסכומים מקורבים. מכאן והלאה כל עסקה נרשמת במדויק.",
 
   // ---- Glossary page ----
   glossary_title: "מילון מונחים",

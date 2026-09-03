@@ -9,6 +9,8 @@ import {
 } from "@/components/Cards";
 import { NavChart } from "@/components/NavChart";
 import { SectorDonut, type SectorSlice } from "@/components/SectorDonut";
+import { ReturnBreakdown } from "@/components/ReturnBreakdown";
+import { buildReturnParts } from "@/lib/return-breakdown";
 import { SectorTrendChart } from "@/components/SectorTrendChart";
 import { buildSectorTrends, toChartRows } from "@/lib/sector-trend";
 import { LivePositionsTable } from "@/components/LivePositionsTable";
@@ -23,6 +25,7 @@ import {
   loadPriceSeries,
   loadSectors,
   loadSnapshots,
+  loadTradeLedger,
 } from "@/lib/data";
 import { AGENTS, metaLocalized } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
@@ -52,14 +55,23 @@ export default async function AgentDrillPage({
   const meta = metaLocalized(slug, locale);
   if (!meta) return notFound();
 
-  const [run, recent, live, companyNames, snapshots, sectorMap] = await Promise.all([
-    loadAgentLatest(slug),
-    loadJournal({ agent: slug, limit: 30 }),
-    loadLivePortfolio(slug),
-    loadCompanyNames(),
-    loadSnapshots(slug),
-    loadSectors(),
-  ]);
+  const [run, recent, live, companyNames, snapshots, sectorMap, ledger] =
+    await Promise.all([
+      loadAgentLatest(slug),
+      loadJournal({ agent: slug, limit: 30 }),
+      loadLivePortfolio(slug),
+      loadCompanyNames(),
+      loadSnapshots(slug),
+      loadSectors(),
+      loadTradeLedger(slug),
+    ]);
+
+  // The parts the headline return is made of. Cheap: arithmetic over a
+  // book already in memory and a ledger already read.
+  const returnBreakdown = buildReturnParts(
+    live ?? ({ positions: [] } as never),
+    ledger,
+  );
 
   // Depends on the book, so it cannot join the batch above. Reads the
   // per-ticker series already published for the charts — no new export,
@@ -214,6 +226,36 @@ export default async function AgentDrillPage({
           {/* Where the money sits, before the list of what it is
               in. A position table answers "what"; this answers "what
               is this investor actually doing". */}
+          {/* Before the sector split, because it answers the question a
+              reader asks first: the headline says +24%, the positions
+              below are red, and until the return is broken into parts
+              those two facts look like a mistake. */}
+          {live && (
+            <Card className="mb-6">
+              <h3 className="text-sm font-semibold mb-1">{t("rb_title")}</h3>
+              <p className="text-xs text-muted mb-3">
+                {t("rb_unrealized")} · {t("rb_realized")} · {t("rb_dividends")} · {t("rb_costs")}
+              </p>
+              <ReturnBreakdown
+                parts={returnBreakdown.parts}
+                contributors={returnBreakdown.contributors}
+                locale={locale}
+                labels={{
+                  initial: t("rb_initial"),
+                  realized: t("rb_realized"),
+                  unrealized: t("rb_unrealized"),
+                  dividends: t("rb_dividends"),
+                  costs: t("rb_costs"),
+                  nav: t("rb_nav"),
+                  contributors: t("rb_contributors"),
+                  named_share: t("rb_named_share"),
+                  unattributed_note: t("rb_unattributed_note"),
+                  reconstructed_note: t("rb_reconstructed_note"),
+                }}
+              />
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             <Card>
               <h3 className="text-sm font-semibold mb-1">{t("sector_title")}</h3>

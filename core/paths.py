@@ -129,6 +129,11 @@ def fiscal_calendar_path() -> Path:
     return cache_dir() / "fiscal_calendar.json"
 
 
+def trade_ledger_dir() -> Path:
+    """Every executed trade, with the realized P&L that used to be lost."""
+    return data_root() / "trades"
+
+
 def council_reviews_dir() -> Path:
     """What each REVIEW run concluded about a holding.
 
