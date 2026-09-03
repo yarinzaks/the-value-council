@@ -68,6 +68,7 @@ const PORTFOLIOS_DIR = path.join(DATA_ROOT, "portfolios");
 const SNAPSHOTS_DIR = path.join(DATA_ROOT, "snapshots");
 const COMPANY_NAMES_PATH = path.join(DATA_ROOT, "cache", "company_names.json");
 const PRICES_DIR = path.join(DATA_ROOT, "prices");
+const TRADES_DIR = path.join(DATA_ROOT, "trades");
 
 // --------------------------------------------------------------------------
 // Backtest run discovery
@@ -337,6 +338,44 @@ export async function loadLivePortfolio(slug: AgentSlug): Promise<LivePortfolio 
   } catch {
     return null;
   }
+}
+
+// ----- Trade ledger -----------------------------------------------------
+
+export interface LedgerRow {
+  date: string;
+  agent: string;
+  ticker: string;
+  side: string;
+  shares: number;
+  price: number;
+  realized_pnl_usd: number;
+  source?: string;
+}
+
+/** Every executed trade for one agent, oldest first.
+ *
+ * The daily snapshot keeps tickers only, which is how a book could show
+ * +24.55% with every open position losing money and no page able to say
+ * which sale paid for it.
+ */
+export async function loadTradeLedger(slug: AgentSlug): Promise<LedgerRow[]> {
+  const dir = path.join(TRADES_DIR, slug);
+  let files: string[];
+  try {
+    files = await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+  const out: LedgerRow[] = [];
+  for (const file of files.filter((f) => f.endsWith(".json")).sort()) {
+    try {
+      out.push(...(await readJson<LedgerRow[]>(path.join(dir, file))));
+    } catch {
+      // One unreadable day costs its attribution, not the whole report.
+    }
+  }
+  return out;
 }
 
 // ----- Daily snapshots --------------------------------------------------

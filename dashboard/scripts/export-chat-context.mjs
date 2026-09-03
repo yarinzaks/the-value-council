@@ -52,6 +52,8 @@ function listJson(dir) {
   }
 }
 
+const round2 = (n) => Math.round(n * 100) / 100;
+
 const portfolios = [];
 const portfolioDir = join(DATA_DIR, "portfolios");
 
@@ -79,6 +81,65 @@ for (const file of listJson(portfolioDir)) {
     .filter(Boolean)
     .map((s) => ({ date: s.date, nav: s.nav, cash: s.cash }));
 
+  // The ledger: every executed trade, with the realized P&L that used
+  // to be computed at the sale and thrown away. Without it the assistant
+  // was asked which stocks produced Graham's +24.55% and could only say
+  // it did not know — which was true, and was the bug.
+  const ledgerDir = join(DATA_DIR, "trades", agent);
+  const ledger = listJson(ledgerDir).flatMap(
+    (f) => readJson(join(ledgerDir, f)) ?? [],
+  );
+
+  const realizedByTicker = {};
+  let reconstructedCount = 0;
+  for (const row of ledger) {
+    if (row.source === "reconstructed") reconstructedCount += 1;
+    if (!row.realized_pnl_usd) continue;
+    realizedByTicker[row.ticker] =
+      (realizedByTicker[row.ticker] ?? 0) + row.realized_pnl_usd;
+  }
+  const contributors = Object.entries(realizedByTicker)
+    .sort((a, b) => b[1] - a[1])
+    .map(([ticker, realized_usd]) => ({
+      ticker,
+      realized_usd: round2(realized_usd),
+    }));
+
+  // The identity: NAV = initial + realized + unrealized + dividends - costs.
+  // realized is solved for rather than summed from the ledger, so it stays
+  // exact however much history the ledger is missing — and the gap between
+  // it and what the ledger can name is reported, not hidden.
+  const costBasis = (book.positions ?? []).reduce(
+    (sum, p) => sum + p.shares * p.entry_price,
+    0,
+  );
+  const unrealized = (book.invested ?? 0) - costBasis;
+  const realized =
+    (book.total_nav ?? 0) -
+    (book.initial_cash ?? 0) -
+    unrealized -
+    (book.cumulative_dividends ?? 0) +
+    (book.cumulative_costs ?? 0);
+  const attributedTotal = contributors.reduce((n, c) => n + c.realized_usd, 0);
+
+  const return_breakdown = {
+    initial_cash: round2(book.initial_cash ?? 0),
+    realized: round2(realized),
+    unrealized: round2(unrealized),
+    dividends: round2(book.cumulative_dividends ?? 0),
+    costs: round2(book.cumulative_costs ?? 0),
+    nav: round2(book.total_nav ?? 0),
+    attributed_total: round2(attributedTotal),
+    unattributed: round2(realized - attributedTotal),
+    ledger_is_reconstructed: reconstructedCount === ledger.length && ledger.length > 0,
+    note:
+      "realized is derived from the accounting identity and is exact. " +
+      "attributed is what the trade ledger can name; unattributed is the " +
+      "rest, from trades that closed before the ledger existed. Entries " +
+      "marked reconstructed were inferred from committed books, not " +
+      "recorded at execution, so they are approximate.",
+  };
+
   const decisionDir = join(DATA_DIR, "decisions", agent);
   const decisions = listJson(decisionDir)
     .slice(-DECISION_DAYS)
@@ -99,7 +160,20 @@ for (const file of listJson(portfolioDir)) {
     invested: book.invested,
     return_pct: book.cumulative_return_pct,
     initial_cash: book.initial_cash,
-    inception: book.inception_date,
+    dividend_floor: book.dividend_floor_date,
+    return_breakdown,
+    realized_contributors: contributors.slice(0, 15),
+    closed_trades: ledger
+      .filter((t) => t.side === "SELL")
+      .slice(-40)
+      .map((t) => ({
+        date: t.date,
+        ticker: t.ticker,
+        shares: t.shares,
+        price: t.price,
+        realized_usd: t.realized_pnl_usd,
+        source: t.source ?? "executed",
+      })),
     last_open_run: book.last_open_run,
     position_count: positions.length,
     positions,

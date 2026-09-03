@@ -1,7 +1,7 @@
 // 4-agent cards row for the Overview page.
 //
 // Server-rendered. Each card shows: NAV, cash, positions count,
-// today's P&L (in $ and %), and watchlist count. Clicking a card
+// watchlist count, total return since seed, and today's P&L. Clicking a card
 // takes the user to the agent drilldown.
 
 import Link from "next/link";
@@ -93,6 +93,30 @@ export function AgentCardsRow({
                   <span className="tabular text-muted">
                     {portfolio.watchlist.length}
                   </span>
+                </div>
+                {/* Total return since the $10,000 seed. The card showed
+                    only the day's move, which is the number that matters
+                    least: a book can be down today and up a quarter, and
+                    the reader had to open the agent's page to find out
+                    which. */}
+                <div className="border-t border-council-100 dark:border-council-800 pt-2 mt-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-muted">
+                      {t("card_return_total")}
+                    </span>
+                    <span className="text-right">
+                      <span className="block">
+                        <Money
+                          value={portfolio.total_nav - portfolio.initial_cash}
+                          signed
+                          digits={2}
+                        />
+                      </span>
+                      <span className="block text-xs">
+                        <PctCell value={portfolio.cumulative_return_pct} />
+                      </span>
+                    </span>
+                  </div>
                 </div>
                 <div className="border-t border-council-100 dark:border-council-800 pt-2 mt-2">
                   <div className="flex items-baseline justify-between">
