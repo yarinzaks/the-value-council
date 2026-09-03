@@ -95,8 +95,9 @@ from core.live.portfolio import (
 from core.live.price_export import export_prices
 from core.live.sector_export import export_sectors
 from core.live.snapshots import make_snapshot, save_snapshot
+from core.live.trade_ledger import record_day
 from core.logger import get_logger
-from core.paths import council_published_dir
+from core.paths import council_published_dir, trade_ledger_dir
 
 logger = get_logger("core.live.runner")
 
@@ -445,6 +446,7 @@ class DailyRunner:
         adapters: list[AgentAdapter] | None = None,
         portfolio_dir: Path = DEFAULT_PORTFOLIO_DIR,
         published_dir: Path | None = None,
+        ledger_dir: Path | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
         initial_cash: float = DEFAULT_INITIAL_CASH,
         rebalance_band: float = DEFAULT_REBALANCE_BAND,
@@ -477,6 +479,7 @@ class DailyRunner:
         # Where the cooling-off lists live. Resolved once here rather
         # than per call so a test can point it at a tmp_path.
         self.published_dir = published_dir or council_published_dir()
+        self.ledger_dir = ledger_dir or trade_ledger_dir()
         self.cost_bps = cost_bps
         self.initial_cash = initial_cash
         self.rebalance_band = rebalance_band
@@ -956,6 +959,16 @@ class DailyRunner:
             save_snapshot(snap)
         except Exception as exc:
             logger.warning(f"{as_of}: snapshot save for {adapter.name} failed: {exc}")
+
+        # The ledger. The snapshot above keeps only tickers, which is
+        # why a book could report +24.55% with every open position
+        # losing money and no file able to say which sale paid for it.
+        # Never fatal: the trades already happened and the book is
+        # already saved, so failing here costs attribution, not money.
+        try:
+            record_day(adapter.name, as_of, trades, directory=self.ledger_dir)
+        except Exception as exc:
+            logger.warning(f"{as_of}: ledger write for {adapter.name} failed: {exc}")
 
         return AgentRunResult(
             agent=adapter.name,

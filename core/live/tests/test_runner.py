@@ -27,6 +27,7 @@ from core.live.runner import (
     _filter_adapters,
     pos_age_days,
 )
+from core.live.trade_ledger import read_ledger
 from scripts.run_daily_paper_trading import parse_args
 
 AS_OF = date(2026, 8, 5)
@@ -97,6 +98,7 @@ def runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> DailyRunner:
         # data root, so a test run would leave artefacts the live
         # rebalance could later trade from.
         published_dir=tmp_path / "published",
+        ledger_dir=tmp_path / "trades",
         price_loader=_StubPriceLoader({}),  # type: ignore[arg-type]
         universe=object(),  # type: ignore[arg-type]
         pit_loader=object(),  # type: ignore[arg-type]
@@ -1892,6 +1894,76 @@ class TestTheQuarterlyRebalanceTradesACooledOffList:
         assert executable_list(
             runner.published_dir, as_of=AS_OF + timedelta(days=1)
         ) is None
+
+
+class TestTheLedgerRecordsWhatWasExecuted:
+    """The number that used to be computed and thrown away.
+
+    The daily snapshot keeps tickers only, which is how a book could
+    report +24.55% with every open position losing money and no file
+    able to say which sale paid for it.
+    """
+
+    def test_a_sale_is_written_with_its_realized_pnl(
+        self, runner: DailyRunner
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "GONE", entry_price=50.0, current_price=50.0
+        )
+        runner.price_loader = _StubPriceLoader({"GONE": 55.0, "KEEP": 20.0})  # type: ignore[assignment]
+        runner._run_one(
+            _StubAdapter("stub_agent", [_target("KEEP")]),
+            AS_OF,
+            ["KEEP", "GONE"],
+            {"KEEP": 20.0, "GONE": 55.0},
+            {"KEEP": None, "GONE": None},
+        )
+
+        entries = read_ledger("stub_agent", directory=runner.ledger_dir)
+        sells = [e for e in entries if e.side == "SELL"]
+        assert [e.ticker for e in sells] == ["GONE"]
+        # 10 shares bought at 50, sold at 55, less the 0.1% cost.
+        assert sells[0].realized_pnl_usd == pytest.approx(50.0, abs=1.0)
+
+    def test_a_day_with_no_trades_leaves_no_ledger_file(
+        self, runner: DailyRunner
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=50.0
+        )
+        runner.price_loader = _StubPriceLoader({"HOLD": 50.0})  # type: ignore[assignment]
+        runner._run_one(
+            _StubAdapter("stub_agent", []),
+            AS_OF, ["HOLD"], {"HOLD": 50.0}, {"HOLD": None},
+        )
+
+        assert read_ledger("stub_agent", directory=runner.ledger_dir) == []
+
+    def test_a_ledger_failure_never_costs_the_run(
+        self, runner: DailyRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The trades already happened and the book is already saved.
+
+        Failing here costs attribution, not money, so it must not take
+        down a run that has moved real positions.
+        """
+        def _boom(*a: object, **k: object) -> None:
+            raise OSError("disk full")
+
+        monkeypatch.setattr("core.live.runner.record_day", _boom)
+        _seed_holding(
+            runner, "stub_agent", "GONE", entry_price=50.0, current_price=50.0
+        )
+        runner.price_loader = _StubPriceLoader({"GONE": 55.0, "KEEP": 20.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", [_target("KEEP")]),
+            AS_OF, ["KEEP", "GONE"], {"KEEP": 20.0, "GONE": 55.0},
+            {"KEEP": None, "GONE": None},
+        )
+
+        assert result.error is None
+        assert [t.ticker for t in result.trades if t.side == "SELL"] == ["GONE"]
 
 
 class TestForceFlagParsing:
