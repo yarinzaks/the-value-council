@@ -1,0 +1,73 @@
+{
+ "at": "2026-09-08T16:05:29+00:00",
+ "cash_weight": 0.4909030630404365,
+ "filings_flagged": [
+  {
+   "accession": "0001562762-26-000102",
+   "code": "1.01",
+   "filed": "2026-09-02",
+   "form": "8-K",
+   "meaning": "entry into a material agreement",
+   "severity": "investigate",
+   "ticker": "CALM"
+  },
+  {
+   "accession": "0001193125-26-381023",
+   "code": "2.02",
+   "filed": "2026-09-03",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "GCO"
+  }
+ ],
+ "grounds_triggered": [],
+ "nav": 9812.079741705,
+ "open_theses": 0,
+ "positions": 23,
+ "punch_card": {
+  "remaining": 20,
+  "used": 0
+ },
+ "queued_for_reading": [],
+ "regime": {
+  "as_of": "2026-09-08",
+  "risk_on_count": 0,
+  "signals": [
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "BAMLH0A0HYM2",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "T10Y3M",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "SP500",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "VIXCLS",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   }
+  ],
+  "unknown_count": 4
+ },
+ "run": "close"
+}
