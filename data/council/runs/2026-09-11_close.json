@@ -1,11 +1,6 @@
 {
- "agent": "mohnish_pabrai",
- "all_clear": null,
- "breaches": [],
- "cash": 4816.78,
+ "at": "2026-09-11T18:02:46+00:00",
  "cash_weight": 0.49244196278115454,
- "circuit_breaker": false,
- "drawdown_from_peak": null,
  "filings_flagged": [
   {
    "accession": "0000832988-26-000227",
@@ -53,25 +48,15 @@
    "ticker": "GCO"
   }
  ],
- "journal": {
-  "calibration": {
-   "brier": null,
-   "buckets": [],
-   "resolved": 0,
-   "shrinkage": 1.0
-  },
-  "entries": 0,
-  "open": 0,
-  "punch_card": {
-   "remaining": 20,
-   "total": 20,
-   "used": 0
-  }
- },
- "limits": [],
+ "grounds_triggered": [],
  "nav": 9781.4166217606,
- "peak_nav": 10000.0,
+ "open_theses": 0,
  "positions": 23,
+ "punch_card": {
+  "remaining": 20,
+  "used": 0
+ },
+ "queued_for_reading": [],
  "regime": {
   "as_of": "2026-09-11",
   "risk_on_count": 0,
@@ -111,7 +96,5 @@
   ],
   "unknown_count": 4
  },
- "run": "close",
- "unknown_limits": [],
- "updated": "2026-09-11T18:02:46+00:00"
+ "run": "close"
 }
