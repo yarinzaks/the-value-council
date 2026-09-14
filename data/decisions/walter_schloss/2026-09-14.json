@@ -1,0 +1,80 @@
+[
+  {
+    "ticker": "BUR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-14T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.410 (< 0.75)",
+      "D/E=0.87 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.4096,
+      "debt_to_equity": 0.8692,
+      "book_value_per_share": 11.183419961421203,
+      "market_cap": 947825898.4994507,
+      "net_income": 62572000.0,
+      "price": 4.329999923706055
+    },
+    "market_conditions": {},
+    "confidence": 0.5903953849221173,
+    "entry_price": 4.329999923706055,
+    "target_price": 11.183419961421203,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.410, D/E 0.87, BVPS 11.18"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-14T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.582 (< 0.75)",
+      "D/E=0.30 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.5825,
+      "debt_to_equity": 0.3009,
+      "book_value_per_share": 125.98787744331774,
+      "market_cap": 3298565509.08593,
+      "net_income": 503000000.0,
+      "price": 73.38500213623047
+    },
+    "market_conditions": {},
+    "confidence": 0.41752330759563305,
+    "entry_price": 73.38500213623047,
+    "target_price": 125.98787744331774,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.582, D/E 0.30, BVPS 125.99"
+  },
+  {
+    "ticker": "RJET",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-14T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.675 (< 0.75)",
+      "D/E=0.23 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.675,
+      "debt_to_equity": 0.2335,
+      "book_value_per_share": 28.368884588843148,
+      "market_cap": 814013352.2787781,
+      "net_income": 76200000.0,
+      "price": 17.38249969482422
+    },
+    "market_conditions": {},
+    "confidence": 0.3250303878285422,
+    "entry_price": 17.38249969482422,
+    "target_price": 28.368884588843148,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.675, D/E 0.23, BVPS 28.37"
+  }
+]
