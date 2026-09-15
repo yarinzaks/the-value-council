@@ -1,0 +1,106 @@
+[
+  {
+    "ticker": "BUR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-15T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.406 (< 0.75)",
+      "D/E=0.87 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.4063,
+      "debt_to_equity": 0.8692,
+      "book_value_per_share": 11.183419961421203,
+      "market_cap": 940164521.5005493,
+      "net_income": 62572000.0,
+      "price": 4.295000076293945
+    },
+    "market_conditions": {},
+    "confidence": 0.5937062623539006,
+    "entry_price": 4.295000076293945,
+    "target_price": 11.183419961421203,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.406, D/E 0.87, BVPS 11.18"
+  },
+  {
+    "ticker": "BHF",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-15T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.417 (< 0.75)",
+      "D/E=0.47 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.4165,
+      "debt_to_equity": 0.4662,
+      "book_value_per_share": 118.35457965334035,
+      "market_cap": 2819176037.071995,
+      "net_income": 433000000.0,
+      "price": 49.29999923706055
+    },
+    "market_conditions": {},
+    "confidence": 0.5834550772647762,
+    "entry_price": 49.29999923706055,
+    "target_price": 118.35457965334035,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.417, D/E 0.47, BVPS 118.35"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-15T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.571 (< 0.75)",
+      "D/E=0.30 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.5711,
+      "debt_to_equity": 0.3009,
+      "book_value_per_share": 125.98787744331774,
+      "market_cap": 3234288755.698654,
+      "net_income": 503000000.0,
+      "price": 71.95500183105469
+    },
+    "market_conditions": {},
+    "confidence": 0.4288736083880179,
+    "entry_price": 71.95500183105469,
+    "target_price": 125.98787744331774,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.571, D/E 0.30, BVPS 125.99"
+  },
+  {
+    "ticker": "RJET",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-15T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.682 (< 0.75)",
+      "D/E=0.23 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.6819,
+      "debt_to_equity": 0.2335,
+      "book_value_per_share": 28.368884588843148,
+      "market_cap": 822325573.5503616,
+      "net_income": 76200000.0,
+      "price": 17.559999465942383
+    },
+    "market_conditions": {},
+    "confidence": 0.3181379987144597,
+    "entry_price": 17.559999465942383,
+    "target_price": 28.368884588843148,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.682, D/E 0.23, BVPS 28.37"
+  }
+]
