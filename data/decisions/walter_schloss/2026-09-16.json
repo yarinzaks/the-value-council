@@ -1,0 +1,192 @@
+[
+  {
+    "ticker": "BUR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.388 (< 0.75)",
+      "D/E=0.87 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.3878,
+      "debt_to_equity": 0.8692,
+      "book_value_per_share": 11.183419961421203,
+      "market_cap": 897479483.1243134,
+      "net_income": 62572000.0,
+      "price": 4.099999904632568
+    },
+    "market_conditions": {},
+    "confidence": 0.612152676132383,
+    "entry_price": 4.099999904632568,
+    "target_price": 11.183419961421203,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.388, D/E 0.87, BVPS 11.18"
+  },
+  {
+    "ticker": "BHF",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.416 (< 0.75)",
+      "D/E=0.47 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.4162,
+      "debt_to_equity": 0.4662,
+      "book_value_per_share": 118.35457965334035,
+      "market_cap": 2816888620.7583885,
+      "net_income": 433000000.0,
+      "price": 49.2599983215332
+    },
+    "market_conditions": {},
+    "confidence": 0.5837930524884178,
+    "entry_price": 49.2599983215332,
+    "target_price": 118.35457965334035,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.416, D/E 0.47, BVPS 118.35"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.572 (< 0.75)",
+      "D/E=0.30 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.5718,
+      "debt_to_equity": 0.3009,
+      "book_value_per_share": 125.98787744331774,
+      "market_cap": 3238109359.911827,
+      "net_income": 503000000.0,
+      "price": 72.04000091552734
+    },
+    "market_conditions": {},
+    "confidence": 0.42819894756986987,
+    "entry_price": 72.04000091552734,
+    "target_price": 125.98787744331774,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.572, D/E 0.30, BVPS 125.99"
+  },
+  {
+    "ticker": "RJET",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.676 (< 0.75)",
+      "D/E=0.23 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.6764,
+      "debt_to_equity": 0.2335,
+      "book_value_per_share": 28.368884588843148,
+      "market_cap": 815769475.4928055,
+      "net_income": 76200000.0,
+      "price": 17.420000076293945
+    },
+    "market_conditions": {},
+    "confidence": 0.3235742325930303,
+    "entry_price": 17.420000076293945,
+    "target_price": 28.368884588843148,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.676, D/E 0.23, BVPS 28.37"
+  },
+  {
+    "ticker": "KSS",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 19.06,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $19.06, exit $16.28 (-14.56%)"
+  },
+  {
+    "ticker": "MOS",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 20.995,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $21.00, exit $25.17 (+19.89%)"
+  },
+  {
+    "ticker": "HPK",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 7.69,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $7.69, exit $8.30 (+7.93%)"
+  },
+  {
+    "ticker": "LGIH",
+    "decision": "EXIT",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "left today's target list"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 58.535,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Closed live position: entry $58.53, exit $51.00 (-12.87%)"
+  },
+  {
+    "ticker": "BHF",
+    "decision": "FILL",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-16T00:00:00+00:00",
+    "criteria_met": [
+      "rank #2",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 49.2599983215332,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "P/B 0.42, D/E 0.47. Trades below tangible book \u2014 Schloss deep-value bargain."
+  }
+]
