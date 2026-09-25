@@ -1,0 +1,80 @@
+[
+  {
+    "ticker": "BUR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-25T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.347 (< 0.75)",
+      "D/E=0.87 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.3467,
+      "debt_to_equity": 0.8692,
+      "book_value_per_share": 11.183419961421203,
+      "market_cap": 802259109.2497253,
+      "net_income": 62572000.0,
+      "price": 3.6649999618530273
+    },
+    "market_conditions": {},
+    "confidence": 0.6533023267699314,
+    "entry_price": 3.6649999618530273,
+    "target_price": 11.183419961421203,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.347, D/E 0.87, BVPS 11.18"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-25T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.556 (< 0.75)",
+      "D/E=0.30 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.556,
+      "debt_to_equity": 0.3009,
+      "book_value_per_share": 125.98787744331774,
+      "market_cap": 3148661405.622757,
+      "net_income": 503000000.0,
+      "price": 70.05000305175781
+    },
+    "market_conditions": {},
+    "confidence": 0.4439941010731491,
+    "entry_price": 70.05000305175781,
+    "target_price": 125.98787744331774,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.556, D/E 0.30, BVPS 125.99"
+  },
+  {
+    "ticker": "GIII",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-09-25T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.656 (< 0.75)",
+      "D/E=0.00 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.656,
+      "debt_to_equity": 0.0026,
+      "book_value_per_share": 41.72440743072998,
+      "market_cap": 1138056032.9189358,
+      "net_income": 67353000.0,
+      "price": 26.975000381469727
+    },
+    "market_conditions": {},
+    "confidence": 0.3439687974416412,
+    "entry_price": 26.975000381469727,
+    "target_price": 41.72440743072998,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.656, D/E 0.00, BVPS 41.72"
+  }
+]
