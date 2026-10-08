@@ -1,0 +1,215 @@
+{
+ "all_clear": false,
+ "at": "2026-10-08T15:41:19+00:00",
+ "breaches": [],
+ "circuit_breaker": false,
+ "drawdown_from_peak": -0.03262687044449997,
+ "filings_flagged": [],
+ "forced_exits_proposed": [],
+ "kill_criteria": [],
+ "limits": [
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:REPX",
+   "note": "",
+   "observed": 0.028507631627799748,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CLMB",
+   "note": "",
+   "observed": 0.027007656799403663,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIG",
+   "note": "",
+   "observed": 0.026645363560846333,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UTMD",
+   "note": "",
+   "observed": 0.024056985205587973,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:GCO",
+   "note": "",
+   "observed": 0.023972060979878137,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PRDO",
+   "note": "",
+   "observed": 0.023590551091165826,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SD",
+   "note": "",
+   "observed": 0.023287906025311528,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:HOG",
+   "note": "",
+   "observed": 0.02292921834431357,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:COLM",
+   "note": "",
+   "observed": 0.02278693870288582,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NGVT",
+   "note": "",
+   "observed": 0.021619927059179384,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PLAB",
+   "note": "",
+   "observed": 0.02090046475581791,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:RMR",
+   "note": "",
+   "observed": 0.020165682800145218,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:TRN",
+   "note": "",
+   "observed": 0.01981655042125106,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:MHO",
+   "note": "",
+   "observed": 0.01959508241531374,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NATR",
+   "note": "",
+   "observed": 0.0192677780326238,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UPBD",
+   "note": "",
+   "observed": 0.018398019178161296,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:CRTO",
+   "note": "",
+   "observed": 0.018216449387112095,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:STRT",
+   "note": "",
+   "observed": 0.017943492759588932,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:ZUMZ",
+   "note": "",
+   "observed": 0.017385180855424127,
+   "state": "pass"
+  },
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "41.6% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.4160929400018101,
+   "state": "unknown"
+  },
+  {
+   "cap": 0.2,
+   "forces_action": false,
+   "limit": "illiquid_aggregate",
+   "note": "",
+   "observed": 0.1311711897184963,
+   "state": "pass"
+  },
+  {
+   "cap": 0.05,
+   "forces_action": false,
+   "limit": "cash_floor",
+   "note": "",
+   "observed": 0.5839070599981898,
+   "state": "pass"
+  },
+  {
+   "cap": 1.0,
+   "forces_action": false,
+   "limit": "leverage",
+   "note": "",
+   "observed": 0.4160929400018102,
+   "state": "pass"
+  },
+  {
+   "cap": -0.25,
+   "forces_action": false,
+   "limit": "drawdown_circuit_breaker",
+   "note": "",
+   "observed": -0.03262687044449997,
+   "state": "pass"
+  }
+ ],
+ "run": "heartbeat",
+ "unknown_limits": [
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "41.6% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.4160929400018101,
+   "state": "unknown"
+  }
+ ]
+}
