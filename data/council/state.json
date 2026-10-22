@@ -3,10 +3,19 @@
  "all_clear": null,
  "breaches": [],
  "cash": 5655.9,
- "cash_weight": 0.5784103974898388,
+ "cash_weight": 0.5768162475210843,
  "circuit_breaker": false,
  "drawdown_from_peak": null,
  "filings_flagged": [
+  {
+   "accession": "0000099780-26-000131",
+   "code": "1.01",
+   "filed": "2026-10-22",
+   "form": "8-K",
+   "meaning": "entry into a material agreement",
+   "severity": "investigate",
+   "ticker": "TRN"
+  },
   {
    "accession": "0001437749-26-033185",
    "code": "1.01",
@@ -15,6 +24,15 @@
    "meaning": "entry into a material agreement",
    "severity": "investigate",
    "ticker": "CLMB"
+  },
+  {
+   "accession": "0001096906-26-001602",
+   "code": "2.02",
+   "filed": "2026-10-22",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "UTMD"
   },
   {
    "accession": "0000799292-26-000030",
@@ -42,7 +60,7 @@
   }
  },
  "limits": [],
- "nav": 9778.351192415,
+ "nav": 9805.37567086,
  "peak_nav": 10000.0,
  "positions": 19,
  "regime": {
@@ -86,5 +104,5 @@
  },
  "run": "close",
  "unknown_limits": [],
- "updated": "2026-10-22T18:02:55+00:00"
+ "updated": "2026-10-22T20:33:18+00:00"
 }
