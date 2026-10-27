@@ -1,0 +1,91 @@
+{
+ "at": "2026-10-27T16:03:20+00:00",
+ "cash_weight": 0.5937737257597551,
+ "filings_flagged": [
+  {
+   "accession": "0000099780-26-000131",
+   "code": "1.01",
+   "filed": "2026-10-22",
+   "form": "8-K",
+   "meaning": "entry into a material agreement",
+   "severity": "investigate",
+   "ticker": "TRN"
+  },
+  {
+   "accession": "0001437749-26-033185",
+   "code": "1.01",
+   "filed": "2026-10-22",
+   "form": "8-K",
+   "meaning": "entry into a material agreement",
+   "severity": "investigate",
+   "ticker": "CLMB"
+  },
+  {
+   "accession": "0001096906-26-001602",
+   "code": "2.02",
+   "filed": "2026-10-22",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "UTMD"
+  },
+  {
+   "accession": "0000799292-26-000030",
+   "code": "2.02",
+   "filed": "2026-10-21",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "MHO"
+  }
+ ],
+ "grounds_triggered": [],
+ "nav": 9804.4924311041,
+ "open_theses": 0,
+ "positions": 18,
+ "punch_card": {
+  "remaining": 20,
+  "used": 0
+ },
+ "queued_for_reading": [],
+ "regime": {
+  "as_of": "2026-10-27",
+  "risk_on_count": 0,
+  "signals": [
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "BAMLH0A0HYM2",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "T10Y3M",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "SP500",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "VIXCLS",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   }
+  ],
+  "unknown_count": 4
+ },
+ "run": "close"
+}
