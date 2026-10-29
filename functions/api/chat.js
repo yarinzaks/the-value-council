@@ -360,6 +360,45 @@ export function isRetryable(status) {
   return status === 429 || status === 408 || status >= 500;
 }
 
+/** The provider's own reason for refusing, when it gave one.
+ *
+ *  Anthropic answers a rejected request with
+ *  `{"type":"error","error":{"type":...,"message":...}}`, and that
+ *  message is the only thing separating the several causes of one status
+ *  code: a 400 is a disabled capability, an unsupported field, or a
+ *  malformed value, and the fix differs for each. Dropping it turns a
+ *  stated cause into a guess.
+ *
+ *  Returns "" for anything that is not that shape, so a gateway's HTML
+ *  error page is not pasted into the conversation.
+ */
+export function providerReason(detail) {
+  if (typeof detail !== "string" || !detail.trim()) return "";
+  let parsed;
+  try {
+    parsed = JSON.parse(detail);
+  } catch {
+    return "";
+  }
+  const message = parsed?.error?.message;
+  if (typeof message !== "string") return "";
+  return message.trim().slice(0, 300);
+}
+
+/** What to tell the reader when the model API refused the request. */
+export function upstreamProblem(status, detail) {
+  const sentence =
+    status === 401 || status === 403
+      ? "The Anthropic API rejected the key. Check ANTHROPIC_API_KEY in the " +
+        "Cloudflare dashboard, then redeploy."
+      : status === 429
+        ? "Rate limited by the Anthropic API, and still limited after three " +
+          "attempts. Try again shortly."
+        : `The model API returned ${status}.`;
+  const reason = providerReason(detail);
+  return reason ? `${sentence} It said: ${reason}` : sentence;
+}
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -476,15 +515,13 @@ export async function onRequestPost({ request, env }) {
   const upstream = await askClaude(apiKey, systemBlocks, toMessages(messages));
   if (!upstream.ok) {
     const detail = await upstream.text();
-    const message =
-      upstream.status === 401 || upstream.status === 403
-        ? "The Anthropic API rejected the key. Check ANTHROPIC_API_KEY in the " +
-          "Cloudflare dashboard, then redeploy."
-        : upstream.status === 429
-          ? "Rate limited by the Anthropic API, and still limited after three " +
-            "attempts. Try again shortly."
-          : `The model API returned ${upstream.status}.`;
-    return json({ error: message, detail: detail.slice(0, 500) }, 502);
+    return json(
+      {
+        error: upstreamProblem(upstream.status, detail),
+        detail: detail.slice(0, 500),
+      },
+      502,
+    );
   }
 
   const data = await upstream.json();

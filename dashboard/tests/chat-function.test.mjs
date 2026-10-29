@@ -29,12 +29,14 @@ import {
   isRetryable,
   isTrusted,
   keyProblem,
+  providerReason,
   readApiKey,
   readQueries,
   readReply,
   readSources,
   sanitizeMessage,
   toMessages,
+  upstreamProblem,
 } from "../../functions/api/chat.js";
 
 // ---------------------------------------------------------------- the key
@@ -426,4 +428,74 @@ test("askClaude returns a first-try success without retrying", async () => {
   const fetchImpl = stubFetch([200]);
   await askClaude("k", [], [], { fetchImpl });
   assert.equal(fetchImpl.calls.length, 1);
+});
+
+// -------------------------------------------- the provider's own reason
+
+// A status code alone does not say what to fix. Three different causes
+// of a 400 — a capability switched off, a field the model does not take,
+// a value out of range — are told apart only by the sentence the API
+// sends back, so these tests exist to keep that sentence reaching the
+// reader rather than being replaced by the number.
+
+test("providerReason reads the message out of an Anthropic error body", () => {
+  const detail = JSON.stringify({
+    type: "error",
+    error: { type: "invalid_request_error", message: "web search is not enabled for this organization" },
+  });
+  assert.equal(
+    providerReason(detail),
+    "web search is not enabled for this organization",
+  );
+});
+
+test("providerReason ignores a body that is not JSON", () => {
+  assert.equal(providerReason("<html><body>502 Bad Gateway</body></html>"), "");
+});
+
+test("providerReason ignores JSON without a message", () => {
+  assert.equal(providerReason(JSON.stringify({ error: { type: "x" } })), "");
+  assert.equal(providerReason(JSON.stringify({ ok: true })), "");
+});
+
+test("providerReason ignores a non-string message", () => {
+  assert.equal(providerReason(JSON.stringify({ error: { message: 42 } })), "");
+});
+
+test("providerReason tolerates an empty or absent body", () => {
+  assert.equal(providerReason(""), "");
+  assert.equal(providerReason("   "), "");
+  assert.equal(providerReason(undefined), "");
+  assert.equal(providerReason(null), "");
+});
+
+test("providerReason caps a long message", () => {
+  const detail = JSON.stringify({ error: { message: "x".repeat(900) } });
+  assert.equal(providerReason(detail).length, 300);
+});
+
+test("upstreamProblem names the status and quotes the reason", () => {
+  const detail = JSON.stringify({
+    error: { message: "tools.0.allowed_callers: must be [\"direct\"]" },
+  });
+  const message = upstreamProblem(400, detail);
+
+  assert.match(message, /returned 400/);
+  assert.match(message, /allowed_callers/);
+});
+
+test("upstreamProblem keeps the key advice on 401 and still quotes the reason", () => {
+  const detail = JSON.stringify({ error: { message: "invalid x-api-key" } });
+  const message = upstreamProblem(401, detail);
+
+  assert.match(message, /ANTHROPIC_API_KEY/);
+  assert.match(message, /invalid x-api-key/);
+});
+
+test("upstreamProblem keeps the rate-limit advice on 429", () => {
+  assert.match(upstreamProblem(429, ""), /Rate limited/);
+});
+
+test("upstreamProblem says only the sentence when there is no reason to quote", () => {
+  assert.equal(upstreamProblem(500, "<html>oops</html>"), "The model API returned 500.");
 });
