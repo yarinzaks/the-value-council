@@ -1,88 +1,80 @@
-// The dashboard's assistant: answers questions about the agents, and
-// searches the web when the answer isn't in this site's own data.
+// The dashboard assistant's endpoint, on Claude.
 //
-// Why a Function and not the browser
-// ----------------------------------
+// Runs as a Cloudflare Pages Function so the key stays in the secret
+// store. This repository is public; a key in the browser bundle would
+// be a key on the internet.
 //
-// The dashboard is a static export, so there is no server to hold a
-// key. Calling the model from the page would put the key in the
-// bundle, and this repository is public. A Pages Function runs on
-// Cloudflare's edge with the key in the project's secret store — the
-// same place SITE_PASSWORD already lives (see ../_middleware.js), and
-// the same place it must stay.
+// Why raw fetch and not @anthropic-ai/sdk
+// ---------------------------------------
 //
-// Read-only, deliberately
-// -----------------------
+// The official SDK is the better choice in a normal Node project. It is
+// the wrong one here, for a reason specific to this deployment: Pages
+// builds this site with `cd dashboard && npm ci`, so the only
+// node_modules in the build live under dashboard/. This file sits in
+// functions/ at the repository root, where there is no package.json for
+// an import to resolve against. Adding the SDK would mean a root
+// package.json and an edit to the build command — which is configured in
+// the Cloudflare UI, not in this repository, and so cannot be tested
+// from here. Changing a working deploy path blind is the less reliable
+// option, not the more professional one.
 //
-// This endpoint answers questions. It cannot trade, cannot write to any
-// book, and is given no tool that could. An assistant able to move
-// positions would be a second execution path around the whole exit
-// table — the one thing the doctrine spent its length making
-// unavoidable.
+// What the SDK would have provided is written out below instead, and
+// tested: retry with backoff on 429 and 5xx, errors separated by class,
+// and a pinned API version.
 //
-// Why Gemini, and what that costs
-// -------------------------------
+// What changed when this moved off Gemini
+// ---------------------------------------
 //
-// The brief for this project has always been that it must not cost
-// anything (see the same reasoning in ../_middleware.js), and Gemini
-// has a free tier. That choice is not free of consequences, and the
-// two that matter are recorded here rather than discovered later:
+// Gemini's search tool took no domain filter. The allowlist could only
+// be a request in the prompt plus a check after the fact, so this file
+// carried a classifier, a correction prompt, and a one-shot retry when
+// every source came back off-list — roughly a hundred lines whose whole
+// job was to notice the rule had been broken.
 //
-// 1. NO DOMAIN ALLOWLIST. Gemini's search tool takes no parameter for
-//    restricting which sites it may read — it is declared as
-//    `{"google_search": {}}` and that is the whole of its
-//    configuration. Where the source list used to be a network
-//    constraint the model could not cross, it is now three weaker
-//    things layered together: an instruction in the system prompt, a
-//    classification of every source the model actually used, and one
-//    corrective retry when nothing trustworthy came back. See
-//    `readSources` below. The reader is shown the domains either way,
-//    which is the part that does not depend on the model cooperating.
-//
-// 2. GROUNDING IS FREE ONLY ON 2.5 FLASH. On the free tier, search
-//    grounding is unavailable on the 3.x models and capped at 500
-//    requests a day on Gemini 2.5 Flash. That fixes the model choice
-//    below; it is not a judgement that 2.5 Flash is the best model for
-//    the job.
-//
-// Why raw fetch rather than the SDK
-// ---------------------------------
-//
-// Pages Functions in this project are plain modules with no bundler and
-// no node_modules; adding a vendor SDK would mean adding a build
-// pipeline for functions/ and a dependency to audit. This endpoint is
-// one HTTP call, so it makes it directly.
+// Claude's web search takes `allowed_domains`. The rule is now enforced
+// by the API: an off-list source cannot come back at all. The classifier,
+// the correction, and the retry are gone. Sources are still listed for
+// the reader, because showing the work is worth keeping on its own.
 
-const API_HOST = "https://generativelanguage.googleapis.com";
-const API_VERSION = "v1beta";
+const API_URL = "https://api.anthropic.com/v1/messages";
 
-// Forced by the free tier: grounding with Google Search is not offered
-// on the 3.x models without a billing account, and is free here up to
-// 500 requests a day. Raise this only alongside a paid key.
-const MODEL = "gemini-2.5-flash";
+// Pinned deliberately. The API is versioned by this header, and letting
+// it float would mean a silent shape change arriving on a day nobody
+// deployed anything.
+const API_VERSION = "2023-06-01";
 
-// Generous on purpose. This model thinks before it answers and the
-// thinking is drawn from the same budget as the reply, so a tight
-// ceiling produces an empty answer with finishReason MAX_TOKENS rather
-// than a short one. That case is handled explicitly in readReply, but
-// the cheaper fix is not to provoke it.
-const MAX_OUTPUT_TOKENS = 8192;
+const MODEL = "claude-sonnet-5-5";
 
-// The sources the assistant is told to rely on.
-//
-// This was an allowlist enforced at the network layer and is now a
-// list the model is asked to honour and is measured against. The
-// reasoning behind the membership is unchanged: regulators and
-// exchanges are primary; the wires and the financial press are
-// secondary but accountable — they publish corrections and can be sued
-// for getting it wrong. What a stock question attracts otherwise —
-// scraped-quote mirrors, SEO farms carrying stale or invented figures,
-// "analyst" blogs with no filing behind them — is exactly what nobody
-// has enumerated, which is why the list names what is good rather than
-// what is bad.
-//
-// A domain here also matches its subdomains. Add by editing this list;
-// there is no runtime override, on purpose.
+// Reasoning depth. Sonnet 5.5 defaults to `high`; `medium` is set
+// explicitly because this is question-answering over data already
+// assembled for it, not open-ended analysis — and because the context
+// below is large enough that effort is the lever with the clearest
+// effect on cost. One constant to change if answers lose their edge.
+const EFFORT = "medium";
+
+// A chat bubble. Deliberately short: 4096 tokens is already a long
+// answer in this surface, and the cap is the backstop against a runaway
+// reply, not a target.
+const MAX_OUTPUT_TOKENS = 4096;
+
+// Searches per question. Enough for the several narrow queries the
+// system prompt asks for, bounded so one question cannot spend the
+// budget of ten.
+const MAX_SEARCHES = 6;
+
+// Retries on a failure that might not repeat. 429 and 5xx only — a 400
+// means the request was wrong and will be wrong again.
+const MAX_ATTEMPTS = 3;
+const BACKOFF_MS = 600;
+
+/** The only sources an answer may be built from.
+ *
+ *  Passed to the search tool as `allowed_domains`, so this is now a
+ *  filter rather than an instruction. Subdomains of each entry are
+ *  included; the two entries that are themselves subdomains are listed
+ *  that way on purpose, to admit one part of a larger site and not the
+ *  rest.
+ */
 export const TRUSTED_DOMAINS = [
   // Regulators and primary filings — the source of record.
   "sec.gov",
@@ -127,28 +119,25 @@ Twelve AI agents each run a $10,000 paper portfolio under a different value-inve
 
 You have two sources, and they are good at different things.
 
-**DASHBOARD DATA** (below, as JSON) — the agents' books, positions, returns, watchlists, and the recorded reason for each trade. Its figures come from SEC filings with a known filing date, which makes it the better source for fundamentals and for anything about what an agent did. It is a build-time snapshot, not live: it carries a generated_at timestamp, so say how fresh it is whenever freshness could change the answer, and never imply it is live.
+**DASHBOARD DATA** (below, as JSON) — the agents' books, positions, returns, watchlists, the realized P&L of closed trades, and the recorded reason for each trade. Its figures come from SEC filings with a known filing date, which makes it the better source for fundamentals and for anything about what an agent did. It is a build-time snapshot, not live: it carries a generated_at timestamp, so say how fresh it is whenever freshness could change the answer, and never imply it is live.
 
-**GOOGLE SEARCH** — better for anything current: today's price, this week's news, a filing made after the snapshot. If a search returns nothing, say so; do not fall back on memory for a figure.
+**WEB SEARCH** — better for anything current: today's price, this week's news, a filing made after the snapshot. If a search returns nothing, say so; do not fall back on memory for a figure.
 
 ## Which sources you may use
 
-Search is not restricted for you, so restricting it is your job.
-
-Only these domains, and their subdomains, count as acceptable sources:
+Your search is restricted at the API to this list of domains and their subdomains:
 
 ${TRUSTED_DOMAINS.join(", ")}
 
-Rules that follow from that:
+A source outside it cannot be returned to you, so you will never have to judge one. Two things follow:
 
-- **Put a site: operator on your searches.** Prefer \`site:sec.gov\`, \`site:reuters.com\` and the like over an open query. Issue several narrow searches rather than one broad one.
-- **Do not state a figure sourced from a domain outside that list.** If the only thing you can find is on some other site, say what you were looking for and that no acceptable source carried it. That is a better answer than a sourced-looking number from a mirror.
-- The reader is shown every domain you actually read, marked as acceptable or not, so an off-list source will be visible whatever you write.
+- **A search that comes back empty usually means the figure is not on an acceptable source**, not that it does not exist. Say that, rather than reaching for memory.
+- **Put a site: operator on your searches anyway.** Prefer \`site:sec.gov\`, \`site:reuters.com\` and the like over an open query, and issue several narrow searches rather than one broad one. The filter decides what you may read; the operator decides what you find.
 
 ## How to answer a question about a company or a number
 
 1. **Check the dashboard data first.** If it has the figure, note it and its date.
-2. **Search** for the same figure from an acceptable source.
+2. **Search** for the same figure.
 3. **Compare them, and say plainly whether they agree.**
 
 When they agree, say so in a clause and give one number — do not print the same figure twice under two headings. That is padding.
@@ -161,6 +150,10 @@ When they **disagree**, that is the interesting case and worth the space. Show b
 - genuinely different definitions of the same word (net debt, free cash flow, EV)
 
 If you cannot explain the gap, say that too — an unexplained discrepancy is a real finding, not a failure.
+
+## Reading a return
+
+A book's total return is the sum of four parts, and they are in the data under return_breakdown: closed trades (realized), open positions (unrealized), dividends, and costs. An agent can show a gain while every position it currently holds is losing money — that means closed trades paid for the open ones, and saying so is the answer. Check attributed and unattributed before naming which stocks produced a gain: unattributed is the part no stock can be named for, because those trades closed before the ledger existed.
 
 ## Sourcing
 
@@ -177,150 +170,101 @@ If you cannot explain the gap, say that too — an unexplained discrepancy is a 
 - Answer in the language the question was asked in.
 - Lead with the answer. Keep it short unless a discrepancy needs explaining.`;
 
-// Appended to a second attempt when the first one came back sourced
-// entirely from domains outside the list. It names the offenders,
-// because "try again" without them tends to produce the same search.
-function correctionFor(domains) {
-  return (
-    `Your previous answer used only these sources, none of which are acceptable: ` +
-    `${domains.join(", ")}. Search again, restricting every query with a site: ` +
-    `operator drawn from the acceptable list. If no acceptable source carries ` +
-    `the figure, say so plainly instead of citing those domains.`
-  );
-}
-
-/**
- * The Gemini key, whatever this project happened to call it.
+/** The API key, by name, without ever logging its value.
  *
- * GEMINI_API_KEY is the name to use and the one checked first. The
- * search that follows exists because the name a key is given where it
- * is *issued* — "Gemini2 API Key" in Google AI Studio, say — is a label
- * with spaces in it, and nothing like the identifier a binding needs.
- * Guessing which of the two ended up in the Pages project is a job for
- * this function, not for the person reading a 503.
- *
- * Only a single unambiguous match is accepted. Two candidates is a
- * question, and picking one of them silently would be the wrong answer
- * half the time.
+ *  ANTHROPIC_API_KEY is the documented name and the one checked first.
+ *  A key bound under some other Anthropic-ish name is still found, and
+ *  named back to the reader, because the likeliest mistake is a binding
+ *  labelled where the key was issued rather than where it is read.
  */
 export function readApiKey(env) {
   const usable = (name) =>
     typeof env?.[name] === "string" && env[name].trim().length > 0;
 
-  if (usable("GEMINI_API_KEY")) {
-    return { key: env.GEMINI_API_KEY.trim(), name: "GEMINI_API_KEY", candidates: [] };
+  if (usable("ANTHROPIC_API_KEY")) {
+    return {
+      key: env.ANTHROPIC_API_KEY.trim(),
+      name: "ANTHROPIC_API_KEY",
+      candidates: [],
+    };
   }
 
-  const candidates = Object.keys(env ?? {})
-    .filter((name) => /gemini/i.test(name))
-    .filter(usable);
-
+  const candidates = Object.keys(env ?? {}).filter(
+    (name) => /anthropic|claude/i.test(name) && usable(name),
+  );
   if (candidates.length === 1) {
-    return { key: env[candidates[0]].trim(), name: candidates[0], candidates };
+    return {
+      key: env[candidates[0]].trim(),
+      name: candidates[0],
+      candidates: [],
+    };
   }
   return { key: null, name: null, candidates };
 }
 
-/**
- * What to tell the reader when no key could be resolved.
- *
- * Names only, never values, and only names that already announced
- * themselves as Gemini-related — enough to close the gap between "I set
- * it" and "it isn't arriving" without turning a 503 into an inventory
- * of the project's secrets.
- */
+/** What to tell the reader when no key resolved. Never a value. */
 export function keyProblem(candidates) {
   if (candidates.length > 1) {
     return (
-      `More than one Gemini key is bound to this site (${candidates.join(", ")}), ` +
-      `so it is not clear which to use. Keep one, and name it GEMINI_API_KEY.`
+      `Several Anthropic-looking variables are set (${candidates.join(", ")}), ` +
+      `so it is not clear which to use. Keep one, and name it ANTHROPIC_API_KEY.`
     );
   }
   return (
-    "The assistant is not configured: no variable whose name contains " +
-    "\"gemini\" reaches this Function. Add the key in the Pages project " +
-    "(Settings → Variables and Secrets) as GEMINI_API_KEY, to Production " +
-    "and Preview, and redeploy — variables added after a build only reach " +
-    "the next one."
+    "The assistant has no API key. Add it in the Cloudflare dashboard " +
+    "(Settings → Variables and Secrets) as ANTHROPIC_API_KEY, to Production " +
+    "and Preview, then redeploy — a variable added after the last build is " +
+    "only bound to the next one."
   );
 }
 
-/** A message the browser sent, reduced to something safe to forward. */
+/** One turn from the browser, or null when it carries no usable text.
+ *
+ *  Only "assistant" may become an assistant turn. A browser sending
+ *  role: "system" must not be able to inject an operator instruction.
+ */
 export function sanitizeMessage(message) {
   if (!message || typeof message !== "object") return null;
-  const role = message.role === "assistant" ? "assistant" : "user";
-  const text = typeof message.content === "string" ? message.content.trim() : "";
-  if (!text) return null;
-  return { role, content: text.slice(0, MAX_MESSAGE_CHARS) };
+  const content = typeof message.content === "string" ? message.content.trim() : "";
+  if (!content) return null;
+  return {
+    role: message.role === "assistant" ? "assistant" : "user",
+    content: content.slice(0, MAX_MESSAGE_CHARS),
+  };
 }
 
-/**
- * Turn the browser's transcript into Gemini's `contents`.
+/** The Messages API takes `user`/`assistant` directly — no rename.
  *
- * Gemini calls the assistant's turns "model", not "assistant"; sending
- * the wrong role is a 400, not a soft failure.
+ *  Kept as a named step anyway: the browser's shape and the wire shape
+ *  are different contracts that happen to agree today, and a caller
+ *  that reaches past this would not notice when they stop agreeing.
  */
-export function toGeminiContents(messages) {
-  return messages.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
+export function toMessages(messages) {
+  return messages.map(({ role, content }) => ({ role, content }));
 }
 
-/**
- * The publisher host for one grounding chunk, or null if it cannot be
- * established.
+/** The publisher's host, or null when the URL is unusable.
  *
- * This is deliberately suspicious of its input. A grounding chunk's
- * `uri` is usually a Vertex redirect that reveals nothing about the
- * publisher, and `title` is usually — but not always — the bare
- * domain. So: take an explicit `domain` if the API gave one, else a
- * `title` that actually looks like a hostname, else a `uri` that is a
- * real URL rather than a redirect. Anything else returns null, and
- * null is treated as untrusted by the caller. Guessing in the other
- * direction would let an unidentifiable source pass as acceptable.
+ *  Simpler than it had to be on Gemini, which returned a redirector and
+ *  left the real address to be guessed. A web_search_result carries the
+ *  publisher's own URL.
  */
-export function hostOf(web) {
-  if (!web || typeof web !== "object") return null;
-
-  const normalise = (value) =>
-    String(value).trim().toLowerCase().replace(/^www\./, "").replace(/\.$/, "");
-
-  if (typeof web.domain === "string" && web.domain.trim()) {
-    return normalise(web.domain);
+export function hostOf(result) {
+  if (!result || typeof result.url !== "string") return null;
+  try {
+    return new URL(result.url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
   }
-
-  // A hostname and nothing else: dot-separated labels ending in a
-  // plausible TLD. "reuters.com" passes; "Reuters: Apple beats" does
-  // not, and neither does a sentence that happens to contain a dot.
-  //
-  // The test runs on the normalised form rather than the raw title,
-  // because a hostname is also legitimately written with a trailing
-  // root dot — "fred.stlouisfed.org." — and matching before stripping
-  // it rejected a real source.
-  if (typeof web.title === "string") {
-    const candidate = normalise(web.title);
-    if (/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(candidate)) return candidate;
-  }
-
-  if (typeof web.uri === "string") {
-    try {
-      const host = normalise(new URL(web.uri).hostname);
-      // Google's own redirector is not the publisher, and reporting it
-      // as one would put "google.com" in the source list of every
-      // answer.
-      if (!host.endsWith("google.com") && !host.endsWith("googleapis.com")) {
-        return host;
-      }
-    } catch {
-      // Not a URL. Fall through to null.
-    }
-  }
-
-  return null;
 }
 
-/** Is `host` on the list, or a subdomain of something on it? */
+/** Whether a host is on the list, by domain rather than by substring.
+ *
+ *  The search filter already enforces this, so nothing here gates an
+ *  answer. It survives as a display label and as a second opinion: a
+ *  false reading on this screen would be visible, which is the point of
+ *  showing sources at all.
+ */
 export function isTrusted(host) {
   if (!host) return false;
   return TRUSTED_DOMAINS.some(
@@ -328,80 +272,92 @@ export function isTrusted(host) {
   );
 }
 
-/**
- * Every web source the model actually read, classified.
+/** Every page the answer was actually built from, deduplicated by host.
  *
- * This is the part of the old allowlist that survives the move to
- * Gemini. It cannot stop the model reading a bad site, but it can
- * refuse to let one pass unnoticed: the caller returns this list to
- * the browser, which shows each domain and marks the ones that are not
- * acceptable.
+ *  A web_search_tool_result's `content` is a list on success and a
+ *  single error object on failure — so the shape is checked before it
+ *  is indexed, and a failed search contributes no sources rather than
+ *  throwing.
  */
-export function readSources(groundingMetadata) {
-  const chunks = groundingMetadata?.groundingChunks;
-  if (!Array.isArray(chunks)) return [];
-
-  const seen = new Map();
-  for (const chunk of chunks) {
-    const web = chunk?.web;
-    if (!web) continue;
-    const host = hostOf(web);
-    const key = host ?? `unidentified:${seen.size}`;
-    if (seen.has(key)) continue;
-    seen.set(key, {
-      domain: host,
-      trusted: isTrusted(host),
-      title: typeof web.title === "string" ? web.title : null,
-      uri: typeof web.uri === "string" ? web.uri : null,
-    });
+export function readSources(content) {
+  if (!Array.isArray(content)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const block of content) {
+    if (block?.type !== "web_search_tool_result") continue;
+    const results = block.content;
+    if (!Array.isArray(results)) continue; // an error object, not results
+    for (const result of results) {
+      if (result?.type !== "web_search_result") continue;
+      const host = hostOf(result);
+      const key = host ?? `?${out.length}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        domain: host,
+        trusted: isTrusted(host),
+        title: typeof result.title === "string" ? result.title : null,
+        uri: typeof result.url === "string" ? result.url : null,
+      });
+    }
   }
-  return [...seen.values()];
+  return out;
 }
 
-/**
- * The reply text, or a description of why there isn't one.
+/** The search queries the model actually issued, for the reader. */
+export function readQueries(content) {
+  if (!Array.isArray(content)) return [];
+  return content
+    .filter((block) => block?.type === "server_tool_use" && block.name === "web_search")
+    .map((block) => block?.input?.query)
+    .filter((query) => typeof query === "string" && query.length > 0);
+}
+
+/** The answer, or a plain statement of why there isn't one.
  *
- * Gemini has several ways of returning HTTP 200 with nothing usable in
- * it, and each looks like an empty bubble to the reader unless it is
- * named here.
+ *  Every branch here is an HTTP 200 with no usable text in it — the
+ *  shapes that would otherwise reach the reader as an empty bubble.
  */
 export function readReply(data) {
-  const blockReason = data?.promptFeedback?.blockReason;
-  if (blockReason) {
-    return { text: null, problem: `The question was blocked (${blockReason}).` };
+  if (data?.stop_reason === "refusal") {
+    const category = data?.stop_details?.category;
+    return {
+      text: null,
+      problem: category
+        ? `The model declined to answer this one (${category}).`
+        : "The model declined to answer this one.",
+    };
   }
 
-  const candidate = data?.candidates?.[0];
-  if (!candidate) {
-    return { text: null, problem: "The model returned no answer." };
-  }
-
-  const text = (candidate.content?.parts ?? [])
-    .filter((part) => typeof part?.text === "string")
-    .map((part) => part.text)
+  const blocks = Array.isArray(data?.content) ? data.content : [];
+  const text = blocks
+    .filter((block) => block?.type === "text" && typeof block.text === "string")
+    .map((block) => block.text)
     .join("")
     .trim();
 
   if (text) return { text, problem: null };
 
-  const reason = candidate.finishReason;
-  if (reason === "MAX_TOKENS") {
+  if (data?.stop_reason === "max_tokens") {
     return {
       text: null,
       problem:
-        "The model ran out of room before it wrote an answer. Ask something narrower.",
+        "The answer ran out of room before any of it was written. Ask for " +
+        "a narrower slice of the question.",
     };
   }
-  if (reason === "SAFETY" || reason === "PROHIBITED_CONTENT") {
-    return { text: null, problem: "I can't answer that one. Try rephrasing." };
-  }
-  if (reason === "RECITATION") {
+  if (data?.stop_reason === "pause_turn") {
     return {
       text: null,
-      problem: "The answer was too close to a copyrighted source to return.",
+      problem: "The model paused mid-search and returned nothing. Ask again.",
     };
   }
-  return { text: null, problem: "The model returned an empty answer." };
+  return { text: null, problem: "The model returned no answer." };
+}
+
+/** Whether a failed response is worth sending again. */
+export function isRetryable(status) {
+  return status === 429 || status === 408 || status >= 500;
 }
 
 function json(body, status = 200) {
@@ -423,39 +379,53 @@ async function loadContext(env, request) {
   return await response.text();
 }
 
-/**
- * One call to Gemini.
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** One call to the Messages API, retried only where a retry can help.
  *
- * The key travels in a header, never in the query string: a URL is the
- * thing most likely to end up in a log, a referrer, or an error report.
+ *  This is the part the SDK would have owned. A 429 or a 5xx is sent
+ *  again after a widening pause; a 400 is returned as-is, because the
+ *  request was wrong and will be wrong again.
  */
-async function askGemini(apiKey, systemText, contents) {
-  const response = await fetch(
-    `${API_HOST}/${API_VERSION}/models/${MODEL}:generateContent`,
-    {
+export async function askClaude(apiKey, systemBlocks, messages, { fetchImpl = fetch } = {}) {
+  let last = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    last = await fetchImpl(API_URL, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-goog-api-key": apiKey,
+        "x-api-key": apiKey,
+        "anthropic-version": API_VERSION,
       },
       body: JSON.stringify({
-        // A single stable prefix, sent first, so this model's implicit
-        // context caching can recognise it across the turns of a
-        // conversation. Nothing else in the request is stable.
-        systemInstruction: { parts: [{ text: systemText }] },
-        contents,
-        tools: [{ google_search: {} }],
-        generationConfig: {
-          maxOutputTokens: MAX_OUTPUT_TOKENS,
-          // Low, not zero: this endpoint reports figures and compares
-          // them, and there is nothing here that benefits from
-          // invention.
-          temperature: 0.2,
-        },
+        model: MODEL,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        // The system prompt and the dashboard JSON are identical on
+        // every question from every reader, so the whole prefix caches.
+        // Without this each question pays full price for ~47,000 tokens
+        // it has already sent a hundred times.
+        system: systemBlocks,
+        messages,
+        output_config: { effort: EFFORT },
+        tools: [
+          {
+            type: "web_search_20260209",
+            name: "web_search",
+            max_uses: MAX_SEARCHES,
+            // The allowlist, enforced by the API. Not a preference.
+            allowed_domains: TRUSTED_DOMAINS,
+          },
+        ],
+        // No temperature: current models reject it. No tool_choice:
+        // Sonnet 5.5 rejects the forcing forms, and the prompt asks for
+        // the searches instead.
       }),
-    },
-  );
-  return response;
+    });
+
+    if (last.ok || !isRetryable(last.status)) return last;
+    if (attempt + 1 < MAX_ATTEMPTS) await sleep(BACKOFF_MS * (attempt + 1));
+  }
+  return last;
 }
 
 export async function onRequestPost({ request, env }) {
@@ -491,72 +461,45 @@ export async function onRequestPost({ request, env }) {
     return json({ error: `Dashboard data unavailable: ${error.message}` }, 503);
   }
 
-  const systemText = `${SYSTEM}\n\nDASHBOARD DATA (JSON):\n${context}`;
-  const contents = toGeminiContents(messages);
+  // Two blocks, with the cache breakpoint after the data: everything
+  // before it is byte-identical between questions, and the question
+  // itself lives in `messages`, after the breakpoint.
+  const systemBlocks = [
+    { type: "text", text: SYSTEM },
+    {
+      type: "text",
+      text: `DASHBOARD DATA (JSON):\n${context}`,
+      cache_control: { type: "ephemeral" },
+    },
+  ];
 
-  let upstream = await askGemini(apiKey, systemText, contents);
+  const upstream = await askClaude(apiKey, systemBlocks, toMessages(messages));
   if (!upstream.ok) {
     const detail = await upstream.text();
-    // 429 on this tier is almost always the free grounding cap rather
-        // than a burst, and "try again in a second" would be wrong advice.
     const message =
-      upstream.status === 429
-        ? "The Gemini free tier's daily limit is used up (500 grounded " +
-          "requests a day). It resets tomorrow."
-        : `The model API returned ${upstream.status}.`;
+      upstream.status === 401 || upstream.status === 403
+        ? "The Anthropic API rejected the key. Check ANTHROPIC_API_KEY in the " +
+          "Cloudflare dashboard, then redeploy."
+        : upstream.status === 429
+          ? "Rate limited by the Anthropic API, and still limited after three " +
+            "attempts. Try again shortly."
+          : `The model API returned ${upstream.status}.`;
     return json({ error: message, detail: detail.slice(0, 500) }, 502);
   }
 
-  let data = await upstream.json();
-  let sources = readSources(data?.candidates?.[0]?.groundingMetadata);
-
-  // The one enforcement step available without a domain filter: if the
-  // model searched and every source it used was off the list, say so
-  // and make it search again with the offenders named. Only once — the
-  // free tier allows 500 grounded requests a day and a retry loop would
-  // spend them on a question that may simply have no acceptable source.
-  let retried = false;
-  const usedOnlyUntrusted =
-    sources.length > 0 && sources.every((source) => !source.trusted);
-  if (usedOnlyUntrusted) {
-    retried = true;
-    const offenders = sources.map((s) => s.domain ?? "an unidentified site");
-    const secondAttempt = await askGemini(apiKey, systemText, [
-      ...contents,
-      { role: "user", parts: [{ text: correctionFor(offenders) }] },
-    ]);
-    if (secondAttempt.ok) {
-      const retryData = await secondAttempt.json();
-      const retrySources = readSources(
-        retryData?.candidates?.[0]?.groundingMetadata,
-      );
-      // Keep the retry only if it actually improved the sourcing.
-      if (retrySources.some((source) => source.trusted)) {
-        data = retryData;
-        sources = retrySources;
-      }
-    }
-    // A failed retry is not an error: the first answer still stands,
-    // and its sources are still shown to the reader marked as
-    // unacceptable.
-  }
-
+  const data = await upstream.json();
+  const sources = readSources(data?.content);
   const { text, problem } = readReply(data);
-  const grounding = data?.candidates?.[0]?.groundingMetadata;
 
   return json({
     reply: text ?? problem,
     searched: sources.length > 0,
     sources,
+    // Enforced upstream, so this should always be zero. Reported anyway:
+    // a non-zero count here would mean the filter had stopped working,
+    // and that is worth seeing rather than assuming.
     untrusted: sources.filter((source) => !source.trusted).length,
-    retried,
-    // Displaying Google's Search Suggestions is a condition of using
-    // grounding with Google Search, and this is the compliant markup
-    // they supply for it. The widget renders it verbatim.
-    searchEntryPoint: grounding?.searchEntryPoint?.renderedContent ?? null,
-    queries: Array.isArray(grounding?.webSearchQueries)
-      ? grounding.webSearchQueries
-      : [],
+    queries: readQueries(data?.content),
   });
 }
 
