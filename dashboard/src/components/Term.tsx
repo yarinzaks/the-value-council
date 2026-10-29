@@ -34,11 +34,25 @@ export function Term({
       <span className="border-b border-dotted border-council-400 dark:border-council-500">
         {children ?? termLabel}
       </span>
+      {/* The definition grows out of the word it defines.
+       *
+       * It used to appear at full size, already there, which gives the
+       * reader nothing to connect it to — a panel that arrives from
+       * nowhere has to be found before it can be read. Scaling it up
+       * from its own top edge, anchored under the term, makes the
+       * relationship between the two the first thing visible. The
+       * reduced-motion rule in globals.css collapses this to a plain
+       * appearance, which is the right fallback: the information is
+       * the point, the growth is only how it got here. */}
       <span
         role="tooltip"
-        className="invisible group-hover:visible group-focus:visible group-focus-within:visible
-                   absolute z-50 left-1/2 -translate-x-1/2 mt-1 top-full
-                   w-64 p-3 rounded-lg shadow-lg
+        className="pointer-events-none opacity-0 scale-95
+                   group-hover:opacity-100 group-hover:scale-100
+                   group-focus:opacity-100 group-focus:scale-100
+                   group-focus-within:opacity-100 group-focus-within:scale-100
+                   origin-top transition-[opacity,transform] duration-quick ease-standard
+                   absolute z-50 left-1/2 -translate-x-1/2 mt-1.5 top-full
+                   w-64 p-3 rounded-xl shadow-elev-3
                    bg-council-900 dark:bg-council-100
                    text-council-50 dark:text-council-900
                    text-xs leading-snug normal-case font-normal"

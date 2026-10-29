@@ -45,10 +45,11 @@ export function AgentCardsRow({
           <Link
             key={portfolio.agent}
             href={`/agents/${portfolio.agent}`}
-            className="block"
+            className="focus-ring block rounded-2xl"
           >
             <Card
-              className={`transition-all hover:ring-2 hover:ring-council-300 dark:hover:ring-council-600 h-full ${
+              interactive
+              className={`h-full ${
                 agentStale
                   ? "ring-1 ring-loss/40"
                   : positivePnl
@@ -58,11 +59,15 @@ export function AgentCardsRow({
                       : ""
               }`}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: meta?.color ?? "#999" }}
-                />
+              {/* The agent's colour is the only identity this card
+                  carries, so it holds the top edge rather than a dot
+                  beside the name — it is readable at a glance across
+                  a row of four, which a 10px dot is not. */}
+              <div
+                className="h-1 w-10 rounded-full mb-3"
+                style={{ backgroundColor: meta?.color ?? "#999" }}
+              />
+              <div className="flex items-center gap-2">
                 <span className="font-semibold">
                   {meta?.display ?? portfolio.agent}
                 </span>

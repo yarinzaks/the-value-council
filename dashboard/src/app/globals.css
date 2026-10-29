@@ -27,16 +27,133 @@
    * to 3.66 on the dark background. */
   --gain: 21 128 61;     /* green-700 — 5.01:1 on white */
   --loss: 220 38 38;     /* red-600   — 4.83:1 on white */
+
+  /* ---------------------------------------------------------------
+   * Motion
+   *
+   * A spring is the right model for anything a pointer touches: it
+   * starts from the current on-screen value and it is interruptible.
+   * We have no JS animator here and will not add a dependency for
+   * one, so each curve below is the closest the compositor can run
+   * unaided — and it is used only where nothing is being dragged.
+   *
+   * --ease-standard is the critically damped default (Apple's damping
+   * 1.0 / response 0.4): it arrives and stops, with no overshoot.
+   * Overshoot is reserved for motion a gesture actually threw, and on
+   * a dashboard nothing is thrown, so --ease-momentum stays unused by
+   * default and exists for the one place a card is flicked.
+   * ------------------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-momentum: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Press feedback has to land inside the same perceptual instant as
+   * the press itself; anything above ~120ms reads as lag rather than
+   * as the surface giving way. */
+  --dur-press: 100ms;
+  --dur-quick: 180ms;
+  --dur-base: 320ms;
+
+  /* ---------------------------------------------------------------
+   * Materials
+   *
+   * Translucent chrome is a functional layer floating over content,
+   * not an opaque strip that eats a band of the viewport. Content
+   * scrolls underneath and stays legible because the blur is paired
+   * with saturation — the same trick that keeps a colour visible
+   * through frosted glass instead of turning it to mud.
+   * ------------------------------------------------------------- */
+  --material-rgb: 255 255 255;
+  --material-alpha: 0.72;
+  --material-blur: 20px;
+  --material-saturate: 180%;
+
+  /* The hairline is light catching the edge of the material, not a
+   * drawn border. It is brighter than the surface in light mode and
+   * brighter than the surface in dark mode too — a real edge does not
+   * invert. */
+  --hairline: 255 255 255;
+  --hairline-alpha: 0.6;
+
+  /* ---------------------------------------------------------------
+   * Elevation
+   *
+   * Bigger surfaces read as thicker: more blur, deeper shadow. Three
+   * steps is the whole vocabulary — a resting card, a card the
+   * pointer is over, and a surface that floats free of the page.
+   * ------------------------------------------------------------- */
+  --elev-1: 0 1px 2px rgb(10 16 32 / 0.05), 0 1px 1px rgb(10 16 32 / 0.03);
+  --elev-2: 0 2px 4px rgb(10 16 32 / 0.05), 0 8px 20px rgb(10 16 32 / 0.08);
+  --elev-3: 0 8px 16px rgb(10 16 32 / 0.08), 0 24px 48px rgb(10 16 32 / 0.14);
+
+  /* Size-specific tracking.
+   *
+   * A single letter-spacing value is wrong somewhere by definition:
+   * letters read too far apart as they grow and too tight as they
+   * shrink. These feed Tailwind's own text-* scale, so a component
+   * asking for text-3xl gets display tracking without knowing it,
+   * and nothing in the tree has to remember a tracking- class.
+   *
+   * They are variables rather than literals because Hebrew does not
+   * want them — see the RTL reset below. */
+  --tk-xs: 0.01em;
+  --tk-sm: 0.005em;
+  --tk-base: 0em;
+  --tk-lg: -0.006em;
+  --tk-xl: -0.011em;
+  --tk-2xl: -0.016em;
+  --tk-3xl: -0.021em;
+  --tk-4xl: -0.024em;
+  --tk-5xl: -0.026em;
+  --tk-6xl: -0.028em;
 }
 
 html.dark {
   --muted: 112 137 169;  /* council-400 — 5.26:1 on council-950 */
   --gain: 34 197 94;     /* green-500 — 8.25:1 on council-950 */
   --loss: 248 113 113;   /* red-400   — 6.89:1 on council-950 */
+
+  /* The dark material is the council-900 surface, not black: a
+   * near-black glass over a near-black page has nothing to separate.
+   * Alpha goes up because a dark blur carries less of the content
+   * through it and the chrome would otherwise read as a hole. */
+  --material-rgb: 17 24 42;
+  --material-alpha: 0.72;
+
+  --hairline: 255 255 255;
+  --hairline-alpha: 0.08;
+
+  /* Shadows do almost no work on a dark page — the separation has to
+   * come from the material and the hairline — so they stay, but only
+   * to anchor floating surfaces rather than to lift resting ones. */
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 8px 20px rgb(0 0 0 / 0.36);
+  --elev-3: 0 8px 16px rgb(0 0 0 / 0.5), 0 24px 48px rgb(0 0 0 / 0.5);
+}
+
+/* Hebrew is not a tracked script. The optical ramp above is tuned for
+ * Latin letterforms; applied to Hebrew it pulls the small text tight
+ * and spaces the headings out, which is the opposite of what either
+ * size needs. Zeroing the variables turns the whole ramp off for RTL
+ * without any component knowing there was one. */
+html[dir="rtl"] {
+  --tk-xs: 0em;
+  --tk-sm: 0em;
+  --tk-base: 0em;
+  --tk-lg: 0em;
+  --tk-xl: 0em;
+  --tk-2xl: 0em;
+  --tk-3xl: 0em;
+  --tk-4xl: 0em;
+  --tk-5xl: 0em;
+  --tk-6xl: 0em;
 }
 
 html {
   font-family: var(--font-sans);
+  /* Let the face pick its optical size where it ships one. */
+  font-optical-sizing: auto;
+  -webkit-text-size-adjust: 100%;
 }
 
 html.dark {
@@ -59,4 +176,196 @@ html[dir="rtl"] {
 /* Tabular numbers for finance tables */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /* A translucent layer: chrome that content passes under.
+   *
+   * Never stack one of these on another — two light materials in a
+   * row have nothing left to be legible against. The header uses it;
+   * the cards underneath are solid on purpose. */
+  .material {
+    background-color: rgb(var(--material-rgb) / var(--material-alpha));
+    backdrop-filter: blur(var(--material-blur)) saturate(var(--material-saturate));
+    -webkit-backdrop-filter: blur(var(--material-blur))
+      saturate(var(--material-saturate));
+  }
+
+  /* The bright top edge of a material — light catching its rim. It
+   * replaces the 1px border that a flat design would draw there. */
+  .material-edge {
+    border-color: rgb(var(--hairline) / var(--hairline-alpha));
+  }
+
+  /* Where floating chrome overlaps content, fade the content out
+   * under it instead of drawing a divider. A hard 1px line says
+   * "two documents"; a fade says "one document, continuing". */
+  .scroll-edge::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 100%;
+    height: 14px;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgb(var(--material-rgb) / 0.5),
+      rgb(var(--material-rgb) / 0)
+    );
+  }
+
+  /* Press feedback, on pointer-down.
+   *
+   * :active fires on press, not on release, which is the whole point
+   * — waiting for the click to acknowledge a tap is the single
+   * cheapest way to make an interface feel dead. The surface gives
+   * way by a hair and comes back on the standard curve. */
+  .pressable {
+    transition:
+      transform var(--dur-press) var(--ease-standard),
+      box-shadow var(--dur-quick) var(--ease-standard),
+      background-color var(--dur-quick) var(--ease-standard),
+      border-color var(--dur-quick) var(--ease-standard);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .pressable:active {
+    transform: scale(0.97);
+    transition-duration: var(--dur-press);
+  }
+
+  /* A card is a bigger surface than a button, so it travels less:
+   * scaling a 300px card by 3% is a visibly different gesture from
+   * scaling a 32px button by the same ratio. */
+  .pressable-surface {
+    transition:
+      transform var(--dur-press) var(--ease-standard),
+      box-shadow var(--dur-base) var(--ease-standard),
+      border-color var(--dur-base) var(--ease-standard);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .pressable-surface:active {
+    transform: scale(0.988);
+  }
+
+  /* Focus has to be visible and has to be the same shape everywhere —
+   * a ring that follows the element's own radius, never a browser
+   * outline square around a rounded card. */
+  .focus-ring:focus-visible {
+    outline: 2px solid rgb(var(--gain));
+    outline-offset: 2px;
+  }
+
+  /* The small caps label over a figure.
+   *
+   * It was `uppercase tracking-wider` inline, which is a Latin
+   * typographic device twice over: Hebrew has no case, so the
+   * transform did nothing while the tracking pulled its letters
+   * apart. Here the whole treatment belongs to the script. */
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  html[dir="rtl"] .eyebrow {
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  /* Tailwind's transform-origin scale is physical (bottom-right), and
+   * this one has to follow the text direction: the chat panel lives
+   * in the end corner, which is the left one in Hebrew. */
+  .origin-bottom-end {
+    transform-origin: 100% 100%;
+  }
+
+  html[dir="rtl"] .origin-bottom-end {
+    transform-origin: 0% 100%;
+  }
+}
+
+/* A surface arriving should materialise — blur and scale resolving
+ * together — rather than fade in at full size. A plain opacity fade
+ * reads as an image being turned up; this reads as glass arriving. */
+@keyframes material-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------
+ * Accessibility preferences
+ *
+ * Three independent signals, three different answers. Reduced motion
+ * is not "no feedback" — it is the same information delivered without
+ * the vestibular cost, so the cross-fades stay and only the travel
+ * goes.
+ * ------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep the acknowledgement, drop the movement: the press still
+   * changes state, it just does not travel. */
+  .pressable:active,
+  .pressable-surface:active {
+    transform: none;
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  html.dark {
+    --material-alpha: 1;
+    --material-blur: 0px;
+  }
+
+  .material {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .scroll-edge::after {
+    display: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --material-alpha: 1;
+    --material-blur: 0px;
+    --hairline: 17 24 42;
+    --hairline-alpha: 0.9;
+    --muted: 51 69 93;   /* council-700 — 9.0:1 on white */
+  }
+
+  html.dark {
+    --hairline: 255 255 255;
+    --hairline-alpha: 0.6;
+    --muted: 159 177 199; /* council-300 — 9.3:1 on council-950 */
+  }
 }

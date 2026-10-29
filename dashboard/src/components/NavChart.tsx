@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import type { NavRow } from "@/lib/types";
+import { ChartTooltip, axisProps, useChartTheme } from "./ChartKit";
 
 export function NavChart({
   data,
@@ -19,6 +20,9 @@ export function NavChart({
   data: NavRow[];
   agentColor: string;
 }) {
+  const theme = useChartTheme();
+  const axis = axisProps(theme);
+
   // Down-sample to ~250 points so the chart renders fast even for
   // 5-year daily series (~1260 points).
   const target = 260;
@@ -26,26 +30,42 @@ export function NavChart({
   const sampled = data.filter((_, i) => i % step === 0 || i === data.length - 1);
 
   return (
-    <div className="h-72 w-full">
+    <div className="h-72 w-full" dir="ltr">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={sampled} margin={{ top: 5, right: 20, bottom: 5, left: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+          {/* Horizontal only. The vertical rules measured nothing a
+              reader of a NAV series asks for, and two grids crossing
+              under a line is most of what makes a chart look busy. */}
+          <CartesianGrid
+            vertical={false}
+            stroke={theme.grid}
+            strokeDasharray="3 3"
+          />
           <XAxis
             dataKey="date"
             tickFormatter={(d: string) => d.slice(0, 7)}
             minTickGap={36}
-            tick={{ fontSize: 11 }}
+            {...axis}
           />
           <YAxis
             tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
-            tick={{ fontSize: 11 }}
             width={56}
+            {...axis}
           />
           <Tooltip
-            formatter={(v: number) => `$${v.toFixed(0)}`}
-            labelFormatter={(d: string) => d}
+            cursor={{ stroke: theme.axis, strokeWidth: 1 }}
+            content={
+              <ChartTooltip
+                formatValue={(v) => `$${v.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}`}
+              />
+            }
           />
-          <Legend />
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: theme.tick }}
+            iconType="plainline"
+          />
           {/* isAnimationActive={false} is load-bearing, not a preference.
               Recharts draws its entry animation by animating
               stroke-dasharray from "0, L" (nothing visible) to "L, 0"
@@ -64,16 +84,18 @@ export function NavChart({
             stroke={agentColor}
             strokeWidth={2}
             dot={false}
+            activeDot={{ r: 4, strokeWidth: 2, stroke: theme.dark ? "#11182a" : "#fff" }}
             isAnimationActive={false}
           />
           <Line
             type="monotone"
             dataKey="benchmark_nav"
             name="S&P 500"
-            stroke="#94a3b8"
+            stroke={theme.benchmark}
             strokeWidth={1.5}
             strokeDasharray="4 4"
             dot={false}
+            activeDot={{ r: 3, strokeWidth: 2, stroke: theme.dark ? "#11182a" : "#fff" }}
             isAnimationActive={false}
           />
         </LineChart>

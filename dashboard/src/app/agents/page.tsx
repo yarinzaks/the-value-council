@@ -41,8 +41,12 @@ export default async function AgentsPage() {
           const b = a.summary.benchmark_metrics;
           const alpha = m.cagr_pct - b.cagr_pct;
           return (
-            <Link key={a.slug} href={`/agents/${a.slug}`} className="block">
-              <Card className="hover:ring-2 hover:ring-council-300 dark:hover:ring-council-600 transition-all h-full">
+            <Link
+              key={a.slug}
+              href={`/agents/${a.slug}`}
+              className="focus-ring block rounded-2xl"
+            >
+              <Card interactive className="h-full">
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className="inline-block w-3 h-3 rounded-full"
@@ -102,8 +106,8 @@ export default async function AgentsPage() {
             dash is there to refuse; showing what it actually does says
             more. */}
         {council && councilMeta && (
-          <Link href="/council" className="block">
-            <Card className="hover:ring-2 hover:ring-council-300 dark:hover:ring-council-600 transition-all h-full">
+          <Link href="/council" className="focus-ring block rounded-2xl">
+            <Card interactive className="h-full">
               <div className="flex items-center gap-2 mb-2">
                 <span
                   className="inline-block w-3 h-3 rounded-full"

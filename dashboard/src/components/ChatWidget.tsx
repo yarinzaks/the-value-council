@@ -104,12 +104,12 @@ function SourceList({
     <div className="mt-1.5 space-y-1.5">
       {sources.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-slate-500">{t.sources}:</span>
+          <span className="text-xs text-muted">{t.sources}:</span>
           {sources.map((source, i) => {
             const label = source.domain ?? t.unidentified;
             const className = source.trusted
-              ? "rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300"
-              : "rounded border border-amber-700/60 bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-400";
+              ? "rounded-full border border-council-200 bg-council-50 px-2 py-0.5 text-xs text-council-700 dark:border-council-700 dark:bg-council-800 dark:text-council-200"
+              : "rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-400";
             // The uri is Google's redirect rather than the publisher's
             // own address, so it is worth following but not worth
             // showing — the domain beside it is the honest label.
@@ -134,7 +134,7 @@ function SourceList({
       )}
 
       {searchedLabel && sources.length === 0 && (
-        <div className="text-xs text-slate-500">{searchedLabel}</div>
+        <div className="text-xs text-muted">{searchedLabel}</div>
       )}
 
     </div>
@@ -200,7 +200,12 @@ export function ChatWidget() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t.open}
-        className="fixed bottom-5 end-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-sky-600 text-white shadow-lg transition hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-400"
+        title={t.open}
+        /* The one solid control on the page, so it carries the same
+           inverted treatment as the active nav item rather than the
+           sky blue it had — that blue belonged to no other element
+           here and read as a widget bolted on from somewhere else. */
+        className="pressable focus-ring fixed bottom-5 end-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-council-900 text-white shadow-elev-3 hover:bg-council-800 dark:bg-council-100 dark:text-council-900 dark:hover:bg-white"
       >
         <svg
           viewBox="0 0 24 24"
@@ -221,14 +226,21 @@ export function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-5 end-5 z-50 flex h-[min(32rem,80vh)] w-[min(24rem,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
-      <header className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-        <span className="text-sm font-semibold text-slate-100">{t.title}</span>
+    /* The panel opens out of the button that opened it — same corner,
+       same anchor — so the two read as one object in two states
+       rather than a panel that happened to appear. Enter and exit
+       share the path, which is what makes the corner feel like where
+       this thing lives. */
+    <div className="animate-material-in origin-bottom-end fixed bottom-5 end-5 z-50 flex h-[min(32rem,80vh)] w-[min(24rem,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-2xl border border-council-200 bg-white shadow-elev-3 dark:border-council-800 dark:bg-council-900">
+      <header className="flex items-center justify-between border-b border-council-200 px-4 py-3 dark:border-council-800">
+        <span className="text-sm font-semibold text-council-900 dark:text-council-100">
+          {t.title}
+        </span>
         <button
           type="button"
           onClick={() => setOpen(false)}
           aria-label={t.close}
-          className="rounded p-1 text-slate-400 transition hover:text-slate-100"
+          className="pressable focus-ring rounded-full p-1.5 text-muted hover:bg-council-100 hover:text-council-900 dark:hover:bg-council-800 dark:hover:text-council-100"
         >
           <svg
             viewBox="0 0 24 24"
@@ -245,7 +257,7 @@ export function ChatWidget() {
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {turns.length === 0 && (
-          <p className="text-sm leading-relaxed text-slate-400">{t.empty}</p>
+          <p className="text-sm leading-relaxed text-muted">{t.empty}</p>
         )}
         {turns.map((turn, i) => (
           <div
@@ -255,8 +267,8 @@ export function ChatWidget() {
             <div
               className={
                 turn.role === "user"
-                  ? "inline-block max-w-[85%] rounded-2xl bg-sky-600 px-3 py-2 text-sm text-white"
-                  : "inline-block max-w-[95%] whitespace-pre-wrap rounded-2xl bg-slate-800 px-3 py-2 text-sm leading-relaxed text-slate-100"
+                  ? "inline-block max-w-[85%] rounded-2xl bg-council-900 px-3 py-2 text-sm text-white dark:bg-council-100 dark:text-council-900"
+                  : "inline-block max-w-[95%] whitespace-pre-wrap rounded-2xl bg-council-100 px-3 py-2 text-sm leading-relaxed text-council-900 dark:bg-council-800 dark:text-council-100"
               }
             >
               {turn.content}
@@ -270,7 +282,20 @@ export function ChatWidget() {
             )}
           </div>
         ))}
-        {busy && <p className="text-sm text-slate-500">{t.thinking}</p>}
+        {busy && (
+          /* Ongoing status is one of the four kinds of feedback a
+             reader is owed, and a static word is a weak way to give
+             it — three dots that are actually moving say the request
+             is alive in a way "Thinking…" alone does not. */
+          <p className="flex items-center gap-1.5 text-sm text-muted">
+            <span className="flex gap-1" aria-hidden="true">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted motion-safe:animate-bounce [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted motion-safe:animate-bounce [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted motion-safe:animate-bounce" />
+            </span>
+            {t.thinking}
+          </p>
+        )}
       </div>
 
       <form
@@ -278,19 +303,19 @@ export function ChatWidget() {
           e.preventDefault();
           void send();
         }}
-        className="flex gap-2 border-t border-slate-700 p-3"
+        className="flex gap-2 border-t border-council-200 p-3 dark:border-council-800"
       >
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={t.placeholder}
           disabled={busy}
-          className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-xl border border-council-200 bg-council-50 px-3 py-2 text-sm text-council-900 transition-colors duration-quick ease-standard placeholder:text-muted focus:border-council-400 focus:bg-white focus:outline-none disabled:opacity-60 dark:border-council-700 dark:bg-council-800 dark:text-council-100 dark:focus:border-council-500 dark:focus:bg-council-800"
         />
         <button
           type="submit"
           disabled={busy || !draft.trim()}
-          className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-500 disabled:opacity-40"
+          className="pressable focus-ring rounded-xl bg-council-900 px-3 py-2 text-sm font-medium text-white hover:bg-council-800 disabled:opacity-40 dark:bg-council-100 dark:text-council-900 dark:hover:bg-white"
         >
           {t.send}
         </button>
