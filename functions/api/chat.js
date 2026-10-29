@@ -92,13 +92,15 @@ export const TRUSTED_DOMAINS = [
   "nyse.com",
   "cboe.com",
   // Wires and financial press with published corrections policies.
-  "reuters.com",
+  //
+  // Reuters, the WSJ, the FT, Barron's and MarketWatch are deliberately
+  // absent, and must not be added back. All five block Anthropic's
+  // crawler, and the Messages API rejects the whole request — not the
+  // one domain — with "the following domains are not accessible to our
+  // user agent". One of them in this list makes every question a 400.
+  // A test below holds them out.
   "bloomberg.com",
-  "wsj.com",
-  "ft.com",
   "cnbc.com",
-  "barrons.com",
-  "marketwatch.com",
   "morningstar.com",
   "spglobal.com",
   "moodys.com",
@@ -113,7 +115,7 @@ export const TRUSTED_DOMAINS = [
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 4000;
 
-const SYSTEM = `You are the assistant for a private paper-trading dashboard called The Value Council.
+export const SYSTEM = `You are the assistant for a private paper-trading dashboard called The Value Council.
 
 Twelve AI agents each run a $10,000 paper portfolio under a different value-investing doctrine — Warren Buffett, Benjamin Graham, Walter Schloss, Seth Klarman, Peter Lynch, Philip Fisher, John Neff, David Dreman, Howard Marks, Joel Greenblatt's Magic Formula, a market-core index tracker, and Mohnish Pabrai. No real money is involved anywhere.
 
@@ -132,7 +134,7 @@ ${TRUSTED_DOMAINS.join(", ")}
 A source outside it cannot be returned to you, so you will never have to judge one. Two things follow:
 
 - **A search that comes back empty usually means the figure is not on an acceptable source**, not that it does not exist. Say that, rather than reaching for memory.
-- **Put a site: operator on your searches anyway.** Prefer \`site:sec.gov\`, \`site:reuters.com\` and the like over an open query, and issue several narrow searches rather than one broad one. The filter decides what you may read; the operator decides what you find.
+- **Put a site: operator on your searches anyway.** Prefer \`site:sec.gov\`, \`site:bloomberg.com\` and the like over an open query, and issue several narrow searches rather than one broad one. The filter decides what you may read; the operator decides what you find.
 
 ## How to answer a question about a company or a number
 

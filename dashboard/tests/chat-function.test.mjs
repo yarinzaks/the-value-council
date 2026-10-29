@@ -23,6 +23,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  SYSTEM,
   TRUSTED_DOMAINS,
   askClaude,
   hostOf,
@@ -161,7 +162,7 @@ test("isTrusted matches a listed domain and its subdomains", () => {
   assert.equal(isTrusted("sec.gov"), true);
   assert.equal(isTrusted("www.sec.gov"), true);
   assert.equal(isTrusted("efts.sec.gov"), true);
-  assert.equal(isTrusted("reuters.com"), true);
+  assert.equal(isTrusted("bloomberg.com"), true);
 });
 
 test("isTrusted rejects a domain that merely contains a listed one", () => {
@@ -170,7 +171,7 @@ test("isTrusted rejects a domain that merely contains a listed one", () => {
   assert.equal(isTrusted("sec.gov.attacker.com"), false);
   assert.equal(isTrusted("sec-gov.com"), false);
   assert.equal(isTrusted("notsec.gov"), false);
-  assert.equal(isTrusted("fakereuters.com"), false);
+  assert.equal(isTrusted("fakebloomberg.com"), false);
 });
 
 test("isTrusted honours a subdomain-scoped entry", () => {
@@ -216,7 +217,7 @@ test("readSources classifies each source and deduplicates by host", () => {
       content: [
         { type: "web_search_result", url: "https://www.sec.gov/a", title: "10-K" },
         { type: "web_search_result", url: "https://www.sec.gov/b", title: "10-Q" },
-        { type: "web_search_result", url: "https://reuters.com/x", title: "Reuters" },
+        { type: "web_search_result", url: "https://bloomberg.com/x", title: "Bloomberg" },
       ],
     },
   ]);
@@ -226,7 +227,7 @@ test("readSources classifies each source and deduplicates by host", () => {
     sources.map((s) => [s.domain, s.trusted]),
     [
       ["sec.gov", true],
-      ["reuters.com", true],
+      ["bloomberg.com", true],
     ],
   );
 });
@@ -498,4 +499,49 @@ test("upstreamProblem keeps the rate-limit advice on 429", () => {
 
 test("upstreamProblem says only the sentence when there is no reason to quote", () => {
   assert.equal(upstreamProblem(500, "<html>oops</html>"), "The model API returned 500.");
+});
+
+// ------------------------------------------- domains the crawler cannot read
+
+// The allowlist is enforced by the API, which means an unreadable entry
+// is not ignored — it rejects the request. These five block Anthropic's
+// crawler, and one of them in the list turns every question into a 400
+// with "the following domains are not accessible to our user agent".
+// They read like the obvious sources for financial news, so this test
+// exists to stop them being added back by someone reasonable.
+
+test("TRUSTED_DOMAINS holds out the domains that block Anthropic's crawler", () => {
+  for (const blocked of [
+    "barrons.com",
+    "ft.com",
+    "marketwatch.com",
+    "reuters.com",
+    "wsj.com",
+  ]) {
+    assert.ok(
+      !TRUSTED_DOMAINS.includes(blocked),
+      `${blocked} blocks Anthropic's crawler: every request would 400`,
+    );
+  }
+});
+
+test("the system prompt does not tell the model to search a blocked domain", () => {
+  for (const blocked of [
+    "barrons.com",
+    "ft.com",
+    "marketwatch.com",
+    "reuters.com",
+    "wsj.com",
+  ]) {
+    assert.ok(
+      !SYSTEM.includes(blocked),
+      `the prompt names ${blocked}, which the filter will not allow`,
+    );
+  }
+});
+
+test("the allowlist still covers the sources of record", () => {
+  for (const kept of ["sec.gov", "federalreserve.gov", "bloomberg.com"]) {
+    assert.ok(TRUSTED_DOMAINS.includes(kept), `${kept} should remain`);
+  }
 });
