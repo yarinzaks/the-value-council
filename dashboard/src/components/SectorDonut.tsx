@@ -10,6 +10,7 @@
 // positions are a bigger bet than five 1% ones.
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { ChartTooltip } from "./ChartKit";
 
 export interface SectorSlice {
   key: string;
@@ -71,12 +72,7 @@ export function SectorDonut({
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 8,
-                border: "1px solid rgba(120,120,120,.25)",
-              }}
-              formatter={(v: number, n: string) => [`${v.toFixed(1)}%`, n]}
+              content={<ChartTooltip formatValue={(v) => `${v.toFixed(1)}%`} />}
             />
           </PieChart>
         </ResponsiveContainer>

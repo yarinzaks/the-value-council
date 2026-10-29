@@ -24,6 +24,7 @@ import {
 } from "recharts";
 
 import type { PricePoint } from "@/lib/data";
+import { ChartTooltip, axisProps, useChartTheme } from "./ChartKit";
 
 interface Props {
   points: PricePoint[];
@@ -44,6 +45,10 @@ export function PositionPriceChart({
   color,
   labels,
 }: Props) {
+  // Before the early return: a hook cannot sit behind a branch.
+  const theme = useChartTheme();
+  const axis = axisProps(theme);
+
   if (points.length < 2) return null;
 
   // Only draw the marker if the entry date is actually inside the
@@ -72,41 +77,47 @@ export function PositionPriceChart({
               <stop offset="100%" stopColor={stroke} stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="2 4" className="stroke-council-200 dark:stroke-council-800" vertical={false} />
+          <CartesianGrid
+            strokeDasharray="2 4"
+            stroke={theme.grid}
+            vertical={false}
+          />
           <XAxis
             dataKey="d"
-            tick={{ fontSize: 11 }}
-            className="fill-council-400"
             minTickGap={48}
             tickFormatter={(d: string) => d.slice(5)}
+            {...axis}
           />
           <YAxis
             domain={[lo - pad, hi + pad]}
-            tick={{ fontSize: 11 }}
-            className="fill-council-400"
             width={52}
             tickFormatter={(v: number) => `$${v.toFixed(0)}`}
+            {...axis}
           />
           <Tooltip
-            contentStyle={{
-              fontSize: 12,
-              borderRadius: 8,
-              border: "1px solid rgba(120,120,120,.25)",
-            }}
-            labelFormatter={(d) => String(d)}
-            formatter={(v: number) => [`$${v.toFixed(2)}`, labels.price]}
+            cursor={{ stroke: theme.axis, strokeWidth: 1 }}
+            content={
+              <ChartTooltip
+                formatValue={(v) => `$${v.toFixed(2)}`}
+                formatName={() => labels.price}
+              />
+            }
           />
           {entryPrice !== null && (
+            /* The entry line's label is text, and it was drawn in
+               #16a34a — 3.28:1 on white, which is the exact value the
+               --gain token exists to avoid. It now takes the same
+               theme-resolved pair as every other gain figure. */
             <ReferenceLine
               y={entryPrice}
-              stroke={up ? "#16a34a" : "#dc2626"}
+              stroke={up ? theme.gain : theme.loss}
               strokeDasharray="4 4"
-              strokeOpacity={0.7}
+              strokeOpacity={0.75}
               label={{
                 value: `${labels.entry} $${entryPrice.toFixed(2)}`,
                 position: "insideTopLeft",
                 fontSize: 11,
-                fill: up ? "#16a34a" : "#dc2626",
+                fill: up ? theme.gain : theme.loss,
               }}
             />
           )}
@@ -125,7 +136,7 @@ export function PositionPriceChart({
               y={entryPoint.c}
               r={4}
               fill={stroke}
-              stroke="#fff"
+              stroke={theme.surface}
               strokeWidth={1.5}
               isFront
             />

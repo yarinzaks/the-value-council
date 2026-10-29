@@ -22,6 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import { sectorColor } from "./SectorDonut";
+import { ChartTooltip, axisProps, useChartTheme } from "./ChartKit";
 import type { SectorTrend } from "@/lib/sector-trend";
 
 export function SectorTrendChart({
@@ -36,6 +37,10 @@ export function SectorTrendChart({
   /** "= 100 at {date}" — the rebasing, stated on the axis. */
   baseLabel: string;
 }) {
+  // Before the empty-state return: a hook cannot sit behind a branch.
+  const theme = useChartTheme();
+  const axis = axisProps(theme);
+
   if (trends.length === 0 || rows.length < 2) {
     return <p className="text-xs text-muted">{emptyLabel}</p>;
   }
@@ -48,31 +53,41 @@ export function SectorTrendChart({
       <div className="h-44">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(120,120,120,.18)" />
+            <CartesianGrid
+              vertical={false}
+              strokeDasharray="3 3"
+              stroke={theme.grid}
+            />
             <XAxis
               dataKey="d"
-              tick={{ fontSize: 10 }}
               minTickGap={40}
               tickFormatter={(d: string) => d.slice(2, 7)}
+              {...axis}
+              tick={{ fontSize: 10, fill: theme.tick }}
             />
             <YAxis
-              tick={{ fontSize: 10 }}
               domain={["auto", "auto"]}
               width={44}
+              {...axis}
+              tick={{ fontSize: 10, fill: theme.tick }}
             />
             <Tooltip
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 8,
-                border: "1px solid rgba(120,120,120,.25)",
-              }}
-              formatter={(v: number, key: string) => [
-                `${v.toFixed(1)} (${v >= 100 ? "+" : "−"}${Math.abs(v - 100).toFixed(1)}%)`,
-                trends.find((t) => t.key === key)?.label ?? key,
-              ]}
+              cursor={{ stroke: theme.axis, strokeWidth: 1 }}
+              content={
+                <ChartTooltip
+                  formatValue={(v) =>
+                    `${v.toFixed(1)} (${v >= 100 ? "+" : "−"}${Math.abs(v - 100).toFixed(1)}%)`
+                  }
+                  formatName={(entry) =>
+                    trends.find((t) => t.key === entry.dataKey)?.label ??
+                    String(entry.dataKey ?? "")
+                  }
+                />
+              }
             />
             <Legend
-              wrapperStyle={{ fontSize: 11 }}
+              wrapperStyle={{ fontSize: 11, color: theme.tick }}
+              iconType="plainline"
               formatter={(key: string) =>
                 trends.find((t) => t.key === key)?.label ?? key
               }

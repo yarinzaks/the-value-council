@@ -22,6 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import { Card, Money, PctCell } from "./Cards";
+import { ChartTooltip, axisProps, rowNumber, useChartTheme } from "./ChartKit";
 import { useUI } from "./Providers";
 import type { DailySnapshot, NavRow } from "@/lib/types";
 
@@ -164,6 +165,10 @@ export function AgentPerformanceChart({
     };
   }, [snapshots, benchmark, period]);
 
+  // Before the empty-state return: a hook cannot sit behind a branch.
+  const theme = useChartTheme();
+  const axis = axisProps(theme);
+
   if (data.rows.length === 0) {
     return (
       <Card>
@@ -174,8 +179,9 @@ export function AgentPerformanceChart({
     );
   }
 
+  // #16a34a is 3.28:1 on white. The token pair exists because of it.
   const lineColor =
-    data.stats && data.stats.totalAgentPct >= 0 ? "#16a34a" : "#dc2626";
+    data.stats && data.stats.totalAgentPct >= 0 ? theme.gain : theme.loss;
   const periods: Period[] = ["1W", "1M", "3M", "ALL"];
 
   return (
@@ -185,14 +191,15 @@ export function AgentPerformanceChart({
         <h3 className="text-sm font-semibold">
           {locale === "he" ? "ביצועי תיק" : "Portfolio performance"} · {agentName}
         </h3>
-        <div className="flex gap-1 bg-council-100 dark:bg-council-800 rounded-md p-1">
+        <div className="flex gap-1 bg-council-100 dark:bg-council-800 rounded-full p-1">
           {periods.map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              aria-pressed={period === p}
+              className={`pressable focus-ring px-3 py-1 text-xs font-medium rounded-full ${
                 period === p
-                  ? "bg-white dark:bg-council-700 shadow-sm"
+                  ? "bg-white dark:bg-council-700 shadow-elev-1 text-council-900 dark:text-council-100"
                   : "text-muted hover:text-council-700 dark:hover:text-council-300"
               }`}
             >
@@ -203,61 +210,70 @@ export function AgentPerformanceChart({
       </div>
 
       {/* Chart */}
-      <div className="h-72 w-full">
+      <div className="h-72 w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.rows} margin={{ top: 5, right: 10, bottom: 5, left: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+            <CartesianGrid
+              vertical={false}
+              strokeDasharray="3 3"
+              stroke={theme.grid}
+            />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11 }}
               minTickGap={30}
               tickFormatter={(d: string) => d.slice(5)}
+              {...axis}
             />
             <YAxis
-              tick={{ fontSize: 11 }}
               tickFormatter={(v: number) => `$${(v / 1000).toFixed(1)}k`}
               domain={["auto", "auto"]}
               width={60}
+              {...axis}
             />
             {data.stats && (
               <ReferenceLine
                 y={data.stats.startNav}
-                stroke="#94a3b8"
+                stroke={theme.benchmark}
                 strokeDasharray="3 3"
                 strokeOpacity={0.5}
                 label={{
                   value: `$${data.stats.startNav.toFixed(0)}`,
                   position: "right",
-                  fill: "#64748b",
+                  fill: theme.tick,
                   fontSize: 10,
                 }}
               />
             )}
             <Tooltip
-              labelFormatter={(d: string) => d}
-              formatter={(value: number, name: string, props: { payload?: ChartRow }) => {
-                const row = props.payload;
-                if (!row) return [`$${value.toFixed(2)}`, name];
-                if (name === "agentNav") {
-                  return [
-                    `$${value.toLocaleString("en-US", {
+              cursor={{ stroke: theme.axis, strokeWidth: 1 }}
+              content={
+                <ChartTooltip
+                  formatName={(entry) =>
+                    entry.dataKey === "benchmarkNav"
+                      ? locale === "he"
+                        ? "מדד S&P 500"
+                        : "S&P 500"
+                      : agentName
+                  }
+                  formatValue={(value, entry) => {
+                    const money = `$${value.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    })}  (${row.agentPct >= 0 ? "+" : ""}${row.agentPct.toFixed(2)}%)`,
-                    agentName,
-                  ];
-                }
-                if (name === "benchmarkNav") {
-                  return [
-                    `$${value.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}  (${row.benchmarkPct !== undefined && row.benchmarkPct >= 0 ? "+" : ""}${row.benchmarkPct?.toFixed(2) ?? "—"}%)`,
-                    locale === "he" ? "מדד S&P 500" : "S&P 500",
-                  ];
-                }
-                return [`${value}`, name];
-              }}
+                    })}`;
+                    // The NAV alone does not say whether the agent is
+                    // up; the percent beside it is the thing the
+                    // reader came for.
+                    const pct = rowNumber(
+                      entry,
+                      entry.dataKey === "benchmarkNav"
+                        ? "benchmarkPct"
+                        : "agentPct",
+                    );
+                    if (pct === null) return money;
+                    return `${money} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`;
+                  }}
+                />
+              }
             />
             <Line
               type="monotone"
@@ -265,6 +281,7 @@ export function AgentPerformanceChart({
               stroke={lineColor}
               strokeWidth={2.5}
               dot={false}
+              activeDot={{ r: 4, strokeWidth: 2, stroke: theme.surface }}
               isAnimationActive={false}
               name={agentName}
             />
@@ -272,10 +289,11 @@ export function AgentPerformanceChart({
               <Line
                 type="monotone"
                 dataKey="benchmarkNav"
-                stroke="#64748b"
+                stroke={theme.benchmark}
                 strokeWidth={1.5}
                 strokeDasharray="4 4"
                 dot={false}
+                activeDot={{ r: 3, strokeWidth: 2, stroke: theme.surface }}
                 isAnimationActive={false}
                 name="S&P 500"
                 connectNulls
