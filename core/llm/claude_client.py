@@ -53,6 +53,13 @@ from pydantic import BaseModel, Field
 
 from core.config import get_settings
 from core.exceptions import LLMError
+from core.llm.memo_log import (
+    MemoLog,
+    MemoRecord,
+    agent_for,
+    digest,
+    now_utc_iso,
+)
 from core.llm.prompts import (
     INVESTMENT_MEMO_SYSTEM,
     render_investment_memo_prompt,
@@ -108,6 +115,7 @@ class ClaudeClient:
         max_tokens: int = DEFAULT_MAX_TOKENS,
         min_interval_seconds: float = DEFAULT_MIN_INTERVAL_SECONDS,
         thinking: bool = False,
+        memo_log: MemoLog | None = None,
     ) -> None:
         """Hold the key and the defaults. Opens no connection.
 
@@ -122,6 +130,11 @@ class ClaudeClient:
         self._max_tokens = max_tokens
         self._min_interval = min_interval_seconds
         self._thinking = thinking
+        # Recording is on by default and not a flag. An analyst layer
+        # whose reasoning is not written down is one nobody can audit,
+        # and that is not a property any single call site should get to
+        # opt out of.
+        self._memo_log = memo_log if memo_log is not None else MemoLog()
 
         key = get_settings().anthropic_api_key
         if key is None:
@@ -147,6 +160,8 @@ class ClaudeClient:
         system: str,
         prompt: str,
         schema: type[MemoT],
+        agent: str = "",
+        ticker: str = "",
     ) -> MemoT:
         """Send one prompt and return a validated instance of ``schema``.
 
@@ -200,7 +215,57 @@ class ClaudeClient:
                 f"Claude returned no {schema.__name__} "
                 f"(stop_reason={stop!r})"
             )
+
+        self._record(
+            memo,
+            schema=schema,
+            prompt=prompt,
+            usage=getattr(response, "usage", None),
+            agent=agent,
+            ticker=ticker,
+        )
         return memo
+
+    def _record(
+        self,
+        memo: BaseModel,
+        *,
+        schema: type[BaseModel],
+        prompt: str,
+        usage: Any,
+        agent: str,
+        ticker: str,
+    ) -> None:
+        """Write the memo down. Never raises.
+
+        A failed write must not turn a call that already succeeded into
+        an error — the memo is in the caller's hands by now and the
+        agent is entitled to act on it. But it is logged at warning,
+        because a silent gap in the audit trail is the one thing this
+        module exists to prevent.
+        """
+        try:
+            self._memo_log.log(
+                MemoRecord(
+                    agent=agent or agent_for(schema.__name__),
+                    # The memo usually names its own subject; the
+                    # parameter is for the ones that do not.
+                    ticker=ticker or str(getattr(memo, "ticker", "") or "?"),
+                    schema=schema.__name__,
+                    timestamp=now_utc_iso(),
+                    model=self._model_name,
+                    memo=memo.model_dump(mode="json"),
+                    input_tokens=getattr(usage, "input_tokens", None),
+                    output_tokens=getattr(usage, "output_tokens", None),
+                    prompt_chars=len(prompt),
+                    prompt_sha256=digest(prompt),
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 — the memo is already delivered
+            self.logger.warning(
+                f"could not record the {schema.__name__} for "
+                f"{agent or schema.__name__}: {type(exc).__name__}: {exc}"
+            )
 
     def generate_investment_memo(
         self,

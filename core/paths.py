@@ -88,6 +88,17 @@ def decisions_dir() -> Path:
     return DATA_ROOT / "decisions"
 
 
+def memos_dir() -> Path:
+    """What the analyst layer said, per agent, per day.
+
+    Separate from ``decisions_dir`` on purpose. A decision is the
+    agent's conclusion and carries three fields of the memo that
+    produced it; this holds the memo whole, so a reader can see the
+    reasoning that was acted on rather than the summary of it.
+    """
+    return DATA_ROOT / "memos"
+
+
 def backtest_decisions_dir() -> Path:
     """Decisions a *backtest* made, kept out of the live journal.
 
@@ -161,6 +172,7 @@ def ensure_dirs() -> None:
         fundamentals_cache_dir(),
         portfolios_dir(),
         decisions_dir(),
+        memos_dir(),
         backtest_decisions_dir(),
         backtest_results_dir(),
         cron_logs_dir(),
@@ -180,6 +192,7 @@ __all__ = [
     "edgar_filings_db",
     "ensure_dirs",
     "fundamentals_cache_dir",
+    "memos_dir",
     "portfolios_dir",
     "prices_db",
     "universe_index",
