@@ -32,6 +32,7 @@ from core.live.why_translator import (
     dreman_why,
     fisher_why,
     graham_defensive_why,
+    graham_near_miss_why,
     graham_net_net_why,
     greenblatt_watch_why,
     greenblatt_why,
@@ -316,10 +317,50 @@ class GrahamLive(AgentAdapter):
         return out
 
     def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
-        # No external all-scores list available; we'd need to expose
-        # one from the strategy. For now, return an empty watchlist
-        # and rely on the next rebalance to surface candidates.
-        return []
+        """The near misses the screen recorded, minus anything held.
+
+        The usual watch list is the tail of a ranking — the names that
+        qualified but missed the cut. Graham has no such tail: he buys
+        every name that passes, so rank 31 does not exist and this
+        returned nothing for as long as it did.
+
+        What he is actually waiting for is the company that clears every
+        test a price cannot change and is blocked only by the
+        quotation. The strategy records those, with the price each would
+        pass at, which is the number this fills ``entry_price_target``
+        with — a field that has been on :class:`LiveWatch` from the
+        start and had nothing to put in it.
+        """
+        # Read off the strategy rather than indexed into it: a strategy
+        # that has not run yet has an empty history, and `[-1]` on that
+        # is an IndexError in the middle of a finished trading run. The
+        # rest of this file indexes directly and predates the base class
+        # declaring the attribute at all.
+        history = getattr(self.strategy, "selection_history", None) or []
+        if not history:
+            return []
+        candidates = getattr(history[-1], "watch_candidates", None) or []
+        held = {t.ticker.upper() for t in targets}
+        watch: list[LiveWatch] = []
+        for candidate in candidates:
+            if candidate.ticker.upper() in held:
+                # Owned, so not awaited. The screen's pool is the
+                # universe and does not exclude the book.
+                continue
+            en, he = graham_near_miss_why(candidate)
+            watch.append(
+                LiveWatch(
+                    ticker=candidate.ticker,
+                    rank=len(watch) + 1,
+                    entry_trigger=self.entry_trigger,
+                    why_en=en,
+                    why_he=he,
+                    entry_price_target=candidate.trigger_price,
+                )
+            )
+            if len(watch) >= self.watchlist_size:
+                break
+        return watch
 
 
 class GrahamSecondCohortLive(GrahamLive):

@@ -33,6 +33,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.logger import get_logger
+from core.watchlist import WatchCandidate
 
 from .filters import (
     DEFAULT_DEFENSIVE_MAX_PB,
@@ -52,6 +53,7 @@ from .ranking import (
     score_defensive_candidates,
     select_top_n,
 )
+from .watch import defensive_watch_candidates
 
 logger = get_logger("agents.graham.net_net")
 
@@ -76,6 +78,11 @@ class GrahamSelection:
     selected_tickers: list[str] = field(default_factory=list)
     top_scores: list[GrahamScore] = field(default_factory=list)
     top_defensive: list[DefensiveScore] = field(default_factory=list)
+    #: Companies that cleared every test a price cannot change and were
+    #: blocked only by the quotation, with the price each would pass at.
+    #: Recorded, never acted on — the weights this class returns are
+    #: built from ``top_scores`` and ``top_defensive`` alone.
+    watch_candidates: list[WatchCandidate] = field(default_factory=list)
 
 
 class BenjaminGraham(Strategy):
@@ -183,6 +190,7 @@ class BenjaminGraham(Strategy):
         # post-1970 reality — classic Net-Nets are extremely rare.
         defensive_top: list[DefensiveScore] = []
         defensive_survivors_count = 0
+        watch_candidates: list[WatchCandidate] = []
         if (
             self.enable_defensive_fallback
             and len(net_net_top) < self.net_net_fallback_threshold
@@ -209,6 +217,20 @@ class BenjaminGraham(Strategy):
             defensive_scores = score_defensive_candidates(defensive_survivors)
             defensive_top = select_top_n(defensive_scores, n=slots_to_fill)
 
+            # The same pool, read a second time for the names the screen
+            # just rejected on price alone. It runs here because this is
+            # where the universe is; it feeds the audit record and
+            # nothing else, so it cannot affect a weight.
+            watch_candidates = defensive_watch_candidates(
+                defensive_pool,
+                as_of=as_of,
+                max_pe=self.defensive_max_pe,
+                max_pb=self.defensive_max_pb,
+                min_current_ratio=self.defensive_min_current_ratio,
+                max_de=self.max_de,
+                min_market_cap=self.min_market_cap,
+            )
+
         all_selected_tickers: list[str] = [s.ticker for s in net_net_top] + [
             s.ticker for s in defensive_top
         ]
@@ -228,6 +250,7 @@ class BenjaminGraham(Strategy):
                 selected=[],
                 top=[],
                 top_defensive=[],
+                watch_candidates=watch_candidates,
             )
             return {}
 
@@ -244,6 +267,7 @@ class BenjaminGraham(Strategy):
             selected=all_selected_tickers,
             top=net_net_top,
             top_defensive=defensive_top,
+            watch_candidates=watch_candidates,
         )
         if self.decision_logger is not None:
             self._log_decisions(
@@ -278,6 +302,7 @@ class BenjaminGraham(Strategy):
         selected: list[str],
         top: list[GrahamScore],
         top_defensive: list[DefensiveScore],
+        watch_candidates: list[WatchCandidate] | None = None,
     ) -> None:
         self.selection_history.append(
             GrahamSelection(
@@ -291,6 +316,7 @@ class BenjaminGraham(Strategy):
                 selected_tickers=selected,
                 top_scores=top,
                 top_defensive=top_defensive,
+                watch_candidates=list(watch_candidates or []),
             )
         )
 

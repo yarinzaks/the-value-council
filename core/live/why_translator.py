@@ -145,6 +145,28 @@ def schloss_watch_why(score: Any) -> tuple[str, str]:
     return en, he
 
 
+def graham_near_miss_why(candidate: Any) -> tuple[str, str]:
+    """Why a near miss is watched, and the price at which it stops being one.
+
+    Takes a :class:`~core.watchlist.WatchCandidate`, not a score. The
+    blocking criteria arrive already phrased by the screen that failed
+    them, so there is nothing here to re-derive and nothing that can
+    end up disagreeing with the decision journal.
+    """
+    blocking = ", ".join(candidate.blocking) or "price"
+    target = candidate.trigger_price
+    fall = candidate.required_fall_pct
+    en = (
+        f"Clears every test a price cannot change; blocked on {blocking}. "
+        f"Qualifies at ${target:,.2f} — {fall:.1f}% below today."
+    )
+    he = (
+        f"עובר כל מבחן שמחיר לא משנה; נחסם על {blocking}. "
+        f"נכנס ב-${target:,.2f} — {fall:.1f}% מתחת למחיר היום."
+    )
+    return en, he
+
+
 def graham_watch_why(score: Any) -> tuple[str, str]:
     # Score may be a NetNet or Defensive — duck-type on attribute presence.
     if hasattr(score, "p_ncav"):
@@ -381,6 +403,7 @@ __all__ = [
     "fmt_pct",
     "fmt_ratio",
     "graham_defensive_why",
+    "graham_near_miss_why",
     "graham_net_net_why",
     "graham_watch_why",
     "greenblatt_watch_why",
