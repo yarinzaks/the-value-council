@@ -16,6 +16,10 @@ classifiers = [
 ]
 
 dependencies = [
+    # Pinned exactly rather than floored: the Messages API dropped
+    # `temperature` and renamed `output_format` between majors, and a
+    # silent minor bump is how a working analyst layer starts 400ing.
+    "anthropic==2.3.0",
     "google-genai>=2.18.1",
     "yfinance>=0.2.40",
     "edgartools>=2.0.0",

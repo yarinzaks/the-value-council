@@ -9,7 +9,7 @@ Typical usage::
 
     from core.config import get_settings
     settings = get_settings()
-    api_key = settings.gemini_api_key.get_secret_value()
+    api_key = settings.anthropic_api_key.get_secret_value()
 """
 
 from __future__ import annotations
@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     # SEC EDGAR (free, no key) and yfinance (free, no key) are required.
     # They stay here so individual playbook scripts that DO use them can
     # opt in via .env without forcing the daily runner to require them.
+    anthropic_api_key: SecretStr | None = None
     gemini_api_key: SecretStr | None = None
     fmp_api_key: SecretStr | None = None
     finnhub_api_key: SecretStr | None = None
