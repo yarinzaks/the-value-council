@@ -51,6 +51,7 @@ from core.live.notify import (
     ChannelCheck,
     TelegramConfig,
     check_channel,
+    choose_decisions,
     notify_run,
     read_config,
     send_message,
@@ -103,14 +104,21 @@ def _book(agent: str) -> dict[str, Any]:
 
 
 def _latest_decisions(agent: str) -> tuple[date, dict[str, Any]]:
-    """The most recent day the agent logged anything, and that day's rows."""
+    """The most recent day the agent logged anything, and that day's rows.
+
+    Joined through :func:`choose_decisions`, the same resolver the live
+    notifier uses. Building the mapping here instead is how this script
+    came to disagree with the thing it exists to rehearse: the days it
+    happened to read had no execution receipts in them, so it showed a
+    plan that a real trading day would not have carried.
+    """
     root = decisions_dir() / agent
     files = sorted(root.glob("*.json")) if root.exists() else []
     if not files:
         return date.today(), {}
     day = date.fromisoformat(files[-1].stem)
     rows = DecisionLogger(root=decisions_dir()).read_day(agent, day)
-    return day, {str(r.ticker).upper(): r for r in rows}
+    return day, choose_decisions(rows)
 
 
 def _explain(

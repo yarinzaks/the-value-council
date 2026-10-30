@@ -26,6 +26,7 @@ from core.live.notify import (
     TelegramConfig,
     TelegramSendError,
     check_channel,
+    choose_decisions,
     clean_company_name,
     format_action,
     format_result,
@@ -372,6 +373,10 @@ class FakeDecision:
     criteria_values: dict[str, Any] = field(default_factory=dict)
     target_price: float | None = None
     exit_trigger: str | None = None
+    #: Which kind of row this is. The journal holds six, and two of them
+    #: are the runner's rather than the strategy's; the join has to tell
+    #: them apart.
+    decision: str = "BUY"
 
 
 NAMES = {
@@ -1316,3 +1321,92 @@ class TestTheWatchPathObeysTheSameGates:
         )
         assert "ההרצה נכשלה: boom" in text
         assert "עוקב" not in text
+
+
+# ------------------------------------- the reason, not the execution receipt
+
+
+def a_fill_row(ticker="SEB", rank=1):
+    """What the runner logs after it executes — shaped like the real one."""
+    return FakeDecision(
+        ticker=ticker,
+        decision="FILL",
+        criteria_met=[f"rank #{rank}", "live paper-trade"],
+        criteria_values={},
+        target_price=None,
+    )
+
+
+def an_exit_row(ticker="EFOR"):
+    return FakeDecision(
+        ticker=ticker,
+        decision="EXIT",
+        criteria_met=["left today's target list"],
+        criteria_values={},
+        target_price=None,
+    )
+
+
+class TestTheJoinPicksTheReasonNotTheReceipt:
+    """A live day holds two rows per bought ticker, and order favours the
+    wrong one.
+
+    The strategy logs its ``BUY`` while screening; the runner logs a
+    ``FILL`` after executing. The fill is written second and carries no
+    criteria values and no target, so keeping the last row per ticker
+    renders "rank #1 / live paper-trade" and no plan at all — which is
+    what Graham's 2026-08-07 journal produces when replayed.
+    """
+
+    def test_the_receipt_does_not_shadow_the_reason(self):
+        chosen = choose_decisions([a_defensive_decision(), a_fill_row()])
+
+        assert chosen["SEB"].decision == "BUY"
+
+    def test_a_receipt_on_its_own_is_not_an_explanation(self):
+        # Better the fill line alone than "rank #4", which is this
+        # system's own bookkeeping and means nothing to a reader.
+        assert choose_decisions([a_fill_row(ticker="SFD")]) == {}
+
+    def test_an_exit_still_wins_over_what_the_strategy_wrote_first(self):
+        # The runner logs the exit last, and that ordering is what makes
+        # a sale report why it was sold. Skipping receipts must not cost
+        # it.
+        chosen = choose_decisions(
+            [a_defensive_decision(ticker="EFOR"), an_exit_row("EFOR")]
+        )
+
+        assert chosen["EFOR"].decision == "EXIT"
+
+    def test_a_watch_row_does_not_outlive_the_exit_that_followed_it(self):
+        watch = FakeDecision(ticker="JBI", decision="WATCH", criteria_met=["P/NCAV=0.5"])
+        chosen = choose_decisions([watch, an_exit_row("JBI")])
+
+        assert chosen["JBI"].decision == "EXIT"
+
+    def test_tickers_are_matched_upper_case(self):
+        chosen = choose_decisions([FakeDecision(ticker="sfd", decision="BUY")])
+
+        assert "SFD" in chosen
+
+    def test_a_row_with_no_ticker_is_dropped_rather_than_keyed_on_nothing(self):
+        assert choose_decisions([FakeDecision(ticker="", decision="BUY")]) == {}
+
+    def test_the_resolved_row_renders_the_plan_the_receipt_would_have_lost(self):
+        """End to end, over a day shaped like a real one.
+
+        This is the test that fails if receipts stop being skipped: the
+        fill is written second, so the message would carry its rank in
+        place of the company's tests and lose the sell target entirely.
+        """
+        rows = [a_defensive_decision(ticker="SEB", target=7936.58), a_fill_row("SEB")]
+        text = rendered(
+            FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB", price=4283.77)]),
+            choose_decisions(rows),
+        )
+
+        assert "התוכנית" in text
+        assert "$7,936.58" in text
+        assert "P/E=7.52 (≤ 15.0)" in text
+        assert "live paper-trade" not in text
+        assert "rank #" not in text

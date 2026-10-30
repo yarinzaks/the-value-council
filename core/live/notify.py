@@ -610,6 +610,48 @@ def format_result(
     return f"{header}\n\n{body}{footer}"
 
 
+#: Journal kinds that record *that* a trade executed, not *why*.
+#:
+#: The strategy logs its own ``BUY`` while it screens, carrying the tests
+#: the company passed and the level the position should close at. The
+#: runner then logs a ``FILL`` for the same ticker on the same day, and
+#: that row holds the rank it executed at and nothing else: no
+#: ``criteria_values``, so no sleeve and so no plan, and no
+#: ``target_price``. It is written second, so a join that keeps the last
+#: row per ticker hands the formatter the receipt and drops the reason —
+#: "מה זיהה / rank #1 / live paper-trade", with no sell target under it.
+#:
+#: Measured, not inferred: all six FILL rows in Graham's journal shadow a
+#: BUY row for the same ticker on the same day, and replaying 2026-08-07
+#: through :func:`format_result` reproduces that message exactly.
+#:
+#: ``EXIT`` is the runner's too and is deliberately absent here. "left
+#: today's target list" *is* why a rotation closed the position, and it
+#: is the only row a sold name gets — a name is sold *because* it left
+#: the target list, so the strategy wrote nothing for it that day.
+_RECEIPT_KINDS: frozenset[str] = frozenset({"FILL"})
+
+
+def choose_decisions(rows: Iterable[Any]) -> dict[str, Any]:
+    """One journal row per ticker: the reason, not the receipt.
+
+    Later rows win, which is what carries an exit — the runner logs it
+    after everything the strategy wrote that day. Receipts are skipped
+    outright rather than merely ranked last: a ticker whose only row is a
+    ``FILL`` is better described by its fill line alone than by "rank
+    #4", which is this system's own bookkeeping and means nothing to the
+    person reading the message.
+    """
+    chosen: dict[str, Any] = {}
+    for row in rows:
+        if str(getattr(row, "decision", "")).upper() in _RECEIPT_KINDS:
+            continue
+        ticker = str(getattr(row, "ticker", "")).upper()
+        if ticker:
+            chosen[ticker] = row
+    return chosen
+
+
 def _decisions_for(agent: str, as_of: date) -> Mapping[str, Any]:
     """The journal entries this run wrote for ``agent``, keyed by ticker.
 
@@ -626,10 +668,7 @@ def _decisions_for(agent: str, as_of: date) -> Mapping[str, Any]:
     except Exception as exc:  # noqa: BLE001 — enrichment is optional
         logger.debug(f"could not read decisions for {agent}: {type(exc).__name__}")
         return {}
-    # Last writer wins per ticker. A day with both a SELL and a later BUY
-    # of one name is not something Graham does, and if it happened the
-    # trade list would carry both fills anyway.
-    return {str(r.ticker).upper(): r for r in rows}
+    return choose_decisions(rows)
 
 
 def _company_names() -> Mapping[str, str]:
@@ -916,6 +955,7 @@ __all__ = [
     "TelegramConfig",
     "TelegramSendError",
     "check_channel",
+    "choose_decisions",
     "clean_company_name",
     "format_action",
     "format_result",
