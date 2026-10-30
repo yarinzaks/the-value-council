@@ -23,6 +23,8 @@ import pytest
 
 from core.live.notify import (
     REDACTED,
+    SEPARATOR,
+    TELEGRAM_TEXT_LIMIT,
     TelegramConfig,
     TelegramSendError,
     check_channel,
@@ -36,6 +38,7 @@ from core.live.notify import (
     redact,
     send_message,
     shape_complaints,
+    split_for_telegram,
 )
 
 AS_OF = date(2026, 10, 30)
@@ -1410,3 +1413,89 @@ class TestTheJoinPicksTheReasonNotTheReceipt:
         assert "P/E=7.52 (≤ 15.0)" in text
         assert "live paper-trade" not in text
         assert "rank #" not in text
+
+
+# -------------------------------------- the busiest day must still arrive
+
+
+class TestAMessageTooLongForTelegramIsSplitNotLost:
+    """Over 4096 characters Telegram answers 400 and delivers nothing.
+
+    ``notify_run`` logs a refusal and carries on, which means the one
+    day worth reading — the day the book rotated — is the one day that
+    would have arrived as silence. Graham screens thirty names, so that
+    day is reachable: the observed maximum is ten blocks and 1,778
+    characters, and thirty sales beside thirty purchases is some 10,700.
+    """
+
+    def test_a_short_message_is_left_exactly_as_it_was(self):
+        text = f"2026-10-30{SEPARATOR}one block"
+
+        assert split_for_telegram(text) == [text]
+
+    def test_a_message_at_the_limit_is_still_one_message(self):
+        text = "x" * TELEGRAM_TEXT_LIMIT
+
+        assert split_for_telegram(text) == [text]
+
+    def test_every_chunk_fits_inside_the_limit(self):
+        blocks = [f"block {i} " + "y" * 300 for i in range(60)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        assert len(chunks) > 1
+        assert all(len(chunk) <= TELEGRAM_TEXT_LIMIT for chunk in chunks)
+
+    def test_not_one_block_is_dropped(self):
+        blocks = [f"BLOCK{i}" + "z" * 300 for i in range(60)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+        joined = "".join(chunks)
+
+        assert all(f"BLOCK{i}" in joined for i in range(60))
+
+    def test_a_split_message_says_which_part_it_is(self):
+        blocks = ["w" * 1000 for _ in range(12)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        assert chunks[0].endswith(f"(1/{len(chunks)})")
+        assert chunks[-1].endswith(f"({len(chunks)}/{len(chunks)})")
+
+    def test_a_single_block_past_the_limit_is_sliced_rather_than_lost(self):
+        # No formatter here produces one. Discarding it silently is the
+        # failure this function exists to prevent, so it is cut instead.
+        chunks = split_for_telegram("q" * (TELEGRAM_TEXT_LIMIT * 2))
+
+        assert all(len(chunk) <= TELEGRAM_TEXT_LIMIT for chunk in chunks)
+        assert sum(chunk.count("q") for chunk in chunks) == TELEGRAM_TEXT_LIMIT * 2
+
+    def test_the_split_happens_on_block_boundaries(self):
+        blocks = [f"B{i}" + "v" * 2000 for i in range(4)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        # Every chunk starts at a block, never mid-sentence.
+        assert all(chunk.lstrip().startswith("B") for chunk in chunks)
+
+    def test_notify_run_sends_every_chunk_of_a_long_day(self):
+        sent = Recorder()
+        trades = [a_buy(ticker=f"T{i}", price=100.0 + i) for i in range(60)]
+        count = notify_run(
+            [FakeResult(agent="benjamin_graham", trades=trades)],
+            as_of=AS_OF,
+            env=ENV,
+            send=sent,
+        )
+
+        assert count == len(sent.calls) > 1
+        assert all(len(text) <= TELEGRAM_TEXT_LIMIT for _cfg, text in sent.calls)
+        assert all(f"T{i}" in "".join(t for _c, t in sent.calls) for i in range(60))
+
+    def test_an_ordinary_day_is_still_exactly_one_message(self):
+        sent = Recorder()
+        count = notify_run(
+            [FakeResult(agent="benjamin_graham", trades=[a_buy()])],
+            as_of=AS_OF,
+            env=ENV,
+            send=sent,
+        )
+
+        assert count == 1
+        assert "(1/1)" not in sent.calls[0][1]

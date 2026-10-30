@@ -88,6 +88,22 @@ TIMEOUT_SECONDS = 10
 #: keeps every name.
 MAX_WATCH_BLOCKS: int = 5
 
+#: What separates two blocks inside one message.
+SEPARATOR = "\n\n———\n\n"
+
+#: Telegram's ceiling on one ``sendMessage`` text, in characters.
+#:
+#: Over it the API answers 400 "message is too long" and delivers
+#: nothing, which is the one failure mode worth engineering against: the
+#: busiest day is the day most worth reading, and a notifier that goes
+#: silent exactly then is worse than one that was never wired up.
+#:
+#: Counted by Telegram in UTF-16 code units. Every character this module
+#: emits — Hebrew, digits, the separator's em dashes — is one unit, so
+#: Python's ``len`` is the same number here. An emoji would not be, and
+#: there are none.
+TELEGRAM_TEXT_LIMIT: int = 4096
+
 #: Which books to report on. One agent today, by request: Graham leads
 #: the live book and is the one being followed closely. A set rather
 #: than a constant so adding a second is a one-line change here.
@@ -595,7 +611,7 @@ def format_result(
     # Date only. Each action block names the agent itself, so that a
     # message Telegram truncates still says who acted.
     header = as_of.isoformat()
-    body = "\n\n———\n\n".join(blocks)
+    body = SEPARATOR.join(blocks)
 
     portfolio = getattr(result, "portfolio", None)
     footer = ""
@@ -604,10 +620,68 @@ def format_result(
         ret = getattr(portfolio, "cumulative_return_pct", None)
         if nav is not None and ret is not None:
             footer = (
-                f"\n\n———\n\nהתיק   {_money(float(nav))}  "
+                f"{SEPARATOR}התיק   {_money(float(nav))}  "
                 f"({float(ret):+.2f}% מההתחלה)"
             )
     return f"{header}\n\n{body}{footer}"
+
+
+#: The widest continuation marker :func:`split_for_telegram` can append,
+#: reserved from every chunk. Two digits a side covers 99 messages, which
+#: is some 300 blocks — an order of magnitude past what thirty holdings
+#: can produce.
+_CONTINUATION_ROOM = "\n\n(99/99)"
+
+
+def split_for_telegram(text: str, *, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str]:
+    """``text`` as one message, or as the fewest messages that each fit.
+
+    Nothing is dropped. Graham's screen holds thirty names, so a day
+    that rotated the book would spell out thirty sales and thirty
+    purchases — measured at roughly 180 characters a block, that is a
+    message Telegram refuses outright, and :func:`notify_run` would log
+    the refusal and move on. The reader would learn nothing about the
+    one day that mattered most. The observed maximum so far is ten
+    blocks and 1,778 characters, well inside the limit; this is the
+    ceiling, not a fault anyone has hit.
+
+    Splitting happens on this module's own block separator, so a message
+    never breaks mid-sentence. A single block longer than the whole
+    limit is pathological — no formatter here can produce one — but it
+    is sliced rather than discarded, because losing it silently is the
+    failure this function exists to prevent.
+    """
+    if len(text) <= limit:
+        return [text]
+
+    parts = text.split(SEPARATOR)
+    # Room for the continuation marker appended below. Reserved from
+    # every part, including the first, so that the packing decision does
+    # not depend on how many messages it is about to produce.
+    room = limit - len(_CONTINUATION_ROOM)
+    chunks: list[str] = []
+    current = ""
+    for part in parts:
+        while len(part) > room:
+            # Nothing here emits a block this long; slicing is the
+            # honest fallback for a block that nonetheless is.
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.append(part[:room])
+            part = part[room:]
+        candidate = f"{current}{SEPARATOR}{part}" if current else part
+        if len(candidate) <= room:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            current = part
+    if current:
+        chunks.append(current)
+
+    total = len(chunks)
+    return [f"{chunk}\n\n({index}/{total})" for index, chunk in enumerate(chunks, 1)]
 
 
 #: Journal kinds that record *that* a trade executed, not *why*.
@@ -931,8 +1005,14 @@ def notify_run(
         if text is None:
             continue
         try:
-            sender(config, text)
-            sent += 1
+            # One send per chunk, and almost always one chunk. A day that
+            # rotated thirty holdings produces a text Telegram refuses
+            # whole, and the refusal would be logged here and nowhere
+            # else — so it is split before it is offered, not after it is
+            # rejected.
+            for chunk in split_for_telegram(text):
+                sender(config, chunk)
+                sent += 1
         except Exception as exc:  # noqa: BLE001 — a notifier may not fail a run
             # Through `redact`, always. The text is worth having — the
             # status and Telegram's own "chat not found" are the whole
@@ -950,6 +1030,8 @@ __all__ = [
     "API_ROOT",
     "MAX_WATCH_BLOCKS",
     "REDACTED",
+    "SEPARATOR",
+    "TELEGRAM_TEXT_LIMIT",
     "WATCHED_AGENTS",
     "ChannelCheck",
     "TelegramConfig",
@@ -967,4 +1049,5 @@ __all__ = [
     "redact",
     "send_message",
     "shape_complaints",
+    "split_for_telegram",
 ]
