@@ -14,6 +14,7 @@ business), the bundle is refreshed manually rather than on every run.
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -23,6 +24,9 @@ logger = get_logger("core.data.sic_codes")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 BUNDLE_PATH = PROJECT_ROOT / "data_bundled" / "company_sic.json"
+#: Code → the SEC's own industry title. Built by
+#: ``scripts.fetch_sic_titles``; see that module for why it is committed.
+TITLES_PATH = PROJECT_ROOT / "data_bundled" / "sic_titles.json"
 
 
 @lru_cache(maxsize=1)
@@ -56,4 +60,72 @@ def industry_for(ticker: str) -> int | None:
     return sic // 100
 
 
-__all__ = ["industry_for", "load_sic_map", "sic_for"]
+@lru_cache(maxsize=1)
+def load_sic_titles() -> dict[str, str]:
+    """Return the bundled ``code -> title`` mapping (in-memory cached)."""
+    if not TITLES_PATH.exists():
+        logger.warning(
+            f"sic_titles.json bundle missing at {TITLES_PATH}; "
+            f"industry labels will be unavailable."
+        )
+        return {}
+    try:
+        raw = json.loads(TITLES_PATH.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(f"failed to load {TITLES_PATH}: {exc}")
+        return {}
+    return {str(k): str(v) for k, v in raw.items()}
+
+
+def sic_title(sic: int | str | None) -> str | None:
+    """The SEC's title for a SIC code, verbatim, or ``None``.
+
+    Verbatim means shouting and the SEC's own abbreviations — 2300 is
+    "APPAREL & OTHER FINISHD PRODS OF FABRICS & SIMILAR MATL". Use
+    :func:`industry_title` for something to show a reader.
+    """
+    if sic is None:
+        return None
+    return load_sic_titles().get(str(sic))
+
+
+#: Characters a new word may start after. An apostrophe is deliberately
+#: absent — ``str.title`` treats it as a boundary and turns "WOMEN'S"
+#: into "Women'S" — while a hyphen is present, because "WHOLESALE-FARM"
+#: is two words and reads wrong as "Wholesale-farm".
+_WORD_START = re.compile(r"(?:^|(?<=[\s\-/(&]))([a-z])")
+
+
+def _titlecase(text: str) -> str:
+    """Title-case the SEC's shouting titles for display."""
+    return _WORD_START.sub(lambda m: m.group(1).upper(), text.lower())
+
+
+def industry_title(ticker: str) -> str | None:
+    """A readable industry label for ``ticker``, or ``None``.
+
+    What the company does, in the SEC's classification of its own
+    primary business — the nearest thing to a description that exists
+    without a profile feed. Sector buckets are too coarse to be worth
+    showing: Harley-Davidson and Ingredion are both "manufacturing",
+    while their SIC titles are "Motorcycles, Bicycles & Parts" and
+    "Grain Mill Products".
+
+    The SEC's abbreviations survive title-casing ("Finishd Prods"). They
+    are left as published rather than expanded by guesswork, since this
+    is a quotation of a classification and not prose.
+    """
+    title = sic_title(sic_for(ticker))
+    if not title:
+        return None
+    return _titlecase(title)
+
+
+__all__ = [
+    "industry_for",
+    "industry_title",
+    "load_sic_map",
+    "load_sic_titles",
+    "sic_for",
+    "sic_title",
+]
