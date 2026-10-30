@@ -40,10 +40,10 @@ class Probe:
     required: bool = True
 
 
-def _probe_gemini() -> str:
-    from core.llm.gemini_client import GeminiClient
+def _probe_claude() -> str:
+    from core.llm.claude_client import ClaudeClient
 
-    client = GeminiClient()
+    client = ClaudeClient()
     # Minimal call — short prompt, no playbook, just verify auth + format.
     memo = client.generate_investment_memo(
         playbook=(
@@ -99,7 +99,7 @@ def _probe_yfinance() -> str:
 
 
 PROBES: list[Probe] = [
-    Probe("Gemini", "LLM reasoning", _probe_gemini),
+    Probe("Claude", "LLM reasoning", _probe_claude),
     Probe("FMP", "Financial Modeling Prep", _probe_fmp),
     Probe("Finnhub", "real-time quotes + news", _probe_finnhub),
     Probe("AlphaVantage", "news + sentiment", _probe_alpha_vantage),

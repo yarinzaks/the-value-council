@@ -18,13 +18,13 @@ Important — when this runs and when it does NOT:
   * **Live mode** (``live/runner.py``): runs once per top-N candidate
     on each rebalance. Real Gemini calls.
   * **Backtest mode** (``run_full_market_validation.py``): NEVER
-    runs. Calling Gemini inside a backtest creates two problems —
-    (a) lookahead bias (model knows the future), (b) infeasible
-    runtime (free-tier 15 RPM × 30 candidates × 6 dates = 12+ min
-    just on LLM, plus daily-quota burn). Documented honest limit.
+    runs. Calling the model inside a backtest creates two problems —
+    (a) lookahead bias (the model knows the future), (b) infeasible
+    runtime and cost across every candidate on every rebalance date.
+    Documented honest limit.
 
-For unit tests, swap the GeminiClient for an instance with a stubbed
-``generate_content`` method — see ``tests/test_moat_analyzer.py``.
+For unit tests, stub ``complete_memo`` on the client — see
+``tests/test_moat_analyzer.py``.
 """
 
 from __future__ import annotations
@@ -32,12 +32,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from google.genai import types
 from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
-from core.exceptions import LLMError
-from core.llm.gemini_client import GeminiClient
+from core.llm.claude_client import ClaudeClient
 from core.logger import get_logger
 
 logger = get_logger("agents.buffett.moat_analyzer")
@@ -174,17 +172,14 @@ def _render_prompt(
 # ---- Analyzer class -------------------------------------------------------
 @dataclass
 class MoatAnalyzer:
-    """Wraps :class:`GeminiClient` with the Buffett-specific prompt
-    and BuffettMemo parsing.
+    """Wraps :class:`ClaudeClient` with the Buffett persona prompt.
 
-    The ``client`` may be either the real :class:`GeminiClient` or a
-    test-time stand-in exposing the three members used below —
-    ``_sdk``, ``_model_name`` and ``_throttle()`` — but in tests the
-    simpler path is to monkeypatch ``analyze`` to return a pre-built
-    memo.
+    The ``client`` may be the real :class:`ClaudeClient` or any
+    stand-in exposing ``complete_memo`` — one method now, rather than
+    the three internals this used to reach for.
     """
 
-    client: GeminiClient
+    client: ClaudeClient
     playbook: str
 
     def analyze(
@@ -207,33 +202,16 @@ class MoatAnalyzer:
 
         # Use the underlying SDK directly so we can override the
         # system prompt to Buffett's persona (not the generic memo
-        # prompt baked into GeminiClient).
-        self.client._throttle()
-        try:
-            response = self.client._sdk.models.generate_content(
-                model=self.client._model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=with_evidence_rules(_BUFFETT_SYSTEM_PROMPT),
-                    temperature=0.3,
-                    response_mime_type="application/json",
-                ),
-            )
-        except Exception as exc:
-            raise LLMError(f"Gemini Buffett call failed: {exc}") from exc
-
-        text = (response.text or "").strip()
-        if not text:
-            raise LLMError("Gemini returned an empty response")
-
-        memo_dict = self.client._parse_json(text)
-        try:
-            return BuffettMemo.model_validate(memo_dict)
-        except Exception as exc:
-            raise LLMError(
-                f"Gemini response did not match BuffettMemo schema: {exc}\n"
-                f"Raw: {text[:500]}"
-            ) from exc
+        # prompt baked into ClaudeClient).
+        # The persona and the schema are this analyzer's whole
+        # contribution. The transport, the retries, the truncation check
+        # and the validation all belong to the client, which is why no
+        # analyzer imports a provider SDK any more.
+        return self.client.complete_memo(
+            system=with_evidence_rules(_BUFFETT_SYSTEM_PROMPT),
+            prompt=prompt,
+            schema=BuffettMemo,
+        )
 
 
 __all__ = [

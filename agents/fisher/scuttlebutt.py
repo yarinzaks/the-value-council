@@ -31,12 +31,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from google.genai import types
 from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
-from core.exceptions import LLMError
-from core.llm.gemini_client import GeminiClient
+from core.llm.claude_client import ClaudeClient
 from core.logger import get_logger
 
 logger = get_logger("agents.fisher.scuttlebutt")
@@ -193,11 +191,11 @@ def _render_prompt(
 
 @dataclass
 class ScuttlebuttAnalyzer:
-    """Wraps :class:`GeminiClient` with the Fisher persona prompt and
+    """Wraps :class:`ClaudeClient` with the Fisher persona prompt and
     FisherMemo parsing. Live mode only.
     """
 
-    client: GeminiClient
+    client: ClaudeClient
     playbook: str
 
     def analyze(
@@ -212,32 +210,15 @@ class ScuttlebuttAnalyzer:
             portfolio_state=portfolio_state,
         )
 
-        self.client._throttle()
-        try:
-            response = self.client._sdk.models.generate_content(
-                model=self.client._model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=with_evidence_rules(_FISHER_SYSTEM_PROMPT),
-                    temperature=0.3,
-                    response_mime_type="application/json",
-                ),
-            )
-        except Exception as exc:
-            raise LLMError(f"Gemini Fisher call failed: {exc}") from exc
-
-        text = (response.text or "").strip()
-        if not text:
-            raise LLMError("Gemini returned an empty response")
-
-        memo_dict = self.client._parse_json(text)
-        try:
-            return FisherMemo.model_validate(memo_dict)
-        except Exception as exc:
-            raise LLMError(
-                f"Gemini response did not match FisherMemo schema: {exc}\n"
-                f"Raw: {text[:500]}"
-            ) from exc
+        # The persona and the schema are this analyzer's whole
+        # contribution. The transport, the retries, the truncation check
+        # and the validation all belong to the client, which is why no
+        # analyzer imports a provider SDK any more.
+        return self.client.complete_memo(
+            system=with_evidence_rules(_FISHER_SYSTEM_PROMPT),
+            prompt=prompt,
+            schema=FisherMemo,
+        )
 
 
 __all__ = [

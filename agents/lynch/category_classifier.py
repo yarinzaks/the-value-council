@@ -29,12 +29,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from google.genai import types
 from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
-from core.exceptions import LLMError
-from core.llm.gemini_client import GeminiClient
+from core.llm.claude_client import ClaudeClient
 from core.logger import get_logger
 
 logger = get_logger("agents.lynch.category_classifier")
@@ -260,13 +258,13 @@ def _render_prompt(
 
 @dataclass
 class CategoryClassifier:
-    """Wraps :class:`GeminiClient` with the Lynch-specific prompt and
+    """Wraps :class:`ClaudeClient` with the Lynch-specific prompt and
     LynchMemo parsing.
 
     Live mode only. Tests stub the underlying SDK call directly.
     """
 
-    client: GeminiClient
+    client: ClaudeClient
     playbook: str
 
     def classify(
@@ -281,32 +279,15 @@ class CategoryClassifier:
             portfolio_state=portfolio_state,
         )
 
-        self.client._throttle()
-        try:
-            response = self.client._sdk.models.generate_content(
-                model=self.client._model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=with_evidence_rules(_LYNCH_SYSTEM_PROMPT),
-                    temperature=0.4,
-                    response_mime_type="application/json",
-                ),
-            )
-        except Exception as exc:
-            raise LLMError(f"Gemini Lynch call failed: {exc}") from exc
-
-        text = (response.text or "").strip()
-        if not text:
-            raise LLMError("Gemini returned an empty response")
-
-        memo_dict = self.client._parse_json(text)
-        try:
-            return LynchMemo.model_validate(memo_dict)
-        except Exception as exc:
-            raise LLMError(
-                f"Gemini response did not match LynchMemo schema: {exc}\n"
-                f"Raw: {text[:500]}"
-            ) from exc
+        # The persona and the schema are this analyzer's whole
+        # contribution. The transport, the retries, the truncation check
+        # and the validation all belong to the client, which is why no
+        # analyzer imports a provider SDK any more.
+        return self.client.complete_memo(
+            system=with_evidence_rules(_LYNCH_SYSTEM_PROMPT),
+            prompt=prompt,
+            schema=LynchMemo,
+        )
 
 
 __all__ = [

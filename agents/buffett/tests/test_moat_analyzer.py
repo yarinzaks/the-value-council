@@ -7,7 +7,6 @@ API key is needed.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -96,29 +95,10 @@ SAMPLE_MEMO_JSON: dict[str, Any] = {
 # ---- Fixtures --------------------------------------------------------------
 @pytest.fixture
 def fake_client() -> MagicMock:
-    """A bare-minimum stand-in for GeminiClient. Only the attributes
-    the analyzer touches are stubbed out — no real SDK initialization.
-    """
+    """A client exposing the single method an analyzer now calls."""
     c = MagicMock()
-    c._model_name = "gemini-2.5-flash"
-    c._throttle = MagicMock()
-    c._parse_json = MagicMock(side_effect=_parse_json_side_effect)
+    c.complete_memo = MagicMock()
     return c
-
-
-def _parse_json_side_effect(text: str) -> dict[str, Any]:
-    """Mirror the real GeminiClient._parse_json behavior."""
-    # Strip markdown fences if present.
-    import re
-
-    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if fence:
-        text = fence.group(1)
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1:
-        raise LLMError(f"no JSON object: {text[:80]}")
-    return json.loads(text[start : end + 1])
 
 
 # ---- Schema tests ----------------------------------------------------------
@@ -188,68 +168,80 @@ def _build_response(text: str) -> MagicMock:
 
 
 class TestAnalyze:
-    """Drives the analyzer through the client's own SDK handle.
+    """What is left of this analyzer once the transport moved out.
 
-    ``fake_client`` is a MagicMock, so ``_sdk.models.generate_content``
-    is already a stub. Nothing global is patched, which is why these
-    tests say nothing about how the vendor module is imported.
+    Render the prompt, name the persona, name the schema, and stay out
+    of the way of an error. The empty-response, unparsable-JSON and
+    API-failure cases used to be tested here against a stubbed vendor
+    SDK — they belong to the client now and are covered once in
+    core/llm/tests/test_claude_client.py, instead of five near-copies
+    each covering one analyzer.
     """
 
-    def test_happy_path(self, fake_client: MagicMock) -> None:
-        analyzer = MoatAnalyzer(client=fake_client, playbook="PB")
-        fake_client._sdk.models.generate_content.return_value = _build_response(
-            json.dumps(SAMPLE_MEMO_JSON)
+    def a_memo(self):
+        return BuffettMemo.model_validate(SAMPLE_MEMO_JSON)
+
+    def test_the_memo_comes_back(self, fake_client: MagicMock) -> None:
+        memo = self.a_memo()
+        fake_client.complete_memo.return_value = memo
+
+        got = MoatAnalyzer(client=fake_client, playbook="PB").analyze(
+            stock_data={"ticker": "QUALITY"}, portfolio_state={"cash": 1000}
         )
 
-        memo = analyzer.analyze(
-            stock_data={"ticker": "KO"},
-            portfolio_state={"cash": 1000},
+        assert got is memo
+
+    def test_the_request_names_the_persona_and_the_schema(
+        self, fake_client: MagicMock
+    ) -> None:
+        """Buffett's whole contribution to the call."""
+        fake_client.complete_memo.return_value = self.a_memo()
+
+        MoatAnalyzer(client=fake_client, playbook="PB").analyze(
+            stock_data={}, portfolio_state={}
         )
 
-        assert memo.ticker == "KO"
-        assert memo.decision == "BUY"
-        fake_client._throttle.assert_called_once()
+        sent = fake_client.complete_memo.call_args.kwargs
+        assert sent["system"] == with_evidence_rules(_BUFFETT_SYSTEM_PROMPT)
+        assert sent["schema"] is BuffettMemo
+        assert "temperature" not in sent, "the parameter no longer exists"
+        assert "config" not in sent, "no vendor config object survives"
 
-    def test_empty_response_raises(self, fake_client: MagicMock) -> None:
-        analyzer = MoatAnalyzer(client=fake_client, playbook="PB")
-        fake_client._sdk.models.generate_content.return_value = _build_response("")
+    def test_the_prompt_carries_the_playbook_and_the_stock(
+        self, fake_client: MagicMock
+    ) -> None:
+        fake_client.complete_memo.return_value = self.a_memo()
 
-        with pytest.raises(LLMError, match="empty"):
-            analyzer.analyze(stock_data={}, portfolio_state={})
-
-    def test_invalid_schema_raises(self, fake_client: MagicMock) -> None:
-        analyzer = MoatAnalyzer(client=fake_client, playbook="PB")
-        bad_payload = dict(SAMPLE_MEMO_JSON)
-        bad_payload["decision"] = "NONSENSE"
-        fake_client._sdk.models.generate_content.return_value = _build_response(
-            json.dumps(bad_payload)
+        MoatAnalyzer(client=fake_client, playbook="THE PLAYBOOK TEXT").analyze(
+            stock_data={"ticker": "ZZZZ"}, portfolio_state={"cash_usd": 4321}
         )
 
-        with pytest.raises(LLMError, match="schema"):
-            analyzer.analyze(stock_data={}, portfolio_state={})
+        prompt = fake_client.complete_memo.call_args.kwargs["prompt"]
+        assert "THE PLAYBOOK TEXT" in prompt
+        assert "ZZZZ" in prompt
+        assert "4321" in prompt
 
-    def test_sdk_error_wrapped_in_llm_error(self, fake_client: MagicMock) -> None:
-        analyzer = MoatAnalyzer(client=fake_client, playbook="PB")
-        fake_client._sdk.models.generate_content.side_effect = RuntimeError("API down")
+    def test_an_error_from_the_client_is_not_swallowed(
+        self, fake_client: MagicMock
+    ) -> None:
+        """A truncated memo must reach the caller, not a half-filled one."""
+        fake_client.complete_memo.side_effect = LLMError("memo is incomplete")
 
-        with pytest.raises(LLMError, match="failed"):
-            analyzer.analyze(stock_data={}, portfolio_state={})
+        with pytest.raises(LLMError, match="incomplete"):
+            MoatAnalyzer(client=fake_client, playbook="PB").analyze(
+                stock_data={}, portfolio_state={}
+            )
 
-    def test_request_carries_the_persona_and_sampling(self, fake_client: MagicMock) -> None:
-        """What makes this call Buffett's rather than the generic memo.
+    def test_this_module_imports_no_provider_sdk(self) -> None:
+        """The property the swap existed to produce.
 
-        The system instruction and temperature are set per request now;
-        before, they were bound when the model object was built.
+        An analyzer that reaches into a vendor SDK is an analyzer that
+        has to be rewritten on the next provider change. This is the
+        cheap guard against that creeping back.
         """
-        analyzer = MoatAnalyzer(client=fake_client, playbook="PB")
-        fake_client._sdk.models.generate_content.return_value = _build_response(
-            json.dumps(SAMPLE_MEMO_JSON)
-        )
+        import importlib
+        from pathlib import Path as _Path
 
-        analyzer.analyze(stock_data={}, portfolio_state={})
-
-        kwargs = fake_client._sdk.models.generate_content.call_args.kwargs
-        assert kwargs["model"] == fake_client._model_name
-        assert kwargs["config"].system_instruction == with_evidence_rules(_BUFFETT_SYSTEM_PROMPT)
-        assert kwargs["config"].temperature == 0.3
-        assert kwargs["config"].response_mime_type == "application/json"
+        source = _Path(importlib.import_module("agents.buffett.moat_analyzer").__file__).read_text()
+        for marker in ("google.genai", "genai", "_sdk", "_parse_json"):
+            assert marker not in source, f"{marker} is back in agents.buffett.moat_analyzer"
