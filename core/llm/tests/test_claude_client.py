@@ -14,6 +14,7 @@ the guard.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import anthropic
@@ -21,6 +22,7 @@ import pytest
 from pydantic import BaseModel, SecretStr
 
 from core.exceptions import LLMError
+from core.llm.claude_client import ClaudeClient
 
 
 class Memo(BaseModel):
@@ -31,6 +33,9 @@ class Memo(BaseModel):
 
 
 A_MEMO = Memo(decision="BUY", confidence=0.8)
+
+#: The factory the `client` fixture hands back.
+ClientFactory = Callable[..., tuple[ClaudeClient, "_FakeMessages"]]
 
 
 class _FakeMessages:
@@ -66,7 +71,7 @@ class _FakeSdk:
 
 
 @pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch):
+def client(monkeypatch: pytest.MonkeyPatch) -> ClientFactory:
     """A ClaudeClient whose SDK and settings are both injected.
 
     The settings are stubbed rather than loaded: the real loader reads
@@ -75,12 +80,15 @@ def client(monkeypatch: pytest.MonkeyPatch):
     """
     import core.llm.claude_client as mod
 
-    def build(**kw: Any):
+    def build(**kw: Any) -> tuple[ClaudeClient, _FakeMessages]:
         fake = _FakeMessages(**kw)
         monkeypatch.setattr(
             mod, "get_settings", lambda: type("S", (), {"anthropic_api_key": SecretStr("k")})()
         )
-        monkeypatch.setattr(mod.anthropic, "Anthropic", lambda **_: _FakeSdk(fake))
+        monkeypatch.setattr(
+            "core.llm.claude_client.anthropic.Anthropic",
+            lambda **_: _FakeSdk(fake),
+        )
         c = mod.ClaudeClient(min_interval_seconds=0.0)
         return c, fake
 
@@ -88,7 +96,7 @@ def client(monkeypatch: pytest.MonkeyPatch):
 
 
 class TestTheHappyPath:
-    def test_the_memo_comes_back_as_the_callers_own_type(self, client):
+    def test_the_memo_comes_back_as_the_callers_own_type(self, client: ClientFactory) -> None:
         c, _fake = client()
 
         got = c.complete_memo(system="sys", prompt="p", schema=Memo)
@@ -96,7 +104,7 @@ class TestTheHappyPath:
         assert isinstance(got, Memo)
         assert got.decision == "BUY"
 
-    def test_the_schema_the_caller_passed_is_what_is_requested(self, client):
+    def test_the_schema_the_caller_passed_is_what_is_requested(self, client: ClientFactory) -> None:
         c, fake = client()
 
         c.complete_memo(system="sys", prompt="the prompt", schema=Memo)
@@ -110,7 +118,7 @@ class TestTheHappyPath:
 class TestTheRemovedParameters:
     """Drift guards. Each of these 400s in production if re-added."""
 
-    def test_no_sampling_parameters_are_sent(self, client):
+    def test_no_sampling_parameters_are_sent(self, client: ClientFactory) -> None:
         """`temperature` was removed from the Messages API.
 
         The client this replaces passed 0.3–0.4. Carrying it over would
@@ -124,21 +132,21 @@ class TestTheRemovedParameters:
         for banned in ("temperature", "top_p", "top_k"):
             assert banned not in fake.calls[0], f"{banned} was sent"
 
-    def test_the_installed_sdk_really_does_reject_temperature(self):
+    def test_the_installed_sdk_really_does_reject_temperature(self) -> None:
         """Proves the assertion above is about reality, not folklore."""
         import inspect
 
         sig = inspect.signature(anthropic.Anthropic(api_key="x").messages.parse)
         assert "temperature" not in sig.parameters
 
-    def test_thinking_is_absent_unless_asked_for(self, client):
+    def test_thinking_is_absent_unless_asked_for(self, client: ClientFactory) -> None:
         c, fake = client()
 
         c.complete_memo(system="s", prompt="p", schema=Memo)
 
         assert "thinking" not in fake.calls[0], "extended reasoning is billed"
 
-    def test_thinking_is_adaptive_when_asked_for(self, monkeypatch):
+    def test_thinking_is_adaptive_when_asked_for(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Adaptive, not a budget: `budget_tokens` is rejected outright."""
         import core.llm.claude_client as mod
 
@@ -146,7 +154,10 @@ class TestTheRemovedParameters:
         monkeypatch.setattr(
             mod, "get_settings", lambda: type("S", (), {"anthropic_api_key": SecretStr("k")})()
         )
-        monkeypatch.setattr(mod.anthropic, "Anthropic", lambda **_: _FakeSdk(fake))
+        monkeypatch.setattr(
+            "core.llm.claude_client.anthropic.Anthropic",
+            lambda **_: _FakeSdk(fake),
+        )
 
         mod.ClaudeClient(min_interval_seconds=0.0, thinking=True).complete_memo(
             system="s", prompt="p", schema=Memo
@@ -157,27 +168,27 @@ class TestTheRemovedParameters:
 
 
 class TestItRefusesHalfAnAnswer:
-    def test_a_truncated_memo_is_an_error_not_a_memo(self, client):
+    def test_a_truncated_memo_is_an_error_not_a_memo(self, client: ClientFactory) -> None:
         """Half a thesis read as a whole one is the worst outcome here."""
         c, _fake = client(stop_reason="max_tokens")
 
         with pytest.raises(LLMError, match="incomplete"):
             c.complete_memo(system="s", prompt="p", schema=Memo)
 
-    def test_a_refusal_is_an_error(self, client):
+    def test_a_refusal_is_an_error(self, client: ClientFactory) -> None:
         c, _fake = client(stop_reason="refusal")
 
         with pytest.raises(LLMError, match="declined"):
             c.complete_memo(system="s", prompt="p", schema=Memo)
 
-    def test_an_empty_parse_is_an_error(self, client):
+    def test_an_empty_parse_is_an_error(self, client: ClientFactory) -> None:
         """`parsed_output` is Optional and does come back None."""
         c, _fake = client(parsed=None)
 
         with pytest.raises(LLMError, match="returned no Memo"):
             c.complete_memo(system="s", prompt="p", schema=Memo)
 
-    def test_an_api_failure_arrives_as_an_llm_error(self, client):
+    def test_an_api_failure_arrives_as_an_llm_error(self, client: ClientFactory) -> None:
         c, _fake = client(
             raises=anthropic.APIError("boom", request=None, body=None)  # type: ignore[arg-type]
         )
@@ -185,7 +196,7 @@ class TestItRefusesHalfAnAnswer:
         with pytest.raises(LLMError, match="Claude API call failed"):
             c.complete_memo(system="s", prompt="p", schema=Memo)
 
-    def test_the_schema_name_is_in_every_failure(self, client):
+    def test_the_schema_name_is_in_every_failure(self, client: ClientFactory) -> None:
         """So a log line says which agent's memo failed."""
         c, _fake = client(stop_reason="max_tokens")
 
@@ -194,7 +205,7 @@ class TestItRefusesHalfAnAnswer:
 
 
 class TestConstruction:
-    def test_a_missing_key_fails_at_construction(self, monkeypatch):
+    def test_a_missing_key_fails_at_construction(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Not on the first call, half way through a trading run."""
         import core.llm.claude_client as mod
 
@@ -205,7 +216,7 @@ class TestConstruction:
         with pytest.raises(LLMError, match="ANTHROPIC_API_KEY"):
             mod.ClaudeClient()
 
-    def test_the_key_is_never_in_the_error(self, monkeypatch):
+    def test_the_key_is_never_in_the_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import core.llm.claude_client as mod
 
         monkeypatch.setattr(

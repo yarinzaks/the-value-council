@@ -22,7 +22,7 @@ INVESTMENT_MEMO_SCHEMA: dict[str, str] = {
     "exit_triggers": "list[str] — conditions that would cause a SELL decision",
 }
 """The expected JSON schema for an investment memo. Documented for prompt
-context and used by the InvestmentMemo Pydantic model in gemini_client."""
+context and used by the InvestmentMemo Pydantic model in claude_client."""
 
 
 INVESTMENT_MEMO_SYSTEM: str = """\

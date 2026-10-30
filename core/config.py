@@ -57,7 +57,6 @@ class Settings(BaseSettings):
     # They stay here so individual playbook scripts that DO use them can
     # opt in via .env without forcing the daily runner to require them.
     anthropic_api_key: SecretStr | None = None
-    gemini_api_key: SecretStr | None = None
     fmp_api_key: SecretStr | None = None
     finnhub_api_key: SecretStr | None = None
     alpha_vantage_key: SecretStr | None = None

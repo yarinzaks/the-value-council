@@ -1,6 +1,6 @@
-"""LLM layer — Gemini client and prompt templates."""
+"""LLM layer — Claude client and prompt templates."""
 
-from .gemini_client import GeminiClient, InvestmentMemo
+from .claude_client import ClaudeClient, InvestmentMemo
 from .prompts import (
     INVESTMENT_MEMO_SCHEMA,
     INVESTMENT_MEMO_SYSTEM,
@@ -11,6 +11,6 @@ __all__ = [
     "INVESTMENT_MEMO_SCHEMA",
     "INVESTMENT_MEMO_SYSTEM",
     "INVESTMENT_MEMO_USER_TEMPLATE",
-    "GeminiClient",
+    "ClaudeClient",
     "InvestmentMemo",
 ]

@@ -23,7 +23,7 @@ def test_missing_env_file_loads_with_defaults(
     monkeypatch.setattr(config, "ENV_FILE", fake_env)
     # Clear API-key env vars in case CI has them set.
     for key in (
-        "GEMINI_API_KEY",
+        "ANTHROPIC_API_KEY",
         "FMP_API_KEY",
         "FINNHUB_API_KEY",
         "ALPHA_VANTAGE_KEY",
@@ -58,7 +58,7 @@ def test_settings_load_with_empty_env(
     fake_env.write_text("")
     monkeypatch.setattr(config, "ENV_FILE", fake_env)
     for key in [
-        "GEMINI_API_KEY",
+        "ANTHROPIC_API_KEY",
         "FMP_API_KEY",
         "FINNHUB_API_KEY",
         "ALPHA_VANTAGE_KEY",
@@ -77,7 +77,7 @@ def test_settings_load_with_empty_env(
     # SEC_USER_AGENT has a default — must always resolve.
     assert s.sec_user_agent
     # API keys are now optional; with no env, they should be None.
-    assert s.gemini_api_key is None
+    assert s.anthropic_api_key is None
     assert s.fmp_api_key is None
     assert s.finnhub_api_key is None
     assert s.alpha_vantage_key is None
