@@ -182,6 +182,14 @@ class AgentRunResult:
     portfolio: LivePortfolio
     targets: list[LiveTarget] = field(default_factory=list)
     watchlist: list[LiveWatch] = field(default_factory=list)
+    #: Tickers that were on the watch list when this run started.
+    #:
+    #: Captured because the run overwrites the stored list before
+    #: anything reads it, and a notifier that reported the list rather
+    #: than the change would send the same names every day. Tickers, not
+    #: entries: the prices in the stored entries are the previous run's
+    #: and nothing should be able to report them as today's.
+    previous_watchlist: tuple[str, ...] = ()
     trades: list[TradeRecord] = field(default_factory=list)
     universe_size: int = 0
     error: str | None = None  # set if the run failed for this agent
@@ -976,6 +984,9 @@ class DailyRunner:
             )
             for w in scan.watchlist
         ]
+        # Read before the overwrite on the next line — this is the only
+        # moment the previous run's list still exists.
+        previous_watchlist = tuple(w.ticker for w in portfolio.watchlist)
         portfolio.set_watchlist(watch_entries)
 
         stamp = now_iso()
@@ -1006,6 +1017,7 @@ class DailyRunner:
             portfolio=portfolio,
             targets=scan.targets,
             watchlist=scan.watchlist,
+            previous_watchlist=previous_watchlist,
             trades=trades,
             universe_size=scan.universe_size,
         )

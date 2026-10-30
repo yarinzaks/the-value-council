@@ -19,8 +19,8 @@ from agents.council.published_list import (
     publish,
 )
 from core.backtest.decision_logger import DecisionLogger
-from core.live.agent_adapter import AgentAdapter, LiveTarget, ScanResult
-from core.live.portfolio import LivePortfolio, Position
+from core.live.agent_adapter import AgentAdapter, LiveTarget, LiveWatch, ScanResult
+from core.live.portfolio import LivePortfolio, Position, WatchEntry
 from core.live.runner import (
     DEFAULT_MIN_HOLDING_DAYS,
     DailyRunner,
@@ -1979,3 +1979,102 @@ class TestForceFlagParsing:
         args = parse_args(["--agent", "mohnish_pabrai", "--force"])
         assert args.agents == ["mohnish_pabrai"]
         assert args.force is True
+
+
+# ---------------------------------------------------------------------------
+# The watch list a run replaces
+# ---------------------------------------------------------------------------
+class _WatchingAdapter(_StubAdapter):
+    """A stub whose scan carries a watch list."""
+
+    def __init__(self, name: str, watch: list[LiveWatch]) -> None:
+        super().__init__(name, [])
+        self._watch = watch
+
+    def run_scan(  # type: ignore[no-untyped-def]
+        self, as_of, universe, prices, fundamentals, *, held=None
+    ) -> ScanResult:
+        self.last_held = held
+        return ScanResult(
+            targets=[], watchlist=list(self._watch), universe_size=len(universe)
+        )
+
+
+def _a_watch(ticker: str, target: float = 12.0) -> LiveWatch:
+    return LiveWatch(
+        ticker=ticker,
+        rank=1,
+        entry_trigger="Defensive thresholds met",
+        why_en="stub",
+        why_he="stub",
+        entry_price_target=target,
+    )
+
+
+class TestThePreviousWatchlistSurvivesTheRun:
+    """A run overwrites the stored list before anything can read it.
+
+    So the result has to carry what was there when the run started, or a
+    notifier can only report the list — which means reporting the same
+    names every day until its reader stops looking.
+    """
+
+    def test_the_result_carries_what_was_there_before(
+        self, runner: DailyRunner
+    ) -> None:
+        portfolio = _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=60.0
+        )
+        portfolio.watchlist = [
+            WatchEntry(ticker="OLD", identified_date="2026-10-01"),
+            WatchEntry(ticker="KEPT", identified_date="2026-10-01"),
+        ]
+        portfolio.save(directory=runner.portfolio_dir)
+        runner.price_loader = _StubPriceLoader({"HOLD": 60.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _WatchingAdapter("stub_agent", [_a_watch("KEPT"), _a_watch("NEW")]),  # type: ignore[arg-type]
+            AS_OF,
+            ["HOLD"],
+            {"HOLD": 60.0},
+            {"HOLD": None},
+        )
+
+        assert set(result.previous_watchlist) == {"OLD", "KEPT"}
+        assert [w.ticker for w in result.watchlist] == ["KEPT", "NEW"]
+
+    def test_the_stored_list_is_the_new_one(self, runner: DailyRunner) -> None:
+        """The capture must read before the overwrite, not instead of it."""
+        portfolio = _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=60.0
+        )
+        portfolio.watchlist = [WatchEntry(ticker="OLD", identified_date="2026-10-01")]
+        portfolio.save(directory=runner.portfolio_dir)
+        runner.price_loader = _StubPriceLoader({"HOLD": 60.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _WatchingAdapter("stub_agent", [_a_watch("NEW")]),  # type: ignore[arg-type]
+            AS_OF,
+            ["HOLD"],
+            {"HOLD": 60.0},
+            {"HOLD": None},
+        )
+
+        assert result.previous_watchlist == ("OLD",)
+        assert [w.ticker for w in result.portfolio.watchlist] == ["NEW"]
+
+    def test_a_first_run_has_no_previous_list(self, runner: DailyRunner) -> None:
+        _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=60.0
+        )
+        runner.price_loader = _StubPriceLoader({"HOLD": 60.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _WatchingAdapter("stub_agent", [_a_watch("NEW")]),  # type: ignore[arg-type]
+            AS_OF,
+            ["HOLD"],
+            {"HOLD": 60.0},
+            {"HOLD": None},
+        )
+
+        assert result.previous_watchlist == ()

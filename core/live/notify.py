@@ -51,6 +51,7 @@ from typing import Any, Protocol
 
 from core.logger import get_logger
 from core.text import titlecase
+from core.watchlist import diff_watchlist
 
 logger = get_logger("core.live.notify")
 
@@ -78,6 +79,15 @@ _NOT_IN_TOKEN = re.compile(r"[^A-Za-z0-9_:-]")
 #: by the time this is called.
 TIMEOUT_SECONDS = 10
 
+#: How many new watch entries a single message spells out in full.
+#:
+#: A steady run adds one or two names, but the first run after this
+#: ships reports the whole list at once — up to the screen's ten. Ten
+#: blocks is not a notification, it is a document, so the rest are
+#: named on one line. The cap is on the message only; the stored list
+#: keeps every name.
+MAX_WATCH_BLOCKS: int = 5
+
 #: Which books to report on. One agent today, by request: Graham leads
 #: the live book and is the one being followed closely. A set rather
 #: than a constant so adding a second is a one-line change here.
@@ -97,6 +107,12 @@ class _Result(Protocol):
 
     @property
     def trades(self) -> list[Any]: ...
+
+    @property
+    def watchlist(self) -> list[Any]: ...
+
+    @property
+    def previous_watchlist(self) -> tuple[str, ...]: ...
 
 
 class TelegramSendError(Exception):
@@ -451,6 +467,50 @@ def format_action(
     return "\n".join(lines)
 
 
+def format_watch_entry(
+    watch: Any,
+    *,
+    actor: str,
+    names: Mapping[str, str],
+    industry: str | None,
+) -> str:
+    """One company the agent has started waiting for.
+
+    Shorter than a trade block on purpose. A watch is the smaller
+    event, and giving it equal weight would make the purchase harder to
+    find in the same message.
+
+    The reasoning is the agent's own ``why_he``, which already names
+    what blocks the company and the price that would unblock it.
+    Rebuilding that sentence here would put one claim in two places and
+    let them disagree.
+    """
+    ticker = str(getattr(watch, "ticker", "?"))
+    lines = [
+        f"{actor} עוקב {ticker}",
+        _company_line(ticker, names=names, industry=industry),
+    ]
+    why = str(getattr(watch, "why_he", "") or "").strip()
+    if why:
+        lines += ["", why]
+    else:
+        # No prose from the agent, but the number is the point.
+        target = getattr(watch, "entry_price_target", None)
+        if target is not None:
+            lines += ["", f"נכנס ב-{_money(float(target))}"]
+    return "\n".join(lines)
+
+
+def format_watch_exit(ticker: str, *, actor: str) -> str:
+    """One company the agent has stopped waiting for.
+
+    A line, and no more. It left because it stopped qualifying, so
+    whatever described it is no longer true — and a paragraph
+    explaining an absence is not worth the attention it costs.
+    """
+    return f"{actor} הסיר מהמעקב {ticker}"
+
+
 def format_result(
     result: _Result,
     *,
@@ -489,7 +549,15 @@ def format_result(
         # outside, from a book that decided to hold.
         return f"{name} — {as_of.isoformat()}\n\nההרצה נכשלה: {result.error}"
 
-    if not trades:
+    change = diff_watchlist(
+        getattr(result, "previous_watchlist", None) or (),
+        list(getattr(result, "watchlist", None) or []),
+    )
+
+    if not trades and change.is_empty:
+        # Nothing bought, nothing sold, and nothing new being waited
+        # for. Silence is the message: a daily "no change" would teach
+        # its reader to stop looking.
         return None
 
     by_ticker = dict(decisions or {})
@@ -506,6 +574,23 @@ def format_result(
         )
         for trade in trades
     ]
+
+    shown = list(change.entered[:MAX_WATCH_BLOCKS])
+    blocks += [
+        format_watch_entry(
+            watch,
+            actor=actor,
+            names=name_map,
+            industry=industry_of(str(getattr(watch, "ticker", ""))),
+        )
+        for watch in shown
+    ]
+    rest = [str(getattr(w, "ticker", "?")) for w in change.entered[len(shown):]]
+    if rest:
+        blocks.append(
+            f"{actor} עוקב גם אחרי {len(rest)} נוספים: " + ", ".join(rest)
+        )
+    blocks += [format_watch_exit(t, actor=actor) for t in change.left]
 
     # Date only. Each action block names the agent itself, so that a
     # message Telegram truncates still says who acted.
@@ -824,6 +909,7 @@ def notify_run(
 
 __all__ = [
     "API_ROOT",
+    "MAX_WATCH_BLOCKS",
     "REDACTED",
     "WATCHED_AGENTS",
     "ChannelCheck",
@@ -834,6 +920,8 @@ __all__ = [
     "format_action",
     "format_result",
     "format_trade",
+    "format_watch_entry",
+    "format_watch_exit",
     "notify_run",
     "read_config",
     "redact",

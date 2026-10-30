@@ -67,6 +67,20 @@ class FakeResult:
     error: str | None = None
     skipped: bool = False
     portfolio: Any = field(default_factory=FakePortfolio)
+    watchlist: list[Any] = field(default_factory=list)
+    previous_watchlist: tuple[str, ...] = ()
+
+
+@dataclass
+class FakeWatch:
+    """The fields of ``LiveWatch`` a message reads."""
+
+    ticker: str
+    rank: int = 1
+    entry_trigger: str = "Defensive thresholds met"
+    why_en: str = ""
+    why_he: str = ""
+    entry_price_target: float | None = None
 
 
 def a_buy(ticker="HOG", shares=74.375, price=25.95):
@@ -1159,3 +1173,146 @@ def test_every_witness_names_a_sleeve_that_has_a_level():
     from core.live.notify import _FALLBACK_WITNESS_BY_MODE, _TARGET_KEY_BY_MODE
 
     assert set(_FALLBACK_WITNESS_BY_MODE) <= set(_TARGET_KEY_BY_MODE)
+
+
+# ------------------------------------------- what is being waited for
+#
+# A watch is an event in its own right: the agent did not trade, but it
+# started waiting for a company at a named price, and that is worth a
+# message. The rule that makes the channel readable is unchanged — a run
+# where nothing entered and nothing left says nothing at all.
+
+WHY_HE = (
+    "עובר כל מבחן שמחיר לא משנה; נחסם על P/B=2.50 (> 1.5). "
+    "נכנס ב-$12.00 — 40.0% מתחת למחיר היום."
+)
+
+
+def a_watch(ticker="UVV", why=WHY_HE, target=12.0):
+    return FakeWatch(ticker=ticker, why_he=why, entry_price_target=target)
+
+
+def watch_result(watchlist=(), previous=(), trades=()):
+    return FakeResult(
+        agent="benjamin_graham",
+        trades=list(trades),
+        watchlist=list(watchlist),
+        previous_watchlist=tuple(previous),
+    )
+
+
+class TestAWatchIsAnEvent:
+    def test_a_new_name_is_reported_with_no_trade_at_all(self):
+        text = rendered(watch_result(watchlist=[a_watch()]))
+
+        assert text is not None, "a new watch produced no message"
+        assert "Benjamin Graham עוקב UVV" in text
+
+    def test_the_company_and_the_reasoning_are_carried(self):
+        text = rendered(watch_result(watchlist=[a_watch(ticker="HOG")]))
+
+        assert "Harley-Davidson, Inc." in text, "the cleaned registered name"
+        assert "Motorcycles, Bicycles & Parts" in text
+        assert "נחסם על P/B=2.50 (> 1.5)" in text
+        assert "$12.00" in text, "the price being waited for"
+
+    def test_a_departure_is_one_line(self):
+        text = rendered(watch_result(previous=["BIO"]))
+
+        assert text is not None
+        assert "הסיר מהמעקב BIO" in text
+        assert "עוקב" not in text
+
+    def test_an_unchanged_list_says_nothing(self):
+        """The rule the whole channel depends on."""
+        assert rendered(watch_result(watchlist=[a_watch()], previous=["UVV"])) is None
+
+    def test_a_trade_and_a_watch_arrive_together(self):
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="SEB")], watchlist=[a_watch()])
+        )
+
+        assert "קנה SEB" in text
+        assert "עוקב UVV" in text
+
+    def test_the_actor_is_never_assumed(self):
+        """The bug that once announced Buffett's trades as Graham's."""
+        text = format_result(
+            FakeResult(agent="warren_buffett", watchlist=[a_watch()]),
+            as_of=AS_OF,
+            decisions={},
+            names=NAMES,
+            industry=industries,
+        )
+
+        assert "Warren Buffett עוקב UVV" in text
+        assert "Graham" not in text
+
+    def test_a_watch_without_prose_still_names_the_price(self):
+        text = rendered(watch_result(watchlist=[a_watch(why="", target=12.5)]))
+
+        assert "$12.50" in text
+
+    def test_a_watch_with_neither_still_renders(self):
+        text = rendered(watch_result(watchlist=[a_watch(why="", target=None)]))
+
+        assert "עוקב UVV" in text
+
+
+class TestTheMessageStaysShort:
+    def test_beyond_the_cap_the_rest_are_named_on_one_line(self):
+        """The first run after this ships reports the whole list.
+
+        Ten blocks is a document, not a notification.
+        """
+        from core.live.notify import MAX_WATCH_BLOCKS
+
+        entries = [a_watch(ticker=f"T{i}") for i in range(MAX_WATCH_BLOCKS + 3)]
+        text = rendered(watch_result(watchlist=entries))
+
+        assert text.count("עוקב T") == MAX_WATCH_BLOCKS
+        assert "עוקב גם אחרי 3 נוספים" in text
+        assert "T5, T6, T7" in text
+
+    def test_at_the_cap_there_is_no_overflow_line(self):
+        from core.live.notify import MAX_WATCH_BLOCKS
+
+        entries = [a_watch(ticker=f"T{i}") for i in range(MAX_WATCH_BLOCKS)]
+        text = rendered(watch_result(watchlist=entries))
+
+        assert "נוספים" not in text
+
+
+class TestTheWatchPathObeysTheSameGates:
+    def test_an_unwatched_agent_is_still_silent(self):
+        sent = Recorder()
+        notify_run(
+            [FakeResult(agent="peter_lynch", watchlist=[a_watch()])],
+            as_of=AS_OF,
+            env=ENV,
+            send=sent,
+        )
+        assert sent.calls == []
+
+    def test_a_skipped_run_reports_nothing(self):
+        sent = Recorder()
+        notify_run(
+            [
+                FakeResult(
+                    agent="benjamin_graham", watchlist=[a_watch()], skipped=True
+                )
+            ],
+            as_of=AS_OF,
+            env=ENV,
+            send=sent,
+        )
+        assert sent.calls == []
+
+    def test_a_failed_run_still_reports_the_failure_not_the_watch(self):
+        text = rendered(
+            FakeResult(
+                agent="benjamin_graham", watchlist=[a_watch()], error="boom"
+            )
+        )
+        assert "ההרצה נכשלה: boom" in text
+        assert "עוקב" not in text

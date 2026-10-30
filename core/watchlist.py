@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Protocol
 
 #: How many names a watch list may carry.
 #:
@@ -69,8 +70,15 @@ class WatchCandidate:
         return (1.0 - self.trigger_price / self.price) * 100.0
 
 
+class Watched(Protocol):
+    """Anything on a watch list. All the diff needs is the name."""
+
+    @property
+    def ticker(self) -> str: ...
+
+
 @dataclass(frozen=True)
-class WatchlistChange:
+class WatchlistChange[WatchedT: Watched]:
     """What moved between two runs.
 
     The reason the store exists. A notification on every run would
@@ -78,19 +86,19 @@ class WatchlistChange:
     them; a notification on a change says something each time.
     """
 
-    entered: tuple[WatchCandidate, ...] = ()
+    entered: tuple[WatchedT, ...] = ()
     left: tuple[str, ...] = ()
-    held: tuple[WatchCandidate, ...] = field(default=())
+    held: tuple[WatchedT, ...] = field(default=())
 
     @property
     def is_empty(self) -> bool:
         return not self.entered and not self.left
 
 
-def diff_watchlist(
+def diff_watchlist[WatchedT: Watched](
     previous: Iterable[str],
-    current: Iterable[WatchCandidate],
-) -> WatchlistChange:
+    current: Iterable[WatchedT],
+) -> WatchlistChange[WatchedT]:
     """Compare a stored list of tickers against a freshly computed one.
 
     ``previous`` is tickers rather than candidates on purpose: the
@@ -115,6 +123,7 @@ def diff_watchlist(
 __all__ = [
     "DEFAULT_WATCH_SLOTS",
     "WatchCandidate",
+    "Watched",
     "WatchlistChange",
     "diff_watchlist",
 ]
