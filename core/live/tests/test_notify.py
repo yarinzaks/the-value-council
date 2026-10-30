@@ -39,6 +39,7 @@ from core.live.notify import (
     send_message,
     shape_complaints,
     split_for_telegram,
+    units,
 )
 
 AS_OF = date(2026, 10, 30)
@@ -1499,3 +1500,93 @@ class TestAMessageTooLongForTelegramIsSplitNotLost:
 
         assert count == 1
         assert "(1/1)" not in sent.calls[0][1]
+
+
+class TestTheFitGuaranteeDoesNotDependOnAnAssumption:
+    """Two things the limit is measured against, neither of them ``len``.
+
+    Telegram counts UTF-16 code units, and the "(n/total)" marker is
+    part of the message it counts. Reserving a fixed nine characters for
+    that marker was right up to 99 messages and wrong after, where it
+    grows a digit — unreachable from this formatter, and reachable
+    through the ``limit`` argument, which is exported.
+    """
+
+    def test_a_character_outside_the_bmp_counts_as_two(self):
+        # Nothing here writes one. Company names come from EDGAR and an
+        # error line comes from an exception, so the message carries
+        # text this module did not choose.
+        assert units("a") == 1
+        assert units("ℵ") == 1
+        assert units("𝕏") == 2
+        assert units("x𝕏x") == 4
+
+    def test_a_message_of_two_unit_characters_is_measured_as_telegram_sees_it(self):
+        text = "𝕏" * (TELEGRAM_TEXT_LIMIT // 2 + 1)
+
+        assert len(text) <= TELEGRAM_TEXT_LIMIT  # len alone would pass it
+        assert units(text) > TELEGRAM_TEXT_LIMIT
+        assert len(split_for_telegram(text)) > 1
+
+    def test_every_chunk_fits_in_units_not_only_in_code_points(self):
+        blocks = ["𝕏" * 400 for _ in range(20)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        assert all(units(chunk) <= TELEGRAM_TEXT_LIMIT for chunk in chunks)
+
+    def test_no_surrogate_pair_is_halved(self):
+        # A cut inside a pair would make a string that cannot be encoded.
+        chunks = split_for_telegram("𝕏" * 6000, limit=100)
+
+        for chunk in chunks:
+            chunk.encode("utf-8")  # raises on a lone surrogate
+        assert "".join(c.split("\n\n(")[0] for c in chunks) == "𝕏" * 6000
+
+    def test_past_ninety_nine_messages_the_wider_marker_still_fits(self):
+        """The reservation has to grow with the count it reserves for.
+
+        Sized against the boundary on purpose. A fixed nine-character
+        reservation leaves room for "(99/99)" and no more, so a block of
+        exactly ``limit - 9`` fits under it and then overflows once the
+        count reaches three digits and the marker needs eleven. Blocks
+        shorter than the room absorb the difference and prove nothing,
+        which is how the first version of this test passed against the
+        bug it was written for.
+        """
+        limit = 60
+        fixed_reservation = len("\n\n(99/99)")
+        blocks = ["k" * (limit - fixed_reservation) for _ in range(150)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks), limit=limit)
+
+        assert len(chunks) > 99
+        assert all(units(chunk) <= limit for chunk in chunks)
+        assert chunks[-1].endswith(f"({len(chunks)}/{len(chunks)})")
+
+    def test_a_refused_chunk_does_not_take_the_rest_of_the_day_with_it(self):
+        """A blip on the first message must not silence the others.
+
+        Refusing once used to abandon the whole result, so a transient
+        429 on message one cost messages two onward. They are each
+        offered now; a fault that is really about the credentials simply
+        repeats and costs a log line per chunk.
+        """
+        attempted: list[str] = []
+
+        def flaky(_config, text):
+            attempted.append(text)
+            if len(attempted) == 1:
+                raise TelegramSendError("sendMessage returned 429: Too Many Requests")
+
+        trades = [a_buy(ticker=f"T{i}", price=100.0 + i) for i in range(60)]
+        sent = notify_run(
+            [FakeResult(agent="benjamin_graham", trades=trades)],
+            as_of=AS_OF,
+            env=ENV,
+            send=flaky,
+        )
+
+        assert len(attempted) > 1, "chunks after the refusal were never offered"
+        assert sent == len(attempted) - 1
+        # The part that did arrive says which part it was, so the gap is
+        # visible rather than silent.
+        assert attempted[-1].endswith(f"({len(attempted)}/{len(attempted)})")

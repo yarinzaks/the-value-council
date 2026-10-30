@@ -626,11 +626,66 @@ def format_result(
     return f"{header}\n\n{body}{footer}"
 
 
-#: The widest continuation marker :func:`split_for_telegram` can append,
-#: reserved from every chunk. Two digits a side covers 99 messages, which
-#: is some 300 blocks — an order of magnitude past what thirty holdings
-#: can produce.
-_CONTINUATION_ROOM = "\n\n(99/99)"
+def units(text: str) -> int:
+    """``text``'s length the way Telegram counts it.
+
+    The limit is documented in UTF-16 code units, and ``len`` is in code
+    points. Everything this module writes itself is one unit a character
+    — Hebrew, the separator's em dashes, ``≤``, ``⅔`` are all inside the
+    BMP — but the message also carries text from outside it: company
+    names quoted from EDGAR and, on a failed run, an exception's own
+    words. None of the 10,430 names in the cache holds a two-unit
+    character today. That is a fact about today's data rather than a
+    property of the format, and measuring costs one encode.
+    """
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _cut(text: str, room: int) -> str:
+    """The longest prefix of ``text`` that fits in ``room`` units.
+
+    Cuts between code points, never inside one, so a surrogate pair
+    cannot be halved into an invalid string. Always takes at least one
+    character, so a caller slicing a long block makes progress even when
+    ``room`` is absurdly small.
+    """
+    used = 0
+    for index, character in enumerate(text):
+        width = 2 if ord(character) > 0xFFFF else 1
+        if used + width > room and index > 0:
+            return text[:index]
+        used += width
+    return text
+
+
+def _marker(index: int, total: int) -> str:
+    return f"\n\n({index}/{total})"
+
+
+def _pack(parts: list[str], room: int) -> list[str]:
+    """``parts`` recombined into the fewest strings of ``room`` units."""
+    chunks: list[str] = []
+    current = ""
+    for part in parts:
+        while units(part) > room:
+            # Nothing here emits a block this long; slicing is the
+            # honest fallback for a block that nonetheless is.
+            if current:
+                chunks.append(current)
+                current = ""
+            head = _cut(part, room)
+            chunks.append(head)
+            part = part[len(head):]
+        candidate = f"{current}{SEPARATOR}{part}" if current else part
+        if units(candidate) <= room:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            current = part
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def split_for_telegram(text: str, *, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str]:
@@ -650,38 +705,34 @@ def split_for_telegram(text: str, *, limit: int = TELEGRAM_TEXT_LIMIT) -> list[s
     limit is pathological — no formatter here can produce one — but it
     is sliced rather than discarded, because losing it silently is the
     failure this function exists to prevent.
+
+    Every returned message fits, and that is a proof rather than an
+    estimate. The "(n/total)" marker is itself part of the message, so
+    the room reserved for it has to be known before the packing that
+    decides how many messages there are. Reserving a fixed width instead
+    was wrong past 99 messages, where the marker grows a digit: the loop
+    below packs, re-reads the count, and packs again until the count
+    stops exceeding the width it reserved. ``total`` strictly increases
+    and the number of chunks is bounded by the text, so it ends; and on
+    the iteration that ends it the real count is at most the reserved
+    one, so the real marker is no wider than the room taken out for it.
     """
-    if len(text) <= limit:
+    if units(text) <= limit:
         return [text]
 
     parts = text.split(SEPARATOR)
-    # Room for the continuation marker appended below. Reserved from
-    # every part, including the first, so that the packing decision does
-    # not depend on how many messages it is about to produce.
-    room = limit - len(_CONTINUATION_ROOM)
-    chunks: list[str] = []
-    current = ""
-    for part in parts:
-        while len(part) > room:
-            # Nothing here emits a block this long; slicing is the
-            # honest fallback for a block that nonetheless is.
-            if current:
-                chunks.append(current)
-                current = ""
-            chunks.append(part[:room])
-            part = part[room:]
-        candidate = f"{current}{SEPARATOR}{part}" if current else part
-        if len(candidate) <= room:
-            current = candidate
-        else:
-            if current:
-                chunks.append(current)
-            current = part
-    if current:
-        chunks.append(current)
+    total = 1
+    while True:
+        chunks = _pack(parts, limit - units(_marker(total, total)))
+        if len(chunks) <= total:
+            break
+        total = len(chunks)
 
     total = len(chunks)
-    return [f"{chunk}\n\n({index}/{total})" for index, chunk in enumerate(chunks, 1)]
+    return [
+        f"{chunk}{_marker(index, total)}"
+        for index, chunk in enumerate(chunks, 1)
+    ]
 
 
 #: Journal kinds that record *that* a trade executed, not *why*.
@@ -1004,25 +1055,32 @@ def notify_run(
         )
         if text is None:
             continue
-        try:
-            # One send per chunk, and almost always one chunk. A day that
-            # rotated thirty holdings produces a text Telegram refuses
-            # whole, and the refusal would be logged here and nowhere
-            # else — so it is split before it is offered, not after it is
-            # rejected.
-            for chunk in split_for_telegram(text):
+        # One send per chunk, and almost always one chunk. A day that
+        # rotated thirty holdings produces a text Telegram refuses
+        # whole, and the refusal would be logged here and nowhere else —
+        # so it is split before it is offered, not after it is rejected.
+        #
+        # Each chunk is attempted even if an earlier one failed. A
+        # refusal that is really about the credentials will repeat on
+        # every chunk and cost a few log lines; a refusal that was a
+        # transient blip on chunk two would otherwise have taken chunks
+        # three to five with it, and the marker on each chunk makes a
+        # gap visible to the reader in a way silence is not.
+        for chunk in split_for_telegram(text):
+            try:
                 sender(config, chunk)
                 sent += 1
-        except Exception as exc:  # noqa: BLE001 — a notifier may not fail a run
-            # Through `redact`, always. The text is worth having — the
-            # status and Telegram's own "chat not found" are the whole
-            # diagnosis, and the type name alone sent a reader back to
-            # guessing — but a urllib message for a bad token is the
-            # request URL, and the token is a path segment of it.
-            logger.warning(
-                f"telegram notification for {result.agent} failed: "
-                f"{type(exc).__name__}: {redact(str(exc), config)}"
-            )
+            except Exception as exc:  # noqa: BLE001 — a notifier may not fail a run
+                # Through `redact`, always. The text is worth having —
+                # the status and Telegram's own "chat not found" are the
+                # whole diagnosis, and the type name alone sent a reader
+                # back to guessing — but a urllib message for a bad
+                # token is the request URL, and the token is a path
+                # segment of it.
+                logger.warning(
+                    f"telegram notification for {result.agent} failed: "
+                    f"{type(exc).__name__}: {redact(str(exc), config)}"
+                )
     return sent
 
 
@@ -1050,4 +1108,5 @@ __all__ = [
     "send_message",
     "shape_complaints",
     "split_for_telegram",
+    "units",
 ]
