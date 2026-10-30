@@ -322,6 +322,29 @@ class GrahamLive(AgentAdapter):
         return []
 
 
+class GrahamSecondCohortLive(GrahamLive):
+    """Graham's rules again, seeded on a later date — a control, not a rival.
+
+    The first Graham opened in May 2026 and leads the live book. That
+    number answers two questions at once and separates neither: whether
+    the method finds undervalued companies, or whether early May was a
+    good week to buy. A screen run today picks the same six names it
+    holds, so the selection is not what differs between the two books —
+    only the price paid for it is.
+
+    Identical class, identical parameters, identical schedule. The sole
+    difference is the inception date, which is the variable under test.
+    Any divergence from the first Graham is entry price and nothing
+    else, which is what makes the pair worth reading.
+
+    It has no place on the leaderboard: that table ranks agents by the
+    same five-year backtest, and this one is defined by not having that
+    history. Same reason the Council sits off it.
+    """
+
+    name = "benjamin_graham_2"
+
+
 # --------------------------------------------------------------------------
 # Dreman
 # --------------------------------------------------------------------------

@@ -16,7 +16,7 @@ import {
   loadCouncilLive,
   loadCouncilOverview,
 } from "@/lib/data";
-import { AGENTS, metaLocalized } from "@/lib/agents";
+import { AGENTS, metaLocalized, rankByReturn } from "@/lib/agents";
 import type { AgentDailyDelta, AgentSlug } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
 
@@ -54,11 +54,12 @@ export default async function OverviewPage() {
   // (used by the Live portfolios table).
   const livePortfolios = [...live.portfolios].sort((a, b) => b.total_nav - a.total_nav);
 
-  // Build the ranking by total return % (cumulative_return_pct already
-  // accounts for all P&L since seed). Best first.
-  const ranking = [...live.portfolios].sort(
-    (a, b) => b.cumulative_return_pct - a.cumulative_return_pct,
-  );
+  // Ranked by total return since seed, best first, control books left
+  // out — the rule and the reason live in `rankByReturn`. A control book
+  // still appears in the cards and tables below, where a reader sees its
+  // own numbers rather than its position against books with six more
+  // months of market behind them.
+  const ranking = rankByReturn(live.portfolios);
 
   // Format USD with no fractional cents above $100.
   const fmtMoney = (v: number) =>

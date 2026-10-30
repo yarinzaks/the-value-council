@@ -69,6 +69,7 @@ from core.live.agent_adapter import (
     DremanLive,
     FisherLive,
     GrahamLive,
+    GrahamSecondCohortLive,
     GreenblattLive,
     KlarmanLive,
     LiveTarget,
@@ -193,7 +194,11 @@ def build_default_adapters(
     edgar_cache: EdgarCache | None = None,
     price_loader: PriceDataLoader | None = None,
 ) -> list[AgentAdapter]:
-    """Construct the live adapters for all 11 council members.
+    """Construct the live adapters for the council's live books.
+
+    Twelve adapters for eleven members: Graham appears twice, the second
+    on a later start date, so the pair isolates entry timing. See
+    :class:`~core.live.agent_adapter.GrahamSecondCohortLive`.
 
     The 4 original quant agents (Greenblatt, Schloss, Graham, Dreman)
     don't need ``edgar_cache`` (they read fundamentals via the runner's
@@ -234,6 +239,18 @@ def build_default_adapters(
             )
         ),
         GrahamLive(
+            BenjaminGraham(
+                portfolio_size=30,
+                min_market_cap=500_000_000.0,
+                decision_logger=decision_logger,
+            )
+        ),
+        # The same rules on a later start date. Every parameter here is
+        # copied deliberately rather than shared through a constant: a
+        # later edit that tunes one Graham and not the other would make
+        # the pair measure two things, and the whole point is that it
+        # measures one. If you change a number above, change it here.
+        GrahamSecondCohortLive(
             BenjaminGraham(
                 portfolio_size=30,
                 min_market_cap=500_000_000.0,

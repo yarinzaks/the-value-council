@@ -10,6 +10,17 @@ export interface AgentMeta {
   school: string;
   school_he: string;
   color: string;
+  /**
+   * A control book rather than a competitor, kept off return rankings.
+   *
+   * A ranking by return compares agents that have run for the same time.
+   * A book opened last week sits at the bottom of that table because it
+   * is new, and the table gives no way to say so — it reads as a verdict
+   * on the method when it is only a statement about the calendar. Such a
+   * book is still shown everywhere else; it is the ordering that would
+   * lie, not the presence.
+   */
+  control?: boolean;
 }
 
 /**
@@ -52,6 +63,23 @@ export const AGENTS: AgentMeta[] = [
     school: "Defensive / Deep Value",
     school_he: "ערך עמוק / הגנתי",
     color: "#059669",
+  },
+  {
+    // Graham's rules on a later start date. Reading it against the first
+    // Graham isolates entry price: the screen picks the same names for
+    // both books, so what differs between them is what was paid.
+    slug: "benjamin_graham_2",
+    display_name: "Benjamin Graham II",
+    display_name_he: "בנג'מין גראהם II",
+    description:
+      "Graham's rules, opened October 2026. A control for entry timing, not a rival.",
+    description_he:
+      "הכללים של גראהם, נפתח באוקטובר 2026. ביקורת לתזמון כניסה, לא מתחרה.",
+    school: "Defensive / Deep Value",
+    school_he: "ערך עמוק / הגנתי",
+    // The first Graham's green, lightened — same method, read as a pair.
+    color: "#34D399",
+    control: true,
   },
   {
     slug: "david_dreman",
@@ -197,4 +225,36 @@ export function metaLocalized(slug: string, locale: "en" | "he") {
 
 export function metaFor(slug: string): AgentMeta | undefined {
   return AGENTS.find((a) => a.slug === slug);
+}
+
+/** Slugs flagged `control` — see {@link AgentMeta.control}.
+ *
+ *  Derived from AGENTS rather than listed separately so adding a control
+ *  book is one field in one place, and a ranking cannot fall out of step
+ *  with the registry.
+ */
+export const CONTROL_SLUGS: ReadonlySet<AgentSlug> = new Set(
+  AGENTS.filter((a) => a.control).map((a) => a.slug),
+);
+
+/** True when this book should be left out of a ranking by return. */
+export function isControl(slug: string): boolean {
+  return CONTROL_SLUGS.has(slug as AgentSlug);
+}
+
+/** The books a return ranking may contain, best first.
+ *
+ *  Lives here rather than inline in the page so the rule is testable and
+ *  stated once: a ranking by return since seed is only meaningful among
+ *  books that have been running the same length of time, so a control
+ *  book is dropped instead of being placed by its start date under a
+ *  heading that claims it placed by its method.
+ */
+export function rankByReturn<T extends { agent: string; cumulative_return_pct: number }>(
+  portfolios: readonly T[],
+): T[] {
+  return portfolios
+    .filter((p) => !isControl(p.agent))
+    .slice()
+    .sort((a, b) => b.cumulative_return_pct - a.cumulative_return_pct);
 }

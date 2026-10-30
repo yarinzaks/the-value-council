@@ -217,7 +217,11 @@ export function narrative(
         return isHe ? greenblattBuyHe(d, opts) : greenblattBuyEn(d, opts);
       case "walter_schloss":
         return isHe ? schlossBuyHe(d, opts) : schlossBuyEn(d, opts);
+      // Both Grahams run the same screen, so a decision from either is
+      // explained the same way. The books differ by start date, not by
+      // reasoning, and the narrative describes the reasoning.
       case "benjamin_graham":
+      case "benjamin_graham_2":
         if (mode === "DEFENSIVE")
           return isHe ? grahamDefensiveBuyHe(d, opts) : grahamDefensiveBuyEn(d, opts);
         return isHe ? grahamNetNetBuyHe(d, opts) : grahamNetNetBuyEn(d, opts);

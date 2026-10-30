@@ -6,6 +6,7 @@ export type AgentSlug =
   | "greenblatt_magic_formula"
   | "walter_schloss"
   | "benjamin_graham"
+  | "benjamin_graham_2"
   | "david_dreman"
   | "john_neff"
   | "warren_buffett"
