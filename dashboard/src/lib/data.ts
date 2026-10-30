@@ -13,6 +13,7 @@ import { parse as parseCsvSync } from "csv-parse/sync";
 import { AGENTS, metaFor } from "./agents";
 import type {
   AgentDailyDelta,
+  BrainMemo,
   AgentLatestRun,
   AgentSlug,
   AnnualReturn,
@@ -275,6 +276,49 @@ export interface WatchEntry {
    *  cross-agent agreement. */
   agent_count: number;
 }
+
+/** Every memo the analyst layer produced, newest first.
+ *
+ * Reads data/memos/<agent>/<YYYY-MM-DD>.json, the files
+ * core/llm/memo_log.py writes. Swallows its own read errors and
+ * returns [] like every loader here — an empty page is the honest
+ * answer when the layer has not run.
+ */
+export async function loadBrainMemos(limit = 400): Promise<BrainMemo[]> {
+  const root = path.join(DATA_ROOT, "memos");
+  if (!existsSync(root)) return [];
+  let agents: string[];
+  try {
+    agents = (await fs.readdir(root, { withFileTypes: true }))
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  } catch {
+    return [];
+  }
+
+  const out: BrainMemo[] = [];
+  for (const agent of agents) {
+    const dir = path.join(root, agent);
+    let files: string[];
+    try {
+      files = (await fs.readdir(dir)).filter((f) => f.endsWith(".json"));
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      try {
+        const raw = JSON.parse(await fs.readFile(path.join(dir, file), "utf8"));
+        if (Array.isArray(raw)) out.push(...(raw as BrainMemo[]));
+      } catch {
+        // A half-written file is not worth failing the page over.
+        continue;
+      }
+    }
+  }
+  out.sort((a, b) => (b.timestamp ?? "").localeCompare(a.timestamp ?? ""));
+  return out.slice(0, limit);
+}
+
 
 export async function loadWatchlist(): Promise<WatchEntry[]> {
   const slugs = AGENTS.map((a) => a.slug);

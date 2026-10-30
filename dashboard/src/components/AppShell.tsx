@@ -15,6 +15,7 @@ const NAV = [
   { href: "/backtest", key: "nav_backtest" },
   { href: "/watchlist", key: "nav_watchlist" },
   { href: "/journal", key: "nav_journal" },
+  { href: "/brain", key: "nav_brain" },
   { href: "/insights", key: "nav_insights" },
   { href: "/compare", key: "nav_compare" },
   { href: "/glossary", key: "nav_glossary" },

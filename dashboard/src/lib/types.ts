@@ -108,6 +108,26 @@ export interface DecisionRow {
   rationale: string | null;
 }
 
+/** One call to the analyst layer, as core/llm/memo_log.py wrote it.
+ *
+ * `memo` is the model's whole answer, whose shape differs per agent —
+ * Fisher's carries fifteen point verdicts, Klarman's a downside
+ * scenario. It stays unknown here on purpose: the page renders what it
+ * finds rather than claiming to know every analyst's schema.
+ */
+export interface BrainMemo {
+  agent: string;
+  ticker: string;
+  schema: string;
+  timestamp: string;
+  model: string;
+  memo: Record<string, unknown>;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  prompt_chars: number | null;
+  prompt_sha256: string | null;
+}
+
 export interface AgentLatestRun {
   slug: AgentSlug;
   display_name: string;

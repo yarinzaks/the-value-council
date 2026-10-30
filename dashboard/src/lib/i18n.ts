@@ -20,6 +20,7 @@ const en: Dict = {
   nav_compare: "Compare",
   nav_agents: "Agents",
   nav_watchlist: "Watchlist",
+  nav_brain: "Brain",
   nav_journal: "Journal",
   nav_insights: "AI Insights",
   nav_history: "History",
@@ -146,6 +147,24 @@ const en: Dict = {
   col_hit_rate: "Hit rate",
 
   // ---- Watchlist ----
+
+  // ---- Brain (analyst layer) ----
+  brain_title: "The Brain",
+  brain_subtitle:
+    "Every memo the analyst layer produced, in full — what it was asked about, what it answered, and what the call cost.",
+  brain_empty:
+    "The analyst layer has not run yet. When it does, every memo appears here in full.",
+  brain_col_when: "When",
+  brain_col_agent: "Agent",
+  brain_col_model: "Model",
+  brain_col_tokens: "Tokens",
+  brain_memo_fields: "What it answered",
+  brain_prompt_digest: "Prompt",
+  brain_chars: "chars",
+  brain_total_calls: "Calls recorded",
+  brain_total_tokens: "Tokens spent",
+  brain_books: "Books with reasoning",
+
   watchlist_title: "Watchlist",
   watchlist_subtitle:
     "Companies on at least one agent's radar — sorted by cross-agent agreement",
@@ -337,6 +356,7 @@ const he: Dict = {
   nav_compare: "השוואה",
   nav_agents: "סוכנים",
   nav_watchlist: "רשימת מעקב",
+  nav_brain: "המוח",
   nav_journal: "יומן",
   nav_insights: "תובנות AI",
   nav_history: "היסטוריה",
@@ -460,6 +480,24 @@ const he: Dict = {
   col_hit_rate: "אחוז פגיעה",
 
   // ---- Watchlist ----
+
+  // ---- Brain (analyst layer) ----
+  brain_title: "המוח",
+  brain_subtitle:
+    "כל מזכר שהמוח הפיק, במלואו — על מה נשאל, מה ענה, וכמה עלתה הקריאה.",
+  brain_empty:
+    "המוח עוד לא רץ. כשירוץ, כל מזכר יופיע כאן במלואו.",
+  brain_col_when: "מתי",
+  brain_col_agent: "סוכן",
+  brain_col_model: "מודל",
+  brain_col_tokens: "טוקנים",
+  brain_memo_fields: "מה ענה",
+  brain_prompt_digest: "הפרומפט",
+  brain_chars: "תווים",
+  brain_total_calls: "קריאות שנרשמו",
+  brain_total_tokens: "טוקנים שנצרכו",
+  brain_books: "תיקים עם נימוק",
+
   watchlist_title: "רשימת מעקב",
   watchlist_subtitle:
     "חברות במעקב של לפחות סוכן אחד — ממוין לפי הסכמה בין-סוכנים",
