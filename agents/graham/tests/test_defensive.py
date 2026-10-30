@@ -501,3 +501,96 @@ class TestDividendRequirement:
             min_market_cap=100_000_000,
         )
         assert result.passed is False
+
+
+class TestDefensiveDecisionLog:
+    """What the journal records for a Defensive buy.
+
+    The scoring side of the Graham Number was already covered, and the
+    bug still shipped: the decision log printed the dimensionless
+    composite under the label "Graham #" and left ``target_price`` empty,
+    so a real entry read "Graham # 5.35" against a $3,871 price and
+    named no level to sell at. Nothing tested what reached the log —
+    these tests close that, not the arithmetic.
+    """
+
+    def _logged(self, tmp_path):
+        from core.backtest.decision_logger import DecisionLogger
+
+        strat = BenjaminGraham(
+            portfolio_size=3,
+            min_market_cap=1_000,
+            decision_logger=DecisionLogger(root=tmp_path / "decisions"),
+        )
+        # Price 10 → P/NCAV far above ⅔, so Net-Net rejects and the
+        # Defensive screen is what logs.
+        fins = {f"T{i}": _make_full_fin(f"T{i}") for i in range(5)}
+        prices = {t: 10.0 for t in fins}
+        strat.select(
+            date(2024, 6, 30),
+            list(fins.keys()),
+            _StubPriceLookup(prices),
+            _StubFundamentalsLookup(fins),
+        )
+
+        import json
+
+        files = list((tmp_path / "decisions").rglob("*.json"))
+        assert files, "the run logged no decisions at all"
+        rows = [r for f in files for r in json.loads(f.read_text())]
+        buys = [r for r in rows if r["decision"] == "BUY"]
+        assert buys, "no BUY was logged"
+        return buys
+
+    def test_a_defensive_buy_records_a_sell_target(self, tmp_path) -> None:
+        for row in self._logged(tmp_path):
+            assert row["target_price"] is not None, (
+                "the playbook's trigger is the price reaching the Graham "
+                "Number; with no target the rule cannot be checked"
+            )
+
+    def test_the_target_is_the_graham_number(self, tmp_path) -> None:
+        # Absolute tolerance, not relative: criteria_values rounds to four
+        # decimals for legibility while the target carries full precision,
+        # and the default relative tolerance is tighter than that rounding.
+        for row in self._logged(tmp_path):
+            assert row["target_price"] == pytest.approx(
+                row["criteria_values"]["graham_number"], abs=1e-4
+            )
+
+    def test_the_target_is_a_price_not_a_ratio(self, tmp_path) -> None:
+        """The invariant the old code broke.
+
+        A share price and a P/E×P/B product are not the same kind of
+        number. Comparing their magnitudes catches the substitution
+        without restating the formula: the composite sits near single
+        digits whatever the price is.
+        """
+        for row in self._logged(tmp_path):
+            entry = row["entry_price"]
+            target = row["target_price"]
+            composite = row["criteria_values"]["pe_times_pb"]
+            assert target != pytest.approx(composite)
+            # Within two orders of magnitude of the entry price: loose
+            # enough to allow any real discount, tight enough that a
+            # dimensionless product fails it on a high-priced name.
+            assert 0.01 < target / entry < 100.0
+
+    def test_the_rationale_does_not_label_the_composite_as_the_graham_number(
+        self, tmp_path
+    ) -> None:
+        for row in self._logged(tmp_path):
+            composite = row["criteria_values"]["pe_times_pb"]
+            rationale = row["rationale"]
+            assert f"Graham # {composite:.2f}" not in rationale
+
+    def test_the_rationale_names_both_quantities(self, tmp_path) -> None:
+        for row in self._logged(tmp_path):
+            assert "P/E×P/B" in row["rationale"]
+            assert "Graham #" in row["rationale"]
+
+    def test_the_exit_trigger_names_the_level(self, tmp_path) -> None:
+        # "fundamentals deteriorate" is a condition; a reader also needs
+        # the price that ends the trade.
+        for row in self._logged(tmp_path):
+            assert "Graham Number" in row["exit_trigger"]

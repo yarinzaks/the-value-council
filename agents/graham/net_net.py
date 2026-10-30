@@ -404,15 +404,33 @@ class BenjaminGraham(Strategy):
                     # Confidence: how far below the Graham 22.5 ceiling we are
                     confidence=max(0.0, min(1.0, 1.0 - (s.composite / 22.5))),
                     entry_price=s.price,
-                    target_price=None,
+                    # Playbook §7.1 trigger 1 for a Defensive holding is
+                    # the price reaching the Graham Number, so that is
+                    # the target. It was left None while the number sat
+                    # unused in criteria_values, which left the journal
+                    # with an entry price, an exit rule naming no level,
+                    # and no way to check either.
+                    target_price=s.graham_number,
                     exit_trigger=(
-                        "P/E or P/B revert above thresholds; "
+                        "price reaches the Graham Number; "
+                        "OR P/E or P/B revert above thresholds; "
                         "OR fundamentals deteriorate"
                     ),
                     rationale=(
                         f"Graham Defensive: P/E {s.pe:.2f}, P/B {s.pb:.2f}, "
                         f"CR {s.current_ratio:.2f}, "
-                        f"Graham # {s.composite:.2f}"
+                        # Both, each under its own name. This line used to
+                        # print the composite labelled "Graham #", which
+                        # put a dimensionless product where a reader
+                        # expects a share price — SEB logged "Graham #
+                        # 5.35" against a $3,871 entry. The two are
+                        # different quantities; see DefensiveScore.
+                        f"P/E×P/B {s.composite:.2f}"
+                        + (
+                            f", Graham # {s.graham_number:,.2f}"
+                            if s.graham_number is not None
+                            else ""
+                        )
                     ),
                 )
             )
