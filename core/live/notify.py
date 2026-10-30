@@ -58,6 +58,21 @@ logger = get_logger("core.live.notify")
 #: nothing in this module logs a URL.
 API_ROOT = "https://api.telegram.org"
 
+#: What a bot token looks like: a numeric bot id, a colon, then the
+#: secret. The bounds are deliberately loose — Telegram documents no
+#: lengths, and this pattern is here to recognise a value that is not a
+#: token at all, not to validate one that is.
+_TOKEN_SHAPE = re.compile(r"\A[0-9]{5,}:[A-Za-z0-9_-]{20,}\Z")
+
+#: A chat id is a signed integer — negative for groups and channels — or
+#: an ``@name`` for a public channel.
+_CHAT_SHAPE = re.compile(r"\A(-?[0-9]{5,}|@[A-Za-z0-9_]{4,})\Z")
+
+#: Characters that cannot occur in a bot token. One of these turning up
+#: can be named in a report: by definition it is not part of a real
+#: token, so naming it discloses nothing.
+_NOT_IN_TOKEN = re.compile(r"[^A-Za-z0-9_:-]")
+
 #: Seconds to wait on the HTTP call. A notification is never worth
 #: holding a run open for, and the runner has already finished its work
 #: by the time this is called.
@@ -142,6 +157,84 @@ def redact(text: str, config: TelegramConfig) -> str:
         if len(secret) >= 5:
             text = text.replace(secret, REDACTED)
     return text
+
+
+def shape_complaints(config: TelegramConfig) -> list[str]:
+    """Structural faults in the credentials, described without quoting them.
+
+    A 404 from ``getMe`` means the token did not resolve to a bot, and
+    ``getMe`` takes no arguments — so the token is the whole fault and
+    the chat id is not implicated at all. What it does not say is *how*
+    the token is wrong, and measured against the live API the common
+    ways all turn out to be shape rather than value: a wrong-but-
+    well-formed token answers 401, while the ``bot`` prefix copied in
+    from the URL, the secret's own name pasted along with its value, and
+    a value with no colon all answer 404.
+
+    Shape is checkable with no network and no disclosure. A length, a
+    missing colon, or a character that cannot occur in a token are facts
+    about the value rather than the value, and only characters outside a
+    token's own alphabet are ever printed — those cannot have come from
+    a real one.
+    """
+    complaints: list[str] = []
+    token = config.token.strip()
+    chat_id = config.chat_id.strip()
+
+    if token.lower().startswith("bot"):
+        complaints.append(
+            "TELEGRAM_BOT_TOKEN starts with 'bot'. That prefix belongs to "
+            "the request URL, not to the secret — store the token alone."
+        )
+    if "://" in token or "api.telegram.org" in token:
+        complaints.append(
+            "TELEGRAM_BOT_TOKEN contains a URL. Store only the value "
+            "BotFather sent, not the address it gets placed into."
+        )
+    if "=" in token:
+        complaints.append(
+            "TELEGRAM_BOT_TOKEN contains an '='. A secret holds the value "
+            "alone; the NAME=value form belongs in a .env file, and the "
+            "name must not be part of what is stored here."
+        )
+
+    if ":" not in token:
+        complaints.append(
+            "TELEGRAM_BOT_TOKEN has no ':' in it. A bot token is a numeric "
+            f"id, a colon, then the secret — this value is {len(token)} "
+            "characters long with no colon anywhere in it."
+        )
+    elif not _TOKEN_SHAPE.match(token):
+        head, _, tail = token.partition(":")
+        digits = "all digits" if head.isdigit() else "not all digits"
+        complaints.append(
+            "TELEGRAM_BOT_TOKEN is not shaped like a bot token: "
+            f"{len(head)} character(s) before the colon ({digits}) and "
+            f"{len(tail)} after it, where a token has roughly 10 and 35."
+        )
+
+    stray = sorted(set(_NOT_IN_TOKEN.findall(token)))
+    if stray:
+        shown = " ".join(repr(character) for character in stray)
+        complaints.append(
+            f"TELEGRAM_BOT_TOKEN contains {len(stray)} kind(s) of character "
+            f"that cannot appear in a bot token: {shown}"
+        )
+
+    if ":" in chat_id:
+        complaints.append(
+            "TELEGRAM_CHAT_ID contains a ':', which is what a bot token "
+            "looks like and a chat id never does. Check whether the two "
+            "secrets were put in each other's boxes."
+        )
+    elif not _CHAT_SHAPE.match(chat_id):
+        complaints.append(
+            "TELEGRAM_CHAT_ID is not shaped like a chat id: a chat id is "
+            "digits, negative for a group, or an @name for a public "
+            f"channel — this value is {len(chat_id)} characters long."
+        )
+
+    return complaints
 
 
 #: What ends the trade, per sleeve, from the playbook's §7.1 rather than
@@ -699,4 +792,5 @@ __all__ = [
     "read_config",
     "redact",
     "send_message",
+    "shape_complaints",
 ]

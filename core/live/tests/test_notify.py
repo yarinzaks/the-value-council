@@ -33,6 +33,7 @@ from core.live.notify import (
     read_config,
     redact,
     send_message,
+    shape_complaints,
 )
 
 AS_OF = date(2026, 10, 30)
@@ -843,3 +844,118 @@ def test_check_channel_survives_an_update_shape_it_does_not_know():
 
     assert found.chats == (CHAT,)
     assert found.configured_found is True
+
+
+# ------------------------------------------- the shape of the credentials
+#
+# Measured against the live API: a wrong-but-well-formed token answers
+# 401, while the `bot` prefix copied in from the URL, the secret's own
+# name pasted along with its value, and a value with no colon all answer
+# 404 — which is what the second failed run returned. None of those can
+# be told apart from the status, and all of them are visible in the
+# shape of the value without the value being disclosed.
+
+WELL_FORMED = TelegramConfig(
+    token="8012345678:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", chat_id="987654321"
+)
+
+
+def complaints_about(token: str = WELL_FORMED.token, chat_id: str = "987654321") -> str:
+    return " | ".join(
+        shape_complaints(TelegramConfig(token=token, chat_id=chat_id))
+    )
+
+
+def test_a_well_formed_pair_draws_no_complaint():
+    assert shape_complaints(WELL_FORMED) == []
+
+
+@pytest.mark.parametrize(
+    "chat_id",
+    ["987654321", "-1001234567890", "@value_council"],
+    ids=["a user", "a group", "a public channel"],
+)
+def test_every_real_kind_of_chat_id_is_accepted(chat_id):
+    """A negative id is a group and an @name is a channel.
+
+    Rejecting either would send a reader to fix a configuration that
+    was already right, which is worse than saying nothing.
+    """
+    assert shape_complaints(TelegramConfig(token=WELL_FORMED.token, chat_id=chat_id)) == []
+
+
+def test_the_url_prefix_copied_into_the_secret_is_named():
+    assert "starts with 'bot'" in complaints_about(f"bot{WELL_FORMED.token}")
+
+
+def test_the_secrets_own_name_pasted_with_its_value_is_named():
+    """Observed habit, not a hypothetical: ``NAME=value`` into a secret box."""
+    said = complaints_about(f"TELEGRAM_BOT_TOKEN={WELL_FORMED.token}")
+    assert "contains an '='" in said
+    assert "'='" in said
+
+
+def test_a_whole_url_in_the_secret_is_named():
+    said = complaints_about(f"https://api.telegram.org/bot{WELL_FORMED.token}")
+    assert "contains a URL" in said
+
+
+def test_a_value_with_no_colon_is_named_with_its_length():
+    said = complaints_about("8012345678")
+    assert "no ':' in it" in said
+    assert "10 characters" in said
+
+
+def test_quotes_around_a_pasted_token_are_named():
+    said = complaints_about(f'"{WELL_FORMED.token}"')
+    assert "cannot appear in a bot token" in said
+    assert "'\"'" in said, "the offending character is the useful part"
+
+
+def test_swapped_secrets_are_called_out_as_swapped():
+    said = complaints_about(token="987654321", chat_id=WELL_FORMED.token)
+    assert "each other's boxes" in said
+
+
+def test_a_truncated_token_is_described_by_its_two_halves():
+    said = complaints_about("8012345678:AAHxx")
+    assert "before the colon" in said
+    assert "all digits" in said, "the id half was fine; say so"
+
+
+@pytest.mark.parametrize(
+    "token,chat_id",
+    [
+        (f"bot{TOKEN}", CHAT),
+        (f"TELEGRAM_BOT_TOKEN={TOKEN}", CHAT),
+        (f"https://api.telegram.org/bot{TOKEN}", CHAT),
+        (f'"{TOKEN}"', CHAT),
+        (TOKEN.split(":")[0], CHAT),
+        ("8012345678:AAHxx", CHAT),
+        (CHAT, TOKEN),
+        (WELL_FORMED.token, "my chat"),
+    ],
+    ids=[
+        "the bot prefix",
+        "the secret's own name",
+        "a whole url",
+        "quotes kept",
+        "no colon",
+        "truncated",
+        "swapped",
+        "a chat id that is prose",
+    ],
+)
+def test_no_complaint_ever_quotes_the_credential(token, chat_id):
+    """The security line: shape is reportable, the value is not.
+
+    Parametrised over every branch that can produce a complaint, because
+    the first version of this test used one broken value, hit one branch,
+    and passed while another branch interpolated the token straight into
+    its message. One covered branch is not a secrecy guarantee.
+    """
+    said = complaints_about(token=token, chat_id=chat_id)
+
+    assert said, "a value this broken must draw a complaint"
+    for secret in (TOKEN, "supersecret", "AAHsupersecret", CHAT):
+        assert secret not in said, f"{secret!r} reached the report"

@@ -154,3 +154,65 @@ def test_every_branch_fails_the_step(chats, configured):
         send=lambda *args: None,
     )
     assert code == 1
+
+
+# ------------------------------------- the credentials, before the network
+
+
+def test_a_misshapen_credential_stops_before_asking_telegram(capsys):
+    """A token that is not token-shaped cannot ask Telegram anything.
+
+    Running the channel check anyway would restate the same refusal
+    under a different method name and bury the one actionable line.
+    """
+
+    def check(config: TelegramConfig) -> ChannelCheck:
+        raise AssertionError("must not reach the network on a broken token")
+
+    code = _explain(
+        CONFIG,
+        MESSAGE,
+        check=check,
+        send=never_sends,
+        shape=lambda config: ["TELEGRAM_BOT_TOKEN starts with 'bot'."],
+    )
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "wrong shape" in captured.err
+    assert "starts with 'bot'" in captured.err
+
+
+def test_a_clean_shape_that_still_fails_points_at_botfather(capsys):
+    """Shape right, token rejected: it is revoked or belongs to no bot."""
+
+    def check(config: TelegramConfig) -> ChannelCheck:
+        raise RuntimeError("getMe returned 404: Not Found")
+
+    code = _explain(
+        CONFIG, MESSAGE, check=check, send=never_sends, shape=lambda config: []
+    )
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "Not Found" in captured.err
+    assert "BotFather" in captured.err
+
+
+def test_the_real_shape_check_is_the_default(capsys):
+    """Wired up, not merely available.
+
+    The whole diagnosis is worth nothing if the script has to be asked
+    for it, so this passes no ``shape`` and relies on the default.
+    """
+    broken = TelegramConfig(token="bot" + TOKEN, chat_id=CHAT)
+
+    def check(config: TelegramConfig) -> ChannelCheck:
+        raise AssertionError("the default shape check did not run")
+
+    code = _explain(broken, MESSAGE, check=check, send=never_sends)
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "wrong shape" in captured.err
+    assert TOKEN not in captured.err, "the broken token reached a public log"

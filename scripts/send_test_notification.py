@@ -54,6 +54,7 @@ from core.live.notify import (
     notify_run,
     read_config,
     send_message,
+    shape_complaints,
 )
 from core.paths import decisions_dir, portfolios_dir
 
@@ -118,6 +119,7 @@ def _explain(
     *,
     check: Callable[[TelegramConfig], ChannelCheck] = check_channel,
     send: Callable[[TelegramConfig, str, str], None] = send_message,
+    shape: Callable[[TelegramConfig], list[str]] = shape_complaints,
 ) -> int:
     """Report which end is broken, and deliver the message if a chat exists.
 
@@ -127,13 +129,31 @@ def _explain(
     configuration is how the next scheduled notification goes missing
     quietly.
 
-    Prints no chat id under any branch. The reader needs one, so it is
-    sent inside the Telegram message, where only its owner can read it.
+    Prints no chat id and no token under any branch. The reader needs a
+    chat id, so it is sent inside the Telegram message, where only its
+    owner can read it; faults in the credentials themselves are reported
+    as shape — a length, a missing colon — rather than as a value.
     """
+    # Shape first, and no further. A token that is not token-shaped
+    # cannot be used to ask Telegram anything, so a channel check would
+    # only restate the same refusal with a different method name.
+    complaints = shape(config)
+    if complaints:
+        print("the credentials are the wrong shape:", file=sys.stderr)
+        for complaint in complaints:
+            print(f"  - {complaint}", file=sys.stderr)
+        return 1
+
     try:
         found = check(config)
     except Exception as exc:  # noqa: BLE001 — the diagnosis is best-effort
         print(f"could not ask telegram anything: {exc}", file=sys.stderr)
+        print(
+            "the credentials are shaped right, so the token is either "
+            "revoked or belongs to no bot. Send /token to BotFather and "
+            "store what it replies in TELEGRAM_BOT_TOKEN.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"the token works — the bot is {found.bot}", file=sys.stderr)
