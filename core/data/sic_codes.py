@@ -19,6 +19,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from core.logger import get_logger
+from core.text import titlecase
 
 logger = get_logger("core.data.sic_codes")
 
@@ -89,18 +90,6 @@ def sic_title(sic: int | str | None) -> str | None:
     return load_sic_titles().get(str(sic))
 
 
-#: Characters a new word may start after. An apostrophe is deliberately
-#: absent — ``str.title`` treats it as a boundary and turns "WOMEN'S"
-#: into "Women'S" — while a hyphen is present, because "WHOLESALE-FARM"
-#: is two words and reads wrong as "Wholesale-farm".
-_WORD_START = re.compile(r"(?:^|(?<=[\s\-/(&]))([a-z])")
-
-
-def _titlecase(text: str) -> str:
-    """Title-case the SEC's shouting titles for display."""
-    return _WORD_START.sub(lambda m: m.group(1).upper(), text.lower())
-
-
 def industry_title(ticker: str) -> str | None:
     """A readable industry label for ``ticker``, or ``None``.
 
@@ -118,7 +107,7 @@ def industry_title(ticker: str) -> str | None:
     title = sic_title(sic_for(ticker))
     if not title:
         return None
-    return _titlecase(title)
+    return titlecase(title)
 
 
 __all__ = [

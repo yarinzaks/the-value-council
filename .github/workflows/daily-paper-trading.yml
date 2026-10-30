@@ -185,6 +185,13 @@ jobs:
       SEC_USER_AGENT: 'value-council research@yarinzaks.dev'
       VALUE_COUNCIL_DATA_DIR: ${{ github.workspace }}/data
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Telegram notifications. Both are empty in a fork — GitHub does
+      # not pass secrets to a workflow triggered from one — and empty
+      # before they are first set. `core.live.notify` treats either case
+      # as "off" and sends nothing, rather than failing a run that has
+      # already traded.
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
     steps:
       - name: Checkout repository

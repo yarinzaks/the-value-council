@@ -25,6 +25,7 @@ the shortest of them two days.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -96,6 +97,7 @@ from core.live.portfolio import (
 from core.live.price_export import export_prices
 from core.live.sector_export import export_sectors
 from core.live.snapshots import make_snapshot, save_snapshot
+from core.live.notify import notify_run
 from core.live.trade_ledger import record_day
 from core.logger import get_logger
 from core.paths import council_published_dir, trade_ledger_dir
@@ -634,6 +636,12 @@ class DailyRunner:
         except Exception as exc:  # presentation only; never fails a run
             logger.warning(f"{as_of}: price export failed: {exc}")
 
+        # Deliberately last, and outside everything that matters: the run
+        # has executed and persisted by now, so the worst a broken
+        # notifier can do is fail to describe work already done right.
+        # `notify_run` never raises and no-ops without credentials.
+        notify_run(results, as_of=as_of or date.today(), env=os.environ)
+
         return results
 
     # ------------------------------------------------------------------
@@ -693,6 +701,12 @@ class DailyRunner:
             )
         except Exception as exc:  # presentation only; never fails a run
             logger.warning(f"{as_of}: price export failed: {exc}")
+
+        # Deliberately last, and outside everything that matters: the run
+        # has executed and persisted by now, so the worst a broken
+        # notifier can do is fail to describe work already done right.
+        # `notify_run` never raises and no-ops without credentials.
+        notify_run(results, as_of=as_of or date.today(), env=os.environ)
 
         return results
 

@@ -1,0 +1,48 @@
+name: Telegram test notification
+
+# Manual only. Sends one message so the channel can be verified without
+# waiting for an agent to trade — see scripts/send_test_notification.py
+# for why that wait is the thing worth avoiding.
+#
+# It reads the committed portfolios and decision journal and sends; it
+# writes nothing, trades nothing, and touches no portfolio.
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: Agent slug to describe
+        required: false
+        default: benjamin_graham
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      VALUE_COUNCIL_DATA_DIR: ${{ github.workspace }}/data
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # Quoted into an env var rather than interpolated into `run:` —
+      # a dispatch input is attacker-controlled on a public repository.
+      AGENT: ${{ inputs.agent }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Send
+        run: python -m scripts.send_test_notification --agent "$AGENT"

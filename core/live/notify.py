@@ -1,0 +1,509 @@
+"""Telegram notifications for a finished paper-trading run.
+
+Where this hangs, and why
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+On :class:`~core.live.runner.AgentRunResult`, after a run has executed
+and persisted everything — not inside the trade loop. A notification is
+the least important thing the runner does, and the loop it would sit in
+is the most important: a raised exception, a hung socket or a rate limit
+there could abort a run that had already moved money. Reading finished
+results instead means the worst a broken notifier can do is fail to
+describe work that already happened correctly.
+
+Everything here therefore degrades to silence rather than to an error.
+No credentials configured is the normal state of a fresh checkout, not a
+fault, so it returns without touching the network. A refusal from
+Telegram is logged and swallowed.
+
+What gets sent
+~~~~~~~~~~~~~~
+
+One message per agent per run, listing that run's actions. A run where
+the watched agent did nothing sends nothing, so silence carries meaning:
+the agent held. An agent that errored is reported, because a book that
+stopped trading for a bad reason looks exactly like a book that chose to
+hold, and the difference is the whole point of watching.
+
+Telegram will not let a bot open a conversation, so the chat has to be
+started from the phone before the first message can arrive. That is
+outside anything this module can check.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import urllib.error
+import urllib.request
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
+from datetime import date
+from typing import Any, Protocol
+
+from core.logger import get_logger
+from core.text import titlecase
+
+logger = get_logger("core.live.notify")
+
+#: Telegram's send endpoint. The bot token goes in the path, which is why
+#: nothing in this module logs a URL.
+API_ROOT = "https://api.telegram.org"
+
+#: Seconds to wait on the HTTP call. A notification is never worth
+#: holding a run open for, and the runner has already finished its work
+#: by the time this is called.
+TIMEOUT_SECONDS = 10
+
+#: Which books to report on. One agent today, by request: Graham leads
+#: the live book and is the one being followed closely. A set rather
+#: than a constant so adding a second is a one-line change here.
+WATCHED_AGENTS: frozenset[str] = frozenset({"benjamin_graham"})
+
+
+class _Result(Protocol):
+    """The part of ``AgentRunResult`` this module reads.
+
+    Structural, so the tests need no runner and this module needs no
+    import from it — the dependency would be circular.
+    """
+
+    agent: str
+    error: str | None
+    skipped: bool
+
+    @property
+    def trades(self) -> list[Any]: ...
+
+
+class TelegramSendError(Exception):
+    """A refusal from Telegram, named without its URL.
+
+    ``urllib.error.HTTPError`` puts the request URL in its message, and
+    for this API the bot token is a path segment of that URL — so the
+    obvious exception type is the one that cannot be raised here.
+    """
+
+
+@dataclass(frozen=True)
+class TelegramConfig:
+    """Bot credentials. Never logged, never included in an exception."""
+
+    token: str
+    chat_id: str
+
+
+def read_config(env: Mapping[str, str]) -> TelegramConfig | None:
+    """Credentials from the environment, or ``None`` when unconfigured.
+
+    Both halves are required: a token without a chat id has nowhere to
+    send, and a chat id without a token cannot authenticate. Returning
+    ``None`` for a partial configuration keeps the failure at startup
+    rather than producing a 401 on every run.
+    """
+    token = (env.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    chat_id = (env.get("TELEGRAM_CHAT_ID") or "").strip()
+    if not token or not chat_id:
+        return None
+    return TelegramConfig(token=token, chat_id=chat_id)
+
+
+#: What ends the trade, per sleeve, from the playbook's §7.1 rather than
+#: from the decision log's English prose. Translating that prose would be
+#: guesswork; the mode is a recorded enum, so the Hebrew is written once
+#: against the rule it describes.
+_PLAN_BY_MODE: Mapping[str, str] = {
+    "DEFENSIVE": (
+        "מוכר כשהמחיר מגיע למספר גרהם. "
+        "יוצא גם אם P/E או P/B חוזרים מעל הרף, או שהיסודות מתדרדרים."
+    ),
+    "NET_NET": (
+        "מוכר כשהמחיר מגיע ל-NCAV המלא — רווח של כ-50% מקניית ⅔. "
+        "יוצא גם אחרי שנתיים בלי התקדמות, או אם היסודות מתדרדרים."
+    ),
+}
+
+#: The name of the level each sleeve sells at.
+_TARGET_LABEL_BY_MODE: Mapping[str, str] = {
+    "DEFENSIVE": "מספר גרהם",
+    "NET_NET": "NCAV למניה",
+}
+
+
+def _money(value: float) -> str:
+    return f"${value:,.2f}"
+
+
+def format_trade(trade: Any) -> str:
+    """One line for one executed trade.
+
+    Plain text, deliberately: Telegram's Markdown and HTML modes both
+    need escaping, and a ticker or an agent name that happened to carry
+    a reserved character would either break the message or be silently
+    dropped by the parser. There is nothing here worth that risk.
+    """
+    side = str(getattr(trade, "side", "?")).upper()
+    ticker = str(getattr(trade, "ticker", "?"))
+    shares = float(getattr(trade, "shares", 0.0) or 0.0)
+    price = float(getattr(trade, "price", 0.0) or 0.0)
+    gross = float(getattr(trade, "gross_value", 0.0) or 0.0)
+    line = f"{side} {ticker}  {shares:,.4f} @ {_money(price)}  = {_money(gross)}"
+
+    realized = getattr(trade, "realized_pnl_usd", None)
+    if side == "SELL" and realized is not None:
+        realized = float(realized)
+        sign = "+" if realized >= 0 else "−"
+        line += f"  (realised {sign}{_money(abs(realized))})"
+    return line
+
+
+#: The state-of-incorporation suffix EDGAR appends to a registered name
+#: — "SEABOARD CORP /DE/". It identifies the filing entity and means
+#: nothing to a reader of a trade notification.
+_STATE_SUFFIX = re.compile(r"\s*/[A-Z]{2}(?:/)?\s*$")
+
+
+def clean_company_name(raw: str) -> str:
+    """A registered name as a reader would write it.
+
+    EDGAR stores names shouted and suffixed. Case is only folded when the
+    stored name is entirely upper case: some are already mixed
+    ("Ingredion Inc"), and title-casing those would be a round trip
+    through a worse spelling.
+    """
+    name = _STATE_SUFFIX.sub("", raw).strip()
+    if name and name == name.upper():
+        name = titlecase(name)
+    return name
+
+
+def _company_line(ticker: str, *, names: Mapping[str, str], industry: str | None) -> str:
+    """Who the company is, in one line.
+
+    Name and industry, both quoted from filings — the company's own
+    registered name and the SEC's classification of its primary
+    business. Nothing here is generated prose, so nothing here can be
+    wrong in the way a generated sentence can.
+    """
+    raw = names.get(ticker.upper(), "").strip()
+    parts = [clean_company_name(raw) if raw else "", (industry or "").strip()]
+    body = " · ".join(p for p in parts if p)
+    return body or ticker
+
+
+def format_action(
+    trade: Any,
+    decision: Any | None,
+    *,
+    actor: str,
+    names: Mapping[str, str],
+    industry: str | None,
+) -> str:
+    """One executed trade, with what triggered it and what ends it.
+
+    The trade record carries the fill; everything a reader actually wants
+    — which test the company passed, at what level the position is meant
+    to close — is in the decision the same run wrote to the journal. The
+    two are joined on the ticker rather than restated, so the message
+    cannot disagree with the audit trail.
+
+    ``decision`` may be ``None``: a trade without a matching journal
+    entry still reports the fill rather than being dropped.
+    """
+    side = str(getattr(trade, "side", "?")).upper()
+    ticker = str(getattr(trade, "ticker", "?"))
+    shares = float(getattr(trade, "shares", 0.0) or 0.0)
+    price = float(getattr(trade, "price", 0.0) or 0.0)
+    gross = float(getattr(trade, "gross_value", 0.0) or 0.0)
+
+    verb = "קנה" if side == "BUY" else "מכר"
+    lines = [
+        # The actor is passed in, never hard-coded: this module is the
+        # channel for every agent, and the subscription list is one set.
+        # A fixed name here would have had Buffett's trades announced
+        # under Graham's.
+        f"{actor} {verb} {ticker}",
+        _company_line(ticker, names=names, industry=industry),
+        "",
+        f"{'קנייה' if side == 'BUY' else 'מכירה'}   "
+        f"{shares:,.4f} @ {_money(price)}  =  {_money(gross)}",
+    ]
+
+    realized = getattr(trade, "realized_pnl_usd", None)
+    if side == "SELL" and realized is not None:
+        realized = float(realized)
+        word = "רווח" if realized >= 0 else "הפסד"
+        lines.append(f"{word} מומש   {_money(abs(realized))}")
+
+    if decision is None:
+        return "\n".join(lines)
+
+    met = list(getattr(decision, "criteria_met", None) or [])
+    # The mode is logged as an enum, which is what makes the plan below
+    # a lookup instead of a translation.
+    values = dict(getattr(decision, "criteria_values", None) or {})
+    mode = str(values.get("mode") or "")
+    target = getattr(decision, "target_price", None)
+
+    if met:
+        # Drop the bookkeeping entries — "mode=DEFENSIVE" is already the
+        # heading for the plan, and repeating it reads as a criterion.
+        shown = [c for c in met if not str(c).lower().startswith("mode=")]
+        if shown:
+            # The field holds different things on the way in and on the
+            # way out. A buy lists the tests the company passed; an exit
+            # row carries the reason it was closed ("left today's target
+            # list"), so labelling both "what it spotted" would describe
+            # a sale by the criteria that justified the purchase.
+            heading = "מה זיהה" if side == "BUY" else "למה יצא"
+            lines += ["", heading] + [f"  {c}" for c in shown]
+
+    if side == "BUY" and target is not None:
+        target = float(target)
+        label = _TARGET_LABEL_BY_MODE.get(mode, "יעד")
+        upside = ((target / price) - 1.0) * 100.0 if price else None
+        plan = [
+            "",
+            "התוכנית",
+            f"  יעד מכירה   {_money(target)}  ({label})"
+            + (f"  {upside:+.1f}%" if upside is not None else ""),
+        ]
+        rule = _PLAN_BY_MODE.get(mode)
+        if rule:
+            plan.append(f"  {rule}")
+        lines += plan
+
+    return "\n".join(lines)
+
+
+def format_result(
+    result: _Result,
+    *,
+    as_of: date,
+    display_name: str | None = None,
+    decisions: Mapping[str, Any] | None = None,
+    names: Mapping[str, str] | None = None,
+    industry: Callable[[str], str | None] | None = None,
+) -> str | None:
+    """The message for one agent's run, or ``None`` when there is nothing to say.
+
+    Nothing to say means the agent neither traded nor failed. Sending
+    "no change" after every run would train the reader to ignore the
+    channel, which costs exactly the attention the channel exists to buy.
+
+    ``decisions`` maps an upper-case ticker to the journal entry the same
+    run wrote for it; ``names`` and ``industry`` supply the company line.
+    All three are injected so the formatter touches no disk and the tests
+    need no fixtures — and so a missing lookup degrades to a shorter
+    message rather than to no message.
+    """
+    # Derived from the slug rather than read from the dashboard registry:
+    # that registry is TypeScript, and duplicating its labels in Python
+    # would give two places to change a name and one of them to forget.
+    # Derived from the slug rather than read from the dashboard registry:
+    # that registry is TypeScript, and duplicating its labels in Python
+    # would give two places to change a name and one of them to forget.
+    # It also means a new agent needs no entry here at all.
+    actor = display_name or result.agent.replace("_", " ").title()
+    name = actor
+    trades = list(result.trades or [])
+
+    if result.error:
+        # Reported even though it is not an action: a book that stopped
+        # trading because of a fault is indistinguishable, from the
+        # outside, from a book that decided to hold.
+        return f"{name} — {as_of.isoformat()}\n\nההרצה נכשלה: {result.error}"
+
+    if not trades:
+        return None
+
+    by_ticker = dict(decisions or {})
+    name_map = dict(names or {})
+    industry_of = industry or (lambda _ticker: None)
+
+    blocks = [
+        format_action(
+            trade,
+            by_ticker.get(str(getattr(trade, "ticker", "")).upper()),
+            actor=actor,
+            names=name_map,
+            industry=industry_of(str(getattr(trade, "ticker", ""))),
+        )
+        for trade in trades
+    ]
+
+    # Date only. Each action block names the agent itself, so that a
+    # message Telegram truncates still says who acted.
+    header = as_of.isoformat()
+    body = "\n\n———\n\n".join(blocks)
+
+    portfolio = getattr(result, "portfolio", None)
+    footer = ""
+    if portfolio is not None:
+        nav = getattr(portfolio, "total_nav", None)
+        ret = getattr(portfolio, "cumulative_return_pct", None)
+        if nav is not None and ret is not None:
+            footer = (
+                f"\n\n———\n\nהתיק   {_money(float(nav))}  "
+                f"({float(ret):+.2f}% מההתחלה)"
+            )
+    return f"{header}\n\n{body}{footer}"
+
+
+def _decisions_for(agent: str, as_of: date) -> Mapping[str, Any]:
+    """The journal entries this run wrote for ``agent``, keyed by ticker.
+
+    Imported inside the function: ``core.live.runner`` imports this
+    module, and the decision logger reaches back into the live package,
+    so a module-level import closes a cycle. Failure returns an empty
+    mapping — a message without the plan is worth more than no message.
+    """
+    try:
+        from core.backtest.decision_logger import DecisionLogger
+        from core.paths import decisions_dir
+
+        rows = DecisionLogger(root=decisions_dir()).read_day(agent, as_of)
+    except Exception as exc:  # noqa: BLE001 — enrichment is optional
+        logger.debug(f"could not read decisions for {agent}: {type(exc).__name__}")
+        return {}
+    # Last writer wins per ticker. A day with both a SELL and a later BUY
+    # of one name is not something Graham does, and if it happened the
+    # trade list would carry both fills anyway.
+    return {str(r.ticker).upper(): r for r in rows}
+
+
+def _company_names() -> Mapping[str, str]:
+    """Ticker → registered company name, or empty when unavailable.
+
+    Reads the cache file and never fetches. ``load_or_fetch`` refreshes
+    from SEC once its TTL expires, which would put a 10,000-name download
+    on whichever run happened to notify first — a notifier has no
+    business doing network work beyond the message it sends. A cold cache
+    costs the company line, not the message.
+    """
+    try:
+        import json as _json
+
+        from core.data.company_names import DEFAULT_CACHE_PATH
+
+        if not DEFAULT_CACHE_PATH.exists():
+            return {}
+        return dict(_json.loads(DEFAULT_CACHE_PATH.read_text()))
+    except Exception as exc:  # noqa: BLE001 — enrichment is optional
+        logger.debug(f"could not load company names: {type(exc).__name__}")
+        return {}
+
+
+def _industry_title(ticker: str) -> str | None:
+    """The SEC's classification of the company's primary business."""
+    try:
+        from core.data.sic_codes import industry_title
+
+        return industry_title(ticker)
+    except Exception as exc:  # noqa: BLE001 — enrichment is optional
+        logger.debug(f"could not resolve industry for {ticker}: {type(exc).__name__}")
+        return None
+
+
+def _post(config: TelegramConfig, text: str) -> None:
+    """Send one message. Raises on failure; the caller swallows."""
+    url = f"{API_ROOT}/bot{config.token}/sendMessage"
+    payload = json.dumps(
+        {
+            "chat_id": config.chat_id,
+            "text": text,
+            # The dashboard link would be the only thing worth previewing
+            # and it is behind a password, so a preview card would show a
+            # login prompt in the chat.
+            "disable_web_page_preview": True,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        if response.status >= 400:
+            # A plain exception, not an HTTPError: that class carries the
+            # request URL in its message, and the URL's path contains the
+            # bot token. The status is the whole of the useful content.
+            raise TelegramSendError(f"telegram returned {response.status}")
+
+
+def notify_run(
+    results: Iterable[_Result],
+    *,
+    as_of: date,
+    env: Mapping[str, str],
+    agents: frozenset[str] = WATCHED_AGENTS,
+    agent_names: Mapping[str, str] | None = None,
+    decisions_for: Callable[[str, date], Mapping[str, Any]] | None = None,
+    company_names: Mapping[str, str] | None = None,
+    industry: Callable[[str], str | None] | None = None,
+    send: Callable[[TelegramConfig, str], None] | None = None,
+) -> int:
+    """Report the watched agents' actions. Returns the number of messages sent.
+
+    Never raises. A notification that fails must not turn a completed run
+    into a failed one, so every error path here ends in a log line.
+
+    The four lookups default to the real sources and are injectable, so
+    the tests exercise the formatting without a journal, a cache or a
+    network, and a run whose journal or caches are unreadable still sends
+    the fill rather than nothing.
+    """
+    config = read_config(env)
+    if config is None:
+        # The normal state of a checkout without credentials.
+        logger.debug("telegram not configured; skipping notifications")
+        return 0
+
+    read_decisions = decisions_for or _decisions_for
+    name_map = company_names if company_names is not None else _company_names()
+    industry_of = industry or _industry_title
+
+    sender = send or _post
+    sent = 0
+    for result in results:
+        if result.agent not in agents:
+            continue
+        if getattr(result, "skipped", False):
+            # The run was a no-op replay of a day already completed.
+            continue
+        text = format_result(
+            result,
+            as_of=as_of,
+            display_name=(agent_names or {}).get(result.agent),
+            decisions=read_decisions(result.agent, as_of),
+            names=name_map,
+            industry=industry_of,
+        )
+        if text is None:
+            continue
+        try:
+            sender(config, text)
+            sent += 1
+        except Exception as exc:  # noqa: BLE001 — a notifier may not fail a run
+            # Deliberately not the exception's args: a urllib error for a
+            # bad token puts the request URL in its message, and the URL
+            # contains the token.
+            logger.warning(
+                f"telegram notification for {result.agent} failed: {type(exc).__name__}"
+            )
+    return sent
+
+
+__all__ = [
+    "API_ROOT",
+    "TelegramConfig",
+    "TelegramSendError",
+    "WATCHED_AGENTS",
+    "clean_company_name",
+    "format_action",
+    "format_result",
+    "format_trade",
+    "notify_run",
+    "read_config",
+]

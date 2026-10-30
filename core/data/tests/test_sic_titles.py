@@ -14,13 +14,13 @@ import pytest
 
 from core.data.sic_codes import (
     TITLES_PATH,
-    _titlecase,
     industry_title,
     load_sic_map,
     load_sic_titles,
     sic_for,
     sic_title,
 )
+from core.text import titlecase as _titlecase
 
 # ------------------------------------------------------------- the bundle
 
