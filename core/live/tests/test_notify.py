@@ -10,19 +10,29 @@ is in the URL.
 
 from __future__ import annotations
 
+import io
+import json
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import date
+from email.message import Message
 from typing import Any
 
 import pytest
 
 from core.live.notify import (
-    clean_company_name,
+    REDACTED,
     TelegramConfig,
+    TelegramSendError,
+    check_channel,
+    clean_company_name,
     format_result,
     format_trade,
     notify_run,
     read_config,
+    redact,
+    send_message,
 )
 
 AS_OF = date(2026, 10, 30)
@@ -546,3 +556,290 @@ def test_notify_run_passes_the_lookups_through():
     _, text = send.calls[0]
     assert "Seaboard Corp" in text
     assert "7,936.58" in text
+
+
+# ------------------------------------------- a refusal a reader can act on
+#
+# The first live run of this notifier failed, and the only thing the log
+# said was "HTTPError". The status and Telegram's own sentence were both
+# in hand and both thrown away, so the single most likely cause — a chat
+# id guessed from the wrong place — was indistinguishable from a bad
+# token. Everything below exists so that cannot happen twice, under the
+# standing constraint that none of it may print the credential.
+
+CONFIG = TelegramConfig(token=TOKEN, chat_id=CHAT)
+
+
+class FakeResponse:
+    """The file-like object ``urlopen`` returns, with a canned body."""
+
+    def __init__(self, body: str) -> None:
+        self._body = body.encode("utf-8")
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+
+def raising(error: BaseException) -> Any:
+    def urlopen(request: Any, timeout: float | None = None) -> FakeResponse:
+        raise error
+
+    return urlopen
+
+
+def returning(body: str) -> Any:
+    def urlopen(request: Any, timeout: float | None = None) -> FakeResponse:
+        return FakeResponse(body)
+
+    return urlopen
+
+
+def an_http_error(code: int, body: str) -> urllib.error.HTTPError:
+    """A refusal shaped the way urllib hands one over.
+
+    The URL carries the token, exactly as the real one does — that is
+    the whole reason this class cannot be allowed to reach a log.
+    """
+    return urllib.error.HTTPError(
+        url=f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        code=code,
+        msg="Bad Request",
+        hdrs=Message(),
+        fp=io.BytesIO(body.encode("utf-8")),
+    )
+
+
+def test_redact_removes_both_credentials():
+    text = f"POST https://api.telegram.org/bot{TOKEN}/sendMessage to {CHAT}"
+    cleaned = redact(text, CONFIG)
+
+    assert TOKEN not in cleaned
+    assert "supersecret" not in cleaned
+    assert CHAT not in cleaned, "the chat id is held in a secret too"
+    assert cleaned.count(REDACTED) == 2
+
+
+def test_redact_leaves_a_short_chat_id_alone():
+    """A two-character id would match digits all over a message.
+
+    Substituting it would corrupt the text it was meant to protect, and
+    a malformed secret is a configuration error rather than a licence to
+    mangle every number in a report.
+    """
+    config = TelegramConfig(token=TOKEN, chat_id="42")
+    assert redact("sold 42 shares at 42", config) == "sold 42 shares at 42"
+
+
+def test_a_refusal_reports_the_status_and_telegrams_own_words(monkeypatch):
+    """The fix for the failed run: 400 and "chat not found" ARE the diagnosis.
+
+    Neither the exception type nor the status alone separates a wrong
+    chat id from a wrong token, and those have different fixes.
+    """
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        raising(
+            an_http_error(
+                400,
+                '{"ok":false,"error_code":400,'
+                '"description":"Bad Request: chat not found"}',
+            )
+        ),
+    )
+
+    with pytest.raises(TelegramSendError) as caught:
+        send_message(CONFIG, CHAT, "hello")
+
+    message = str(caught.value)
+    assert "400" in message
+    assert "chat not found" in message
+    assert TOKEN not in message, "the url in the HTTPError reached the message"
+    assert "supersecret" not in message
+
+
+def test_a_bad_token_is_named_as_unauthorised(monkeypatch):
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        raising(an_http_error(401, '{"ok":false,"description":"Unauthorized"}')),
+    )
+
+    with pytest.raises(TelegramSendError) as caught:
+        send_message(CONFIG, CHAT, "hello")
+
+    assert "401" in str(caught.value)
+    assert "Unauthorized" in str(caught.value)
+    assert TOKEN not in str(caught.value)
+
+
+def test_an_error_body_that_is_not_json_still_reports_something(monkeypatch):
+    monkeypatch.setattr(
+        urllib.request, "urlopen", raising(an_http_error(502, "<html>bad gateway"))
+    )
+
+    with pytest.raises(TelegramSendError) as caught:
+        send_message(CONFIG, CHAT, "hello")
+
+    assert "502" in str(caught.value)
+    assert "bad gateway" in str(caught.value)
+
+
+def test_an_unreachable_telegram_is_distinguished_from_a_refusal(monkeypatch):
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        raising(urllib.error.URLError("nodename nor servname provided")),
+    )
+
+    with pytest.raises(TelegramSendError) as caught:
+        send_message(CONFIG, CHAT, "hello")
+
+    assert "could not reach telegram" in str(caught.value)
+    assert "nodename" in str(caught.value)
+
+
+def test_ok_false_is_a_refusal_even_with_a_200(monkeypatch):
+    """Telegram answers some failures with a 200 and ``ok: false``.
+
+    Treating the status alone as success would report a message nobody
+    received, which is the one outcome this whole module exists to avoid.
+    """
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        returning('{"ok":false,"description":"Forbidden: bot was blocked by the user"}'),
+    )
+
+    with pytest.raises(TelegramSendError) as caught:
+        send_message(CONFIG, CHAT, "hello")
+
+    assert "blocked by the user" in str(caught.value)
+
+
+def test_a_successful_send_posts_the_text_to_the_named_chat(monkeypatch):
+    requests: list[Any] = []
+
+    def urlopen(request: Any, timeout: float | None = None) -> FakeResponse:
+        requests.append(request)
+        return FakeResponse('{"ok":true,"result":{"message_id":7}}')
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    send_message(CONFIG, "111222333", "hello")
+
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
+    body = json.loads(requests[0].data)
+    assert body["chat_id"] == "111222333", "the chat is the argument, not the config"
+    assert body["text"] == "hello"
+    assert body["disable_web_page_preview"] is True
+
+
+def test_a_failure_logs_why_and_not_only_the_type():
+    """The log line that failed to say anything, now saying it.
+
+    Paired with ``test_a_failure_does_not_log_the_token`` above: that one
+    proves the credential stays out, this one proves the reason gets in.
+    Either alone is satisfiable by a log line that is useless or unsafe.
+    """
+    from loguru import logger as loguru_logger
+
+    messages: list[str] = []
+    sink_id = loguru_logger.add(lambda m: messages.append(str(m)), level="DEBUG")
+    try:
+        notify_run(
+            [FakeResult(agent="benjamin_graham", trades=[a_buy()])],
+            as_of=AS_OF,
+            env=ENV,
+            send=Recorder(
+                fail=TelegramSendError(
+                    "sendMessage returned 400: Bad Request: chat not found"
+                )
+            ),
+        )
+    finally:
+        loguru_logger.remove(sink_id)
+    logged = "".join(messages)
+
+    assert "benjamin_graham" in logged
+    assert "400" in logged
+    assert "chat not found" in logged
+
+
+# --------------------------------------------- which chats actually exist
+
+
+def a_channel(updates: Any, *, username: str = "Value_Council_Bot") -> Any:
+    def call(config: TelegramConfig, method: str, **kwargs: Any) -> Any:
+        if method == "getMe":
+            return {"id": 123456, "username": username}
+        if method == "getUpdates":
+            return updates
+        raise AssertionError(f"unexpected call to {method}")
+
+    return call
+
+
+def test_check_channel_names_the_bot_and_the_chats_that_wrote_to_it():
+    found = check_channel(
+        CONFIG,
+        call=a_channel(
+            [
+                {"message": {"chat": {"id": int(CHAT)}}},
+                {"message": {"chat": {"id": int(CHAT)}}},
+                {"my_chat_member": {"chat": {"id": 555}}},
+            ]
+        ),
+    )
+
+    assert found.bot == "@Value_Council_Bot"
+    assert found.chats == (CHAT, "555"), "each chat once, in the order seen"
+    assert found.configured_found is True
+
+
+def test_check_channel_counts_a_bot_nobody_opened_as_having_no_chats():
+    """The fault Telegram reports identically to a wrong chat id.
+
+    A bot may not write first, so a chat that was never started refuses
+    exactly like one that does not exist. An empty update list is the
+    only thing that separates them.
+    """
+    found = check_channel(CONFIG, call=a_channel([]))
+
+    assert found.chats == ()
+    assert found.configured_found is False
+    assert found.bot == "@Value_Council_Bot"
+
+
+def test_check_channel_knows_the_configured_chat_is_not_among_them():
+    found = check_channel(
+        CONFIG, call=a_channel([{"message": {"chat": {"id": 111222333}}}])
+    )
+
+    assert found.chats == ("111222333",)
+    assert found.configured_found is False
+
+
+def test_check_channel_survives_an_update_shape_it_does_not_know():
+    """Telegram adds update kinds; an unknown one is not a crash."""
+    found = check_channel(
+        CONFIG,
+        call=a_channel(
+            [
+                {"poll_answer": {"poll_id": "x"}},
+                {"message": {"from": {"id": 9}}},
+                "not a mapping at all",
+                {"message": {"chat": {}}},
+                {"message": {"chat": {"id": int(CHAT)}}},
+            ]
+        ),
+    )
+
+    assert found.chats == (CHAT,)
+    assert found.configured_found is True

@@ -23,6 +23,15 @@ Usage::
 Needs ``TELEGRAM_BOT_TOKEN`` and ``TELEGRAM_CHAT_ID`` in the
 environment. Without them it says so and exits non-zero, rather than
 reporting success for a message nobody received.
+
+When the send is refused it diagnoses itself. A Telegram refusal names
+the fault but not the fix, and the two likely faults — a wrong chat id,
+and a bot the owner has never opened — produce the same one. So it asks
+Telegram which chats the bot may actually write to, and if exactly one
+exists it delivers the message there with the correct id inside it. The
+id travels through Telegram rather than through this output on purpose:
+this runs in the CI log of a public repository, and nothing here prints
+a chat id.
 """
 
 from __future__ import annotations
@@ -32,12 +41,20 @@ import json
 import os
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
 from core.backtest.decision_logger import DecisionLogger
-from core.live.notify import notify_run, read_config
+from core.live.notify import (
+    ChannelCheck,
+    TelegramConfig,
+    check_channel,
+    notify_run,
+    read_config,
+    send_message,
+)
 from core.paths import decisions_dir, portfolios_dir
 
 DEFAULT_AGENT = "benjamin_graham"
@@ -95,6 +112,86 @@ def _latest_decisions(agent: str) -> tuple[date, dict[str, Any]]:
     return day, {str(r.ticker).upper(): r for r in rows}
 
 
+def _explain(
+    config: TelegramConfig,
+    text: str,
+    *,
+    check: Callable[[TelegramConfig], ChannelCheck] = check_channel,
+    send: Callable[[TelegramConfig, str, str], None] = send_message,
+) -> int:
+    """Report which end is broken, and deliver the message if a chat exists.
+
+    Always returns non-zero. Even the best outcome here — the message
+    delivered to a chat the configuration does not name — leaves
+    ``TELEGRAM_CHAT_ID`` wrong, and a run that exits 0 on a broken
+    configuration is how the next scheduled notification goes missing
+    quietly.
+
+    Prints no chat id under any branch. The reader needs one, so it is
+    sent inside the Telegram message, where only its owner can read it.
+    """
+    try:
+        found = check(config)
+    except Exception as exc:  # noqa: BLE001 — the diagnosis is best-effort
+        print(f"could not ask telegram anything: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"the token works — the bot is {found.bot}", file=sys.stderr)
+
+    if found.configured_found:
+        print(
+            "TELEGRAM_CHAT_ID names a chat this bot can see, so the chat id "
+            "is right and the refusal above is the whole fault.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not found.chats:
+        print(
+            f"no chat has written to {found.bot} in the last 24 hours, and "
+            "telegram does not let a bot write first. Open that bot on your "
+            "phone, send it any message, then run this again.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if len(found.chats) > 1:
+        print(
+            f"{len(found.chats)} chats have written to {found.bot} and "
+            "TELEGRAM_CHAT_ID matches none of them. Which one is yours is "
+            "not something this script should guess.",
+            file=sys.stderr,
+        )
+        return 1
+
+    chat_id = found.chats[0]
+    try:
+        send(
+            config,
+            chat_id,
+            f"{text}\n\n———\n\n"
+            "ה-TELEGRAM_CHAT_ID שמוגדר כרגע שגוי, ולכן ההודעה הזאת נשלחה "
+            "לצ'אט היחיד שכתב לבוט.\n"
+            f"המזהה הנכון: {chat_id}\n"
+            "GitHub → Settings → Secrets and variables → Actions → "
+            "TELEGRAM_CHAT_ID",
+        )
+    except Exception as exc:  # noqa: BLE001 — reported, not raised
+        print(
+            f"the one chat that exists refused as well: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(
+        "TELEGRAM_CHAT_ID is wrong. The message went to the one chat that "
+        "has written to the bot, and it carries the id to put in the secret "
+        "— on your phone, not in this log.",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent", default=DEFAULT_AGENT)
@@ -103,7 +200,8 @@ def main(argv: list[str] | None = None) -> int:
     if not _SLUG.match(args.agent):
         raise SystemExit(f"not an agent slug: {args.agent!r}")
 
-    if read_config(os.environ) is None:
+    config = read_config(os.environ)
+    if config is None:
         print(
             "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are not both set; "
             "nothing was sent.",
@@ -140,6 +238,22 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
 
+    # ``notify_run`` may not raise — it runs after a real trading run and
+    # must not turn a completed one into a failure — so it logs the cause
+    # and returns a count. That leaves a caller with no cause at all,
+    # which is how one failed run produced the single word "HTTPError".
+    # Wrapping the real sender keeps that contract and keeps the reason.
+    attempted: list[str] = []
+    failures: list[str] = []
+
+    def send(cfg: TelegramConfig, text: str) -> None:
+        attempted.append(text)
+        try:
+            send_message(cfg, cfg.chat_id, text)
+        except Exception as exc:
+            failures.append(str(exc))
+            raise
+
     sent = notify_run(
         [result],
         as_of=day,
@@ -148,12 +262,21 @@ def main(argv: list[str] | None = None) -> int:
         agents=frozenset({args.agent}),
         agent_names={args.agent: f"[בדיקה] {args.agent.replace('_', ' ').title()}"},
         decisions_for=lambda _agent, _day: decisions,
+        send=send,
     )
-    if sent == 0:
-        print("notify_run sent nothing — see the log above", file=sys.stderr)
+    if sent:
+        print(f"sent {sent} message(s) for {args.agent} ({ticker}, {day})")
+        return 0
+
+    if not attempted:
+        print(
+            f"nothing was sent: {args.agent} produced no message to send.",
+            file=sys.stderr,
+        )
         return 1
-    print(f"sent {sent} message(s) for {args.agent} ({ticker}, {day})")
-    return 0
+
+    print(f"telegram refused: {failures[-1]}", file=sys.stderr)
+    return _explain(config, attempted[-1])
 
 
 if __name__ == "__main__":

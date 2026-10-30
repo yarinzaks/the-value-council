@@ -26,8 +26,16 @@ stopped trading for a bad reason looks exactly like a book that chose to
 hold, and the difference is the whole point of watching.
 
 Telegram will not let a bot open a conversation, so the chat has to be
-started from the phone before the first message can arrive. That is
-outside anything this module can check.
+started from the phone before the first message can arrive. Nothing in
+this repository can arrange that, but :func:`check_channel` can tell
+whether it has happened — which is the difference between "your chat id
+is wrong" and "you have not opened the bot yet", two faults that produce
+the same refusal.
+
+Nothing here may print a credential. The bot token is a path segment of
+every request URL, so ``urllib``'s own error messages carry it, and the
+chat id is kept in a secret; both are stripped by :func:`redact`, which
+every reported string goes through.
 """
 
 from __future__ import annotations
@@ -106,6 +114,34 @@ def read_config(env: Mapping[str, str]) -> TelegramConfig | None:
     if not token or not chat_id:
         return None
     return TelegramConfig(token=token, chat_id=chat_id)
+
+
+#: What a redacted secret is replaced with. Visible on purpose: a line
+#: that silently dropped the value would read as though Telegram had
+#: returned nothing there.
+REDACTED = "[redacted]"
+
+
+def redact(text: str, config: TelegramConfig) -> str:
+    """``text`` with the credentials removed, for a log line or stdout.
+
+    Every string this module reports passes through here. ``urllib``
+    names the request URL in its error messages, and for this API the bot
+    token is a path segment of that URL — so a line that looks like a
+    bare status can carry the credential into the CI log of a public
+    repository. Redacting where the text is produced, rather than
+    trusting each call site to remember, means a log line added later
+    cannot leak it by omission.
+
+    The chat id goes the same way and for the same reason: it is kept in
+    a secret, and a public log is public. It is only substituted when it
+    is long enough to be unambiguous, so a short or malformed value
+    cannot turn every digit in the text into a redaction.
+    """
+    for secret in (config.token.strip(), config.chat_id.strip()):
+        if len(secret) >= 5:
+            text = text.replace(secret, REDACTED)
+    return text
 
 
 #: What ends the trade, per sleeve, from the playbook's §7.1 rather than
@@ -405,31 +441,180 @@ def _industry_title(ticker: str) -> str | None:
         return None
 
 
-def _post(config: TelegramConfig, text: str) -> None:
-    """Send one message. Raises on failure; the caller swallows."""
-    url = f"{API_ROOT}/bot{config.token}/sendMessage"
-    payload = json.dumps(
-        {
-            "chat_id": config.chat_id,
+def _explanation(parsed: Any, raw: str, config: TelegramConfig) -> str:
+    """Telegram's own account of a refusal, or the body when it gave none."""
+    if isinstance(parsed, Mapping):
+        description = parsed.get("description")
+        if isinstance(description, str) and description.strip():
+            return redact(description.strip(), config)
+    return redact(raw[:200].strip() or "no explanation given", config)
+
+
+def _refusal(exc: urllib.error.HTTPError, config: TelegramConfig) -> str:
+    """The explanation inside an error response.
+
+    ``HTTPError`` is both an exception and the response it describes, so
+    the body is readable from it — and the body is where Telegram puts
+    the only text that tells a wrong chat id apart from a wrong token.
+    """
+    try:
+        raw = exc.read().decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 — an unreadable body is not a new failure
+        return "no response body"
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        parsed = None
+    return _explanation(parsed, raw, config)
+
+
+def _call(
+    config: TelegramConfig,
+    method: str,
+    *,
+    body: Mapping[str, Any] | None = None,
+) -> Any:
+    """One Telegram API call, returning its ``result``.
+
+    Every failure becomes a :class:`TelegramSendError` carrying the
+    status and Telegram's own ``description``, because that sentence is
+    the whole of the diagnosis: "chat not found", "Unauthorized" and
+    "bot was blocked by the user" are three different problems with three
+    different fixes, and neither the exception type nor the status alone
+    tells them apart. Reporting only the type cost a failed run to learn.
+    """
+    url = f"{API_ROOT}/bot{config.token}/{method}"
+    data = json.dumps(dict(body)).encode("utf-8") if body is not None else None
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={"content-type": "application/json"},
+        method="POST" if data is not None else "GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            raw = response.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        # ``from None`` deliberately: a chained HTTPError would put the
+        # request URL, and so the token, into any traceback printed from
+        # the exception this raises.
+        raise TelegramSendError(
+            f"{method} returned {exc.code}: {_refusal(exc, config)}"
+        ) from None
+    except urllib.error.URLError as exc:
+        raise TelegramSendError(
+            f"{method} could not reach telegram: {redact(str(exc.reason), config)}"
+        ) from None
+
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        raise TelegramSendError(
+            f"{method} returned something other than JSON: "
+            f"{redact(raw[:200], config)}"
+        ) from None
+    # A 200 with ``ok: false`` is a real Telegram answer, not a transport
+    # fault, and it carries the same description an error status would.
+    if not isinstance(parsed, Mapping) or not parsed.get("ok"):
+        raise TelegramSendError(
+            f"{method} refused: {_explanation(parsed, raw, config)}"
+        )
+    return parsed.get("result")
+
+
+def send_message(config: TelegramConfig, chat_id: str, text: str) -> None:
+    """Send ``text`` to one chat. Raises :class:`TelegramSendError`.
+
+    The chat is a parameter rather than ``config.chat_id`` so that a
+    diagnosis can reach a chat the configuration does not name — which
+    is the interesting case, because a chat id that is merely wrong
+    delivers nowhere at all and so cannot report itself.
+    """
+    _call(
+        config,
+        "sendMessage",
+        body={
+            "chat_id": chat_id,
             "text": text,
             # The dashboard link would be the only thing worth previewing
             # and it is behind a password, so a preview card would show a
             # login prompt in the chat.
             "disable_web_page_preview": True,
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=payload,
-        headers={"content-type": "application/json"},
-        method="POST",
+        },
     )
-    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
-        if response.status >= 400:
-            # A plain exception, not an HTTPError: that class carries the
-            # request URL in its message, and the URL's path contains the
-            # bot token. The status is the whole of the useful content.
-            raise TelegramSendError(f"telegram returned {response.status}")
+
+
+def _post(config: TelegramConfig, text: str) -> None:
+    """Send one message to the configured chat; the caller swallows."""
+    send_message(config, config.chat_id, text)
+
+
+@dataclass(frozen=True)
+class ChannelCheck:
+    """What Telegram says about this configuration.
+
+    ``chats`` holds real chat ids. They are credential-adjacent — kept in
+    a secret, and a public CI log is public — so they are meant to be
+    handed to :func:`send_message`, never printed. :func:`redact` removes
+    the configured one from any text; the others have to be kept out of
+    reports by hand.
+    """
+
+    bot: str
+    chats: tuple[str, ...]
+    configured_found: bool
+
+
+#: Where an update carries the chat it happened in. ``my_chat_member`` is
+#: included because pressing Start produces one, and a user who has only
+#: ever pressed Start is exactly the case worth detecting.
+_CHAT_BEARING = ("message", "edited_message", "channel_post", "my_chat_member")
+
+
+def check_channel(
+    config: TelegramConfig,
+    *,
+    call: Callable[..., Any] | None = None,
+) -> ChannelCheck:
+    """Who the bot is, and which chats it is actually allowed to write to.
+
+    Telegram will not let a bot open a conversation: the chat has to be
+    started from the phone before anything can be delivered. So a send
+    can fail for a reason that lives entirely outside this repository,
+    and from the refusal alone a wrong chat id and a chat that was never
+    started look the same.
+
+    ``getUpdates`` separates them. The chats that have written to the bot
+    are the chats it may write back to, so their presence or absence is
+    the answer. It reaches back about 24 hours, which means an empty list
+    says "nobody has written recently", not "nobody ever did".
+    """
+    api = call or _call
+
+    me = api(config, "getMe")
+    username = str(me.get("username") or "") if isinstance(me, Mapping) else ""
+
+    updates = api(config, "getUpdates")
+    chats: list[str] = []
+    for update in updates if isinstance(updates, list) else []:
+        if not isinstance(update, Mapping):
+            continue
+        for key in _CHAT_BEARING:
+            payload = update.get(key)
+            if not isinstance(payload, Mapping):
+                continue
+            chat = payload.get("chat")
+            if not isinstance(chat, Mapping) or chat.get("id") is None:
+                continue
+            chat_id = str(chat["id"])
+            if chat_id not in chats:
+                chats.append(chat_id)
+
+    return ChannelCheck(
+        bot=f"@{username}" if username else "(unnamed bot)",
+        chats=tuple(chats),
+        configured_found=config.chat_id.strip() in chats,
+    )
 
 
 def notify_run(
@@ -486,24 +671,32 @@ def notify_run(
             sender(config, text)
             sent += 1
         except Exception as exc:  # noqa: BLE001 — a notifier may not fail a run
-            # Deliberately not the exception's args: a urllib error for a
-            # bad token puts the request URL in its message, and the URL
-            # contains the token.
+            # Through `redact`, always. The text is worth having — the
+            # status and Telegram's own "chat not found" are the whole
+            # diagnosis, and the type name alone sent a reader back to
+            # guessing — but a urllib message for a bad token is the
+            # request URL, and the token is a path segment of it.
             logger.warning(
-                f"telegram notification for {result.agent} failed: {type(exc).__name__}"
+                f"telegram notification for {result.agent} failed: "
+                f"{type(exc).__name__}: {redact(str(exc), config)}"
             )
     return sent
 
 
 __all__ = [
     "API_ROOT",
+    "REDACTED",
+    "WATCHED_AGENTS",
+    "ChannelCheck",
     "TelegramConfig",
     "TelegramSendError",
-    "WATCHED_AGENTS",
+    "check_channel",
     "clean_company_name",
     "format_action",
     "format_result",
     "format_trade",
     "notify_run",
     "read_config",
+    "redact",
+    "send_message",
 ]
