@@ -258,6 +258,22 @@ _TARGET_LABEL_BY_MODE: Mapping[str, str] = {
     "NET_NET": "NCAV למניה",
 }
 
+#: Where in ``criteria_values`` each sleeve records that level.
+#:
+#: The sell target reached ``target_price`` only recently, and every
+#: Defensive row written before that carries nothing in the field while
+#: recording the Graham Number here — 1,336 rows of it. Reading the
+#: agent's own figure from where the agent put it keeps those messages
+#: whole without the formatter computing a price of its own.
+#:
+#: Keyed on the same modes as the two mappings above, and a test holds
+#: the three key sets identical: a mode present in one and missing from
+#: another renders half a plan.
+_TARGET_KEY_BY_MODE: Mapping[str, str] = {
+    "DEFENSIVE": "graham_number",
+    "NET_NET": "ncav_per_share",
+}
+
 
 def _money(value: float) -> str:
     return f"${value:,.2f}"
@@ -373,6 +389,12 @@ def format_action(
     values = dict(getattr(decision, "criteria_values", None) or {})
     mode = str(values.get("mode") or "")
     target = getattr(decision, "target_price", None)
+    if target is None:
+        # The level the agent recorded, not one derived here.
+        try:
+            target = float(values[_TARGET_KEY_BY_MODE[mode]])
+        except (KeyError, TypeError, ValueError):
+            target = None
 
     if met:
         # Drop the bookkeeping entries — "mode=DEFENSIVE" is already the

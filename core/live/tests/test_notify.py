@@ -27,6 +27,7 @@ from core.live.notify import (
     TelegramSendError,
     check_channel,
     clean_company_name,
+    format_action,
     format_result,
     format_trade,
     notify_run,
@@ -959,3 +960,130 @@ def test_no_complaint_ever_quotes_the_credential(token, chat_id):
     assert said, "a value this broken must draw a complaint"
     for secret in (TOKEN, "supersecret", "AAHsupersecret", CHAT):
         assert secret not in said, f"{secret!r} reached the report"
+
+
+# ---------------------------------- the sell level, from where it was written
+#
+# The plan is the half of the message a reader acts on, and the first
+# real notification arrived without it. The journal row it was built
+# from carried no `target_price` — as none of the 1,336 Defensive rows
+# written before that field was populated do — while recording the
+# Graham Number in `criteria_values` all along. The formatter reads it
+# from where the agent put it; it does not compute a price.
+
+
+def a_decision_without_a_target(mode="DEFENSIVE", **values):
+    return FakeDecision(
+        ticker="SFD",
+        criteria_met=["P/E=7.37 (≤ 15.0)", f"mode={mode}"],
+        criteria_values={"mode": mode, **values},
+        target_price=None,
+    )
+
+
+def test_a_defensive_row_without_a_target_uses_the_recorded_graham_number():
+    text = format_action(
+        a_buy(ticker="SFD", shares=94.1566, price=25.35),
+        a_decision_without_a_target(graham_number=31.2431),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "התוכנית" in text, "the plan went missing"
+    assert "$31.24" in text
+    assert "מספר גרהם" in text
+    assert "+23.2%" in text, "the upside against the price actually paid"
+
+
+def test_a_net_net_row_without_a_target_uses_the_recorded_ncav():
+    text = format_action(
+        a_buy(ticker="ACMR", price=70.30),
+        a_decision_without_a_target(mode="NET_NET", ncav_per_share=105.4551),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "$105.46" in text
+    assert "NCAV למניה" in text
+
+
+def test_a_recorded_target_price_wins_over_the_criteria_value():
+    """Precedence matters: the field is the agent's conclusion.
+
+    The fallback exists for rows that predate the field, not to override
+    one — a row carrying both must render the one the agent decided on.
+    """
+    decision = FakeDecision(
+        ticker="SFD",
+        criteria_met=["mode=DEFENSIVE"],
+        criteria_values={"mode": "DEFENSIVE", "graham_number": 31.2431},
+        target_price=40.0,
+    )
+    text = format_action(
+        a_buy(ticker="SFD", price=25.35),
+        decision,
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "$40.00" in text
+    assert "$31.24" not in text
+
+
+def test_a_row_with_no_level_anywhere_renders_without_a_plan():
+    """Short, not broken, and certainly not invented."""
+    text = format_action(
+        a_buy(ticker="SFD", price=25.35),
+        a_decision_without_a_target(),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "התוכנית" not in text
+    assert "מה זיהה" in text, "the rest of the message survives"
+
+
+def test_an_unknown_mode_invents_nothing():
+    text = format_action(
+        a_buy(ticker="SFD", price=25.35),
+        a_decision_without_a_target(mode="SOMETHING_NEW", graham_number=31.24),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "התוכנית" not in text
+    assert "31.24" not in text
+
+
+def test_a_level_recorded_as_something_other_than_a_number_is_ignored():
+    text = format_action(
+        a_buy(ticker="SFD", price=25.35),
+        a_decision_without_a_target(graham_number="not a number"),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "התוכנית" not in text
+
+
+def test_the_three_mode_mappings_describe_the_same_sleeves():
+    """The drift guard.
+
+    Three mappings keyed on the recorded mode — the label, the value's
+    key, and the exit rule. A sleeve present in one and missing from
+    another renders half a plan, and the halves are written far enough
+    apart in the file to make that easy to do.
+    """
+    from core.live.notify import (
+        _PLAN_BY_MODE,
+        _TARGET_KEY_BY_MODE,
+        _TARGET_LABEL_BY_MODE,
+    )
+
+    assert set(_PLAN_BY_MODE) == set(_TARGET_LABEL_BY_MODE) == set(_TARGET_KEY_BY_MODE)
