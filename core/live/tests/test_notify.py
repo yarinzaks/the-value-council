@@ -984,7 +984,9 @@ def a_decision_without_a_target(mode="DEFENSIVE", **values):
 def test_a_defensive_row_without_a_target_uses_the_recorded_graham_number():
     text = format_action(
         a_buy(ticker="SFD", shares=94.1566, price=25.35),
-        a_decision_without_a_target(graham_number=31.2431),
+        # `pe_times_pb` is the witness that this row records the Graham
+        # Number under the right name — see the pre-fix test below.
+        a_decision_without_a_target(graham_number=31.2431, pe_times_pb=7.886),
         actor="Benjamin Graham",
         names={},
         industry=None,
@@ -1087,3 +1089,73 @@ def test_the_three_mode_mappings_describe_the_same_sleeves():
     )
 
     assert set(_PLAN_BY_MODE) == set(_TARGET_LABEL_BY_MODE) == set(_TARGET_KEY_BY_MODE)
+
+
+# ------------------------- a level recorded under the wrong name
+#
+# The Defensive path once wrote `pe * pb` under the key
+# `graham_number` — a dimensionless product under the name of a price.
+# 1,031 journal rows still hold it that way, verified: every Defensive
+# row lacking `pe_times_pb` has `graham_number == pe * pb` to the cent,
+# and every row carrying it matches sqrt(22.5 x EPS x BVPS) recomputed
+# from that date's own financials. Reading the first kind as a sell
+# target prints $6.74 against a stock bought at $4,337.
+
+
+def test_a_row_that_recorded_the_composite_under_the_graham_key_is_refused():
+    """The guard. Without it this message quotes a nonsense price."""
+    text = format_action(
+        a_buy(ticker="SEB", shares=0.4145, price=4337.15),
+        a_decision_without_a_target(pe=8.43, pb=0.80, graham_number=6.74),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "התוכנית" not in text, "a dimensionless product rendered as a price"
+    assert "6.74" not in text
+    assert "מה זיהה" in text, "the rest of the message still stands"
+
+
+def test_the_same_row_with_the_witness_renders_the_real_level():
+    text = format_action(
+        a_buy(ticker="SEB", shares=0.4145, price=4337.15),
+        a_decision_without_a_target(
+            pe=8.43, pb=0.80, pe_times_pb=6.74, graham_number=7936.58
+        ),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "$7,936.58" in text
+    assert "+83.0%" in text
+
+
+def test_net_net_needs_no_witness():
+    """Its own fallback cannot reach a suspect row.
+
+    The net-net sleeve always recorded `target_price` directly, so the
+    fallback only fires on rows that never had the mislabelling — which
+    is why requiring a witness there would only break working output.
+    """
+    text = format_action(
+        a_buy(ticker="ACMR", price=70.30),
+        a_decision_without_a_target(mode="NET_NET", ncav_per_share=105.4551),
+        actor="Benjamin Graham",
+        names={},
+        industry=None,
+    )
+
+    assert "$105.46" in text
+
+
+def test_every_witness_names_a_sleeve_that_has_a_level():
+    """A witness for a mode with no target key would be dead config.
+
+    It would also read as protection that is not there, which is worse
+    than no entry at all.
+    """
+    from core.live.notify import _FALLBACK_WITNESS_BY_MODE, _TARGET_KEY_BY_MODE
+
+    assert set(_FALLBACK_WITNESS_BY_MODE) <= set(_TARGET_KEY_BY_MODE)

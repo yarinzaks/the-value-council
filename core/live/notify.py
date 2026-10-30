@@ -274,6 +274,26 @@ _TARGET_KEY_BY_MODE: Mapping[str, str] = {
     "NET_NET": "ncav_per_share",
 }
 
+#: A key whose presence in the same row marks it as written after that
+#: sleeve's level was recorded under the right name.
+#:
+#: The Defensive path once wrote ``pe * pb`` — a dimensionless product —
+#: under the key ``graham_number``, which is a price per share. 1,031
+#: journal rows still hold it that way, and reading one as a sell target
+#: renders "$6.72" against a stock bought at $4,337. ``pe_times_pb``
+#: arrived in the same change that fixed the key, which makes its
+#: presence an exact witness: of all 1,336 Defensive rows, every row
+#: without it has ``graham_number == pe * pb`` to the cent, and every
+#: row with it carries the real sqrt(22.5 x EPS x BVPS) — checked
+#: against the point-in-time financials for the row's own date.
+#:
+#: A sleeve absent from this mapping needs no witness. Net-net is
+#: absent because it always recorded ``target_price`` directly, so its
+#: fallback never fires on a row old enough to be suspect.
+_FALLBACK_WITNESS_BY_MODE: Mapping[str, str] = {
+    "DEFENSIVE": "pe_times_pb",
+}
+
 
 def _money(value: float) -> str:
     return f"${value:,.2f}"
@@ -390,11 +410,15 @@ def format_action(
     mode = str(values.get("mode") or "")
     target = getattr(decision, "target_price", None)
     if target is None:
-        # The level the agent recorded, not one derived here.
-        try:
-            target = float(values[_TARGET_KEY_BY_MODE[mode]])
-        except (KeyError, TypeError, ValueError):
-            target = None
+        # The level the agent recorded, not one derived here — and only
+        # from a row that recorded it under the right name.
+        key = _TARGET_KEY_BY_MODE.get(mode)
+        witness = _FALLBACK_WITNESS_BY_MODE.get(mode)
+        if key is not None and (witness is None or witness in values):
+            try:
+                target = float(values[key])
+            except (KeyError, TypeError, ValueError):
+                target = None
 
     if met:
         # Drop the bookkeeping entries — "mode=DEFENSIVE" is already the
