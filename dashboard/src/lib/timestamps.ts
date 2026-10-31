@@ -75,6 +75,29 @@ export function formatRelativeTime(iso: string, locale: Locale, now: Date = new 
 }
 
 /** Just the time portion in IL TZ as HH:MM. */
+/** The moment itself, in IL local time, as dd/mm/yyyy HH:MM.
+ *
+ *  The relative form above is the friendlier one and it cannot be used
+ *  in a static export: `now` is evaluated when the page is *built*, so
+ *  a page built at 13:31 says "today 13:31" and keeps saying it. The
+ *  published site carried that for two and a half months.
+ *
+ *  An absolute stamp is true whenever it is read, which is the whole
+ *  job of the "last updated" line — the reader is asking how old the
+ *  numbers are, and a label that lies about it is worse than none.
+ */
+export function formatAbsolute(iso: string, locale: Locale = "he"): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const date = new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en-GB", {
+    timeZone: TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(d);
+  return `${date} ${ilHourMinute(d)}`;
+}
+
 export function formatTimeOfDay(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);

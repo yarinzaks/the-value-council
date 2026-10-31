@@ -6,7 +6,7 @@ import { Providers } from "@/components/Providers";
 import { loadCouncilLive } from "@/lib/data";
 import { readLocale } from "@/lib/locale-server";
 import {
-  formatRelativeTime,
+  formatAbsolute,
   isStale,
   nextScheduledLabel,
 } from "@/lib/timestamps";
@@ -35,7 +35,12 @@ export default async function RootLayout({
     "",
   );
   const now = new Date();
-  const lastSyncLabel = mostRecent ? formatRelativeTime(mostRecent, locale, now) : "";
+  // The *instant*, not a label. `now` here is build time in a static
+  // export, so a relative label ("today 13:31") freezes and then lies
+  // — the published site said "today" for two and a half months. The
+  // shell renders the absolute stamp and upgrades it to a relative one
+  // in the browser, against the reader's own clock.
+  const lastSyncAbsolute = mostRecent ? formatAbsolute(mostRecent, locale) : "";
   const stale = mostRecent ? isStale(mostRecent, 24, now) : true;
   const nextUsLabel = nextScheduledLabel("US", locale, now);
   const nextTaseLabel = nextScheduledLabel("TASE", locale, now);
@@ -45,7 +50,8 @@ export default async function RootLayout({
       <body>
         <Providers initialLocale={locale}>
           <AppShell
-            lastSyncLabel={lastSyncLabel}
+            lastSyncIso={mostRecent}
+            lastSyncAbsolute={lastSyncAbsolute}
             stale={stale}
             nextUsLabel={nextUsLabel}
             nextTaseLabel={nextTaseLabel}

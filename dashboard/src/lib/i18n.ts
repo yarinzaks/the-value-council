@@ -31,6 +31,20 @@ const en: Dict = {
   // ---- Toggles ----
   toggle_language: "עברית",
   toggle_theme: "Toggle theme",
+  log_out: "Log out",
+  action_log_title: "Action log",
+  action_log_subtitle: "What this agent did, most recent first",
+  action_log_empty: "No actions recorded yet.",
+  action_buy: "Bought",
+  action_add: "Added",
+  action_sell: "Sold",
+  action_trim: "Trimmed",
+  action_watch: "Watching",
+  action_unwatch: "Dropped",
+  action_waiting_for: "waiting for",
+  action_gain: "gain",
+  action_loss: "loss",
+
 
   // ---- Overview page ----
   overview_subtitle: "Live paper-trading state across all ten investors",
@@ -371,6 +385,20 @@ const he: Dict = {
   // ---- Toggles ----
   toggle_language: "English",
   toggle_theme: "החלף ערכת צבעים",
+  log_out: "התנתקות",
+  action_log_title: "יומן פעולות",
+  action_log_subtitle: "מה הסוכן עשה, מהחדש לישן",
+  action_log_empty: "עוד לא נרשמו פעולות.",
+  action_buy: "קנה",
+  action_add: "הוסיף",
+  action_sell: "מכר",
+  action_trim: "קיצץ",
+  action_watch: "נכנס למעקב",
+  action_unwatch: "יצא מהמעקב",
+  action_waiting_for: "ממתין למחיר",
+  action_gain: "רווח",
+  action_loss: "הפסד",
+
 
   // ---- Overview page ----
   overview_subtitle: "מצב מסחר הנייר החי בכל עשרת המשקיעים",
@@ -676,7 +704,11 @@ const he: Dict = {
   days_ago: "לפני {n} ימים",
   stale_warning:
     "⚠️ נתונים לא מעודכנים מעל 24 שעות — בדוק את הסריקה היומית.",
-  next_us_update: "US",
+  not_backtested: "לא נבדק היסטורית",
+  punch_card: "כרטיס ניקוב",
+  council_card_note:
+    "מנהל תיק אמיתי באותם תנאים; אין לו CAGR כי אי אפשר לשחזר אותו על ההיסטוריה.",
+  next_us_update: "ארה״ב",
   next_tase_update: "ישראל",
   next_label: "עדכון הבא",
   never: "לא היה",
