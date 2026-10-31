@@ -229,16 +229,28 @@ __marimo__/
 # (~2GB), they are regenerable from public APIs, and committing them
 # would inflate the repo to no benefit.
 #
-# One exception, and it is deliberate. company_names.json (~376K) is the
-# ticker-to-company-name map every page renders, and the dashboard is
-# now built in the cloud from this repo rather than served from the Mac.
-# A build that cannot read it renders "AAPL" where "Apple Inc." belongs
-# on every screen. It is regenerable but not from a build container, so
-# it ships. The `data/cache/*` form is required over `data/cache/`:
-# git does not descend into an excluded directory, so a negation inside
-# one is never reached.
+# Two exceptions, and both are deliberate. company_names.json (~376K) is
+# the ticker-to-company-name map every page renders, and the dashboard
+# is now built in the cloud from this repo rather than served from the
+# Mac. A build that cannot read it renders "AAPL" where "Apple Inc."
+# belongs on every screen. It is regenerable but not from a build
+# container, so it ships.
+#
+# market_calendar.json (~8K) is the exchange's closures and half-days,
+# published by scripts/export_market_calendar.py from the rules in
+# core/market_calendar.py. It ships for a different reason: so the
+# dashboard does not need a second implementation of those rules. A copy
+# in TypeScript would be a copy that has to agree forever and would not
+# — Rule 7.2's New Year exception is exactly the detail one side
+# acquires and the other does not — and the symptom would be a page
+# quietly disagreeing with the runner about which days exist.
+#
+# The `data/cache/*` form is required over `data/cache/`: git does not
+# descend into an excluded directory, so a negation inside one is never
+# reached.
 data/cache/*
 !data/cache/company_names.json
+!data/cache/market_calendar.json
 data/fundamentals_cache/
 
 # Local-only artifacts

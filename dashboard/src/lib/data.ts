@@ -70,6 +70,7 @@ const DECISIONS_DIR = path.join(DATA_ROOT, "decisions");
 const PORTFOLIOS_DIR = path.join(DATA_ROOT, "portfolios");
 const SNAPSHOTS_DIR = path.join(DATA_ROOT, "snapshots");
 const COMPANY_NAMES_PATH = path.join(DATA_ROOT, "cache", "company_names.json");
+const MARKET_CALENDAR_PATH = path.join(DATA_ROOT, "cache", "market_calendar.json");
 const PRICES_DIR = path.join(DATA_ROOT, "prices");
 const TRADES_DIR = path.join(DATA_ROOT, "trades");
 
@@ -463,6 +464,45 @@ export async function loadCompanyNames(): Promise<Record<string, string>> {
     _companyNamesCache = {};
   }
   return _companyNamesCache;
+}
+
+// ----- Exchange calendar -----------------------------------------------
+//
+// Read rather than recomputed. The rules live in core/market_calendar.py
+// and scripts/export_market_calendar.py publishes their answers, because
+// a second implementation here would be a copy that has to agree forever
+// and would not: Rule 7.2's New Year exception is exactly the detail one
+// copy acquires and the other does not, and the symptom would be this
+// page quietly disagreeing with the runner about which days exist.
+
+export interface MarketCalendar {
+  /** ISO date -> why the exchange was shut. */
+  closures: Record<string, string>;
+  /** ISO date -> why it closed at 13:00 ET instead of 16:00. */
+  half_days: Record<string, string>;
+}
+
+const EMPTY_CALENDAR: MarketCalendar = { closures: {}, half_days: {} };
+
+let _marketCalendarCache: MarketCalendar | null = null;
+
+/** The exchange calendar, or empty when the file has not been published.
+ *
+ * Empty is the honest degradation: a page that cannot say a day was a
+ * holiday should say nothing, not guess.
+ */
+export async function loadMarketCalendar(): Promise<MarketCalendar> {
+  if (_marketCalendarCache) return _marketCalendarCache;
+  try {
+    const raw = await readJson<Partial<MarketCalendar>>(MARKET_CALENDAR_PATH);
+    _marketCalendarCache = {
+      closures: raw.closures ?? {},
+      half_days: raw.half_days ?? {},
+    };
+  } catch {
+    _marketCalendarCache = EMPTY_CALENDAR;
+  }
+  return _marketCalendarCache;
 }
 
 /** Load all four agents' live portfolios + compute council aggregate. */

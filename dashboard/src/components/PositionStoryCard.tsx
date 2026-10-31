@@ -31,6 +31,15 @@ interface Props {
   companyName: string;
   agentDisplay: string;
   agentColor: string;
+  /** ISO date -> why the exchange was shut that day.
+   *
+   *  The schedule ran Monday to Friday and knew nothing else, so four
+   *  2026 holidays were ordinary trading days to it and collected
+   *  movements at the previous session's close. The runner declines
+   *  those days now; the rows already written stay, marked, because the
+   *  prices on them were real closes and rewriting history to tidy a
+   *  date would cost more than the date is worth. */
+  marketClosures?: Record<string, string>;
   t: (key: string) => string;
 }
 
@@ -39,6 +48,7 @@ export function PositionStoryCard({
   companyName,
   agentDisplay,
   agentColor,
+  marketClosures,
   t,
 }: Props) {
   const lifecycleLabel =
@@ -201,9 +211,19 @@ export function PositionStoryCard({
           entry, which is the truth about it. */}
       {events.length > 0 && (
         <ol className="mt-3 space-y-1.5 border-s-2 border-council-100 dark:border-council-800 ps-3">
-          {events.map((m) => (
+          {events.map((m) => {
+            const shut = marketClosures?.[m.date];
+            return (
             <li key={`${m.date}-${m.kind}`} className="text-xs">
               <span className="tabular text-muted">{m.date}</span>{" "}
+              {shut && (
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 me-1 rounded text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
+                  title={shut}
+                >
+                  {t("market_was_closed")}
+                </span>
+              )}
               <span
                 className={`font-medium ${
                   m.kind === "exited"
@@ -219,7 +239,8 @@ export function PositionStoryCard({
                 </p>
               )}
             </li>
-          ))}
+            );
+          })}
           {story.lifecycle === "held" && (
             <li className="text-xs text-muted">
               {t("pos_still_held").replace(
