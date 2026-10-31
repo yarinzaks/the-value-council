@@ -117,6 +117,28 @@ class TestTheRecordedReturnIsNotRestated:
 
         assert book.cumulative_return_pct == pytest.approx(before, abs=1e-6)
 
+    def test_a_fraction_worth_a_part_of_a_cent_does_not_move_the_return(
+        self,
+    ) -> None:
+        """Rounding the freed cash to the cent restated three books.
+
+        A fraction of a share is not a whole number of cents: 0.007184
+        of Lam Research at $239.11 is $1.71757. Rounding that to $1.72
+        gains two thousandths of a cent, which moved howard_marks from
+        9.0920% to 9.0919% and two others likewise. A tenth of a basis
+        point is not a real difference, but a migration whose whole
+        claim is that it restates nothing may not restate anything.
+        """
+        book = _book([_pos("LRCX", 0.007184, 239.11), _pos("KEEP", 3.0, 100.0)])
+        before_nav = book.total_nav
+        before_ret = book.cumulative_return_pct
+
+        floor_one(book)
+        book.mark_to_market({})
+
+        assert book.total_nav == pytest.approx(before_nav, abs=1e-9)
+        assert book.cumulative_return_pct == pytest.approx(before_ret, abs=1e-12)
+
     def test_nothing_is_added_to_cumulative_costs(self) -> None:
         """There is no counterparty and no commission. Charging one
         would take real money out of the book for a trade nobody made."""
