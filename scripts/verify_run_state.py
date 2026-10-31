@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+from core.market_calendar import why_closed
 from core.paths import portfolios_dir
 
 # Which timestamp each mode is expected to refresh. ``run()`` stamps
@@ -173,6 +174,17 @@ def main(argv: list[str] | None = None) -> int:
 
     as_of = args.as_of or datetime.now(UTC).date()
     directory = args.portfolios or portfolios_dir()
+
+    # A day with no session has nothing to verify. The runner declines
+    # it on purpose — prices on a shut day are the previous close, and
+    # booking them under today's date is how four 2026 holidays acquired
+    # 21 trades that never happened — so every stamp is yesterday's and
+    # this check would read a correct refusal as a failed run. Both read
+    # the same calendar, which is what keeps them from disagreeing.
+    shut = why_closed(as_of)
+    if shut is not None:
+        print(f"no US session on {as_of} ({shut}); nothing to verify.")
+        return 0
 
     report = check_portfolios(directory, mode=args.mode, as_of=as_of)
     print(format_report(report, mode=args.mode, as_of=as_of))

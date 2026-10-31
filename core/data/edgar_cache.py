@@ -94,6 +94,15 @@ class EdgarCache:
         # parquet file (~10ms × 96,000 = 16 minutes of pure I/O).
         # With the cache, the second pass through the universe at
         # any rebalance is in-memory.
+        #
+        # The default holds more entries than there are tickers, so for
+        # a caller that reads each one repeatedly nothing is ever
+        # evicted — which is the point. For a caller that reads each one
+        # *once* it is the opposite of the point: over the full
+        # 8,290-ticker cache, peak RSS is 2,353 MB with the default and
+        # 604 MB with it off, for identical output in identical time.
+        # Such a caller passes a small size, or zero to turn the cache
+        # off entirely.
         self._df_cache: dict[str, pd.DataFrame] = {}
         self._df_cache_order: list[str] = []
         self._df_cache_size = memory_cache_size
@@ -172,6 +181,13 @@ class EdgarCache:
         for col in ("period_start", "period_end", "filed"):
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], errors="coerce")
+        if self._df_cache_size <= 0:
+            # Caching turned off. Worth saying explicitly rather than
+            # letting the loop below handle it: with a size of zero its
+            # condition is true against an empty list, so it popped from
+            # one and raised, which made the obvious way to ask for no
+            # cache at all the one way to crash.
+            return df
         # Evict if cache full
         while len(self._df_cache_order) >= self._df_cache_size:
             evicted = self._df_cache_order.pop(0)

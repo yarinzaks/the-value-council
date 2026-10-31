@@ -203,6 +203,9 @@ const en: Dict = {
   pos_event_exited: "Sold out",
   pos_event_changed: "Changed its view",
   pos_still_held: "Held since, unchanged, through {days} trading days.",
+  // Shown against a movement dated to a day the exchange never opened.
+  // Four 2026 holidays collected them before the runner knew to decline.
+  market_was_closed: "market closed",
   price_chart_title: "Price since entry",
   price_chart_note: "Adjusted closes over the past year. The dashed line is what the agent paid; the dot is the entry date when it falls inside this window.",
   filter_agent: "Agent",
@@ -536,6 +539,7 @@ const he: Dict = {
   pos_event_exited: "נמכרה",
   pos_event_changed: "שינה את דעתו",
   pos_still_held: "מוחזקת מאז ללא שינוי, לאורך {days} ימי מסחר.",
+  market_was_closed: "השוק היה סגור",
   price_chart_title: "מחיר מאז הכניסה",
   price_chart_note: "מחירי סגירה מתואמים בשנה האחרונה. הקו המקווקו הוא מה שהסוכן שילם; הנקודה היא תאריך הכניסה, כשהוא נופל בתוך החלון הזה.",
   filter_agent: "סוכן",

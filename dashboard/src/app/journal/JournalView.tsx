@@ -17,7 +17,12 @@ import Link from "next/link";
 import { Card, EmptyState, PageTitle } from "@/components/Cards";
 import { PositionStoryCard } from "@/components/PositionStoryCard";
 import { AGENTS, metaLocalized } from "@/lib/agents";
-import { loadCompanyNames, loadJournal, loadLivePortfolio } from "@/lib/data";
+import {
+  loadCompanyNames,
+  loadJournal,
+  loadLivePortfolio,
+  loadMarketCalendar,
+} from "@/lib/data";
 import { getServerI18n } from "@/lib/locale-server";
 import {
   TRADE_HISTORY_STARTS_AT,
@@ -72,8 +77,9 @@ export async function JournalView({
 
   const slugs: AgentSlug[] = agentSlug ? [agentSlug] : AGENTS.map((a) => a.slug);
 
-  const [companyNames, ...perAgent] = await Promise.all([
+  const [companyNames, calendar, ...perAgent] = await Promise.all([
     loadCompanyNames(),
+    loadMarketCalendar(),
     ...slugs.map(async (slug) => {
       const [decisions, portfolio] = await Promise.all([
         loadJournal({ agent: slug }),
@@ -194,6 +200,7 @@ export async function JournalView({
                 companyName={companyNames[story.ticker] ?? ""}
                 agentDisplay={meta?.display ?? story.agent}
                 agentColor={meta?.color ?? "#999"}
+                marketClosures={calendar.closures}
                 t={t}
               />
             );

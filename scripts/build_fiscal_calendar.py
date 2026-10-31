@@ -56,7 +56,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    cache = EdgarCache()
+    # No in-memory cache: this is the one tool that reads every ticker
+    # exactly once, so retaining a dataframe can never pay for itself.
+    # The default holds more entries than there are tickers, so nothing
+    # is ever evicted and every parquet read stays resident for the life
+    # of the process.
+    #
+    # Measured over the full 8,290-ticker cache: peak RSS 2,353 MB with
+    # the default and 604 MB without, in the same 77 seconds and
+    # producing the same 6,529 profiles.
+    #
+    # This is not known to be why the weekly job has failed five Mondays
+    # running. It is killed around ten minutes in with a runner shutdown
+    # signal and eighty of its ninety minutes unused, and 2.4 GB should
+    # not trouble a hosted runner's sixteen. Freeing 1.7 GB is worth
+    # doing on its own; whether it is also the fix will be answered by
+    # the next Monday rather than asserted here.
+    cache = EdgarCache(memory_cache_size=0)
     tickers = cache.tickers()
     if args.max_tickers is not None:
         tickers = tickers[: args.max_tickers]
