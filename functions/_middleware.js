@@ -235,10 +235,30 @@ export function safeNext(raw) {
   }
   if (resolved.origin !== SELF) return "/he/";
   if (PUBLIC_PATHS.has(resolved.pathname)) return "/he/";
-  // Reassembled from the parsed parts, so what is returned is what a
-  // browser will have resolved — `/a/../b` normalised, and nothing
-  // ambiguous left in it.
-  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+
+  const out = `${resolved.pathname}${resolved.search}${resolved.hash}`;
+
+  // And now check `out`, which is the string that goes in the header.
+  //
+  // The origin test above is about the *input*, and that is not the
+  // same question. Normalisation collapses `.` and `..` segments, and
+  // collapsing them can *produce* a leading `//` that the input never
+  // had: `/a/..//evil.example` has an origin of SELF — the base
+  // supplied it — and a pathname of `//evil.example`. Six inputs
+  // reached https://evil.example that way, through a guard whose whole
+  // purpose was to stop exactly this.
+  //
+  // Twice now the mistake has been checking something adjacent to the
+  // property instead of the property. The property belongs to the
+  // returned string, because that string is what a browser resolves,
+  // so it is the returned string that is resolved and compared.
+  if (!out.startsWith("/") || out.startsWith("//")) return "/he/";
+  try {
+    if (new URL(out, SELF).origin !== SELF) return "/he/";
+  } catch {
+    return "/he/";
+  }
+  return out;
 }
 
 function escapeHtml(text) {
