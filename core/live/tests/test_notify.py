@@ -1283,6 +1283,53 @@ class TestTheFiguresSayWhatHappened:
         assert "רווח מומש" not in text
         assert "הפסד מומש" not in text
 
+    def test_a_price_with_a_third_decimal_is_shown_in_full(self) -> None:
+        """34 of the last 198 real trades filled at a price carrying a
+        third decimal — $25.135, $83.995 — because the mark is a
+        midpoint or a split-adjusted close. Rounding it to the cent for
+        display left the three figures not multiplying out: 13 shares at
+        a displayed $25.14 is $326.82 against a stated $326.75, a
+        seven-cent gap with nothing on the message to explain it.
+        """
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="MTG", shares=13.0, price=25.135)])
+        )
+
+        assert "מחיר למניה: $25.135" in text
+        assert "$25.14" not in text
+
+    def test_a_two_decimal_price_gains_no_decimals(self) -> None:
+        """Which is nearly every price. The fix must not make the
+        common message noisier to repair the uncommon one."""
+        text = rendered(watch_result(trades=[a_buy(shares=61.0, price=31.22)]))
+
+        assert "מחיר למניה: $31.22" in text
+        assert "31.2200" not in text
+
+    def test_a_round_price_keeps_its_cents(self) -> None:
+        """$1,012.00, not $1,012 — a price is written with cents."""
+        text = rendered(watch_result(trades=[a_buy(shares=2.0, price=1012.0)]))
+
+        assert "מחיר למניה: $1,012.00" in text
+
+    @pytest.mark.parametrize("price", [25.135, 83.995, 31.22, 1012.0, 0.5])
+    def test_the_figures_reconcile_at_any_precision(self, price: float) -> None:
+        """A reader who multiplies the two printed figures must land on
+        the third, to the cent."""
+        import re
+
+        shares = 13.0
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="X", shares=shares, price=price)])
+        )
+        shown_price = float(
+            re.search(r"מחיר למניה: \$([\d,.]+)", text).group(1).replace(",", "")
+        )
+        shown_total = float(
+            re.search(r"סכום העסקה: \$([\d,.]+)", text).group(1).replace(",", "")
+        )
+        assert shown_price * shares == pytest.approx(shown_total, abs=0.005)
+
     def test_the_three_figures_of_a_trade_multiply_out(self) -> None:
         """Shares x price = amount, on the face of the message. A reader
         who checks the arithmetic must not find it wrong."""

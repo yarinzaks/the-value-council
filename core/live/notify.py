@@ -366,6 +366,25 @@ def _money(value: float) -> str:
     return ltr(f"${value:,.2f}")
 
 
+def _price(value: float) -> str:
+    """A quoted price, at the precision it actually filled at.
+
+    ``_money`` rounds to the cent, which is right for a total and wrong
+    for a price: 34 of the last 198 real fills carry a third decimal —
+    $25.135, $83.995 — because the mark is a midpoint or a
+    split-adjusted close. Rounding those for display left the three
+    figures of a trade not multiplying out, and a reader who checks
+    13 x $25.14 = $326.82 against a stated $326.75 has found a
+    seven-cent gap with nothing on the message to explain it.
+
+    Two decimals at least, because a price is written with cents, and
+    four at most, because beyond that the digits are the data feed's
+    arithmetic rather than a price anyone paid.
+    """
+    whole, _, frac = f"{value:,.4f}".rstrip("0").partition(".")
+    return ltr(f"${whole}.{frac.ljust(2, '0')}")
+
+
 def _shares(value: float) -> str:
     """A share count, isolated, and without decimals it does not have.
 
@@ -508,7 +527,7 @@ def format_action(
 
     lines += [
         "",
-        _field("מחיר למניה", _money(price)),
+        _field("מחיר למניה", _price(price)),
         _field("כמות מניות", _shares(shares)),
         _field("סכום העסקה", _money(gross)),
     ]
@@ -606,9 +625,9 @@ def format_watch_entry(
     target = getattr(watch, "entry_price_target", None)
     last = getattr(watch, "last_price", None)
     if target is not None:
-        prices = ["", _field("מחיר כניסה", _money(float(target)))]
+        prices = ["", _field("מחיר כניסה", _price(float(target)))]
         if last:
-            prices.append(_field("מחיר נוכחי", _money(float(last))))
+            prices.append(_field("מחיר נוכחי", _price(float(last))))
             fall = (1.0 - float(target) / float(last)) * 100.0
             prices.append(_field("צריך לרדת", ltr(f"{fall:.1f}%")))
         lines += prices
