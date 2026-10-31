@@ -40,6 +40,37 @@ export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
  * shows up here with no change to this page, which is the only way a
  * page like this stays honest about "everything it said".
  */
+/** Fields whose zero means the snapshot carried nothing.
+ *
+ *  Kept to the fields where zero is impossible as a measurement: a
+ *  company is never worth $0, retention is never 0%, and an industry
+ *  average operating margin of exactly 0 is not an industry. A score of
+ *  0 out of 15 is deliberately absent — that one is a verdict.
+ */
+const ZERO_IS_UNREPORTED = new Set([
+  "intrinsic_value_estimate_usd",
+  "intrinsic_value_estimate_usd_per_share",
+  "margin_of_safety_pct",
+  "expected_growth_rate_5yr_pct",
+  "industry_avg_operating_margin_pct",
+  "customer_retention_pct",
+  "employee_turnover_pct",
+  "owner_earnings_5yr_avg_usd",
+  "market_temperature_score",
+]);
+
+/** A number at the precision it was measured to, not computed to. */
+function formatNumber(value: number): string {
+  if (Number.isInteger(value)) return value.toLocaleString("en-US");
+  // Two decimals for a price or a ratio, four for a figure small
+  // enough that two would round it away.
+  const digits = Math.abs(value) >= 0.1 ? 2 : 4;
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  });
+}
+
 /** Colour by what the verdict does, not by sentiment. */
 const VERDICT_STYLE: Record<string, string> = {
   BUY: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -88,7 +119,22 @@ function renderValue(
 ): React.ReactNode {
   if (value === null || value === undefined) return <span className="text-muted">—</span>;
   if (typeof value === "boolean") return value ? t("yes") : t("no");
-  if (typeof value === "number") return <span className="tabular">{value}</span>;
+  if (typeof value === "number") {
+    // Raw floats arrived as the analyst computed them: a current price
+    // of 229.1699981689453 and a P/E of 29.38076899601863. Fifteen
+    // digits of a quantity nobody measures past two.
+    //
+    // And a zero in a valuation field is not a zero. The analyst says
+    // so itself, in the rationale of the memo that prompted this —
+    // "read 0 as 'not reported'" — because the schema requires a
+    // number and the snapshot gave it nothing. 72 of 120 intrinsic
+    // values are zero that way. Printed as "0" it reads as a
+    // measurement; named, it reads as the gap it is.
+    if (value === 0 && ZERO_IS_UNREPORTED.has(path.split(".").pop() ?? "")) {
+      return <span className="text-muted">{t("brain_not_reported")}</span>;
+    }
+    return <span className="tabular">{formatNumber(value)}</span>;
+  }
   // Through the phrase table: a memo's short string values are the
   // agents' own vocabulary — "Fast Grower", "Tier A", "INSIDE" — and
   // the same table that renders them in the Telegram message renders
