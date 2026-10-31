@@ -220,6 +220,26 @@ jobs:
       # already traded.
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # The analyst layer. Empty in a fork and empty before the secret
+      # is first set; `core.llm.wiring` reads either as "no layer" and
+      # the books trade on their quantitative screens exactly as they
+      # did before there was one, rather than failing a run.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Whether the layer runs at all, and whether it decides.
+      #
+      # A repository variable rather than a literal, so turning it off
+      # is a click rather than a pull request. That matters because
+      # this is the one setting here that spends money per run —
+      # measured at about $2.20 a scan on Sonnet, some $46 a month —
+      # and the first surprising invoice should not have to wait for a
+      # merge.
+      #
+      # Unset is the same as "off", which is what every run before this
+      # did. "shadow" asks the five hybrid agents' candidates and writes
+      # the memos to /brain without touching any selection; "enforce"
+      # lets a verdict remove a name, and no book should reach that
+      # before someone has read a fortnight of shadow output.
+      LLM_MODE: ${{ vars.LLM_MODE }}
 
     steps:
       - name: Checkout repository
@@ -373,6 +393,7 @@ jobs:
         run: |
           python -m scripts.run_daily_paper_trading \
             --mode "$MODE" --market "$MARKET" \
+            --llm "${LLM_MODE:-off}" \
             2>&1 | tee "data/cron_logs/daily.${MARKET}.${MODE}.log"
 
       # The Council is a separate step because it is a separate kind of
