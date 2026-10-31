@@ -251,7 +251,11 @@ __marimo__/
 data/cache/*
 !data/cache/company_names.json
 !data/cache/market_calendar.json
-data/fundamentals_cache/
+# No trailing slash: the cache is sometimes a symlink into the data
+# root rather than a directory here, and a pattern ending in '/' matches
+# only the directory form — which left the link itself showing as an
+# untracked file in the middle of a run.
+data/fundamentals_cache
 
 # Local-only artifacts
 .DS_Store
