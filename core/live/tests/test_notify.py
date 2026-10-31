@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -41,6 +42,7 @@ from core.live.notify import (
     split_for_telegram,
     units,
 )
+from core.live.rtl import LRI, PDI, RLM, strip_marks
 
 AS_OF = date(2026, 10, 30)
 TOKEN = "123456:AAHsupersecrettokenvalue"
@@ -186,12 +188,15 @@ def test_a_run_with_no_trades_says_nothing():
 
 
 def test_a_run_with_trades_names_the_agent_and_the_date():
-    text = format_result(
-        FakeResult(agent="benjamin_graham", trades=[a_buy()]), as_of=AS_OF
+    text = strip_marks(
+        format_result(
+            FakeResult(agent="benjamin_graham", trades=[a_buy()]), as_of=AS_OF
+        )
+        or ""
     )
-    assert text is not None
-    assert "Benjamin Graham" in text
-    assert "2026-10-30" in text
+    assert "סוכן: Benjamin Graham" in text
+    # dd/mm/yyyy, which is how the reader of this channel writes a date.
+    assert "30/10/2026" in text
 
 
 def test_the_message_carries_nav_and_return():
@@ -413,13 +418,21 @@ def a_defensive_decision(ticker="SEB", target=7936.58):
 
 
 def rendered(result, decisions=None):
-    return format_result(
+    """The message as a reader sees it, with the direction marks gone.
+
+    Those marks are invisible and mean nothing to the person reading
+    the notification, so a test about what the message *says* should
+    not have to know where they were placed. That they are present at
+    all is its own concern, asserted in TestTheMessageReadsRightToLeft.
+    """
+    text = format_result(
         result,
         as_of=AS_OF,
         decisions=decisions or {},
         names=NAMES,
         industry=industries,
     )
+    return None if text is None else strip_marks(text)
 
 
 def test_the_company_line_carries_a_clean_name_and_the_industry():
@@ -508,7 +521,15 @@ def test_a_sell_does_not_label_the_exit_reason_as_what_it_spotted():
     target list" — so heading it "what it spotted" would describe a sale
     by the reasoning that justified the purchase.
     """
-    decision = FakeDecision(ticker="UFPI", criteria_met=["left today's target list"])
+    # decision="EXIT", because that is the kind the runner writes for a
+    # disposal — and since the reason is only read off a row whose kind
+    # matches the trade's side, the kind is now part of the fixture
+    # rather than an unused default.
+    decision = FakeDecision(
+        ticker="UFPI",
+        decision="EXIT",
+        criteria_met=["left today's target list"],
+    )
     text = rendered(
         FakeResult(agent="benjamin_graham", trades=[a_sell(ticker="UFPI")]),
         {"UFPI": decision},
@@ -1210,12 +1231,172 @@ def watch_result(watchlist=(), previous=(), trades=()):
     )
 
 
+class TestTheFiguresSayWhatHappened:
+    """The three numbers a reader checks against their own broker, and
+    the one sign that must never be lost."""
+
+    def test_a_whole_share_count_carries_no_decimals(self) -> None:
+        """Sizing buys whole shares, so "61.0000" is four characters of
+        noise on the figure a reader compares with their statement."""
+        text = rendered(watch_result(trades=[a_buy(shares=61.0, price=31.22)]))
+
+        assert "כמות מניות: 61" in text
+        assert "61.0000" not in text
+        assert "61.0" not in text
+
+    def test_a_legacy_fractional_lot_still_reports_its_fraction(self) -> None:
+        """The books hold lots bought before whole-share sizing. A sale
+        of one has to report what it really sold, or the cash it
+        produced will not reconcile against the share count beside it."""
+        text = rendered(
+            watch_result(trades=[a_buy(shares=74.375194, price=25.95)])
+        )
+
+        assert "כמות מניות: 74.3752" in text
+
+    def test_a_realised_loss_is_labelled_a_loss(self) -> None:
+        """The failure that would matter most: a losing round trip
+        announced as a gain. The label carries the sign, so the figure
+        itself is printed unsigned and cannot be read the wrong way."""
+        text = rendered(watch_result(trades=[a_sell(realized=-168.90)]))
+
+        assert "הפסד מומש: $168.90" in text
+        assert "רווח מומש" not in text
+
+    def test_a_realised_gain_is_labelled_a_gain(self) -> None:
+        text = rendered(watch_result(trades=[a_sell(realized=326.08)]))
+
+        assert "רווח מומש: $326.08" in text
+        assert "הפסד מומש" not in text
+
+    def test_a_break_even_round_trip_reads_as_a_gain_of_nothing(self) -> None:
+        """Zero is not a loss, and "הפסד מומש: $0.00" would read as one."""
+        text = rendered(watch_result(trades=[a_sell(realized=0.0)]))
+
+        assert "רווח מומש: $0.00" in text
+
+    def test_a_buy_reports_no_realised_figure_at_all(self) -> None:
+        """Nothing is realised on the way in, and $0.00 would read as a
+        round trip that broke even."""
+        text = rendered(watch_result(trades=[a_buy()]))
+
+        assert "רווח מומש" not in text
+        assert "הפסד מומש" not in text
+
+    def test_the_three_figures_of_a_trade_multiply_out(self) -> None:
+        """Shares x price = amount, on the face of the message. A reader
+        who checks the arithmetic must not find it wrong."""
+        text = rendered(watch_result(trades=[a_buy(shares=61.0, price=31.22)]))
+
+        assert "מחיר למניה: $31.22" in text
+        assert "כמות מניות: 61" in text
+        assert "סכום העסקה: $1,904.42" in text
+
+
+class TestAReasonMustMatchTheTradeItExplains:
+    """The join is on the ticker, so nothing stops a sale being handed
+    the row that justified the purchase."""
+
+    def a_defensive_buy_row(self):
+        return FakeDecision(
+            ticker="HOG",
+            decision="BUY",
+            criteria_met=["mode=DEFENSIVE", "P/E 11.23 < 15", "P/B 1.11 < 1.50"],
+            criteria_values={
+                "mode": "DEFENSIVE",
+                "graham_number": 43.68,
+                "pe_times_pb": 12.46,
+            },
+        )
+
+    def test_a_sale_is_never_explained_by_the_reasons_it_was_bought(self):
+        """A rebalance trim is a SELL that writes no exit row, so the
+        only row in the journal for that ticker is the BUY which put it
+        there — the name is still a target. The message said "why it
+        left: P/E 11.23 < 15", which is the test the company passed on
+        the way in, printed as the reason it was sold.
+        """
+        text = rendered(
+            watch_result(trades=[a_sell(ticker="HOG", realized=63.12)]),
+            decisions={"HOG": self.a_defensive_buy_row()},
+        )
+
+        assert "למה יצא" not in text
+        assert "P/E 11.23 < 15" not in text
+        # The fill itself is still reported in full.
+        assert "פעולה: מכירה" in text
+        assert "רווח מומש: $326.08" not in text  # the realised figure passed in
+        assert "רווח מומש: $63.12" in text
+
+    def test_a_real_exit_row_does_explain_the_sale(self):
+        text = rendered(
+            watch_result(trades=[a_sell(ticker="HOG", realized=63.12)]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG",
+                    decision="EXIT",
+                    criteria_met=["left today's target list"],
+                )
+            },
+        )
+
+        assert "למה יצא:" in text
+        assert "left today's target list" in text
+
+    def test_a_purchase_is_never_explained_by_an_exit(self):
+        """The symmetric case. It should not arise, but the guard costs
+        nothing and the join that produced the first one produces this
+        one just as easily."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG",
+                    decision="EXIT",
+                    criteria_met=["left today's target list"],
+                )
+            },
+        )
+
+        assert "מה זיהה" not in text
+        assert "left today's target list" not in text
+
+    def test_a_buy_row_still_explains_a_purchase(self):
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_defensive_buy_row()},
+        )
+
+        assert "מה זיהה:" in text
+        assert "P/E 11.23 < 15" in text
+        assert "יעד מכירה: $43.68" in text
+
+    def test_a_row_of_an_unknown_kind_explains_nothing(self):
+        """A kind this module has not been taught is not assumed to be
+        either an entry or an exit. The fill is reported and the reason
+        is left out rather than guessed."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG", decision="SOMETHING_NEW",
+                    criteria_met=["whatever it was"],
+                )
+            },
+        )
+
+        assert "whatever it was" not in text
+        assert "פעולה: קנייה" in text
+
+
 class TestAWatchIsAnEvent:
     def test_a_new_name_is_reported_with_no_trade_at_all(self):
         text = rendered(watch_result(watchlist=[a_watch()]))
 
         assert text is not None, "a new watch produced no message"
-        assert "Benjamin Graham עוקב UVV" in text
+        assert "פעולה: נוסף למעקב" in text
+        assert "סוכן: Benjamin Graham" in text
+        assert "טיקר: UVV" in text
 
     def test_the_company_and_the_reasoning_are_carried(self):
         text = rendered(watch_result(watchlist=[a_watch(ticker="HOG")]))
@@ -1229,8 +1410,9 @@ class TestAWatchIsAnEvent:
         text = rendered(watch_result(previous=["BIO"]))
 
         assert text is not None
-        assert "הסיר מהמעקב BIO" in text
-        assert "עוקב" not in text
+        assert "פעולה: הוסר מהמעקב" in text
+        assert "טיקר: BIO" in text
+        assert "נוסף למעקב" not in text
 
     def test_an_unchanged_list_says_nothing(self):
         """The rule the whole channel depends on."""
@@ -1241,20 +1423,26 @@ class TestAWatchIsAnEvent:
             watch_result(trades=[a_buy(ticker="SEB")], watchlist=[a_watch()])
         )
 
-        assert "קנה SEB" in text
-        assert "עוקב UVV" in text
+        assert "פעולה: קנייה" in text
+        assert "טיקר: SEB" in text
+        assert "פעולה: נוסף למעקב" in text
+        assert "טיקר: UVV" in text
 
     def test_the_actor_is_never_assumed(self):
         """The bug that once announced Buffett's trades as Graham's."""
-        text = format_result(
-            FakeResult(agent="warren_buffett", watchlist=[a_watch()]),
-            as_of=AS_OF,
-            decisions={},
-            names=NAMES,
-            industry=industries,
+        text = strip_marks(
+            format_result(
+                FakeResult(agent="warren_buffett", watchlist=[a_watch()]),
+                as_of=AS_OF,
+                decisions={},
+                names=NAMES,
+                industry=industries,
+            )
+            or ""
         )
 
-        assert "Warren Buffett עוקב UVV" in text
+        assert "סוכן: Warren Buffett" in text
+        assert "טיקר: UVV" in text
         assert "Graham" not in text
 
     def test_a_watch_without_prose_still_names_the_price(self):
@@ -1265,7 +1453,8 @@ class TestAWatchIsAnEvent:
     def test_a_watch_with_neither_still_renders(self):
         text = rendered(watch_result(watchlist=[a_watch(why="", target=None)]))
 
-        assert "עוקב UVV" in text
+        assert "פעולה: נוסף למעקב" in text
+        assert "טיקר: UVV" in text
 
 
 class TestTheMessageStaysShort:
@@ -1279,7 +1468,7 @@ class TestTheMessageStaysShort:
         entries = [a_watch(ticker=f"T{i}") for i in range(MAX_WATCH_BLOCKS + 3)]
         text = rendered(watch_result(watchlist=entries))
 
-        assert text.count("עוקב T") == MAX_WATCH_BLOCKS
+        assert text.count("פעולה: נוסף למעקב") == MAX_WATCH_BLOCKS
         assert "עוקב גם אחרי 3 נוספים" in text
         assert "T5, T6, T7" in text
 
@@ -1323,8 +1512,9 @@ class TestTheWatchPathObeysTheSameGates:
                 agent="benjamin_graham", watchlist=[a_watch()], error="boom"
             )
         )
-        assert "ההרצה נכשלה: boom" in text
-        assert "עוקב" not in text
+        assert "פעולה: ההרצה נכשלה" in text
+        assert "הסיבה: boom" in text
+        assert "נוסף למעקב" not in text
 
 
 # ------------------------------------- the reason, not the execution receipt
@@ -1590,3 +1780,105 @@ class TestTheFitGuaranteeDoesNotDependOnAnAssumption:
         # The part that did arrive says which part it was, so the gap is
         # visible rather than silent.
         assert attempted[-1].endswith(f"({len(attempted)}/{len(attempted)})")
+
+
+class TestTheMessageReadsRightToLeft:
+    """Hebrew prose with English tickers and dollar figures inside it.
+
+    Every renderer that shows this message lays it out with the Unicode
+    bidirectional algorithm: a line beginning in Hebrew is a
+    right-to-left paragraph, and the digits in it are a left-to-right
+    run embedded in one. Where that run lands depends on the neutral
+    characters around it — a dollar sign, a plus, a bracket — and the
+    answer is often not what was written.
+
+    Isolates settle it. Every test above reads the message with them
+    stripped, because they are invisible and mean nothing to a reader;
+    this class is the one that asks whether they are there.
+    """
+
+    def a_full_message(self) -> str:
+        return format_result(
+            FakeResult(
+                agent="benjamin_graham",
+                trades=[a_buy(ticker="SEB", price=4283.77)],
+            ),
+            as_of=AS_OF,
+            decisions={"SEB": a_defensive_decision()},
+            names=NAMES,
+            industry=industries,
+        )
+
+    def test_every_dollar_figure_is_isolated(self) -> None:
+        """The most common left-to-right island, and the one in most
+        danger: a price sits between Hebrew words on three lines."""
+        text = self.a_full_message()
+
+        for figure in re.findall(r"\$[\d,]+\.\d{2}", text):
+            start = text.index(figure)
+            assert text[start - 1] == LRI, f"{figure} is not isolated"
+            assert text[start + len(figure)] == PDI, f"{figure} is not closed"
+
+    def test_the_upside_percentage_is_isolated(self) -> None:
+        """It ends an RTL line, which is exactly where a sign drifts."""
+        text = self.a_full_message()
+
+        assert f"רווח אפשרי: {LRI}+85.3%{PDI}" in text
+
+    def test_every_line_hangs_from_the_right(self) -> None:
+        """A line opening with a Latin name or a digit would otherwise
+        be laid out left to right and hang from the opposite margin to
+        the Hebrew lines around it, which reads as a different message
+        rather than the same one. Every line carries the mark, so no
+        future field can be added without it."""
+        text = self.a_full_message()
+
+        for line in text.split("\n"):
+            if not line or line == "———":
+                continue
+            assert line.startswith(RLM), f"unmarked line: {line!r}"
+
+    def test_the_ticker_is_isolated_in_the_headline(self) -> None:
+        text = self.a_full_message()
+
+        assert f"{LRI}SEB{PDI}" in text
+
+    def test_every_isolate_is_closed(self) -> None:
+        """An unbalanced isolate leaks into everything after it."""
+        text = self.a_full_message()
+
+        assert text.count(LRI) == text.count(PDI)
+
+    def test_the_marks_are_invisible_to_a_reader(self) -> None:
+        """Stripping them must change the layout and nothing else."""
+        text = self.a_full_message()
+        plain = strip_marks(text)
+
+        assert "פעולה: קנייה" in plain and "$4,283.77" in plain
+        assert LRI not in plain and PDI not in plain and RLM not in plain
+        assert len(plain) < len(text), "nothing was added at all"
+
+    def test_a_watch_line_is_marked_too(self) -> None:
+        text = format_result(
+            FakeResult(agent="benjamin_graham", watchlist=[a_watch()]),
+            as_of=AS_OF,
+            decisions={},
+            names=NAMES,
+            industry=industries,
+        )
+
+        assert text is not None
+        assert f"{RLM}סוכן: {LRI}Benjamin Graham{PDI}" in text
+        assert f"{RLM}טיקר: {LRI}UVV{PDI}" in text
+
+    def test_a_failed_run_is_marked_as_well(self) -> None:
+        text = format_result(
+            FakeResult(agent="benjamin_graham", error="boom"),
+            as_of=AS_OF,
+            decisions={},
+            names=NAMES,
+            industry=industries,
+        )
+
+        assert text.startswith(RLM)
+        assert "ההרצה נכשלה" in strip_marks(text)

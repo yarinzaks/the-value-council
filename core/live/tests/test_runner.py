@@ -26,6 +26,7 @@ from core.live.runner import (
     DailyRunner,
     _filter_adapters,
     pos_age_days,
+    reachable_targets,
 )
 from core.live.trade_ledger import read_ledger
 from scripts.run_daily_paper_trading import parse_args
@@ -436,18 +437,22 @@ class TestExecutionLabels:
 # ---------------------------------------------------------------------------
 # Position sizing
 # ---------------------------------------------------------------------------
-class TestFractionalSizing:
-    """Whole-share rounding discarded the remainder of every position.
-    On a $10,000 book across 27 names that residue compounded into
-    roughly a fifth of the portfolio sitting in cash against a design
-    target of zero."""
+class TestWholeShareSizing:
+    """The book holds whole shares, because the broker it is copied
+    into sells whole shares. The remainder of each position stays in
+    cash and the names a $10,000 book cannot afford at all give their
+    weight to the names it can."""
 
-    def test_equal_weight_book_deploys_its_cash(self, runner: DailyRunner) -> None:
+    def test_equal_weight_book_holds_every_affordable_name(
+        self, runner: DailyRunner
+    ) -> None:
         n = 27
         weight = 1.0 / n
         # Deliberately awkward prices — the whole-share remainder is
-        # worst when the price does not divide the slot.
+        # worst when the price does not divide the slot. Every one is
+        # under the $370 slot, so none is out of reach.
         prices = {f"T{i:02d}": 37.0 + i * 11.3 for i in range(n)}
+        assert max(prices.values()) < 10_000.0 * weight
         targets = [
             _target(t, weight=weight, rank=i + 1)
             for i, t in enumerate(sorted(prices))
@@ -465,15 +470,27 @@ class TestFractionalSizing:
 
         p = result.portfolio
         assert len(p.positions) == n
-        cash_pct = p.cash / p.total_nav * 100.0
-        assert cash_pct < 1.0, f"{cash_pct:.2f}% left idle"
         for pos in p.positions:
-            assert pos.weight_pct == pytest.approx(100.0 / n, abs=0.10)
+            assert pos.shares == float(int(pos.shares)), f"{pos.ticker} fractional"
+        # Flooring 27 positions strands 20.1% of this book in cash —
+        # measured, with these prices. The residue pass spends it down
+        # to 2.5%. It does not reach zero and should not: the band caps
+        # the top-up, so a $331 share in a $370 slot cannot take a
+        # second one and its $40 stays put. 4% is the ceiling this
+        # asserts; 20% is the number it exists to prevent.
+        cash_pct = p.cash / p.total_nav * 100.0
+        assert cash_pct < 4.0, f"{cash_pct:.2f}% left idle"
+        # Nothing was pushed past the band in the process.
+        for pos in p.positions:
+            assert pos.weight_pct <= (100.0 / n) * 1.25 + 0.01
 
-    def test_a_slot_smaller_than_one_share_still_fills(
+    def test_a_name_no_share_of_which_fits_is_left_alone(
         self, runner: DailyRunner
     ) -> None:
-        # $10,000 / 30 = $333 per slot. A $2,000 share used to buy zero.
+        # $10,000 / 30 = $333 per slot against a $2,000 share. It is the
+        # only name on the list, so there is nowhere for the money to go
+        # and the book stays in cash — which is the honest answer, not a
+        # third of a share.
         runner.price_loader = _StubPriceLoader({"PRICEY": 2_000.0})  # type: ignore[assignment]
         adapter = _StubAdapter("stub_agent", [_target("PRICEY", weight=1 / 30)])
 
@@ -485,8 +502,94 @@ class TestFractionalSizing:
             {"PRICEY": None},
         )
 
-        assert result.portfolio.has("PRICEY")
-        assert result.portfolio.positions[0].shares < 1.0
+        assert not result.portfolio.has("PRICEY")
+        assert result.portfolio.cash == pytest.approx(10_000.0)
+
+    def test_an_unreachable_name_hands_its_weight_to_the_rest(
+        self, runner: DailyRunner
+    ) -> None:
+        """The regression this class exists for.
+
+        Four equal 25% slots on $10,000 is $2,500 each. One name costs
+        $4,000 a share and cannot be held. Sizing the other three at
+        their original $2,500 would leave $2,500 — a quarter of the book
+        — idle. They are resized to a third of the book each instead,
+        which is what an investor told "you cannot buy this one" does.
+        """
+        prices = {"CHEAP1": 100.0, "CHEAP2": 100.0, "CHEAP3": 100.0, "DEAR": 4_000.0}
+        targets = [
+            _target(t, weight=0.25, rank=i + 1)
+            for i, t in enumerate(["DEAR", "CHEAP1", "CHEAP2", "CHEAP3"])
+        ]
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", targets)
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        p = result.portfolio
+        assert not p.has("DEAR")
+        assert {pos.ticker for pos in p.positions} == {"CHEAP1", "CHEAP2", "CHEAP3"}
+        # $3,333 each at $100 a share is 33 shares, not the 25 that the
+        # original quarter-weight slot would have bought.
+        for pos in p.positions:
+            assert pos.shares == 33.0
+        assert p.cash / p.total_nav * 100.0 < 2.0
+
+    def test_dropping_one_name_can_bring_another_back_in_reach(self) -> None:
+        """Names are dropped one at a time, not as a set.
+
+        Two $600 shares against two 50% slots of a $1,000 book: both are
+        out of reach at $500 a slot. Removing one takes the survivor's
+        slot to $1,000, which covers it. Dropping the unaffordable set
+        in one pass would have left the book empty.
+        """
+        targets = [
+            _target("A", weight=0.5, rank=1),
+            _target("B", weight=0.5, rank=2),
+        ]
+        kept = reachable_targets(
+            targets, {"A": 600.0, "B": 600.0}, nav=1_000.0
+        )
+        assert len(kept) == 1
+        assert kept[0].weight == pytest.approx(1.0)
+
+    def test_a_held_name_is_never_dropped_for_price(self) -> None:
+        """Affordability is an entry question, not a holding question.
+
+        A name bought at $50 that has run to $600 is above its slot, but
+        the cash is already in it. Dropping it would hand the exit
+        decision to the sizing pass, which has no view on whether to
+        sell.
+        """
+        targets = [
+            _target("RAN", weight=0.5, rank=1),
+            _target("FLAT", weight=0.5, rank=2),
+        ]
+        kept = reachable_targets(
+            targets,
+            {"RAN": 600.0, "FLAT": 100.0},
+            nav=1_000.0,
+            held=frozenset({"RAN"}),
+        )
+        assert {t.ticker for t in kept} == {"RAN", "FLAT"}
+        assert sum(t.weight for t in kept) == pytest.approx(1.0)
+
+    def test_an_unpriced_name_is_passed_through_untouched(self) -> None:
+        """No price is not the same as too expensive.
+
+        The buy loop has its own "cannot buy, no price" branch and logs
+        a warning there. Silently dropping the name here would turn a
+        data problem into a sizing decision and hide it.
+        """
+        targets = [_target("A", weight=0.5), _target("NOPRICE", weight=0.5)]
+        kept = reachable_targets(targets, {"A": 10.0, "NOPRICE": None}, nav=1_000.0)
+        assert [t.ticker for t in kept] == ["A"]
 
 
 class TestRebalanceBand:
@@ -549,7 +652,14 @@ class TestRebalanceBand:
         # The line is trimmed, not closed.
         assert result.portfolio.has("DRIFT")
         pos = result.portfolio.positions[0]
-        assert pos.weight_pct == pytest.approx(50.0, abs=1.0)
+        # A whole-share trim lands within one share of target, not on
+        # it: the ideal trim is 16.67 shares, so 16 go and the position
+        # sits at 34 × $300 = 51.0% of a $20,000 NAV. One share is 1.5%
+        # of this book, which is the tolerance — tightening it below
+        # that would be asserting a fraction can be sold.
+        one_share_pct = 300.0 / result.portfolio.total_nav * 100.0
+        assert pos.weight_pct == pytest.approx(50.0, abs=one_share_pct)
+        assert pos.shares == float(int(pos.shares))
 
     def test_a_trim_keeps_the_original_cost_basis(
         self, runner: DailyRunner
@@ -1860,6 +1970,46 @@ class TestTheQuarterlyRebalanceTradesACooledOffList:
         bought = [t.ticker for t in result.trades if t.side == "BUY"]
         assert bought == ["COOLED"]
         assert "FRESH" not in bought
+
+    def test_a_name_on_both_lists_is_rebalanced_to_its_published_weight(
+        self, runner: DailyRunner
+    ) -> None:
+        """The common case, and it used to raise.
+
+        Most names survive a quarter, so most of a published list is
+        still in today's scan. The code reused today's LiveTarget and
+        assigned the published weight onto it — but LiveTarget is
+        frozen, so that is a FrozenInstanceError, caught by the
+        per-agent guard and reported as a failed run. Every quarterly
+        rebalance whose list overlapped the current scan failed this
+        way, and the only reason the suite stayed green is that its one
+        test published a ticker today's scan did not name.
+        """
+        self._fresh_book().save(directory=runner.portfolio_dir)
+        publish(
+            PublishedList(
+                published_on=AS_OF - timedelta(days=30),
+                as_of=AS_OF - timedelta(days=30),
+                tickers=("BOTH",),
+                # Deliberately not the weight today's scan carries.
+                weights={"BOTH": 0.25},
+                note="last quarter's rank",
+            ),
+            directory=runner.published_dir,
+        )
+
+        result = self._run(
+            runner,
+            self._council([_target("BOTH", weight=0.5)]),
+            {"BOTH": 50.0},
+        )
+
+        assert result.error is None
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert [t.ticker for t in buys] == ["BOTH"]
+        # $10,000 at the published 25% is $2,500, which buys 50 shares
+        # at $50 — not the 100 that today's 50% weight would have.
+        assert buys[0].shares == 50.0
 
     def test_the_rebalance_is_stamped_so_it_happens_once(
         self, runner: DailyRunner
