@@ -327,6 +327,75 @@ test("whatever safeNext returns stays on this origin", async () => {
   }
 });
 
+test("normalisation cannot produce an origin the input did not have", async () => {
+  // The second hole, and the same mistake one level in. The origin
+  // check looks at the *input*; collapsing `.` and `..` segments can
+  // *produce* a leading `//` in the output. `/a/..//evil.example` parses
+  // with an origin of SELF — the base supplied it — and a pathname of
+  // `//evil.example`, which a browser then resolves off-site. Six
+  // inputs reached https://evil.example through a guard built to stop
+  // exactly that.
+  for (const raw of [
+    "/.//evil.example",
+    "/a/..//evil.example",
+    "/%2e//evil.example",
+    "/a/b/../..//evil.example",
+    "/./././//evil.example",
+    "/a/..///evil.example",
+  ]) {
+    assert.equal(safeNext(raw), "/he/", raw);
+  }
+});
+
+test("no combination of path syntax escapes this origin", async () => {
+  // Generated, not listed. Twice the guard was wrong and twice the
+  // test that should have caught it was the right shape with an input
+  // set that came out of my head — `/a/../b` was in it, and
+  // `/a/..//evil.example` was not.
+  //
+  // So the inputs are built from the fragments that matter, in every
+  // order, and the property is asserted over all of them. The next
+  // variant of this fails here rather than in a Location header.
+  const SITE = "https://council.pages.dev";
+  const FRAGMENTS = [
+    "/", "//", "///", ".", "..", "%2e", "%2e%2e", "%2f", "\\",
+    "\t", "\n", "\r", " ", "a", "evil.example", "@evil.example", ":",
+  ];
+
+  let checked = 0;
+  const build = (parts) => parts.join("");
+  for (const a of FRAGMENTS) {
+    for (const b of FRAGMENTS) {
+      for (const c of FRAGMENTS) {
+        for (const candidate of [
+          build(["/", a, b, c]),
+          build(["/", a, "/", b, c]),
+          build(["/he/", a, b, "/", c]),
+        ]) {
+          const out = safeNext(candidate);
+          checked++;
+          assert.ok(
+            typeof out === "string" && out.startsWith("/"),
+            `${JSON.stringify(candidate)} -> ${JSON.stringify(out)}`,
+          );
+          let origin;
+          try {
+            origin = new URL(out, SITE).origin;
+          } catch {
+            origin = "(unparseable)";
+          }
+          assert.equal(
+            origin,
+            SITE,
+            `${JSON.stringify(candidate)} -> ${JSON.stringify(out)} -> ${origin}`,
+          );
+        }
+      }
+    }
+  }
+  assert.ok(checked > 10_000, `only ${checked} combinations checked`);
+});
+
 test("a legitimate path survives intact", async () => {
   assert.equal(safeNext("/he/agents/john_neff/"), "/he/agents/john_neff/");
   assert.equal(
