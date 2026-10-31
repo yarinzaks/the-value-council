@@ -299,3 +299,92 @@ export function translateExitTrigger(text: string, locale: Locale): string {
   }
   return applyRules(text, CRITERIA_RULES);
 }
+
+// ---- Memo fields, for the brain page ---------------------------------------
+//
+// The page rendered the memo as a key/value dump with `key.replace(/_/g, " ")`
+// for the label, so every one of the 123 fields a memo can carry was
+// titled in raw English — "thesis en", "moat analysis", "fifteen points
+// score". And it showed `thesis_en` *and* `thesis_he` side by side, the
+// Hebrew already written and the English next to it.
+
+/** Field name → Hebrew label. Nested fields are keyed `parent.child`. */
+const MEMO_FIELDS = hebrew.memo_fields as Record<string, string>;
+
+/** Enum value → Hebrew, matched **whole** and never as a substring.
+ *
+ *  A substring rule on a short word is a trap here: "Fair" would rewrite
+ *  the middle of "Fairfax", "stable" the middle of "positive_stable",
+ *  and "CALM" is Cal-Maine Foods before it is an adjective. Whole value
+ *  or nothing. */
+const MEMO_VALUES = hebrew.memo_values as Record<string, string>;
+
+/**
+ * A memo's value, in Hebrew where it is one of the analyst's enums.
+ *
+ * The exact map first, then the phrase table for anything longer — an
+ * exit trigger, a sentence. A ticker, a standard abbreviation and the
+ * investors' own quotations fall through both and stay as written,
+ * which is correct: Fisher's playbook says outright that his quotes
+ * stay in English to preserve accuracy.
+ */
+export function memoValue(value: string, locale: Locale): string {
+  if (locale !== "he") return value;
+  const exact = MEMO_VALUES[value.trim()];
+  if (exact !== undefined) return exact;
+  return translateCriterion(value, locale);
+}
+
+/**
+ * The label for a memo field.
+ *
+ * `path` is the dotted path, so a nested `scaling_out_plan.full_exit_price`
+ * is labelled as itself rather than as whatever `full_exit_price` means
+ * somewhere else. Falls back to the old underscore-stripping, so a field
+ * a new agent schema introduces is readable rather than blank — and the
+ * test that walks the live memos names it.
+ */
+export function memoFieldLabel(path: string, locale: Locale): string {
+  if (locale !== "he") return path.split(".").pop()!.replace(/_/g, " ");
+  const label = MEMO_FIELDS[path] ?? MEMO_FIELDS[path.split(".").pop()!];
+  return label ?? path.split(".").pop()!.replace(/_/g, " ");
+}
+
+/**
+ * The memo's fields, with the reader's language picked where the analyst
+ * wrote both.
+ *
+ * Five agents' schemas carry `thesis_en` and `thesis_he` — 180 memos, the
+ * Hebrew already there. Showing both is showing the reader a language
+ * they did not ask for, beside the one they did. So the twin that matches
+ * the locale is kept under the bare name and the other is dropped.
+ *
+ * Fields the analyst writes in only one language are left alone. Making
+ * those bilingual is a change to the five playbooks and a re-run, not
+ * something this function can do.
+ */
+export function memoEntries(
+  memo: Record<string, unknown>,
+  locale: Locale,
+): [string, unknown][] {
+  const wanted = locale === "he" ? "_he" : "_en";
+  const other = locale === "he" ? "_en" : "_he";
+  const out: [string, unknown][] = [];
+  const seen = new Set<string>();
+  for (const [key, value] of Object.entries(memo ?? {})) {
+    if (key.endsWith(other)) {
+      const base = key.slice(0, -3);
+      // Only drop it when the twin is actually present.
+      if (`${base}${wanted}` in memo) continue;
+    }
+    if (key.endsWith(wanted)) {
+      const base = key.slice(0, -3);
+      if (seen.has(base)) continue;
+      seen.add(base);
+      out.push([`${base}${wanted}`, value]);
+      continue;
+    }
+    out.push([key, value]);
+  }
+  return out;
+}
