@@ -152,6 +152,157 @@ def pos_age_days(pos: Position, as_of: date) -> int | None:
     return max(0, (as_of - entry).days)
 
 
+def reachable_targets(
+    targets: Sequence[LiveTarget],
+    prices: dict[str, float | None],
+    nav: float,
+    held: frozenset[str] = frozenset(),
+) -> list[LiveTarget]:
+    """``targets`` reduced to the names this book can hold a share of.
+
+    A $10,000 book divided 27 ways is a $370 slot, and one share of Eli
+    Lilly is $810. The name is not expensive relative to its worth — it
+    is expensive relative to the book, and no amount of conviction buys
+    a third of a share from a broker that sells whole ones.
+
+    The question is what happens to that $370. Leaving it in cash is
+    one answer and it is the wrong one: the money was never earmarked
+    for Lilly specifically, it was earmarked for *a position*, and an
+    investor told "you cannot buy this one" puts it into the next name
+    on the same list rather than under the mattress. So an unreachable
+    name is dropped and the survivors' weights are scaled back up to
+    the same invested total.
+
+    Dropping is iterative and one name at a time, worst offender first,
+    because dropping one widens every remaining slot and may bring a
+    second name back within reach. Discarding the whole unaffordable
+    set in one pass would throw away names the first removal had
+    already fixed.
+
+    Names already in ``held`` are never dropped. The cash is in them
+    already, and re-deciding their affordability would sell a position
+    over a price move — the exit path's business, not sizing's.
+
+    A book with no reachable name at all returns an empty list and
+    stays in cash. That is the honest outcome for a small book pointed
+    at a list of expensive names, and the agents it happens to should
+    show it rather than have it modelled away.
+    """
+    priced = [t for t in targets if (prices.get(t.ticker) or 0.0) > 0.0]
+    invested = sum(t.weight for t in priced)
+    if not priced or nav <= 0 or invested <= 0:
+        return list(priced)
+
+    kept = list(priced)
+    while True:
+        scale = invested / sum(t.weight for t in kept)
+        # Worst offender: the biggest shortfall relative to its own
+        # slot, so a name missing by tenfold goes before one missing by
+        # a tenth.
+        worst: tuple[float, LiveTarget, float] | None = None
+        for t in kept:
+            if t.ticker in held:
+                continue
+            price = prices[t.ticker] or 0.0
+            slot = nav * t.weight * scale
+            if slot <= 0 or price <= slot:
+                continue
+            ratio = price / slot
+            if worst is None or ratio > worst[0]:
+                worst = (ratio, t, slot)
+        if worst is None:
+            break
+        _, dropped, slot = worst
+        logger.info(
+            f"{dropped.ticker} out of reach — one share is "
+            f"${prices[dropped.ticker]:,.2f} against a ${slot:,.2f} slot; "
+            f"its weight goes to the {len(kept) - 1} name(s) that fit"
+        )
+        kept = [t for t in kept if t.ticker != dropped.ticker]
+        if not kept:
+            return []
+
+    scale = invested / sum(t.weight for t in kept)
+    if scale == 1.0:
+        return kept
+    return [replace(t, weight=t.weight * scale) for t in kept]
+
+
+def plan_whole_share_buys(
+    targets: Sequence[LiveTarget],
+    prices: dict[str, float | None],
+    nav: float,
+    cash: float,
+    *,
+    cost_bps: float,
+    band: float,
+) -> dict[str, int]:
+    """How many whole shares of each target to buy, decided in one pass.
+
+    Flooring each slot on its own strands up to one share's price per
+    name. Across 27 names priced $37 to $331 against a $370 slot that is
+    20.1% of the book in cash — measured, not estimated — and no
+    investor here held a fifth of their book in cash by accident.
+
+    So the remainders are pooled and spent, one share at a time, on
+    whichever name is furthest below its slot in dollars. That is
+    largest-remainder apportionment: the rule a person uses on the last
+    $2,000, which is to top up whatever is most short.
+
+    Decided here, in full, rather than executed as a second round of
+    trades. A top-up pass that bought again would put two BUY rows on
+    one position in one day — two ledger entries, two notification
+    lines, two decision records — for a single decision to hold N
+    shares. The caller gets one number per ticker and places one trade.
+
+    ``band`` is the ceiling, as a fraction above the slot. A share that
+    would carry a position past it is refused, because the next run's
+    rebalance would only sell it back, and buying into a trim is worse
+    than holding the cash. That ceiling is why the residue is
+    irreducible rather than zero: a $331 share in a $370 slot cannot
+    take a second one without reaching 179% of its target, so its $40
+    stays in cash — visibly, which is the point.
+    """
+    per_share: dict[str, float] = {}
+    for t in targets:
+        price = prices.get(t.ticker) or 0.0
+        if price > 0 and t.weight > 0:
+            per_share[t.ticker] = price * (1.0 + cost_bps)
+    if not per_share or nav <= 0 or cash <= 0:
+        return {}
+
+    slots = {t.ticker: nav * t.weight for t in targets if t.ticker in per_share}
+    ceiling = {tk: slot * (1.0 + band) for tk, slot in slots.items()}
+
+    shares: dict[str, int] = {}
+    spent = 0.0
+    for tk, slot in slots.items():
+        n = int(min(slot, cash) // per_share[tk])
+        shares[tk] = n
+        spent += n * per_share[tk]
+
+    # The pooled remainder, one share at a time, to the biggest gap.
+    while True:
+        remaining = cash - spent
+        best: tuple[float, str] | None = None
+        for tk, slot in slots.items():
+            outlay = per_share[tk]
+            if outlay > remaining:
+                continue
+            held_value = (shares[tk] + 1) * outlay
+            if held_value > ceiling[tk]:
+                continue
+            gap = slot - shares[tk] * outlay
+            if gap <= 0:
+                continue
+            if best is None or gap > best[0]:
+                best = (gap, tk)
+        if best is None:
+            return {tk: n for tk, n in shares.items() if n > 0}
+        shares[best[1]] += 1
+        spent += per_share[best[1]]
+
+
 def _parse_date(value: str) -> date | None:
     """An ISO date, or ``None`` when the field is empty or unreadable."""
     if not value:
@@ -999,6 +1150,29 @@ class DailyRunner:
         # Each target's notional is target.weight × NAV. The strategies
         # produce equal weights so this is uniform; we honour whatever
         # weight was set just in case.
+        #
+        # First, drop the names a book this size cannot hold a share of
+        # and give their weight to the ones it can. The same list then
+        # feeds the rebalance pass — sizing and the band have to agree
+        # on what a target weight is, or the band spends every run
+        # trimming a position the sizing pass deliberately widened.
+        scan.targets = reachable_targets(
+            scan.targets,
+            prices,
+            nav_after_sells,
+            held=frozenset(pos.ticker for pos in portfolio.positions),
+        )
+        # Then decide the share count for every new name together, so
+        # the remainder one slot cannot round up becomes a share in the
+        # slot that needs it most.
+        plan = plan_whole_share_buys(
+            [t for t in scan.targets if not portfolio.has(t.ticker)],
+            prices,
+            nav_after_sells,
+            portfolio.cash,
+            cost_bps=self.cost_bps,
+            band=self.rebalance_band,
+        )
         for target in scan.targets:
             if portfolio.has(target.ticker):
                 # Refresh the why string on the existing position so the
@@ -1014,13 +1188,19 @@ class DailyRunner:
                     f"{as_of}: cannot buy {target.ticker} — no price"
                 )
                 continue
-            target_dollars = nav_after_sells * target.weight
+            want_shares = plan.get(target.ticker, 0)
+            if want_shares <= 0:
+                # No whole share of this name fits what is left. The
+                # allocator has already said so and said why; repeating
+                # it per ticker here would log the same fact twice.
+                continue
+            # The plan is in shares; buy() takes dollars. One cent of
+            # headroom absorbs the float error in price × shares × cost
+            # without being able to buy an extra share of anything that
+            # trades above a cent.
+            target_dollars = want_shares * price * (1.0 + self.cost_bps) + 0.01
             if target_dollars > portfolio.cash:
-                target_dollars = portfolio.cash * 0.99  # leave a sliver for cost
-            # Was `target_dollars < price` — a $50 slot in a $500 stock
-            # bought nothing and the cash sat idle. Fractional shares
-            # make any positive target executable; the floor now only
-            # rejects amounts too small to be worth a trade.
+                target_dollars = portfolio.cash
             if target_dollars < MIN_TRADE_USD:
                 logger.info(
                     f"{as_of}: skipping {target.ticker} — target "
@@ -1324,6 +1504,10 @@ class DailyRunner:
             if delta < MIN_TRADE_USD:
                 continue
             if drift > 0:
+                if delta < price:
+                    # Less than one share of drift. Trimming would need a
+                    # fraction, and leaving it is what a real book does.
+                    continue
                 trims.append((target.ticker, price, delta / price))
             else:
                 adds.append((target.ticker, price, delta))
@@ -1342,7 +1526,10 @@ class DailyRunner:
 
         for ticker, price, dollars in adds:
             spend = min(dollars, portfolio.cash * 0.99)
-            if spend < MIN_TRADE_USD:
+            if spend < MIN_TRADE_USD or spend < price:
+                # Under a share's price there is no trade to make, and
+                # the drift stays until the next run — which is correct:
+                # a band cannot be closed with less than one share.
                 continue
             try:
                 out.append(

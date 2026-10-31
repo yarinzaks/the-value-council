@@ -14,6 +14,7 @@ adapter at trade time.
 from __future__ import annotations
 
 import json
+import math
 import tempfile
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field, replace
@@ -248,7 +249,16 @@ class LivePortfolio:
                 raise LivePortfolioError(
                     f"non-positive sell quantity for {ticker}: {shares}"
                 )
-            sold = round(min(shares, pos.shares), SHARE_PRECISION)
+            # Floored, for the same reason a buy is: a trim is a sale of
+            # whole shares. A full exit passes ``shares=None`` and sells
+            # the line entire, which is how a legacy fractional holding
+            # leaves the book without needing a fractional trade.
+            wanted = min(shares, pos.shares)
+            sold = float(math.floor(wanted))
+            if sold <= 0:
+                raise LivePortfolioError(
+                    f"trim of {ticker} is {wanted:.4f} shares, less than one"
+                )
 
         remaining = round(pos.shares - sold, SHARE_PRECISION)
         if remaining <= 0:
@@ -404,16 +414,25 @@ class LivePortfolio:
         why_he: str,
         cost_bps: float = DEFAULT_COST_BPS,
     ) -> TradeRecord:
-        """Buy ``ticker`` for at most ``target_dollars`` notional.
+        """Buy whole shares of ``ticker`` for at most ``target_dollars``.
 
-        Sizes fractional shares. Whole-share rounding used to discard
-        the remainder of every position, and on a $10,000 book spread
-        across 27 names the residue compounded into roughly a fifth of
-        the portfolio sitting in cash against a design target of zero —
-        an accounting artifact large enough to dominate the return
-        difference between two agents. Every real broker has offered
-        fractional shares for years; the constraint was ours, not the
-        market's.
+        Whole shares, because the founder's broker sells whole shares. A
+        paper book exists to be copied, and one holding 0.414 of a share
+        of Seaboard is recording a trade nobody can place.
+
+        This was fractional for a while and the reason was real: whole
+        shares leave a remainder in every position, and on a $10,000
+        book that residue is not small. Measured across the thirteen
+        live books before this change, holding whole shares instead
+        would have left between 1% and 72% of each in idle cash, and put
+        some names out of reach entirely — a single Seaboard share is
+        $4,283 against a $1,700 slot.
+
+        Both of those are now true and visible rather than modelled
+        away. Cash a book cannot deploy is a fact about trading $10,000,
+        not an accounting artifact, and a reader comparing two agents
+        should see it. What they must not see is a position they could
+        not have opened.
 
         Costs are taken on top of notional, so ``target_dollars`` is the
         limit including fees.
@@ -431,11 +450,14 @@ class LivePortfolio:
             )
         # Solve: notional + notional*cost_bps <= target_dollars  →  notional max.
         max_notional = target_dollars / (1.0 + cost_bps)
-        shares_bought = round(max_notional / price, SHARE_PRECISION)
+        # Floor, never round: rounding up buys a share the cash does not
+        # cover, and the check below would then reject the whole trade
+        # for an off-by-one the caller could not have anticipated.
+        shares_bought = float(math.floor(max_notional / price))
         if shares_bought <= 0:
             raise LivePortfolioError(
                 f"${target_dollars:.2f} target on {ticker} at ${price:.2f} "
-                f"rounds to zero shares"
+                f"buys no whole share"
             )
         gross = shares_bought * price
         cost = gross * cost_bps
