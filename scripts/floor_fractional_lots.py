@@ -108,7 +108,13 @@ def floor_one(portfolio: LivePortfolio) -> tuple[float, list[tuple[str, float, f
         kept.append(pos)
 
     portfolio.positions = kept
-    portfolio.cash = round(portfolio.cash + freed, 2)
+    # Not rounded to the cent. A fraction of a share is not a whole
+    # number of cents — 0.007184 of Lam Research at $239.11 is
+    # $1.71757 — and rounding it moved three books' cumulative return
+    # in the fourth decimal place. The point of this migration is that
+    # it restates nothing, so the cent stays where the arithmetic puts
+    # it.
+    portfolio.cash += freed
     return freed, changes
 
 
