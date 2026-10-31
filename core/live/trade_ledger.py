@@ -66,7 +66,19 @@ class LedgerEntry:
     #: price the sale actually got. The two must stay distinguishable
     #: on the page as well as in the file — a reconstruction shown as
     #: a record is worse than no reconstruction.
+    #:
+    #: ``caught-up`` is a third thing: exact like ``executed``, from
+    #: the same code against the same session's prices, but performed
+    #: on a later calendar day because the scheduled run did not. The
+    #: row's ``date`` is the session it belongs to, so nothing here
+    #: trades on a day the market was shut — but a reader finding a
+    #: Friday trade whose book was written on a Saturday deserves to
+    #: be told which Saturday and why, rather than having to work it
+    #: out from two timestamps that happen not to match.
     source: str = "executed"
+    #: The wall-clock date the row was written, when that is not the
+    #: session it describes. Absent on an ordinary same-day run.
+    recorded_on: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -80,6 +92,7 @@ class LedgerEntry:
             "cost_paid": round(self.cost_paid, 4),
             "realized_pnl_usd": round(self.realized_pnl_usd, 2),
             "source": self.source,
+            **({"recorded_on": self.recorded_on} if self.recorded_on else {}),
         }
 
     @classmethod
@@ -95,6 +108,9 @@ class LedgerEntry:
             cost_paid=float(data.get("cost_paid", 0.0)),
             realized_pnl_usd=float(data.get("realized_pnl_usd", 0.0)),
             source=str(data.get("source", "executed")),
+            recorded_on=(
+                str(data["recorded_on"]) if data.get("recorded_on") else None
+            ),
         )
 
 
@@ -104,13 +120,22 @@ def record_day(
     trades: Iterable[TradeRecord],
     *,
     directory: Path,
+    recorded_on: date | None = None,
 ) -> Path | None:
     """Write one day's executed trades. ``None`` when there were none.
 
     A day with no trades writes no file rather than an empty one, so the
     ledger's directory listing is the list of days this agent actually
     traded — which is the question most often asked of it.
+
+    ``recorded_on`` is the wall-clock date, and is only written down
+    when it differs from ``as_of`` — a run catching up a session the
+    schedule missed. The rows are still dated to the session, so the
+    ledger never claims a trade on a day the market was shut; the
+    marker is there so a reader who notices the book was written later
+    finds the answer in the file instead of inferring it.
     """
+    late = recorded_on is not None and recorded_on != as_of
     rows = [
         LedgerEntry(
             date=as_of.isoformat(),
@@ -122,6 +147,8 @@ def record_day(
             gross_value=t.gross_value,
             cost_paid=t.cost_paid,
             realized_pnl_usd=t.realized_pnl_usd,
+            source="caught-up" if late else "executed",
+            recorded_on=recorded_on.isoformat() if late else None,
         )
         for t in trades
     ]
