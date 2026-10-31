@@ -23,7 +23,7 @@ import pytest
 from pydantic import BaseModel, SecretStr
 
 from core.exceptions import LLMError
-from core.llm.claude_client import ClaudeClient
+from core.llm.claude_client import DEFAULT_MODEL, ClaudeClient
 from core.llm.memo_log import MemoLog
 
 
@@ -272,7 +272,10 @@ class TestEveryMemoIsRecorded:
         c.complete_memo(system="s", prompt="p" * 40, schema=Memo, agent="a_book")
 
         got = c._memo_log.read_all_for_agent("a_book")[0]
-        assert got.model == "claude-opus-5-5"
+        # Against the constant, not a literal: which model the layer
+        # runs on is a decision that gets revisited, and a record that
+        # named the wrong one would be worse than one naming none.
+        assert got.model == DEFAULT_MODEL
         assert got.prompt_chars == 40
         assert got.prompt_sha256 and len(got.prompt_sha256) == 64
 

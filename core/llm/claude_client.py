@@ -69,10 +69,23 @@ from core.logger import get_logger
 
 logger = get_logger("core.llm.claude_client")
 
-#: Opus 5.5 — the judgment these memos ask for is the kind worth the
-#: better model, and the brain runs once a day per agent rather than
-#: once per quote.
-DEFAULT_MODEL: str = "claude-opus-5-5"
+#: Sonnet 5.5, chosen against Opus on a measured comparison rather than
+#: on the usual assumption that the better model is worth it here.
+#:
+#: Both were asked for the same Buffett memo on the same holding. Opus
+#: took 40.2 seconds and 3,222 output tokens to return HOLD. Sonnet took
+#: 14.6 and 1,794 to return REJECT — and gave the better answer: the
+#: snapshot carries no earnings history, so an intrinsic value cannot be
+#: computed from it, and Sonnet said so in as many words where Opus
+#: silently reported $0.00.
+#:
+#: Across the five hybrid agents a run is about ninety-eight calls.
+#: Opus: $7.19 a run, $151 a month, 65 minutes if run end to end.
+#: Sonnet: $2.20, $46, and 24 minutes. The judgment is not obviously
+#: worse and the budget and the clock are both comfortable instead of
+#: both strained, so a daily job that must finish inside a scan's
+#: remaining time gets the faster one.
+DEFAULT_MODEL: str = "claude-sonnet-5-5"
 
 #: Enough for the longest memo any agent defines. Fisher's carries a
 #: verdict and a note for each of fifteen points; the rest are shorter.
