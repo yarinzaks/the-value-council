@@ -36,6 +36,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 from .filters import (
@@ -97,6 +98,7 @@ class PhilipFisher(Strategy):
         max_de: float = DEFAULT_MAX_DE,
         max_portfolio_size: int = DEFAULT_MAX_PORTFOLIO_SIZE,
         scuttlebutt_analyzer: ScuttlebuttAnalyzer | None = None,
+        llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if min_market_cap <= 0:
@@ -114,6 +116,7 @@ class PhilipFisher(Strategy):
         self.max_de = max_de
         self.max_portfolio_size = max_portfolio_size
         self.scuttlebutt_analyzer = scuttlebutt_analyzer
+        self.llm_mode = llm_mode
         self.decision_logger = decision_logger
         self.selection_history: list[FisherSelection] = []
         self.last_memos: list[FisherMemo] = []
@@ -292,6 +295,12 @@ class PhilipFisher(Strategy):
                 kept.append(s)
                 continue
             memos.append(memo)
+            if not self.llm_mode.may_drop_a_name:
+                # Shadow: the memo is on disk and on /brain, and the
+                # screen's own selection stands. Asking what the layer
+                # would have said used to mean living with the answer.
+                kept.append(s)
+                continue
             # Fisher's hard rule: integrity is non-negotiable.
             if not memo.integrity_check_passed:
                 logger.info(

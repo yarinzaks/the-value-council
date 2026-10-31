@@ -39,6 +39,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 from .downside import DownsideAnalyzer, KlarmanMemo
@@ -133,6 +134,7 @@ class SethKlarman(Strategy):
         max_portfolio_size: int = DEFAULT_MAX_PORTFOLIO_SIZE,
         max_position_pct: float = DEFAULT_MAX_POSITION_PCT,
         downside_analyzer: DownsideAnalyzer | None = None,
+        llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if min_market_cap <= 0:
@@ -156,6 +158,7 @@ class SethKlarman(Strategy):
         self.max_portfolio_size = max_portfolio_size
         self.max_position_pct = max_position_pct
         self.downside_analyzer = downside_analyzer
+        self.llm_mode = llm_mode
         self.decision_logger = decision_logger
         self.selection_history: list[KlarmanSelection] = []
         self.last_memos: list[KlarmanMemo] = []
@@ -311,6 +314,12 @@ class SethKlarman(Strategy):
                 kept.append(s)
                 continue
             memos.append(memo)
+            if not self.llm_mode.may_drop_a_name:
+                # Shadow: the memo is on disk and on /brain, and the
+                # screen's own selection stands. Asking what the layer
+                # would have said used to mean living with the answer.
+                kept.append(s)
+                continue
             if memo.decision in ("BUY", "HOLD"):
                 kept.append(s)
             else:

@@ -42,6 +42,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 from .category_classifier import CategoryClassifier, LynchMemo
@@ -171,6 +172,7 @@ class PeterLynch(Strategy):
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
         max_de: float = DEFAULT_MAX_DE,
         category_classifier: CategoryClassifier | None = None,
+        llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -186,6 +188,7 @@ class PeterLynch(Strategy):
         self.min_market_cap = min_market_cap
         self.max_de = max_de
         self.category_classifier = category_classifier
+        self.llm_mode = llm_mode
         self.decision_logger = decision_logger
         self.selection_history: list[LynchSelection] = []
         self.last_memos: list[LynchMemo] = []
@@ -340,6 +343,12 @@ class PeterLynch(Strategy):
                 kept.append(s)
                 continue
             memos.append(memo)
+            if not self.llm_mode.may_drop_a_name:
+                # Shadow: the memo is on disk and on /brain, and the
+                # screen's own selection stands. Asking what the layer
+                # would have said used to mean living with the answer.
+                kept.append(s)
+                continue
             if memo.decision in ("BUY", "HOLD"):
                 kept.append(s)
             else:
