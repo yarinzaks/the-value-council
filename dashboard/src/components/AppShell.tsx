@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useUI } from "./Providers";
+import { formatRelativeTime } from "../lib/timestamps";
 
 const NAV = [
   { href: "/", key: "nav_overview" },
@@ -52,17 +54,69 @@ function ThemeIcon({ dark }: { dark: boolean }) {
   );
 }
 
+/** "Last updated", rendered against the reader's clock rather than the
+ *  build's.
+ *
+ *  First paint is the absolute stamp the server computed, so the HTML
+ *  is stable and hydration has nothing to disagree about. The effect
+ *  then replaces it with the relative form — "today 16:35", "3 days
+ *  ago" — using the browser's real `now`. In a static export that is
+ *  the only clock that is not frozen: the published site rendered a
+ *  relative label at build time and said "today 13:31" for two and a
+ *  half months.
+ */
+function LastUpdated({
+  iso,
+  absolute,
+  locale,
+  stale,
+  label,
+}: {
+  iso: string;
+  absolute: string;
+  locale: "en" | "he";
+  stale: boolean;
+  label: string;
+}) {
+  const [shown, setShown] = useState(absolute);
+  useEffect(() => {
+    if (!iso) return;
+    const tick = () => setShown(formatRelativeTime(iso, locale, new Date()));
+    tick();
+    // A page left open overnight should stop claiming it is current.
+    const timer = setInterval(tick, 60_000);
+    return () => clearInterval(timer);
+  }, [iso, locale]);
+
+  if (!iso) return null;
+  return (
+    <span
+      className={`text-xs whitespace-nowrap me-1 ${
+        stale ? "text-rose-600 dark:text-rose-400 font-medium" : "text-muted"
+      }`}
+      // The exact instant, for a reader who wants it rather than a
+      // rounded "3 days ago".
+      title={absolute}
+    >
+      {label}: {shown}
+    </span>
+  );
+}
+
 export function AppShell({
   children,
-  lastSyncLabel = "",
+  lastSyncIso = "",
+  lastSyncAbsolute = "",
   stale = false,
   nextUsLabel = "",
   nextTaseLabel = "",
 }: {
   children: React.ReactNode;
-  /** Pre-formatted bilingual relative timestamp ("today 16:35"). Empty
-   *  if no sync has ever occurred. */
-  lastSyncLabel?: string;
+  /** The sync instant, ISO-8601. Empty if no sync has ever occurred. */
+  lastSyncIso?: string;
+  /** The same instant as dd/mm/yyyy HH:MM, computed server-side so the
+   *  first paint carries a true value even before JavaScript runs. */
+  lastSyncAbsolute?: string;
   /** True when most recent sync is older than 24h. Renders the
    *  red warning banner. */
   stale?: boolean;
@@ -140,16 +194,21 @@ export function AppShell({
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5">
-            {/* Last-sync timestamp — hidden on small screens to keep
-                the toggle area uncluttered. */}
-            {lastSyncLabel && (
-              <span
-                className="hidden 2xl:inline-block text-xs text-muted me-1 whitespace-nowrap"
-                title={lastSyncLabel}
-              >
-                {t("last_sync")}: {lastSyncLabel}
-              </span>
-            )}
+            {/* Shown at every width. It was `hidden 2xl:inline-block`,
+                which meant invisible on every screen under 1536px —
+                including the phone this is mostly read on — so the one
+                line that says how old the numbers are was the one line
+                nobody saw. On a narrow screen it moves to its own row
+                below rather than competing with the toggles. */}
+            <span className="hidden lg:inline-block">
+              <LastUpdated
+                iso={lastSyncIso}
+                absolute={lastSyncAbsolute}
+                locale={locale}
+                stale={stale}
+                label={t("last_sync")}
+              />
+            </span>
             <button
               onClick={() => setLocale(locale === "en" ? "he" : "en")}
               className={`${controlClass} px-3`}
@@ -165,7 +224,34 @@ export function AppShell({
             >
               <ThemeIcon dark={theme === "light"} />
             </button>
+            {/* A real way out. The gate this replaced was HTTP Basic
+                auth, which the browser cannot be told to forget — see
+                functions/_middleware.js. /logout is served by the gate
+                itself, so it is a plain link rather than a route of
+                this app — a <Link> would prefetch it, and Next would
+                then end the session while the reader was still
+                reading. */}
+            <a
+              href="/logout"
+              className={`${controlClass} px-3`}
+              title={t("log_out")}
+            >
+              {t("log_out")}
+            </a>
           </div>
+        </div>
+
+        {/* Below lg the header has no room for the stamp beside the
+            toggles, and it is the screen this is mostly read on. Its
+            own row, under the nav. */}
+        <div className="lg:hidden border-t border-council-200/60 dark:border-council-800/60 px-4 py-1.5">
+          <LastUpdated
+            iso={lastSyncIso}
+            absolute={lastSyncAbsolute}
+            locale={locale}
+            stale={stale}
+            label={t("last_sync")}
+          />
         </div>
 
         {/* Compact nav row — everything below lg. The scrollbar is

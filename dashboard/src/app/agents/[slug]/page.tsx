@@ -14,6 +14,8 @@ import { buildReturnParts } from "@/lib/return-breakdown";
 import { SectorTrendChart } from "@/components/SectorTrendChart";
 import { buildSectorTrends, toChartRows } from "@/lib/sector-trend";
 import { LivePositionsTable } from "@/components/LivePositionsTable";
+import { ActionLog } from "@/components/ActionLog";
+import { buildActionLog } from "@/lib/action-log";
 import { AgentPerformanceChart } from "@/components/AgentPerformanceChart";
 import { Term } from "@/components/Term";
 import {
@@ -58,13 +60,21 @@ export default async function AgentDrillPage({
   const [run, recent, live, companyNames, snapshots, sectorMap, ledger] =
     await Promise.all([
       loadAgentLatest(slug),
-      loadJournal({ agent: slug, limit: 30 }),
+      // No limit: loadJournal reads every file for the agent and
+      // slices afterwards, so a cap saves no I/O — and the action log
+      // needs the *earliest* WATCH of each name, which the newest 30
+      // rows do not contain. Sliced at each use site instead.
+      loadJournal({ agent: slug }),
       loadLivePortfolio(slug),
       loadCompanyNames(),
       loadSnapshots(slug),
       loadSectors(),
       loadTradeLedger(slug),
     ]);
+
+  // What the agent did, in the order it happened. Both sources are
+  // already in memory; this is a merge and a sort.
+  const actions = buildActionLog(ledger, recent, { limit: 60 });
 
   // The parts the headline return is made of. Cheap: arithmetic over a
   // book already in memory and a ledger already read.
@@ -417,6 +427,20 @@ export default async function AgentDrillPage({
           </Card>
         </>
       )}
+
+      <Card className="mb-6">
+        <div className="flex items-baseline justify-between mb-1">
+          <h3 className="text-sm font-semibold">{t("action_log_title")}</h3>
+          <Link
+            href={`/journal/${slug}/all`}
+            className="text-xs text-muted hover:underline"
+          >
+            {t("view_all")}
+          </Link>
+        </div>
+        <p className="text-xs text-muted mb-3">{t("action_log_subtitle")}</p>
+        <ActionLog actions={actions} agentSlug={slug} locale={locale} t={t} />
+      </Card>
 
       <Card>
         <div className="flex items-center justify-between mb-3">

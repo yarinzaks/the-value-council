@@ -8,6 +8,12 @@
 import Link from "next/link";
 
 import { Card, PctCell } from "@/components/Cards";
+import type { Locale } from "@/lib/i18n";
+import {
+  translateCriterion,
+  translateExitTrigger,
+  translateRationale,
+} from "@/lib/translate-dynamic";
 import {
   movements,
   parseConditions,
@@ -41,6 +47,11 @@ interface Props {
    *  date would cost more than the date is worth. */
   marketClosures?: Record<string, string>;
   t: (key: string) => string;
+  /** For the condition labels, which are the agent's own English —
+   *  "Fast Grower", "Tier A", "quality 5/5". They reach the page
+   *  straight off the journal and were the English a Hebrew reader
+   *  kept finding here. */
+  locale: Locale;
 }
 
 export function PositionStoryCard({
@@ -50,6 +61,7 @@ export function PositionStoryCard({
   agentColor,
   marketClosures,
   t,
+  locale,
 }: Props) {
   const lifecycleLabel =
     story.lifecycle === "held"
@@ -128,12 +140,12 @@ export function PositionStoryCard({
                 {conditions.map((c) =>
                   c.used === null ? (
                     <div key={c.raw} className="text-xs text-council-600 dark:text-muted">
-                      · {c.label}
+                      · {translateCriterion(c.label, locale)}
                     </div>
                   ) : (
                     <div key={c.raw} className="flex items-center gap-2 text-xs">
                       <span className="w-28 shrink-0 text-council-700 dark:text-council-300">
-                        {c.label}
+                        {translateCriterion(c.label, locale)}
                       </span>
                       <span className="tabular font-mono w-14 shrink-0 text-end">
                         {c.value}
@@ -162,7 +174,9 @@ export function PositionStoryCard({
               {story.exitTrigger && (
                 <p className="mt-2 text-[11px] leading-relaxed text-muted">
                   <span className="font-semibold">{t("exit_label")}</span>{" "}
-                  {story.exitTrigger}
+                  {/* 46,959 exit rules in the journal, every one of them
+                      written in English by the Python side. */}
+                  {translateExitTrigger(story.exitTrigger, locale)}
                 </p>
               )}
             </div>
@@ -235,7 +249,10 @@ export function PositionStoryCard({
               </span>
               {m.note && (
                 <p className="mt-0.5 text-council-600 dark:text-muted leading-relaxed">
-                  {m.note}
+                  {/* The journal's `rationale`, which Python writes in
+                      English only — this was the English a Hebrew
+                      reader kept finding under "נפתחה פוזיציה". */}
+                  {translateRationale(m.note, locale)}
                 </p>
               )}
             </li>

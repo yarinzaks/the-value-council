@@ -143,7 +143,15 @@ export default async function PositionDetailPage({
   const latestBuy = decisions[0]; // already sorted newest-first
   const value = position.shares * position.current_price;
   const companyName = names[ticker] ?? "";
-  const why = locale === "he" ? position.why_he : position.why_en;
+  // Through the table even though `why_he` is the agent's Hebrew field:
+  // several builders interpolate an English label into it, and the
+  // positions already on the books carry that English until the next
+  // run rewrites them. core/live/why_translator.py fixes it at the
+  // source; this fixes today's page.
+  const why = translateRationale(
+    locale === "he" ? position.why_he : position.why_en,
+    locale,
+  );
 
   return (
     <>

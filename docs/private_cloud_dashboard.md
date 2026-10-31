@@ -15,8 +15,9 @@ Three separate machines, none of them yours:
    `.github/workflows/daily-paper-trading.yml`.
 2. **Cloudflare Pages** notices that commit, rebuilds the site from it,
    and publishes the result. This is the part that is new.
-3. **Cloudflare Access** stands in front of the published site and asks
-   for a one-time code sent to your email before letting anyone in.
+3. **A login**, served by `functions/_middleware.js` as a Cloudflare
+   Pages Function, stands in front of the published site. It is the one
+   part of this that runs code on a request.
 
 The Mac is not involved in any of it.
 
@@ -83,22 +84,61 @@ prerendering the journal.
 
 ### 2. Put the door in front of it
 
-Still in Cloudflare: **Zero Trust → Access → Applications → Add an
-application → Self-hosted**.
+This section described Cloudflare Access, which is the better tool and
+is not what is deployed. Enabling Zero Trust requires a payment method
+on file even on its free tier, and the brief was "private, and it must
+never cost me anything". The door is `functions/_middleware.js`
+instead: a Pages Function, which the free plan runs, in front of every
+page and every asset.
 
-- Application domain: the `*.pages.dev` hostname the project was given.
-- Add a policy: action **Allow**, rule **Emails**, value *your email
-  address*.
-- Identity provider: **One-time PIN**. This needs no Google or GitHub
-  login — Cloudflare emails a code that expires in ten minutes.
+In the Cloudflare dashboard: the Pages project → **Settings → Variables
+and Secrets**, for **Production and Preview** both:
 
-Free for up to 50 users. You are one.
+| Variable | Value |
+| --- | --- |
+| `SITE_USER` | whatever you like |
+| `SITE_PASSWORD` | long and random; choose **Secret** so it is encrypted |
+| `SESSION_SECRET` | optional; a second long random value |
+
+They live there and only there. None of them appears in this
+repository, in the build, or in any log — the repository is public, so a
+password committed here would be a password published.
+
+Without `SESSION_SECRET` the cookie is signed with a key derived from
+`SITE_PASSWORD`, which has a useful consequence: changing the password
+invalidates every session that exists. That is the button to press if a
+laptop goes missing.
+
+**What it is, honestly.** A form, and a cookie carrying the user and a
+twelve-hour expiry, signed with HMAC-SHA256. No second factor and no
+per-user audit, which Access would give. It is appropriate for what is
+behind it — simulated portfolios, no real money, no personal data, no
+secrets — and it has the one thing the HTTP Basic prompt it replaced
+could not offer: a log out that works. Basic auth has no session, so the
+browser held the credentials for its whole lifetime and pressing Cancel
+on a later prompt cleared nothing.
 
 ### 3. Check it
 
-Open the site in a private window. You should be asked for your email,
-then for the code. Anyone without an address on that policy gets a
-refusal rather than the dashboard.
+Open the site in a private window. You should get the login form; the
+wrong password should return to it, and the right one should let you in
+and show a **התנתקות** button in the header that actually signs you out.
+
+From a terminal, with no browser state involved:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://<your-host>/he/
+```
+
+303 is the gate redirecting to the form. 200 would mean the site is
+open, and is the one answer that is wrong.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<your-host>/api/chat
+```
+
+401. The assistant endpoint spends an Anthropic key, so a stranger
+reaching it is the most expensive way for this to be misconfigured.
 
 ## What happens from then on
 

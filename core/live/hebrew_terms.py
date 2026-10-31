@@ -48,64 +48,21 @@ from __future__ import annotations
 
 import re
 
-#: English phrase → Hebrew. Applied as substring replacement, longest
-#: key first, so a longer phrase cannot be pre-empted by a prefix of it.
-#:
-#: Each key is a literal fragment of a real journal string. The numbers
-#: around them are left exactly as the agent wrote them.
-TERMS: dict[str, str] = {
-    # ---- whole phrases, no numbers -------------------------------
-    "positive trailing net income": "רווח נקי חיובי בשנה החולפת",
-    "rotated out of target portfolio": "יצאה מתיק היעד",
-    "left today's target list": "לא נמצאת ברשימת היעד של היום",
-    "largest_by_capitalisation": "מהגדולות בשווי שוק",
-    "live paper-trade": "מסחר נייר חי",
-    "liquid": "נזילה",
-    # ---- Lynch's six categories ----------------------------------
-    "Fast Grower": "צומחת מהר",
-    "Slow Grower": "צומחת לאט",
-    "Stalwart": "חברה יציבה",
-    # ---- Buffett's quality tiers ---------------------------------
-    "Tier A": "דרגה A",
-    "Tier B": "דרגה B",
-    # ---- Marks' market posture -----------------------------------
-    "posture Cool": "עמדה: מצננת",
-    "posture Neutral": "עמדה: נייטרלית",
-    # ---- Graham's two sleeves ------------------------------------
-    "mode=DEFENSIVE": "מסלול: המשקיע ההגנתי",
-    "mode=NET_NET": "מסלול: נטו-נטו",
-    # ---- qualifiers ----------------------------------------------
-    "(bottom quintile)": "(בחמישון התחתון)",
-    "(top quintile)": "(בחמישון העליון)",
-    # ---- labelled figures ----------------------------------------
-    # Longest first within each family: "EY rank #" before "rank #",
-    # "dividend yield" before "yield".
-    "current ratio=": "יחס שוטף=",
-    "EPS growth=": "צמיחת EPS=",
-    "dividend yield ": "תשואת דיבידנד ",
-    "earnings yield ": "תשואת רווח ",
-    "FCF yield ": "תשואת FCF ",
-    "market cap $": "שווי שוק $",
-    "combined rank #": "דירוג משולב #",
-    "EY rank #": "דירוג תשואת רווח #",
-    "ROC rank #": "דירוג תשואה על ההון #",
-    "rank #": "דירוג #",
-    "quality ": "איכות ",
-    "score ": "ניקוד ",
-    "MoS ": "מרווח ביטחון ",
-    "yield=": "תשואה=",
-    "yield ": "תשואה ",
-}
+from core.live.hebrew_bundle import bundle
+
+#: English phrase → Hebrew. Applied as substring replacement,
+#: longest key first, so a longer phrase cannot be pre-empted by a
+#: prefix of it.
+TERMS: dict[str, str] = dict(bundle()["terms"])
 
 #: Patterns whose Hebrew has to move a number, so a substring swap
 #: cannot do it. ``5yr avg FCF $217,127,200`` reads in Hebrew as "FCF
 #: ממוצע ל-5 שנים", with the 5 before the word rather than after it.
-PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b(\d+)-?yr avg ROE\b"), r"ROE ממוצע ל-\1 שנים:"),
-    (re.compile(r"\b(\d+)-?yr avg FCF\b"), r"FCF ממוצע ל-\1 שנים:"),
-    (re.compile(r"\bOE (\d+)-?yr avg\b"), r"רווחי בעלים ממוצע ל-\1 שנים:"),
-    (re.compile(r"\b(\d+)-?yr EPS CAGR\b"), r"צמיחת EPS שנתית ל-\1 שנים:"),
+PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(pattern), replacement)
+    for pattern, replacement in bundle()["patterns"]
 )
+
 
 _LONGEST_FIRST: tuple[tuple[str, str], ...] = tuple(
     sorted(TERMS.items(), key=lambda kv: -len(kv[0]))
