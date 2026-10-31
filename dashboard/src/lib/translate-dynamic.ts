@@ -52,15 +52,42 @@ const SHARED_PATTERNS: readonly [RegExp, string][] = (
   replacement.replace(/\\(\d)/g, "$$$1"),
 ]);
 
+/** Latin that belongs in a Hebrew sentence: the abbreviations an Israeli
+ *  investor reads in Latin script, and the units beside them. */
+const LATIN_BY_CONVENTION =
+  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|REIT|SPAC|NAV|CEO|USD|nan|CR|bps/g;
+
+/**
+ * Whether a string came out half Hebrew and half English sentence.
+ *
+ * The table is substring replacement, which is right for a format
+ * string and actively wrong for a sentence. Applied to the analyst's
+ * English it produced "No customer reviews, retention figures או
+ * pricing-power evidence were provided" and "Management ספק ביושרה
+ * emerges" — ungrammatical in both languages, and worse than the
+ * English alone.
+ *
+ * Checked on the output, not the input. Guarding the input was the
+ * first attempt and it was the wrong object: a 110-character reverse
+ * trigger is neither long enough nor first-person enough to look like
+ * prose, and it mangled anyway. What distinguishes a bad result is
+ * visible in the result.
+ */
+export function isHybrid(text: string): boolean {
+  if (!/[\u0590-\u05ff]/.test(text)) return false;
+  return /[A-Za-z]{3,}/.test(text.replace(LATIN_BY_CONVENTION, ""));
+}
+
 /** Apply the shared table to one string. Numbers are never touched —
- *  the table replaces words around them. */
+ *  the table replaces words around them — and a half-translated result
+ *  is discarded in favour of the original. */
 function applyShared(text: string): string {
   let out = text;
   for (const [re, replacement] of SHARED_PATTERNS) out = out.replace(re, replacement);
   for (const [english, he] of SHARED_TERMS) {
     if (out.includes(english)) out = out.split(english).join(he);
   }
-  return out;
+  return isHybrid(out) ? text : out;
 }
 
 interface Rule {
@@ -263,7 +290,14 @@ export function translateRationale(text: string, locale: Locale): string {
       // meant a rationale matching one of the rules above skipped the
       // table completely — 194 of them, every one translated by the
       // notifier and half-translated here.
-      return applyShared(text.replace(r.re, r.he));
+      // When one of this file's own rules leaves a hybrid, fall back to
+      // the shared table on the *original* rather than giving up and
+      // returning the English: Dreman's rationale matches a rule here
+      // that half-translates it, and the table renders it whole.
+      const matched = text.replace(r.re, r.he);
+      if (!isHybrid(matched)) return applyShared(matched);
+      const shared = applyShared(text);
+      return isHybrid(shared) ? text : shared;
     }
   }
   // Fall through to per-fragment translation for unknown rationales.
@@ -279,7 +313,14 @@ export function translateTrigger(text: string, locale: Locale): string {
       // meant a rationale matching one of the rules above skipped the
       // table completely — 194 of them, every one translated by the
       // notifier and half-translated here.
-      return applyShared(text.replace(r.re, r.he));
+      // When one of this file's own rules leaves a hybrid, fall back to
+      // the shared table on the *original* rather than giving up and
+      // returning the English: Dreman's rationale matches a rule here
+      // that half-translates it, and the table renders it whole.
+      const matched = text.replace(r.re, r.he);
+      if (!isHybrid(matched)) return applyShared(matched);
+      const shared = applyShared(text);
+      return isHybrid(shared) ? text : shared;
     }
   }
   return applyRules(text, CRITERIA_RULES);
@@ -294,7 +335,14 @@ export function translateExitTrigger(text: string, locale: Locale): string {
       // meant a rationale matching one of the rules above skipped the
       // table completely — 194 of them, every one translated by the
       // notifier and half-translated here.
-      return applyShared(text.replace(r.re, r.he));
+      // When one of this file's own rules leaves a hybrid, fall back to
+      // the shared table on the *original* rather than giving up and
+      // returning the English: Dreman's rationale matches a rule here
+      // that half-translates it, and the table renders it whole.
+      const matched = text.replace(r.re, r.he);
+      if (!isHybrid(matched)) return applyShared(matched);
+      const shared = applyShared(text);
+      return isHybrid(shared) ? text : shared;
     }
   }
   return applyRules(text, CRITERIA_RULES);
@@ -387,4 +435,89 @@ export function memoEntries(
     out.push([key, value]);
   }
   return out;
+}
+
+/** The fields a reader wants first, in the order they want them.
+ *
+ *  The brain page printed all 123 as a two-column grid, per memo, 400
+ *  memos deep. Every field equally prominent is no field prominent, and
+ *  the founder's word for it was "מתיש" — exhausting.
+ *
+ *  So a memo now leads with its verdict, its thesis and three figures,
+ *  and everything else folds away. These are the three figures: the
+ *  first of each group that the memo actually carries, because the five
+ *  schemas do not share a vocabulary — Buffett quotes owner earnings
+ *  where Lynch quotes PEG.
+ */
+const HEADLINE_FIGURES: readonly string[][] = [
+  ["margin_of_safety_pct", "total_score_out_of_15", "market_temperature_score"],
+  ["intrinsic_value_estimate_usd_per_share", "intrinsic_value_estimate_usd", "peg_ratio"],
+  ["confidence"],
+];
+
+/** Fields where a zero means "could not estimate", not "zero".
+ *
+ *  A company is never worth $0, and 72 of the 120 memos carrying
+ *  `intrinsic_value_estimate_usd` carry it as zero — the snapshot did
+ *  not give the analyst what a valuation needs. Printing "$0" as the
+ *  headline figure reads as "worth nothing", which is a different and
+ *  much stronger claim than the one the memo is making.
+ *
+ *  `total_score_out_of_15` is deliberately not here: Fisher scoring a
+ *  company 0 out of 15 is a verdict, and six memos say exactly that.
+ */
+const ZERO_MEANS_ABSENT = new Set([
+  "intrinsic_value_estimate_usd",
+  "intrinsic_value_estimate_usd_per_share",
+  "margin_of_safety_pct",
+]);
+
+/** The verdict, the thesis and up to three figures — in that order. */
+export function memoDigest(
+  memo: Record<string, unknown>,
+  locale: Locale,
+): {
+  decision: string | null;
+  thesis: string | null;
+  figures: [string, unknown][];
+} {
+  const entries = new Map(memoEntries(memo ?? {}, locale));
+  const thesisKey = locale === "he" ? "thesis_he" : "thesis_en";
+  const thesis =
+    (entries.get(thesisKey) as string | undefined) ??
+    (entries.get("thesis_en") as string | undefined) ??
+    (entries.get("thesis_he") as string | undefined) ??
+    null;
+
+  const figures: [string, unknown][] = [];
+  for (const group of HEADLINE_FIGURES) {
+    for (const key of group) {
+      const value = entries.get(key);
+      if (value === undefined || value === null || value === "") continue;
+      if (value === 0 && ZERO_MEANS_ABSENT.has(key)) continue;
+      figures.push([key, value]);
+      break;
+    }
+  }
+
+  return {
+    decision: (memo?.decision as string | undefined) ?? null,
+    thesis,
+    figures,
+  };
+}
+
+/** Everything the digest did not show, for the fold. */
+export function memoRest(
+  memo: Record<string, unknown>,
+  locale: Locale,
+): [string, unknown][] {
+  const digest = memoDigest(memo, locale);
+  const shown = new Set<string>(["decision", ...digest.figures.map(([k]) => k)]);
+  if (digest.thesis !== null) {
+    shown.add(locale === "he" ? "thesis_he" : "thesis_en");
+    shown.add("thesis_en");
+    shown.add("thesis_he");
+  }
+  return memoEntries(memo ?? {}, locale).filter(([k]) => !shown.has(k));
 }

@@ -236,3 +236,131 @@ class TestEveryRationaleBuilderFinishesItsHebrew:
                     if found.strip():
                         leaks.append(f"{book['agent']}/{pos['ticker']}: {found.strip()!r}")
         assert leaks == [], f"English inside why_he: {leaks[:6]}"
+
+
+# --------------------------------------------- half-translated is worse
+class TestNothingComesBackHalfTranslated:
+    """The defect this class exists for, found on a published page.
+
+    The table is substring replacement. Applied to the analyst's English
+    it reached into sentences it did not understand and produced:
+
+        "No customer reviews, retention figures או pricing-power
+         evidence were provided"
+        "Management ספק ביושרה emerges"
+        "Verified 15-point ניקוד comes in below 12, או falls below 11"
+
+    Ungrammatical in both languages, and worse than the English alone.
+
+    The measurement that passed this reported 0% English. It was
+    counting English *words*, the words were gone, and what replaced
+    them was not Hebrew either — which is why the check now runs on the
+    output and asks a different question.
+    """
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "Not available in this snapshot. No customer reviews, retention "
+            "figures or pricing-power evidence were provided, so I could not "
+            "check this.",
+            "Management integrity question emerges (restatement, undisclosed "
+            "related-party dealings, misleading disclosure)",
+            "Verified 15-point score comes in below 12, or falls below 11 "
+            "after any purchase",
+            "Scuttlebutt from customers, former employees or competitors "
+            "comes back negative",
+            "Culture or management succession deteriorates",
+            "Share count dilution accelerates or a major equity raise is "
+            "announced",
+        ],
+    )
+    def test_an_english_sentence_comes_back_whole(self, sentence: str) -> None:
+        assert translate(sentence) == sentence
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "Fast Grower",
+            "positive trailing net income",
+            "current ratio=2.10 (≥ 2.0)",
+            "annual rotation OR rank slips out of top-30",
+            "P/E rises toward market average OR earnings miss two quarters "
+            "OR dividend yield collapses",
+            "5yr avg FCF $217,127,200",
+            "Graham Defensive: P/E 11.23, P/B 1.11, CR 2.10, Graham # 43.68",
+        ],
+    )
+    def test_a_template_is_still_translated(self, template: str) -> None:
+        from core.live.hebrew_terms import is_hybrid
+
+        out = translate(template)
+        assert out != template, "a template must not be left in English"
+        assert not is_hybrid(out), out
+
+    def test_nothing_in_the_live_journal_comes_back_hybrid(self) -> None:
+        """Walks every string the journal holds.
+
+        Asserts the *delta*: a hybrid this function created. A string
+        that arrived mixed — the analyst's Hebrew quoting an English
+        brand name — is its writing and not a translation fault.
+        """
+        import json
+        from pathlib import Path as _Path
+
+        from core.live.hebrew_terms import is_hybrid
+
+        journal = _Path(__file__).resolve().parents[3] / "data" / "decisions"
+        if not journal.exists():
+            pytest.skip("no decision journal in this checkout")
+        hybrids: list[str] = []
+        seen = 0
+        for path in sorted(journal.glob("*/*.json")):
+            for row in json.loads(path.read_text()):
+                values: list[str] = list(row.get("criteria_met") or [])
+                for field in ("rationale", "exit_trigger"):
+                    if row.get(field):
+                        values.append(str(row[field]))
+                for value in values:
+                    seen += 1
+                    out = translate(str(value))
+                    # Only a hybrid this function *created*. The
+                    # analyst's own Hebrew quotes English brand names,
+                    # and that is its writing, not a translation fault.
+                    if is_hybrid(out) and not is_hybrid(str(value)):
+                        hybrids.append(f"{value[:60]} -> {out[:60]}")
+        assert seen > 0, "the journal produced no strings to check"
+        assert hybrids == [], f"{len(hybrids)} half-translated: {hybrids[:3]}"
+
+    def test_nothing_in_the_live_memos_comes_back_hybrid(self) -> None:
+        import json
+        from pathlib import Path as _Path
+
+        from core.live.hebrew_terms import is_hybrid
+
+        memos = _Path(__file__).resolve().parents[3] / "data" / "memos"
+        if not memos.exists():
+            pytest.skip("no memos in this checkout")
+        hybrids: list[str] = []
+        seen = 0
+
+        def walk(node: object) -> None:
+            nonlocal seen
+            if isinstance(node, dict):
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+            elif isinstance(node, str) and node:
+                seen += 1
+                out = translate(node)
+                if is_hybrid(out) and not is_hybrid(node):
+                    hybrids.append(f"{node[:60]} -> {out[:60]}")
+
+        for path in sorted(memos.glob("*/*.json")):
+            rows = json.loads(path.read_text())
+            for row in rows if isinstance(rows, list) else [rows]:
+                walk(row.get("memo"))
+        assert seen > 0, "the memos produced no strings to check"
+        assert hybrids == [], f"{len(hybrids)} half-translated: {hybrids[:3]}"
