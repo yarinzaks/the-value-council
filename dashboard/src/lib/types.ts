@@ -170,6 +170,11 @@ export interface LiveWatchEntry {
   current_rank: number | null;
   entry_trigger: string;
   entry_price_target: number | null;
+  /** The quotation the screen saw when it put the name here. Beside
+   *  the target it makes the distance to the trigger a subtraction.
+   *  Optional: absent from every file written before the field existed,
+   *  and from every agent whose trigger is not a price. */
+  last_price?: number | null;
   why_en: string;
   why_he: string;
 }

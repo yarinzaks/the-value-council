@@ -88,6 +88,22 @@ TIMEOUT_SECONDS = 10
 #: keeps every name.
 MAX_WATCH_BLOCKS: int = 5
 
+#: What separates two blocks inside one message.
+SEPARATOR = "\n\n———\n\n"
+
+#: Telegram's ceiling on one ``sendMessage`` text, in characters.
+#:
+#: Over it the API answers 400 "message is too long" and delivers
+#: nothing, which is the one failure mode worth engineering against: the
+#: busiest day is the day most worth reading, and a notifier that goes
+#: silent exactly then is worse than one that was never wired up.
+#:
+#: Counted by Telegram in UTF-16 code units. Every character this module
+#: emits — Hebrew, digits, the separator's em dashes — is one unit, so
+#: Python's ``len`` is the same number here. An emoji would not be, and
+#: there are none.
+TELEGRAM_TEXT_LIMIT: int = 4096
+
 #: Which books to report on. One agent today, by request: Graham leads
 #: the live book and is the one being followed closely. A set rather
 #: than a constant so adding a second is a one-line change here.
@@ -595,7 +611,7 @@ def format_result(
     # Date only. Each action block names the agent itself, so that a
     # message Telegram truncates still says who acted.
     header = as_of.isoformat()
-    body = "\n\n———\n\n".join(blocks)
+    body = SEPARATOR.join(blocks)
 
     portfolio = getattr(result, "portfolio", None)
     footer = ""
@@ -604,10 +620,161 @@ def format_result(
         ret = getattr(portfolio, "cumulative_return_pct", None)
         if nav is not None and ret is not None:
             footer = (
-                f"\n\n———\n\nהתיק   {_money(float(nav))}  "
+                f"{SEPARATOR}התיק   {_money(float(nav))}  "
                 f"({float(ret):+.2f}% מההתחלה)"
             )
     return f"{header}\n\n{body}{footer}"
+
+
+def units(text: str) -> int:
+    """``text``'s length the way Telegram counts it.
+
+    The limit is documented in UTF-16 code units, and ``len`` is in code
+    points. Everything this module writes itself is one unit a character
+    — Hebrew, the separator's em dashes, ``≤``, ``⅔`` are all inside the
+    BMP — but the message also carries text from outside it: company
+    names quoted from EDGAR and, on a failed run, an exception's own
+    words. None of the 10,430 names in the cache holds a two-unit
+    character today. That is a fact about today's data rather than a
+    property of the format, and measuring costs one encode.
+    """
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _cut(text: str, room: int) -> str:
+    """The longest prefix of ``text`` that fits in ``room`` units.
+
+    Cuts between code points, never inside one, so a surrogate pair
+    cannot be halved into an invalid string. Always takes at least one
+    character, so a caller slicing a long block makes progress even when
+    ``room`` is absurdly small.
+    """
+    used = 0
+    for index, character in enumerate(text):
+        width = 2 if ord(character) > 0xFFFF else 1
+        if used + width > room and index > 0:
+            return text[:index]
+        used += width
+    return text
+
+
+def _marker(index: int, total: int) -> str:
+    return f"\n\n({index}/{total})"
+
+
+def _pack(parts: list[str], room: int) -> list[str]:
+    """``parts`` recombined into the fewest strings of ``room`` units."""
+    chunks: list[str] = []
+    current = ""
+    for part in parts:
+        while units(part) > room:
+            # Nothing here emits a block this long; slicing is the
+            # honest fallback for a block that nonetheless is.
+            if current:
+                chunks.append(current)
+                current = ""
+            head = _cut(part, room)
+            chunks.append(head)
+            part = part[len(head):]
+        candidate = f"{current}{SEPARATOR}{part}" if current else part
+        if units(candidate) <= room:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            current = part
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def split_for_telegram(text: str, *, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str]:
+    """``text`` as one message, or as the fewest messages that each fit.
+
+    Nothing is dropped. Graham's screen holds thirty names, so a day
+    that rotated the book would spell out thirty sales and thirty
+    purchases — measured at roughly 180 characters a block, that is a
+    message Telegram refuses outright, and :func:`notify_run` would log
+    the refusal and move on. The reader would learn nothing about the
+    one day that mattered most. The observed maximum so far is ten
+    blocks and 1,778 characters, well inside the limit; this is the
+    ceiling, not a fault anyone has hit.
+
+    Splitting happens on this module's own block separator, so a message
+    never breaks mid-sentence. A single block longer than the whole
+    limit is pathological — no formatter here can produce one — but it
+    is sliced rather than discarded, because losing it silently is the
+    failure this function exists to prevent.
+
+    Every returned message fits, and that is a proof rather than an
+    estimate. The "(n/total)" marker is itself part of the message, so
+    the room reserved for it has to be known before the packing that
+    decides how many messages there are. Reserving a fixed width instead
+    was wrong past 99 messages, where the marker grows a digit: the loop
+    below packs, re-reads the count, and packs again until the count
+    stops exceeding the width it reserved. ``total`` strictly increases
+    and the number of chunks is bounded by the text, so it ends; and on
+    the iteration that ends it the real count is at most the reserved
+    one, so the real marker is no wider than the room taken out for it.
+    """
+    if units(text) <= limit:
+        return [text]
+
+    parts = text.split(SEPARATOR)
+    total = 1
+    while True:
+        chunks = _pack(parts, limit - units(_marker(total, total)))
+        if len(chunks) <= total:
+            break
+        total = len(chunks)
+
+    total = len(chunks)
+    return [
+        f"{chunk}{_marker(index, total)}"
+        for index, chunk in enumerate(chunks, 1)
+    ]
+
+
+#: Journal kinds that record *that* a trade executed, not *why*.
+#:
+#: The strategy logs its own ``BUY`` while it screens, carrying the tests
+#: the company passed and the level the position should close at. The
+#: runner then logs a ``FILL`` for the same ticker on the same day, and
+#: that row holds the rank it executed at and nothing else: no
+#: ``criteria_values``, so no sleeve and so no plan, and no
+#: ``target_price``. It is written second, so a join that keeps the last
+#: row per ticker hands the formatter the receipt and drops the reason —
+#: "מה זיהה / rank #1 / live paper-trade", with no sell target under it.
+#:
+#: Measured, not inferred: all six FILL rows in Graham's journal shadow a
+#: BUY row for the same ticker on the same day, and replaying 2026-08-07
+#: through :func:`format_result` reproduces that message exactly.
+#:
+#: ``EXIT`` is the runner's too and is deliberately absent here. "left
+#: today's target list" *is* why a rotation closed the position, and it
+#: is the only row a sold name gets — a name is sold *because* it left
+#: the target list, so the strategy wrote nothing for it that day.
+_RECEIPT_KINDS: frozenset[str] = frozenset({"FILL"})
+
+
+def choose_decisions(rows: Iterable[Any]) -> dict[str, Any]:
+    """One journal row per ticker: the reason, not the receipt.
+
+    Later rows win, which is what carries an exit — the runner logs it
+    after everything the strategy wrote that day. Receipts are skipped
+    outright rather than merely ranked last: a ticker whose only row is a
+    ``FILL`` is better described by its fill line alone than by "rank
+    #4", which is this system's own bookkeeping and means nothing to the
+    person reading the message.
+    """
+    chosen: dict[str, Any] = {}
+    for row in rows:
+        if str(getattr(row, "decision", "")).upper() in _RECEIPT_KINDS:
+            continue
+        ticker = str(getattr(row, "ticker", "")).upper()
+        if ticker:
+            chosen[ticker] = row
+    return chosen
 
 
 def _decisions_for(agent: str, as_of: date) -> Mapping[str, Any]:
@@ -626,10 +793,7 @@ def _decisions_for(agent: str, as_of: date) -> Mapping[str, Any]:
     except Exception as exc:  # noqa: BLE001 — enrichment is optional
         logger.debug(f"could not read decisions for {agent}: {type(exc).__name__}")
         return {}
-    # Last writer wins per ticker. A day with both a SELL and a later BUY
-    # of one name is not something Graham does, and if it happened the
-    # trade list would carry both fills anyway.
-    return {str(r.ticker).upper(): r for r in rows}
+    return choose_decisions(rows)
 
 
 def _company_names() -> Mapping[str, str]:
@@ -891,19 +1055,32 @@ def notify_run(
         )
         if text is None:
             continue
-        try:
-            sender(config, text)
-            sent += 1
-        except Exception as exc:  # noqa: BLE001 — a notifier may not fail a run
-            # Through `redact`, always. The text is worth having — the
-            # status and Telegram's own "chat not found" are the whole
-            # diagnosis, and the type name alone sent a reader back to
-            # guessing — but a urllib message for a bad token is the
-            # request URL, and the token is a path segment of it.
-            logger.warning(
-                f"telegram notification for {result.agent} failed: "
-                f"{type(exc).__name__}: {redact(str(exc), config)}"
-            )
+        # One send per chunk, and almost always one chunk. A day that
+        # rotated thirty holdings produces a text Telegram refuses
+        # whole, and the refusal would be logged here and nowhere else —
+        # so it is split before it is offered, not after it is rejected.
+        #
+        # Each chunk is attempted even if an earlier one failed. A
+        # refusal that is really about the credentials will repeat on
+        # every chunk and cost a few log lines; a refusal that was a
+        # transient blip on chunk two would otherwise have taken chunks
+        # three to five with it, and the marker on each chunk makes a
+        # gap visible to the reader in a way silence is not.
+        for chunk in split_for_telegram(text):
+            try:
+                sender(config, chunk)
+                sent += 1
+            except Exception as exc:  # noqa: BLE001 — a notifier may not fail a run
+                # Through `redact`, always. The text is worth having —
+                # the status and Telegram's own "chat not found" are the
+                # whole diagnosis, and the type name alone sent a reader
+                # back to guessing — but a urllib message for a bad
+                # token is the request URL, and the token is a path
+                # segment of it.
+                logger.warning(
+                    f"telegram notification for {result.agent} failed: "
+                    f"{type(exc).__name__}: {redact(str(exc), config)}"
+                )
     return sent
 
 
@@ -911,11 +1088,14 @@ __all__ = [
     "API_ROOT",
     "MAX_WATCH_BLOCKS",
     "REDACTED",
+    "SEPARATOR",
+    "TELEGRAM_TEXT_LIMIT",
     "WATCHED_AGENTS",
     "ChannelCheck",
     "TelegramConfig",
     "TelegramSendError",
     "check_channel",
+    "choose_decisions",
     "clean_company_name",
     "format_action",
     "format_result",
@@ -927,4 +1107,6 @@ __all__ = [
     "redact",
     "send_message",
     "shape_complaints",
+    "split_for_telegram",
+    "units",
 ]

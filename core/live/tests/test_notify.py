@@ -23,9 +23,12 @@ import pytest
 
 from core.live.notify import (
     REDACTED,
+    SEPARATOR,
+    TELEGRAM_TEXT_LIMIT,
     TelegramConfig,
     TelegramSendError,
     check_channel,
+    choose_decisions,
     clean_company_name,
     format_action,
     format_result,
@@ -35,6 +38,8 @@ from core.live.notify import (
     redact,
     send_message,
     shape_complaints,
+    split_for_telegram,
+    units,
 )
 
 AS_OF = date(2026, 10, 30)
@@ -372,6 +377,10 @@ class FakeDecision:
     criteria_values: dict[str, Any] = field(default_factory=dict)
     target_price: float | None = None
     exit_trigger: str | None = None
+    #: Which kind of row this is. The journal holds six, and two of them
+    #: are the runner's rather than the strategy's; the join has to tell
+    #: them apart.
+    decision: str = "BUY"
 
 
 NAMES = {
@@ -1316,3 +1325,268 @@ class TestTheWatchPathObeysTheSameGates:
         )
         assert "ההרצה נכשלה: boom" in text
         assert "עוקב" not in text
+
+
+# ------------------------------------- the reason, not the execution receipt
+
+
+def a_fill_row(ticker="SEB", rank=1):
+    """What the runner logs after it executes — shaped like the real one."""
+    return FakeDecision(
+        ticker=ticker,
+        decision="FILL",
+        criteria_met=[f"rank #{rank}", "live paper-trade"],
+        criteria_values={},
+        target_price=None,
+    )
+
+
+def an_exit_row(ticker="EFOR"):
+    return FakeDecision(
+        ticker=ticker,
+        decision="EXIT",
+        criteria_met=["left today's target list"],
+        criteria_values={},
+        target_price=None,
+    )
+
+
+class TestTheJoinPicksTheReasonNotTheReceipt:
+    """A live day holds two rows per bought ticker, and order favours the
+    wrong one.
+
+    The strategy logs its ``BUY`` while screening; the runner logs a
+    ``FILL`` after executing. The fill is written second and carries no
+    criteria values and no target, so keeping the last row per ticker
+    renders "rank #1 / live paper-trade" and no plan at all — which is
+    what Graham's 2026-08-07 journal produces when replayed.
+    """
+
+    def test_the_receipt_does_not_shadow_the_reason(self):
+        chosen = choose_decisions([a_defensive_decision(), a_fill_row()])
+
+        assert chosen["SEB"].decision == "BUY"
+
+    def test_a_receipt_on_its_own_is_not_an_explanation(self):
+        # Better the fill line alone than "rank #4", which is this
+        # system's own bookkeeping and means nothing to a reader.
+        assert choose_decisions([a_fill_row(ticker="SFD")]) == {}
+
+    def test_an_exit_still_wins_over_what_the_strategy_wrote_first(self):
+        # The runner logs the exit last, and that ordering is what makes
+        # a sale report why it was sold. Skipping receipts must not cost
+        # it.
+        chosen = choose_decisions(
+            [a_defensive_decision(ticker="EFOR"), an_exit_row("EFOR")]
+        )
+
+        assert chosen["EFOR"].decision == "EXIT"
+
+    def test_a_watch_row_does_not_outlive_the_exit_that_followed_it(self):
+        watch = FakeDecision(ticker="JBI", decision="WATCH", criteria_met=["P/NCAV=0.5"])
+        chosen = choose_decisions([watch, an_exit_row("JBI")])
+
+        assert chosen["JBI"].decision == "EXIT"
+
+    def test_tickers_are_matched_upper_case(self):
+        chosen = choose_decisions([FakeDecision(ticker="sfd", decision="BUY")])
+
+        assert "SFD" in chosen
+
+    def test_a_row_with_no_ticker_is_dropped_rather_than_keyed_on_nothing(self):
+        assert choose_decisions([FakeDecision(ticker="", decision="BUY")]) == {}
+
+    def test_the_resolved_row_renders_the_plan_the_receipt_would_have_lost(self):
+        """End to end, over a day shaped like a real one.
+
+        This is the test that fails if receipts stop being skipped: the
+        fill is written second, so the message would carry its rank in
+        place of the company's tests and lose the sell target entirely.
+        """
+        rows = [a_defensive_decision(ticker="SEB", target=7936.58), a_fill_row("SEB")]
+        text = rendered(
+            FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB", price=4283.77)]),
+            choose_decisions(rows),
+        )
+
+        assert "התוכנית" in text
+        assert "$7,936.58" in text
+        assert "P/E=7.52 (≤ 15.0)" in text
+        assert "live paper-trade" not in text
+        assert "rank #" not in text
+
+
+# -------------------------------------- the busiest day must still arrive
+
+
+class TestAMessageTooLongForTelegramIsSplitNotLost:
+    """Over 4096 characters Telegram answers 400 and delivers nothing.
+
+    ``notify_run`` logs a refusal and carries on, which means the one
+    day worth reading — the day the book rotated — is the one day that
+    would have arrived as silence. Graham screens thirty names, so that
+    day is reachable: the observed maximum is ten blocks and 1,778
+    characters, and thirty sales beside thirty purchases is some 10,700.
+    """
+
+    def test_a_short_message_is_left_exactly_as_it_was(self):
+        text = f"2026-10-30{SEPARATOR}one block"
+
+        assert split_for_telegram(text) == [text]
+
+    def test_a_message_at_the_limit_is_still_one_message(self):
+        text = "x" * TELEGRAM_TEXT_LIMIT
+
+        assert split_for_telegram(text) == [text]
+
+    def test_every_chunk_fits_inside_the_limit(self):
+        blocks = [f"block {i} " + "y" * 300 for i in range(60)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        assert len(chunks) > 1
+        assert all(len(chunk) <= TELEGRAM_TEXT_LIMIT for chunk in chunks)
+
+    def test_not_one_block_is_dropped(self):
+        blocks = [f"BLOCK{i}" + "z" * 300 for i in range(60)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+        joined = "".join(chunks)
+
+        assert all(f"BLOCK{i}" in joined for i in range(60))
+
+    def test_a_split_message_says_which_part_it_is(self):
+        blocks = ["w" * 1000 for _ in range(12)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        assert chunks[0].endswith(f"(1/{len(chunks)})")
+        assert chunks[-1].endswith(f"({len(chunks)}/{len(chunks)})")
+
+    def test_a_single_block_past_the_limit_is_sliced_rather_than_lost(self):
+        # No formatter here produces one. Discarding it silently is the
+        # failure this function exists to prevent, so it is cut instead.
+        chunks = split_for_telegram("q" * (TELEGRAM_TEXT_LIMIT * 2))
+
+        assert all(len(chunk) <= TELEGRAM_TEXT_LIMIT for chunk in chunks)
+        assert sum(chunk.count("q") for chunk in chunks) == TELEGRAM_TEXT_LIMIT * 2
+
+    def test_the_split_happens_on_block_boundaries(self):
+        blocks = [f"B{i}" + "v" * 2000 for i in range(4)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        # Every chunk starts at a block, never mid-sentence.
+        assert all(chunk.lstrip().startswith("B") for chunk in chunks)
+
+    def test_notify_run_sends_every_chunk_of_a_long_day(self):
+        sent = Recorder()
+        trades = [a_buy(ticker=f"T{i}", price=100.0 + i) for i in range(60)]
+        count = notify_run(
+            [FakeResult(agent="benjamin_graham", trades=trades)],
+            as_of=AS_OF,
+            env=ENV,
+            send=sent,
+        )
+
+        assert count == len(sent.calls) > 1
+        assert all(len(text) <= TELEGRAM_TEXT_LIMIT for _cfg, text in sent.calls)
+        assert all(f"T{i}" in "".join(t for _c, t in sent.calls) for i in range(60))
+
+    def test_an_ordinary_day_is_still_exactly_one_message(self):
+        sent = Recorder()
+        count = notify_run(
+            [FakeResult(agent="benjamin_graham", trades=[a_buy()])],
+            as_of=AS_OF,
+            env=ENV,
+            send=sent,
+        )
+
+        assert count == 1
+        assert "(1/1)" not in sent.calls[0][1]
+
+
+class TestTheFitGuaranteeDoesNotDependOnAnAssumption:
+    """Two things the limit is measured against, neither of them ``len``.
+
+    Telegram counts UTF-16 code units, and the "(n/total)" marker is
+    part of the message it counts. Reserving a fixed nine characters for
+    that marker was right up to 99 messages and wrong after, where it
+    grows a digit — unreachable from this formatter, and reachable
+    through the ``limit`` argument, which is exported.
+    """
+
+    def test_a_character_outside_the_bmp_counts_as_two(self):
+        # Nothing here writes one. Company names come from EDGAR and an
+        # error line comes from an exception, so the message carries
+        # text this module did not choose.
+        assert units("a") == 1
+        assert units("ℵ") == 1
+        assert units("𝕏") == 2
+        assert units("x𝕏x") == 4
+
+    def test_a_message_of_two_unit_characters_is_measured_as_telegram_sees_it(self):
+        text = "𝕏" * (TELEGRAM_TEXT_LIMIT // 2 + 1)
+
+        assert len(text) <= TELEGRAM_TEXT_LIMIT  # len alone would pass it
+        assert units(text) > TELEGRAM_TEXT_LIMIT
+        assert len(split_for_telegram(text)) > 1
+
+    def test_every_chunk_fits_in_units_not_only_in_code_points(self):
+        blocks = ["𝕏" * 400 for _ in range(20)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks))
+
+        assert all(units(chunk) <= TELEGRAM_TEXT_LIMIT for chunk in chunks)
+
+    def test_no_surrogate_pair_is_halved(self):
+        # A cut inside a pair would make a string that cannot be encoded.
+        chunks = split_for_telegram("𝕏" * 6000, limit=100)
+
+        for chunk in chunks:
+            chunk.encode("utf-8")  # raises on a lone surrogate
+        assert "".join(c.split("\n\n(")[0] for c in chunks) == "𝕏" * 6000
+
+    def test_past_ninety_nine_messages_the_wider_marker_still_fits(self):
+        """The reservation has to grow with the count it reserves for.
+
+        Sized against the boundary on purpose. A fixed nine-character
+        reservation leaves room for "(99/99)" and no more, so a block of
+        exactly ``limit - 9`` fits under it and then overflows once the
+        count reaches three digits and the marker needs eleven. Blocks
+        shorter than the room absorb the difference and prove nothing,
+        which is how the first version of this test passed against the
+        bug it was written for.
+        """
+        limit = 60
+        fixed_reservation = len("\n\n(99/99)")
+        blocks = ["k" * (limit - fixed_reservation) for _ in range(150)]
+        chunks = split_for_telegram(SEPARATOR.join(blocks), limit=limit)
+
+        assert len(chunks) > 99
+        assert all(units(chunk) <= limit for chunk in chunks)
+        assert chunks[-1].endswith(f"({len(chunks)}/{len(chunks)})")
+
+    def test_a_refused_chunk_does_not_take_the_rest_of_the_day_with_it(self):
+        """A blip on the first message must not silence the others.
+
+        Refusing once used to abandon the whole result, so a transient
+        429 on message one cost messages two onward. They are each
+        offered now; a fault that is really about the credentials simply
+        repeats and costs a log line per chunk.
+        """
+        attempted: list[str] = []
+
+        def flaky(_config, text):
+            attempted.append(text)
+            if len(attempted) == 1:
+                raise TelegramSendError("sendMessage returned 429: Too Many Requests")
+
+        trades = [a_buy(ticker=f"T{i}", price=100.0 + i) for i in range(60)]
+        sent = notify_run(
+            [FakeResult(agent="benjamin_graham", trades=trades)],
+            as_of=AS_OF,
+            env=ENV,
+            send=flaky,
+        )
+
+        assert len(attempted) > 1, "chunks after the refusal were never offered"
+        assert sent == len(attempted) - 1
+        # The part that did arrive says which part it was, so the gap is
+        # visible rather than silent.
+        assert attempted[-1].endswith(f"({len(attempted)}/{len(attempted)})")

@@ -174,7 +174,35 @@ jobs:
     # proper fix, tracked separately). "Hold until the anchor" now adds
     # up to 120 on top of that under EST, so: 120 waiting plus 45
     # working plus setup still leaves headroom inside 180.
-    timeout-minutes: 180
+    #
+    # That arithmetic stopped holding. The scanning run is the only one
+    # that moves a book, and on 2026-10-30 it was killed at exactly 180
+    # minutes with the scan unfinished — so the agents last scanned on
+    # 2026-10-29, Graham's watch list stayed empty and the second Graham
+    # never opened, none of which looks like a fault from the outside.
+    #
+    # The margin had been gone for a while rather than disappearing that
+    # day. Job durations for cron '0 13': 177 min on 10-22, 175 on
+    # 10-23, then 94, 114, 132 and 116 — the last four inside a budget
+    # that the first two came within three minutes of. Which part grew
+    # is not established: the retrievable log ends at the same line on a
+    # run that finished and on the one that did not.
+    #
+    # And it was about to get worse on a date rather than on a trend.
+    # The hold is 60 minutes under EDT and 120 under EST, out of the
+    # same budget, so 180 left two hours to scan in summer and one in
+    # winter. US daylight saving ends on 2026-11-01, which would have
+    # taken the next working hour away from the first run after it —
+    # and the scan has not finished inside two.
+    #
+    # 300 restores the headroom without touching the anchor arithmetic,
+    # which is what encodes daylight saving and is the one thing here
+    # worth being slow to change. It treats the symptom on purpose. The
+    # causes — an hour of this budget spent idle before the anchor, two
+    # Grahams running an identical screen twice, and the unbatched fetch
+    # loop — are each worth their own change, and none of them should be
+    # made in a hurry to get Monday's run through.
+    timeout-minutes: 300
 
     env:
       TRIGGER_SCHEDULE: ${{ github.event.schedule }}

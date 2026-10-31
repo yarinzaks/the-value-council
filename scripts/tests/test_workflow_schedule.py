@@ -210,6 +210,50 @@ def test_hold_ceiling_clears_the_largest_lead() -> None:
     assert worst < MAX_HOLD, f"ceiling {MAX_HOLD} would abort a real {worst} hold"
 
 
+#: What the scan is allowed to need, after the hold has been paid for.
+#:
+#: The job's clock starts when the cron fires and the scan does not
+#: start until the anchor, so the hold is spent out of the same budget.
+#: Observed scan times for cron '0 13' are 34, 54, 72 and 56 minutes;
+#: the run on 2026-10-30 was killed at 180 with the scan unfinished,
+#: which puts it past 121. 150 is above everything measured, including
+#: the one that did not finish.
+MIN_WORKING_BUDGET = timedelta(minutes=150)
+
+JOB_TIMEOUT = re.compile(r"^\s{4}timeout-minutes:\s*(?P<minutes>\d+)\s*$", re.M)
+
+
+def test_the_job_timeout_leaves_the_scan_room_after_the_hold() -> None:
+    """The budget covers an idle hour before it covers any work.
+
+    This failed in production rather than here: on 2026-10-30 the only
+    run that moves a book was killed at exactly its 180-minute ceiling
+    with the scan unfinished, so the agents last scanned the day before,
+    Graham's watch list stayed empty and the second Graham never opened
+    — none of which looks like a fault from outside. The margin had been
+    gone for a while; two runs the week before came within three minutes
+    of the same ceiling.
+
+    Asserted against the largest hold any cron here actually asks for,
+    so moving a cron earlier without raising the ceiling fails here
+    instead of nine days later in a log nobody reads.
+    """
+    match = JOB_TIMEOUT.search(DAILY_TEXT)
+    assert match is not None, "the job declares no timeout-minutes"
+    ceiling = timedelta(minutes=int(match["minutes"]))
+
+    worst_hold = max(
+        _anchor_utc(CRONS[c], EST_MONDAY) - _cron_utc(c, EST_MONDAY)
+        for c in US_CRONS
+    )
+    working = ceiling - worst_hold
+
+    assert working >= MIN_WORKING_BUDGET, (
+        f"a {ceiling} ceiling minus a {worst_hold} hold leaves {working} "
+        f"to scan in, and the scan has needed more than that"
+    )
+
+
 def test_the_workflow_calls_the_module_that_holds() -> None:
     """A hold step that stopped invoking it would fail silently open."""
     assert "scripts.hold_until_anchor" in DAILY_TEXT

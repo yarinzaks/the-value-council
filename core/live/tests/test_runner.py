@@ -2000,7 +2000,9 @@ class _WatchingAdapter(_StubAdapter):
         )
 
 
-def _a_watch(ticker: str, target: float = 12.0) -> LiveWatch:
+def _a_watch(
+    ticker: str, target: float = 12.0, price: float | None = 20.0
+) -> LiveWatch:
     return LiveWatch(
         ticker=ticker,
         rank=1,
@@ -2008,6 +2010,7 @@ def _a_watch(ticker: str, target: float = 12.0) -> LiveWatch:
         why_en="stub",
         why_he="stub",
         entry_price_target=target,
+        last_price=price,
     )
 
 
@@ -2062,6 +2065,53 @@ class TestThePreviousWatchlistSurvivesTheRun:
 
         assert result.previous_watchlist == ("OLD",)
         assert [w.ticker for w in result.portfolio.watchlist] == ["NEW"]
+
+    def test_the_stored_entry_keeps_both_prices(self, runner: DailyRunner) -> None:
+        """The hand-off from LiveWatch to the stored entry, field by field.
+
+        The dashboard subtracts one from the other to say how far the
+        price must fall. The adapter records both and the file holds
+        both, and in between is this copy — which dropped the quotation
+        silently for as long as it was not listed here.
+        """
+        _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=60.0
+        )
+        runner.price_loader = _StubPriceLoader({"HOLD": 60.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _WatchingAdapter(  # type: ignore[arg-type]
+                "stub_agent", [_a_watch("NEW", target=74.2, price=91.0)]
+            ),
+            AS_OF,
+            ["HOLD"],
+            {"HOLD": 60.0},
+            {"HOLD": None},
+        )
+
+        stored = result.portfolio.watchlist[0]
+        assert stored.entry_price_target == pytest.approx(74.2)
+        assert stored.last_price == pytest.approx(91.0)
+
+    def test_an_adapter_that_records_no_price_stores_none(
+        self, runner: DailyRunner
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "HOLD", entry_price=50.0, current_price=60.0
+        )
+        runner.price_loader = _StubPriceLoader({"HOLD": 60.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _WatchingAdapter(  # type: ignore[arg-type]
+                "stub_agent", [_a_watch("NEW", target=74.2, price=None)]
+            ),
+            AS_OF,
+            ["HOLD"],
+            {"HOLD": 60.0},
+            {"HOLD": None},
+        )
+
+        assert result.portfolio.watchlist[0].last_price is None
 
     def test_a_first_run_has_no_previous_list(self, runner: DailyRunner) -> None:
         _seed_holding(

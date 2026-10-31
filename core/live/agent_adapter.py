@@ -71,6 +71,10 @@ class LiveWatch:
     why_en: str
     why_he: str
     entry_price_target: float | None = None
+    #: The quotation the screen saw. Carried beside the target so the
+    #: distance to the trigger is a subtraction rather than a second
+    #: lookup; left None by every adapter whose trigger is not a price.
+    last_price: float | None = None
 
 
 @dataclass
@@ -356,6 +360,7 @@ class GrahamLive(AgentAdapter):
                     why_en=en,
                     why_he=he,
                     entry_price_target=candidate.trigger_price,
+                    last_price=candidate.price,
                 )
             )
             if len(watch) >= self.watchlist_size:

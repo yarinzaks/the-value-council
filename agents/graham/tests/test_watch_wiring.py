@@ -156,6 +156,21 @@ class TestTheAdapterCarriesThem:
         )
         assert [w.rank for w in watch] == [1, 2, 3]
 
+    def test_the_quotation_travels_beside_the_target(self):
+        """Without it the dashboard cannot say how far the price must fall.
+
+        The drilldown has a "distance from trigger" column whose two
+        branches both returned a dash, because the entry held the price
+        it wanted and not the price it saw.
+        """
+        strategy, _weights = a_run()
+        watch = GrahamLive(strategy)._collect_watchlist([])
+
+        assert all(w.last_price == pytest.approx(WATCH_PRICE) for w in watch)
+        assert all(
+            w.last_price > w.entry_price_target for w in watch
+        ), "a watch is a name the price has to fall to reach"
+
     def test_the_why_names_the_price_and_the_blocker(self):
         strategy, _weights = a_run()
         watch = GrahamLive(strategy)._collect_watchlist([])

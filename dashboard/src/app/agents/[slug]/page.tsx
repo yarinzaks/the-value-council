@@ -312,13 +312,23 @@ export default async function AgentDrillPage({
                   </thead>
                   <tbody>
                     {live.watchlist.slice(0, 30).map((w) => {
-                      // Distance to trigger: only meaningful if entry_price_target
-                      // is set and non-null. Sign indicates which side of the
-                      // trigger the price currently sits.
+                      // How far the quotation has to move to reach the
+                      // trigger. Both branches of this used to return a
+                      // dash, so the column had a heading and could
+                      // never carry a number; the screen records the
+                      // price it saw beside the target it wants, and the
+                      // list is rewritten every run, so the figure is at
+                      // most a day old.
                       const target = w.entry_price_target;
-                      const distLabel = target !== null && target !== undefined
-                        ? "—"
-                        : "—";
+                      const price = w.last_price;
+                      const distLabel =
+                        target !== null &&
+                        target !== undefined &&
+                        price !== null &&
+                        price !== undefined &&
+                        price > 0
+                          ? `${((target / price - 1) * 100).toFixed(1)}%`
+                          : "—";
                       return (
                         <tr
                           key={w.ticker}
