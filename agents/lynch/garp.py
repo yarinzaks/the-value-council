@@ -42,6 +42,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
@@ -314,7 +315,7 @@ class PeterLynch(Strategy):
         memos: list[LynchMemo] = []
         classifier = self.category_classifier
         assert classifier is not None
-        for s in top:
+        def ask(s: LynchScore) -> LynchMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -330,18 +331,20 @@ class PeterLynch(Strategy):
                 "debt_to_equity": s.debt_to_equity,
                 "heuristic_category": s.lynch_category,
             }
-            try:
-                memo = classifier.classify(
-                    stock_data=stock_data,
-                    portfolio_state={"as_of": as_of.isoformat()},
-                )
-            except Exception as exc:
+            return classifier.classify(
+                stock_data=stock_data,
+                portfolio_state={"as_of": as_of.isoformat()},
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: classifier failed ({exc}); "
+                    f"{as_of} {s.ticker}: classifier failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
             if not self.llm_mode.may_drop_a_name:
                 # Shadow: the memo is on disk and on /brain, and the

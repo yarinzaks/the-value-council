@@ -35,6 +35,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
@@ -268,7 +269,7 @@ class HowardMarks(Strategy):
         memos: list[MarksMemo] = []
         analyzer = self.second_level_analyzer
         assert analyzer is not None
-        for s in top:
+        def ask(s: MarksScore) -> MarksMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -289,21 +290,23 @@ class HowardMarks(Strategy):
                     "median_yield_pct": temperature.signals.median_yield_pct,
                 },
             }
-            try:
-                memo = analyzer.analyze(
-                    stock_data=stock_data,
-                    portfolio_state={
-                        "as_of": as_of.isoformat(),
-                        "posture": temperature.posture,
-                    },
-                )
-            except Exception as exc:
+            return analyzer.analyze(
+                stock_data=stock_data,
+                portfolio_state={
+                    "as_of": as_of.isoformat(),
+                    "posture": temperature.posture,
+                },
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: second-level analyzer failed ({exc}); "
+                    f"{as_of} {s.ticker}: second-level analyzer failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
             if not self.llm_mode.may_drop_a_name:
                 # Shadow: the memo is on disk and on /brain, and the

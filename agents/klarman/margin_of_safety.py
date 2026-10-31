@@ -39,6 +39,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
@@ -286,7 +287,7 @@ class SethKlarman(Strategy):
         memos: list[KlarmanMemo] = []
         analyzer = self.downside_analyzer
         assert analyzer is not None
-        for s in top:
+        def ask(s: KlarmanScore) -> KlarmanMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -301,18 +302,20 @@ class SethKlarman(Strategy):
                 "debt_to_equity": s.debt_to_equity,
                 "valuation_notes": list(s.valuation_notes),
             }
-            try:
-                memo = analyzer.analyze(
-                    stock_data=stock_data,
-                    portfolio_state={"as_of": as_of.isoformat()},
-                )
-            except Exception as exc:
+            return analyzer.analyze(
+                stock_data=stock_data,
+                portfolio_state={"as_of": as_of.isoformat()},
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: downside analyzer failed ({exc}); "
+                    f"{as_of} {s.ticker}: downside analyzer failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
             if not self.llm_mode.may_drop_a_name:
                 # Shadow: the memo is on disk and on /brain, and the

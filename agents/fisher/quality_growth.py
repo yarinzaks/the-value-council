@@ -36,6 +36,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
@@ -241,7 +242,7 @@ class PhilipFisher(Strategy):
         memos: list[FisherMemo] = []
         analyzer = self.scuttlebutt_analyzer
         assert analyzer is not None
-        for s in top:
+        def ask(s: FisherScore) -> FisherMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -282,18 +283,20 @@ class PhilipFisher(Strategy):
                     ),
                 },
             }
-            try:
-                memo = analyzer.analyze(
-                    stock_data=stock_data,
-                    portfolio_state={"as_of": as_of.isoformat()},
-                )
-            except Exception as exc:
+            return analyzer.analyze(
+                stock_data=stock_data,
+                portfolio_state={"as_of": as_of.isoformat()},
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: scuttlebutt analyzer failed ({exc}); "
+                    f"{as_of} {s.ticker}: scuttlebutt analyzer failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
             if not self.llm_mode.may_drop_a_name:
                 # Shadow: the memo is on disk and on /brain, and the

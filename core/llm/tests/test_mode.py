@@ -90,3 +90,33 @@ class TestEveryHybridObeysIt:
         gate = source.index("may_drop_a_name")
 
         assert kept < gate, f"{strategy.__name__} gates before recording"
+
+
+@pytest.mark.parametrize("strategy,param", HYBRIDS, ids=lambda v: getattr(v, "__name__", v))
+class TestEveryHybridAsksConcurrently:
+    """One memo is fifteen seconds; a run asks for ninety-eight.
+
+    Structural for the same reason the gate census is: each agent
+    assembles its own stock_data and names its own analyzer, so there
+    is no shared behaviour to assert — only that the work goes through
+    the pool rather than a bare loop, and that the ordering the pool
+    guarantees is the ordering the caller relies on.
+    """
+
+    def test_the_filter_goes_through_the_pool(self, strategy: type, param: str) -> None:
+        source = inspect.getsource(strategy._llm_filter)
+
+        assert "analyze_all(" in source, (
+            f"{strategy.__name__} still asks one candidate at a time"
+        )
+        assert "for s in top:" not in source, "the sequential loop survived"
+
+    def test_a_failure_is_handled_as_a_value(self, strategy: type, param: str) -> None:
+        """The pool returns exceptions rather than raising them, and a
+        caller that did not check would treat one as a memo."""
+        source = inspect.getsource(strategy._llm_filter)
+
+        assert "isinstance(outcome, Exception)" in source
+        # And the quantitative verdict is still kept when it happens.
+        failure = source[source.index("isinstance(outcome, Exception)"):]
+        assert "kept.append(s)" in failure[: failure.index("memo = outcome")]

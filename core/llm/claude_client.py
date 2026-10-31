@@ -190,6 +190,13 @@ class ClaudeClient:
         self._sdk = anthropic.Anthropic(api_key=key.get_secret_value())
 
     # --- Rate floor ----------------------------------------------------------
+    @property
+    def model_name(self) -> str:
+        """Which model this client speaks to. Read by the log line that
+        says what the analyst layer is running on, so a change of model
+        is visible in a run's output rather than only in a constant."""
+        return self._model_name
+
     def _throttle(self) -> None:
         with ClaudeClient._lock:
             elapsed = time.monotonic() - ClaudeClient._last_call_at
@@ -369,4 +376,5 @@ __all__ = [
     "DEFAULT_MODEL",
     "ClaudeClient",
     "InvestmentMemo",
+    "LLMError",
 ]

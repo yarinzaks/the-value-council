@@ -40,6 +40,7 @@ import sys
 from datetime import date
 
 from core.live.runner import AgentRunResult, DailyRunner
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 logger = get_logger("scripts.run_daily_paper_trading")
@@ -90,6 +91,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             " once-a-day guard exists so a retried schedule cannot trade"
             " a book twice; this is the override for the case where the"
             " decision rule itself changed between the two runs."
+        ),
+    )
+    p.add_argument(
+        "--llm",
+        choices=[m.value for m in LLMMode],
+        default=LLMMode.OFF.value,
+        help=(
+            "Whether the analyst layer runs, and whether it decides."
+            " 'shadow' asks it about every candidate and writes the memos"
+            " to /brain without touching the selection; 'enforce' lets a"
+            " verdict remove a name. Off by default: it costs money per"
+            " run and a book that has never been read against it should"
+            " not acquire a veto by accident."
         ),
     )
     return p.parse_args(argv)
@@ -179,7 +193,15 @@ def main(argv: list[str] | None = None) -> int:
     all_results: list[AgentRunResult] = []
     any_error = False
     for market in _markets_to_run(args.market):
-        runner = DailyRunner(market=market, only_agents=args.agents)
+        runner = DailyRunner(
+            market=market,
+            only_agents=args.agents,
+            # Only the scan asks the layer anything. A close run
+            # marks prices and selects nothing, so an analyzer
+            # there would be ninety-eight calls about a decision
+            # nobody is making.
+            llm_mode=LLMMode(args.llm) if args.mode != "close" else LLMMode.OFF,
+        )
         if args.mode == "close":
             results = runner.run_mark_to_market(as_of=args.as_of)
         else:

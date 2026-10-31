@@ -32,6 +32,7 @@ from datetime import date
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
+from agents.buffett.moat_analyzer import MoatAnalyzer
 from agents.council.cadence import (
     RunType,
     is_first_run_of_week,
@@ -44,12 +45,16 @@ from agents.council.regime import read_regime
 from agents.council.strategy import MohnishPabrai
 from agents.dreman.contrarian import DavidDreman
 from agents.fisher import PhilipFisher
+from agents.fisher.scuttlebutt import ScuttlebuttAnalyzer
 from agents.graham.net_net import BenjaminGraham
 from agents.greenblatt.magic_formula import MagicFormula
 from agents.klarman import SethKlarman
+from agents.klarman.downside import DownsideAnalyzer
 from agents.lynch import PeterLynch
+from agents.lynch.category_classifier import CategoryClassifier
 from agents.market_core.strategy import MarketCore
 from agents.marks import HowardMarks
+from agents.marks.second_level import SecondLevelAnalyzer
 from agents.neff.total_return import JohnNeff
 from agents.schloss.deep_value import WalterSchloss
 from core.backtest.data_loader import PriceDataLoader, _to_date
@@ -83,6 +88,7 @@ from core.live.agent_adapter import (
     ScanResult,
     SchlossLive,
 )
+from core.live.notify import notify_run
 from core.live.portfolio import (
     DEFAULT_COST_BPS,
     DEFAULT_INITIAL_CASH,
@@ -97,8 +103,9 @@ from core.live.portfolio import (
 from core.live.price_export import export_prices
 from core.live.sector_export import export_sectors
 from core.live.snapshots import make_snapshot, save_snapshot
-from core.live.notify import notify_run
 from core.live.trade_ledger import record_day
+from core.llm.mode import LLMMode
+from core.llm.wiring import build_analyst_layer
 from core.logger import get_logger
 from core.market_calendar import closes_early, why_closed
 from core.paths import council_published_dir, trade_ledger_dir
@@ -204,6 +211,7 @@ def build_default_adapters(
     decision_logger: DecisionLogger,
     edgar_cache: EdgarCache | None = None,
     price_loader: PriceDataLoader | None = None,
+    llm_mode: LLMMode = LLMMode.OFF,
 ) -> list[AgentAdapter]:
     """Construct the live adapters for the council's live books.
 
@@ -221,13 +229,26 @@ def build_default_adapters(
     a 52-week low and a five-year high, which are price facts rather
     than filings.
 
-    LLM analyzers are intentionally ``None`` for live mode here — same
-    rationale as backtest: lookahead bias + free-tier quota burn. The
-    quant pipelines drive selection identically; if/when the LLM-quota
-    story changes, the analyzers can be wired in by the caller.
+    ``llm_mode`` decides whether the five hybrid agents get an analyzer
+    at all. It defaults to ``OFF``, which is what every caller meant
+    before there was a choice, and what a backtest must keep meaning —
+    a model that has read the future is not analysis.
+
+    ``SHADOW`` builds them and lets them write memos without touching
+    the selection. Nothing here fails when the layer cannot be built:
+    no API key is the normal state of a checkout, and a book that
+    cannot reach the layer trades on its screen exactly as it did
+    before there was one.
     """
     cache = edgar_cache or EdgarCache()
     prices = price_loader or PriceDataLoader()
+    layer = build_analyst_layer(
+        ("buffett", "lynch", "marks", "klarman", "fisher"), mode=llm_mode
+    )
+    # The mode the agents are told about is the layer's own, which is
+    # OFF when it could not be built. Handing them SHADOW alongside a
+    # None analyzer would be harmless but would log a lie.
+    mode = layer.mode
     return [
         GreenblattLive(
             MagicFormula(
@@ -292,7 +313,8 @@ def build_default_adapters(
                 edgar_cache=cache,
                 portfolio_size=8,
                 min_market_cap=5_000_000_000.0,
-                moat_analyzer=None,
+                moat_analyzer=layer.build("buffett", MoatAnalyzer),
+                llm_mode=mode,
                 decision_logger=decision_logger,
             )
         ),
@@ -301,7 +323,8 @@ def build_default_adapters(
                 edgar_cache=cache,
                 portfolio_size=30,
                 min_market_cap=300_000_000.0,
-                category_classifier=None,
+                category_classifier=layer.build("lynch", CategoryClassifier),
+                llm_mode=mode,
                 decision_logger=decision_logger,
             )
         ),
@@ -309,7 +332,8 @@ def build_default_adapters(
             HowardMarks(
                 edgar_cache=cache,
                 min_market_cap=500_000_000.0,
-                second_level_analyzer=None,
+                second_level_analyzer=layer.build("marks", SecondLevelAnalyzer),
+                llm_mode=mode,
                 decision_logger=decision_logger,
             )
         ),
@@ -318,7 +342,8 @@ def build_default_adapters(
                 edgar_cache=cache,
                 min_market_cap=500_000_000.0,
                 max_portfolio_size=20,
-                downside_analyzer=None,
+                downside_analyzer=layer.build("klarman", DownsideAnalyzer),
+                llm_mode=mode,
                 decision_logger=decision_logger,
             )
         ),
@@ -327,7 +352,8 @@ def build_default_adapters(
                 edgar_cache=cache,
                 min_market_cap=1_000_000_000.0,
                 max_portfolio_size=15,
-                scuttlebutt_analyzer=None,
+                scuttlebutt_analyzer=layer.build("fisher", ScuttlebuttAnalyzer),
+                llm_mode=mode,
                 decision_logger=decision_logger,
             )
         ),
@@ -485,6 +511,7 @@ class DailyRunner:
         pit_loader: PointInTimeLoader | None = None,
         decision_logger: DecisionLogger | None = None,
         only_agents: Sequence[str] | None = None,
+        llm_mode: LLMMode = LLMMode.OFF,
     ) -> None:
         if market not in ("US", "TASE"):
             raise ValueError(
@@ -500,6 +527,7 @@ class DailyRunner:
             decision_logger=self.decision_logger,
             edgar_cache=self.cache,
             price_loader=self.price_loader,
+            llm_mode=llm_mode,
         )
         if only_agents is not None:
             self.adapters = _filter_adapters(self.adapters, only_agents)
