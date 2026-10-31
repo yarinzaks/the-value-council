@@ -94,18 +94,24 @@ class TestFailureIsAValue:
 
 class TestConcurrency:
     def test_work_actually_overlaps(self) -> None:
-        """Otherwise this is an elaborate for-loop."""
+        """Otherwise this is an elaborate for-loop.
+
+        The first candidate is deliberately excluded: it goes alone, to
+        warm the playbook cache, so the barrier is for the rest.
+        """
         started = threading.Barrier(DEFAULT_WORKERS, timeout=5)
 
-        def ask(_n: int) -> str:
+        def ask(n: int) -> str:
+            if n == 0:
+                return "warm-up"
             # Returns only once DEFAULT_WORKERS calls are in flight, so
             # it cannot pass unless they genuinely overlap.
             started.wait()
             return "ok"
 
-        out = analyze_all(list(range(DEFAULT_WORKERS)), ask)
+        out = analyze_all(list(range(DEFAULT_WORKERS + 1)), ask)
 
-        assert [r for _, r in out] == ["ok"] * DEFAULT_WORKERS
+        assert [r for _, r in out] == ["warm-up"] + ["ok"] * DEFAULT_WORKERS
 
     def test_the_pool_is_never_wider_than_the_work(self) -> None:
         live, peak = 0, 0
@@ -140,3 +146,69 @@ class TestConcurrency:
         analyze_all([1], ask)
 
         assert where == [threading.current_thread().name]
+
+
+class TestTheFirstCallGoesAlone:
+    """So the playbook is written to the cache once, not once per worker.
+
+    Measured over a real run before this: Lynch's thirty candidates
+    paid 71,580 cache-write tokens where one playbook is about 17,000.
+    Four workers all started before any cache existed, so four of them
+    wrote it. Across the five agents that was $3.89 a run against the
+    $2.20 one write apiece costs.
+    """
+
+    def test_nothing_overlaps_the_first_call(self) -> None:
+        in_flight: list[int] = []
+        peak_during_first = 0
+        lock = threading.Lock()
+        done_first = threading.Event()
+
+        def ask(n: int) -> int:
+            nonlocal peak_during_first
+            with lock:
+                in_flight.append(n)
+                if not done_first.is_set():
+                    peak_during_first = max(peak_during_first, len(in_flight))
+            if n == 0:
+                time.sleep(0.05)
+                done_first.set()
+            with lock:
+                in_flight.remove(n)
+            return n
+
+        analyze_all(list(range(8)), ask)
+
+        assert peak_during_first == 1, "something ran beside the cache-warming call"
+
+    def test_the_rest_still_overlap(self) -> None:
+        """The warm-up must not turn this back into a sequential loop."""
+        started = threading.Barrier(DEFAULT_WORKERS, timeout=5)
+
+        def ask(n: int) -> str:
+            if n == 0:
+                return "first"
+            started.wait()
+            return "ok"
+
+        out = analyze_all(list(range(DEFAULT_WORKERS + 1)), ask)
+
+        assert [r for _, r in out] == ["first"] + ["ok"] * DEFAULT_WORKERS
+
+    def test_order_survives_the_split(self) -> None:
+        out = analyze_all(["A", "B", "C", "D"], lambda c: c.lower())
+
+        assert out == [("A", "a"), ("B", "b"), ("C", "c"), ("D", "d")]
+
+    def test_a_failing_first_call_does_not_stop_the_rest(self) -> None:
+        """The cache simply stays cold; the others still get answers."""
+
+        def ask(n: int) -> int:
+            if n == 0:
+                raise RuntimeError("the warm-up failed")
+            return n
+
+        out = analyze_all([0, 1, 2], ask)
+
+        assert isinstance(out[0][1], RuntimeError)
+        assert [r for _, r in out[1:]] == [1, 2]

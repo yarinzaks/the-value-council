@@ -67,10 +67,25 @@ def analyze_all[CandidateT, ResultT](
         # turn concurrency off and get identical behaviour.
         return [(c, _attempt(ask, c)) for c in candidates]
 
-    with ThreadPoolExecutor(max_workers=min(workers, len(candidates))) as pool:
+    # The first candidate goes alone, and the rest follow together.
+    #
+    # Not for ordering — `map` already guarantees that — but for the
+    # cache. An agent's playbook is written to the cache by whichever
+    # call arrives first and read by every call after, and four workers
+    # starting at once means four of them arrive before any cache
+    # exists. Measured over a real run: Lynch's thirty candidates paid
+    # 71,580 cache-write tokens where one playbook is about 17,000, so
+    # it was written four times. Across the five agents that was $3.89
+    # a run against the $2.20 one write apiece would cost.
+    #
+    # The price is one call's latency per agent, about fifteen seconds,
+    # against roughly a third of the bill.
+    head, tail = candidates[0], candidates[1:]
+    outcomes = [_attempt(ask, head)]
+    with ThreadPoolExecutor(max_workers=min(workers, len(tail))) as pool:
         # `map` preserves input order and yields lazily, which is what
         # keeps the ordering guarantee without a sort afterwards.
-        outcomes = list(pool.map(lambda c: _attempt(ask, c), candidates))
+        outcomes.extend(pool.map(lambda c: _attempt(ask, c), tail))
     return list(zip(candidates, outcomes, strict=True))
 
 
