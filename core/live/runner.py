@@ -100,6 +100,7 @@ from core.live.snapshots import make_snapshot, save_snapshot
 from core.live.notify import notify_run
 from core.live.trade_ledger import record_day
 from core.logger import get_logger
+from core.market_calendar import closes_early, why_closed
 from core.paths import council_published_dir, trade_ledger_dir
 
 logger = get_logger("core.live.runner")
@@ -548,11 +549,50 @@ class DailyRunner:
         )
         return []
 
+    def _market_shut(self, mode_label: str, as_of: date) -> bool:
+        """Whether to decline ``as_of`` because the US market had no session.
+
+        The schedule ran Monday to Friday and knew nothing else, so a
+        public holiday was an ordinary trading day to it. On four of
+        them in 2026 the agents wrote 1,770 journal rows and executed 21
+        trades, every one priced at the previous session's close —
+        because that is what a quote feed returns when there is no
+        session. The NAV was not even distorted. The dates were, and a
+        paper-trading record whose dates cannot be trusted records
+        nothing.
+
+        Declining is deliberately louder than skipping: the workflow's
+        own verifier asserts every book was refreshed, so a day stopped
+        here has to be a day it also knows about, or this becomes a way
+        to fail the build quietly. They read the same calendar.
+        """
+        reason = why_closed(as_of)
+        if reason is None:
+            early = closes_early(as_of)
+            if early is not None:
+                # Reported, not acted on: an early close moves the
+                # auction forward, and a mark struck after it reads the
+                # real official close, which is the number wanted.
+                logger.info(
+                    f"{as_of}: the market closes at 13:00 ET today "
+                    f"({early}); running as normal"
+                )
+            return False
+        logger.warning(
+            f"{as_of}: no US session today ({reason}) — {mode_label} "
+            f"declined. Prices on a shut day are the previous close, and "
+            f"booking them under today's date is how four 2026 holidays "
+            f"acquired 21 trades that never happened."
+        )
+        return True
+
     def run_mark_to_market(
         self, *, as_of: date | None = None
     ) -> list[AgentRunResult]:
         if self.market == "TASE":
             return self._tase_placeholder("close", as_of)
+        if self._market_shut("mark-to-market", as_of or date.today()):
+            return []
         """Close-of-day mode: refresh prices on every open position,
         update NAV / P&L / weights, write a fresh portfolio.json AND a
         snapshot. No new BUYs or SELLs executed.
@@ -659,6 +699,8 @@ class DailyRunner:
         if self.market == "TASE":
             return self._tase_placeholder("open", as_of)
         as_of = as_of or date.today()
+        if self._market_shut("scan", as_of):
+            return []
         logger.info(f"daily run for {as_of}")
         self.universe._ensure_loaded()
         members = self.universe.constituents_at(as_of)
