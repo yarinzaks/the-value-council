@@ -4,6 +4,11 @@ import { metaLocalized } from "@/lib/agents";
 import { getServerI18n } from "@/lib/locale-server";
 import type { Locale } from "@/lib/i18n";
 import type { BrainMemo } from "@/lib/types";
+import {
+  memoEntries,
+  memoFieldLabel,
+  memoValue,
+} from "@/lib/translate-dynamic";
 
 // Static in the two-language export, where "force-dynamic" is a hard
 // error; dynamic under a live server. Same pattern as every other page.
@@ -34,19 +39,30 @@ export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
  * shows up here with no change to this page, which is the only way a
  * page like this stays honest about "everything it said".
  */
-function MemoBody({ memo }: { memo: Record<string, unknown> }) {
-  const entries = Object.entries(memo ?? {});
+function MemoBody({
+  memo,
+  locale,
+  t,
+}: {
+  memo: Record<string, unknown>;
+  locale: Locale;
+  t: (key: string) => string;
+}) {
+  // memoEntries drops the language twin the reader did not ask for:
+  // five schemas write `thesis_en` and `thesis_he`, and this page used
+  // to print both.
+  const entries = memoEntries(memo ?? {}, locale);
   if (entries.length === 0) return null;
 
   return (
     <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
       {entries.map(([key, value]) => (
         <div key={key} className="min-w-0">
-          <dt className="text-xs uppercase tracking-wider text-muted">
-            {key.replace(/_/g, " ")}
+          <dt className="text-xs tracking-wider text-muted">
+            {memoFieldLabel(key, locale)}
           </dt>
           <dd className="mt-0.5 text-sm break-words">
-            {renderValue(value)}
+            {renderValue(value, key, locale, t)}
           </dd>
         </div>
       ))}
@@ -54,28 +70,44 @@ function MemoBody({ memo }: { memo: Record<string, unknown> }) {
   );
 }
 
-function renderValue(value: unknown): React.ReactNode {
+function renderValue(
+  value: unknown,
+  path: string,
+  locale: Locale,
+  t: (key: string) => string,
+): React.ReactNode {
   if (value === null || value === undefined) return <span className="text-muted">—</span>;
-  if (typeof value === "boolean") return value ? "yes" : "no";
+  if (typeof value === "boolean") return value ? t("yes") : t("no");
   if (typeof value === "number") return <span className="tabular">{value}</span>;
-  if (typeof value === "string") return value;
+  // Through the phrase table: a memo's short string values are the
+  // agents' own vocabulary — "Fast Grower", "Tier A", "INSIDE" — and
+  // the same table that renders them in the Telegram message renders
+  // them here.
+  if (typeof value === "string") return memoValue(value, locale);
   if (Array.isArray(value)) {
     if (value.length === 0) return <span className="text-muted">—</span>;
     return (
       <ul className="list-disc ms-4 space-y-0.5">
         {value.map((v, i) => (
-          <li key={i}>{renderValue(v)}</li>
+          <li key={i}>{renderValue(v, path, locale, t)}</li>
         ))}
       </ul>
     );
   }
-  // A nested object — Fisher's fifteen points arrive this way.
+  // A nested object — Fisher's fifteen points arrive this way. The
+  // label is looked up on the dotted path, so `scaling_out_plan.
+  // full_exit_price` is labelled as itself rather than as whatever
+  // `full_exit_price` means elsewhere.
   return (
     <dl className="space-y-0.5">
       {Object.entries(value as Record<string, unknown>).map(([k, v]) => (
         <div key={k} className="flex gap-2">
-          <dt className="text-muted shrink-0">{k.replace(/_/g, " ")}:</dt>
-          <dd className="min-w-0 break-words">{renderValue(v)}</dd>
+          <dt className="text-muted shrink-0">
+            {memoFieldLabel(`${path}.${k}`, locale)}:
+          </dt>
+          <dd className="min-w-0 break-words">
+            {renderValue(v, `${path}.${k}`, locale, t)}
+          </dd>
         </div>
       ))}
     </dl>
@@ -210,7 +242,7 @@ function MemoCard({
         <span className="font-mono">{memo.schema}</span>
       </div>
 
-      <MemoBody memo={memo.memo} />
+      <MemoBody memo={memo.memo} locale={locale} t={t} />
     </Card>
   );
 }
