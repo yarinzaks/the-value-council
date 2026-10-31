@@ -49,6 +49,8 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
+from core.live.hebrew_industry import industry_he
+from core.live.hebrew_terms import translate
 from core.live.rtl import ltr, rtl_line
 from core.logger import get_logger
 from core.text import titlecase
@@ -366,6 +368,25 @@ def _money(value: float) -> str:
     return ltr(f"${value:,.2f}")
 
 
+def _price(value: float) -> str:
+    """A quoted price, at the precision it actually filled at.
+
+    ``_money`` rounds to the cent, which is right for a total and wrong
+    for a price: 34 of the last 198 real fills carry a third decimal —
+    $25.135, $83.995 — because the mark is a midpoint or a
+    split-adjusted close. Rounding those for display left the three
+    figures of a trade not multiplying out, and a reader who checks
+    13 x $25.14 = $326.82 against a stated $326.75 has found a
+    seven-cent gap with nothing on the message to explain it.
+
+    Two decimals at least, because a price is written with cents, and
+    four at most, because beyond that the digits are the data feed's
+    arithmetic rather than a price anyone paid.
+    """
+    whole, _, frac = f"{value:,.4f}".rstrip("0").partition(".")
+    return ltr(f"${whole}.{frac.ljust(2, '0')}")
+
+
 def _shares(value: float) -> str:
     """A share count, isolated, and without decimals it does not have.
 
@@ -389,9 +410,29 @@ def _field(label: str, value: str) -> str:
     return rtl_line(f"{label}: {value}")
 
 
+#: A criterion whose value never arrived. ``P/B=nan (< 1.5)`` is not a
+#: test the company passed — it is a missing figure, and 90 rows of the
+#: journal carry one. Printed, it tells the reader nothing and looks
+#: like a fault in the system that wrote it.
+_MISSING_VALUE = re.compile(r"\bnan\b", re.IGNORECASE)
+
+
+def _is_measured(text: str) -> bool:
+    """Whether a criterion carries a figure rather than a gap."""
+    return not _MISSING_VALUE.search(str(text))
+
+
 def _bullet(text: str) -> str:
-    """One item under a heading."""
-    return rtl_line(f"\u2022 {ltr(text) if _is_latin(text) else text}")
+    """One item under a heading, in Hebrew where this module knows it.
+
+    The agents write their criteria in English and that string is the
+    audit trail, so the translation happens here rather than at each of
+    the twelve strategies — see :mod:`core.live.hebrew_terms`. A phrase
+    with no entry there passes through in English, which is why the
+    isolate below is still decided per item.
+    """
+    rendered = translate(str(text))
+    return rtl_line(f"\u2022 {ltr(rendered) if _is_latin(rendered) else rendered}")
 
 
 def _is_latin(text: str) -> bool:
@@ -508,7 +549,7 @@ def format_action(
 
     lines += [
         "",
-        _field("מחיר למניה", _money(price)),
+        _field("מחיר למניה", _price(price)),
         _field("כמות מניות", _shares(shares)),
         _field("סכום העסקה", _money(gross)),
     ]
@@ -548,7 +589,11 @@ def format_action(
     if met:
         # Drop the bookkeeping entries — "mode=DEFENSIVE" is already the
         # heading for the plan, and repeating it reads as a criterion.
-        shown = [c for c in met if not str(c).lower().startswith("mode=")]
+        shown = [
+            c
+            for c in met
+            if not str(c).lower().startswith("mode=") and _is_measured(c)
+        ]
         if shown:
             # The field holds different things on the way in and on the
             # way out. A buy lists the tests the company passed; an exit
@@ -606,9 +651,9 @@ def format_watch_entry(
     target = getattr(watch, "entry_price_target", None)
     last = getattr(watch, "last_price", None)
     if target is not None:
-        prices = ["", _field("מחיר כניסה", _money(float(target)))]
+        prices = ["", _field("מחיר כניסה", _price(float(target)))]
         if last:
-            prices.append(_field("מחיר נוכחי", _money(float(last))))
+            prices.append(_field("מחיר נוכחי", _price(float(last))))
             fall = (1.0 - float(target) / float(last)) * 100.0
             prices.append(_field("צריך לרדת", ltr(f"{fall:.1f}%")))
         lines += prices
@@ -946,11 +991,19 @@ def _company_names() -> Mapping[str, str]:
 
 
 def _industry_title(ticker: str) -> str | None:
-    """The SEC's classification of the company's primary business."""
-    try:
-        from core.data.sic_codes import industry_title
+    """The company's primary business, in Hebrew where it is known.
 
-        return industry_title(ticker)
+    The SEC's own title is the fallback rather than the answer: it is
+    legal nomenclature — ``APPAREL & OTHER FINISHD PRODS OF FABRICS &
+    SIMILAR MATL`` — and the message has one line for this. See
+    :mod:`core.live.hebrew_industry` for the two-level mapping and why
+    the four-digit code sometimes has to override its own group.
+    """
+    try:
+        from core.data.sic_codes import industry_title, sic_for
+
+        english = industry_title(ticker)
+        return industry_he(sic_for(ticker), english)
     except Exception as exc:  # noqa: BLE001 — enrichment is optional
         logger.debug(f"could not resolve industry for {ticker}: {type(exc).__name__}")
         return None
