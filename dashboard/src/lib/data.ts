@@ -11,6 +11,8 @@ import path from "node:path";
 import { parse as parseCsvSync } from "csv-parse/sync";
 
 import { AGENTS, metaFor } from "./agents";
+import { mergeWatchSignals } from "./watchlist-merge";
+import type { WatchEntry, WatchSignal } from "./watchlist-merge";
 import type {
   AgentDailyDelta,
   BrainMemo,
@@ -264,18 +266,15 @@ export async function loadJournal(query: JournalQuery = {}): Promise<DecisionRow
 }
 
 // --------------------------------------------------------------------------
-// Watchlist — derived from latest WATCH decisions across agents
+// Watchlist — two sources, one page
 // --------------------------------------------------------------------------
+//
+// The merge itself, and why there are two sources at all, live in
+// ./watchlist-merge. It is a leaf module so `node --test` can load it:
+// this file reads the filesystem and imports `./agents` without a file
+// extension, which Node will not resolve.
 
-export interface WatchEntry {
-  ticker: string;
-  agents: { slug: AgentSlug; display_name: string; rationale: string | null }[];
-  most_recent: string;
-  /** A WATCH usually has the same criteria as a BUY but didn't make the
-   *  top-N. Track how many agents are watching the name to surface
-   *  cross-agent agreement. */
-  agent_count: number;
-}
+export type { WatchEntry, WatchSignal } from "./watchlist-merge";
 
 /** Every memo the analyst layer produced, newest first.
  *
@@ -322,52 +321,41 @@ export async function loadBrainMemos(limit = 400): Promise<BrainMemo[]> {
 
 export async function loadWatchlist(): Promise<WatchEntry[]> {
   const slugs = AGENTS.map((a) => a.slug);
-  const watches = (
-    await Promise.all(
-      slugs.map(async (s) =>
-        (await loadDecisionsForAgent(s)).filter((d) => d.decision === "WATCH"),
-      ),
-    )
-  ).flat();
-
-  // Keep only most-recent WATCH per (ticker, agent) pair.
-  const latest = new Map<string, DecisionRow>();
-  for (const w of watches) {
-    const key = `${w.ticker}|${w.agent}`;
-    const cur = latest.get(key);
-    if (!cur || w.timestamp > cur.timestamp) latest.set(key, w);
-  }
-
-  // Group by ticker.
-  const byTicker = new Map<string, DecisionRow[]>();
-  for (const w of latest.values()) {
-    const list = byTicker.get(w.ticker) ?? [];
-    list.push(w);
-    byTicker.set(w.ticker, list);
-  }
-
-  const entries: WatchEntry[] = [];
-  for (const [ticker, list] of byTicker.entries()) {
-    list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-    entries.push({
-      ticker,
-      agents: list.map((d) => ({
-        slug: d.agent as AgentSlug,
-        display_name: metaFor(d.agent as AgentSlug)?.display_name ?? d.agent,
-        rationale: d.rationale,
-      })),
-      most_recent: list[0].timestamp,
-      agent_count: list.length,
-    });
-  }
-
-  // Surface highest-conviction (most agents agreeing) first, then newest.
-  entries.sort((a, b) => {
-    if (b.agent_count !== a.agent_count) return b.agent_count - a.agent_count;
-    return b.most_recent.localeCompare(a.most_recent);
-  });
-
-  return entries;
+  const perAgent = await Promise.all(
+    slugs.map(async (slug): Promise<WatchSignal[]> => {
+      const [rows, live] = await Promise.all([
+        loadDecisionsForAgent(slug),
+        loadLivePortfolio(slug),
+      ]);
+      const display = metaFor(slug)?.display_name ?? slug;
+      const fromJournal: WatchSignal[] = rows
+        .filter((d) => d.decision === "WATCH")
+        .map((d) => ({
+          slug,
+          display_name: display,
+          ticker: d.ticker,
+          rationale: d.rationale,
+          when: d.timestamp,
+          entry_price_target: null,
+          live: false,
+        }));
+      const fromPortfolio: WatchSignal[] = (live?.watchlist ?? []).map((w) => ({
+        slug,
+        display_name: display,
+        ticker: w.ticker,
+        // The agent's own sentence, which already names what blocks the
+        // company and the price that would unblock it. English here
+        // because the row's tooltip is translated at render like every
+        // other rationale on this page.
+        rationale: w.why_en || null,
+        when: w.identified_date,
+        entry_price_target: w.entry_price_target ?? null,
+        live: true,
+      }));
+      return [...fromJournal, ...fromPortfolio];
+    }),
+  );
+  return mergeWatchSignals(perAgent.flat());
 }
 
 // --------------------------------------------------------------------------

@@ -73,6 +73,17 @@ export default async function WatchlistPage() {
                               style={{ backgroundColor: meta?.color ?? "#999" }}
                             />
                             {meta?.display ?? a.slug}
+                            {/* The price this agent is waiting for, on
+                                the agent rather than in a column of its
+                                own: two agents can be waiting for the
+                                same name at different prices, and one
+                                column would have to pick one of them
+                                and say nothing about whose it was. */}
+                            {a.entry_price_target !== null && (
+                              <span className="font-mono tabular text-muted">
+                                ${a.entry_price_target.toFixed(2)}
+                              </span>
+                            )}
                           </span>
                         );
                       })}
