@@ -191,19 +191,54 @@ export function readCookie(header, name = COOKIE_NAME) {
 
 // ----------------------------------------------------------- the pages
 
+/** A sentinel to resolve a candidate path against.
+ *
+ *  `.invalid` is reserved by RFC 2606 and can never be a real host, so
+ *  a candidate that resolves to some *other* origin is one that
+ *  carried an origin of its own.
+ */
+const SELF = "https://self.invalid";
+
 /** Where to send the reader after signing in.
  *
- *  Only a path on this site, and only one starting with a single `/`.
- *  `//evil.example` is a protocol-relative URL that a browser resolves
- *  to another origin, which would make the login form an open
- *  redirector; a backslash is normalised to `/` by some browsers, so it
- *  is refused too.
+ *  Only a path on this site. Anything else is an open redirector: a
+ *  crafted `/login?next=…` link, a victim who signs in, and the 303
+ *  lands them on the attacker's page — having just arrived from a
+ *  domain they trust and typed a password into it.
+ *
+ *  Checked by resolving the candidate and comparing origins, not by
+ *  listing the characters that break it. The first version did list
+ *  them — it refused a leading `//` and any backslash — and it was
+ *  wrong, because the URL spec *deletes* tab, LF and CR from the input
+ *  before parsing. `/⇥/evil.example` is parsed as `//evil.example`,
+ *  which is protocol-relative, and a browser resolved it to
+ *  https://evil.example. Tab, LF and CR all got through, confirmed by
+ *  running them.
+ *
+ *  Resolving instead of matching is the structural answer: whatever
+ *  the parser does to the input, the origin it lands on is the thing
+ *  that matters, and that is the thing compared. Control characters
+ *  and whitespace are refused outright as well — not because the
+ *  origin check needs the help, but because a path that contains one
+ *  is not a path this site ever produced, and a value that reaches a
+ *  `Location` header should not carry a byte that could split it.
  */
 export function safeNext(raw) {
   if (typeof raw !== "string" || !raw.startsWith("/")) return "/he/";
-  if (raw.startsWith("//") || raw.includes("\\")) return "/he/";
-  if (PUBLIC_PATHS.has(raw.split("?")[0])) return "/he/";
-  return raw;
+  // C0 controls, space, DEL, and the backslash some parsers fold to `/`.
+  if (/[\u0000-\u0020\u007f\\]/.test(raw)) return "/he/";
+  let resolved;
+  try {
+    resolved = new URL(raw, SELF);
+  } catch {
+    return "/he/";
+  }
+  if (resolved.origin !== SELF) return "/he/";
+  if (PUBLIC_PATHS.has(resolved.pathname)) return "/he/";
+  // Reassembled from the parsed parts, so what is returned is what a
+  // browser will have resolved — `/a/../b` normalised, and nothing
+  // ambiguous left in it.
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
 
 function escapeHtml(text) {

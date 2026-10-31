@@ -280,6 +280,62 @@ test("the login form cannot be turned into an open redirector", async () => {
   }
 });
 
+test("a character the URL parser deletes cannot smuggle in an origin", async () => {
+  // The hole the first version left. WHATWG strips tab and newline from
+  // a URL *before* parsing it, so "/\t/evil.example" is parsed as
+  // "//evil.example" — protocol-relative, and a browser resolves that
+  // against the scheme and nothing else. The guard tested for two
+  // literal slashes and never considered the character between them
+  // vanishing.
+  //
+  // Reproduced: tab, LF and CR all reached https://evil.example.
+  const hostile = [
+    "/\t/evil.example",
+    "/\n/evil.example",
+    "/\r/evil.example",
+    "/\u0000/evil.example",
+    "/ /evil.example",
+    "/\t\t//evil.example",
+    "/\u000b/evil.example",
+    "/\u000c/evil.example",
+    "/\u007f/evil.example",
+  ];
+  for (const raw of hostile) {
+    assert.equal(safeNext(raw), "/he/", JSON.stringify(raw));
+  }
+});
+
+test("whatever safeNext returns stays on this origin", async () => {
+  // The property, asserted directly rather than by enumerating the
+  // characters that break it — which is the enumeration that went
+  // wrong. Anything the function lets through must resolve to this
+  // site when a browser resolves it.
+  const SITE = "https://council.pages.dev";
+  const inputs = [
+    "/he/", "/en/agents/", "/he/agents/john_neff/?tab=trades",
+    "/he/x#frag", "/a/../b", "/a/./b", "//evil.example", "///evil.example",
+    "/\t/evil.example", "/\n//evil.example", "/\\evil.example",
+    "https://evil.example", "http://evil.example", "javascript:alert(1)",
+    "/%2f%2fevil.example", "/he/\u2028/evil.example", "/?next=//evil.example",
+    "/#//evil.example", "/\u0085/evil.example", "/\ufeff/evil.example",
+  ];
+  for (const raw of inputs) {
+    const allowed = safeNext(raw);
+    assert.ok(allowed.startsWith("/"), `${raw} -> ${allowed}`);
+    const resolved = new URL(allowed, SITE);
+    assert.equal(resolved.origin, SITE, `${JSON.stringify(raw)} -> ${allowed}`);
+  }
+});
+
+test("a legitimate path survives intact", async () => {
+  assert.equal(safeNext("/he/agents/john_neff/"), "/he/agents/john_neff/");
+  assert.equal(
+    safeNext("/en/journal/?state=open"),
+    "/en/journal/?state=open",
+  );
+  assert.equal(safeNext("/he/x#section"), "/he/x#section");
+});
+
 test("a path on this site is carried through", async () => {
   assert.equal(safeNext("/he/agents/benjamin_graham/"), "/he/agents/benjamin_graham/");
   assert.equal(safeNext("/en/journal/?state=open"), "/en/journal/?state=open");
