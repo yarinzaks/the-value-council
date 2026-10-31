@@ -52,15 +52,42 @@ const SHARED_PATTERNS: readonly [RegExp, string][] = (
   replacement.replace(/\\(\d)/g, "$$$1"),
 ]);
 
+/** Latin that belongs in a Hebrew sentence: the abbreviations an Israeli
+ *  investor reads in Latin script, and the units beside them. */
+const LATIN_BY_CONVENTION =
+  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|REIT|SPAC|NAV|CEO|USD|nan|CR|bps/g;
+
+/**
+ * Whether a string came out half Hebrew and half English sentence.
+ *
+ * The table is substring replacement, which is right for a format
+ * string and actively wrong for a sentence. Applied to the analyst's
+ * English it produced "No customer reviews, retention figures או
+ * pricing-power evidence were provided" and "Management ספק ביושרה
+ * emerges" — ungrammatical in both languages, and worse than the
+ * English alone.
+ *
+ * Checked on the output, not the input. Guarding the input was the
+ * first attempt and it was the wrong object: a 110-character reverse
+ * trigger is neither long enough nor first-person enough to look like
+ * prose, and it mangled anyway. What distinguishes a bad result is
+ * visible in the result.
+ */
+export function isHybrid(text: string): boolean {
+  if (!/[\u0590-\u05ff]/.test(text)) return false;
+  return /[A-Za-z]{3,}/.test(text.replace(LATIN_BY_CONVENTION, ""));
+}
+
 /** Apply the shared table to one string. Numbers are never touched —
- *  the table replaces words around them. */
+ *  the table replaces words around them — and a half-translated result
+ *  is discarded in favour of the original. */
 function applyShared(text: string): string {
   let out = text;
   for (const [re, replacement] of SHARED_PATTERNS) out = out.replace(re, replacement);
   for (const [english, he] of SHARED_TERMS) {
     if (out.includes(english)) out = out.split(english).join(he);
   }
-  return out;
+  return isHybrid(out) ? text : out;
 }
 
 interface Rule {
@@ -263,7 +290,14 @@ export function translateRationale(text: string, locale: Locale): string {
       // meant a rationale matching one of the rules above skipped the
       // table completely — 194 of them, every one translated by the
       // notifier and half-translated here.
-      return applyShared(text.replace(r.re, r.he));
+      // When one of this file's own rules leaves a hybrid, fall back to
+      // the shared table on the *original* rather than giving up and
+      // returning the English: Dreman's rationale matches a rule here
+      // that half-translates it, and the table renders it whole.
+      const matched = text.replace(r.re, r.he);
+      if (!isHybrid(matched)) return applyShared(matched);
+      const shared = applyShared(text);
+      return isHybrid(shared) ? text : shared;
     }
   }
   // Fall through to per-fragment translation for unknown rationales.
@@ -279,7 +313,14 @@ export function translateTrigger(text: string, locale: Locale): string {
       // meant a rationale matching one of the rules above skipped the
       // table completely — 194 of them, every one translated by the
       // notifier and half-translated here.
-      return applyShared(text.replace(r.re, r.he));
+      // When one of this file's own rules leaves a hybrid, fall back to
+      // the shared table on the *original* rather than giving up and
+      // returning the English: Dreman's rationale matches a rule here
+      // that half-translates it, and the table renders it whole.
+      const matched = text.replace(r.re, r.he);
+      if (!isHybrid(matched)) return applyShared(matched);
+      const shared = applyShared(text);
+      return isHybrid(shared) ? text : shared;
     }
   }
   return applyRules(text, CRITERIA_RULES);
@@ -294,7 +335,14 @@ export function translateExitTrigger(text: string, locale: Locale): string {
       // meant a rationale matching one of the rules above skipped the
       // table completely — 194 of them, every one translated by the
       // notifier and half-translated here.
-      return applyShared(text.replace(r.re, r.he));
+      // When one of this file's own rules leaves a hybrid, fall back to
+      // the shared table on the *original* rather than giving up and
+      // returning the English: Dreman's rationale matches a rule here
+      // that half-translates it, and the table renders it whole.
+      const matched = text.replace(r.re, r.he);
+      if (!isHybrid(matched)) return applyShared(matched);
+      const shared = applyShared(text);
+      return isHybrid(shared) ? text : shared;
     }
   }
   return applyRules(text, CRITERIA_RULES);
