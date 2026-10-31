@@ -167,3 +167,72 @@ class TestTheIndustryReadsInHebrew:
             for code, hebrew in table.items():
                 assert hebrew.strip(), code
                 assert any("֐" <= c <= "׿" for c in hebrew), code
+
+
+# ------------------------------------------------ the rationale builders
+class TestEveryRationaleBuilderFinishesItsHebrew:
+    """The Hebrew half of a ``*_why`` goes through the phrase table.
+
+    Several builders compose a Hebrew sentence and interpolate an
+    English label into it — Lynch's category, Marks' posture, Pabrai's
+    floor reason. 71 positions across the thirteen live books carried
+    one, so every page and every notification showing the Hebrew showed
+    that word in English.
+    """
+
+    def test_every_exported_builder_is_wrapped(self) -> None:
+        """The wrapping is applied in a loop over ``__all__``, which is
+        what makes a builder added later safe by default — and what this
+        test exists to keep true."""
+        from core.live import why_translator
+
+        builders = [n for n in why_translator.__all__ if n.endswith("_why")]
+        assert len(builders) >= 20, "the module lost its builders"
+        unwrapped = [
+            n for n in builders if not hasattr(getattr(why_translator, n), "__wrapped__")
+        ]
+        assert unwrapped == [], f"not passed through the table: {unwrapped}"
+
+    def test_lynch_category_arrives_in_hebrew(self) -> None:
+        from core.live.why_translator import lynch_why
+
+        class Score:
+            lynch_category = "Fast Grower"
+            peg = 0.07
+            growth_rate_5yr_pct = 247.4
+            pe = 17.93
+
+        english, hebrew = lynch_why(Score())
+        assert "צומחת מהר" in hebrew
+        assert "Fast Grower" not in hebrew
+        # The English half is the audit string and the English pages
+        # render it as written.
+        assert "Fast Grower" in english
+
+    def test_no_live_book_carries_english_in_its_hebrew_reason(self) -> None:
+        """Walks the real portfolios. The scan that found this found 71
+        positions across nine distinct English fragments."""
+        import json
+        import re
+        from pathlib import Path as _Path
+
+        books = _Path(__file__).resolve().parents[3] / "data" / "portfolios"
+        if not books.exists():
+            pytest.skip("no portfolios in this checkout")
+        # Latin that stays Latin: the ratio abbreviations, and the
+        # composite forms the agents quote.
+        keep = re.compile(
+            r"P/E|P/B|P/CF|P/NCAV|D/E|ROE|ROC|EPS|FCF|PEGY|PEG|TR/PE|MoS|OE|EY"
+            r"|NCAV|CAGR|DCF|EV/EBIT|EBIT|REIT|SPAC|nan"
+        )
+        leaks: list[str] = []
+        for path in sorted(books.glob("*.json")):
+            book = json.loads(path.read_text())
+            for pos in book.get("positions", []):
+                rendered = translate(str(pos.get("why_he") or ""))
+                for found in re.findall(
+                    r"[A-Za-z][A-Za-z\- ]{3,}", keep.sub("", rendered)
+                ):
+                    if found.strip():
+                        leaks.append(f"{book['agent']}/{pos['ticker']}: {found.strip()!r}")
+        assert leaks == [], f"English inside why_he: {leaks[:6]}"

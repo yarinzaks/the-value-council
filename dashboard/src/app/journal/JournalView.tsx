@@ -202,6 +202,7 @@ export async function JournalView({
                 agentColor={meta?.color ?? "#999"}
                 marketClosures={calendar.closures}
                 t={t}
+                              locale={locale}
               />
             );
           })}

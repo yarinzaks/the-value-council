@@ -13,8 +13,55 @@
 //
 // Each rule is a (regex, replacement) pair. ``$1``/``$2`` etc. carry
 // matched groups (numbers, ratios) through unchanged.
+//
+// The shared table
+// ----------------
+//
+// The criteria rules below are no longer the whole story. The same
+// strings are rendered twice — here, and by the Telegram notifier in
+// Python — and the two had drifted: 26 of the 50 templates the decision
+// journal holds (about 90,000 rows) were still arriving in English on
+// this side while the notifier translated them. "Fast Grower", "Tier
+// A", "quality 5/5", "market cap $…", "posture Neutral".
+//
+// So the phrase table lives in `data_bundled/hebrew.json` and both
+// languages read it. The rules in this file stay for what it does that
+// the shared table does not: whole-sentence rationales, watchlist
+// triggers and exit triggers, which are this surface's own.
+//
+// Edited in the JSON, not here.
+
+import hebrew from "../../../data_bundled/hebrew.json" with { type: "json" };
 
 import type { Locale } from "./i18n";
+
+/** The shared phrase table, longest key first so a longer phrase cannot
+ *  be pre-empted by a prefix of it — "yield=" must not match inside
+ *  "yield=12.0% (top quintile)" and leave an English tail. */
+const SHARED_TERMS: readonly [string, string][] = Object.entries(
+  hebrew.terms as Record<string, string>,
+).sort((a, b) => b[0].length - a[0].length);
+
+/** Patterns whose Hebrew moves a number rather than sitting beside it:
+ *  "5yr avg FCF $217,127,200" reads as "FCF ממוצע ל-5 שנים: $217,127,200".
+ *  Python writes `\1` for a group; JavaScript wants `$1`. */
+const SHARED_PATTERNS: readonly [RegExp, string][] = (
+  hebrew.patterns as [string, string][]
+).map(([pattern, replacement]) => [
+  new RegExp(pattern, "g"),
+  replacement.replace(/\\(\d)/g, "$$$1"),
+]);
+
+/** Apply the shared table to one string. Numbers are never touched —
+ *  the table replaces words around them. */
+function applyShared(text: string): string {
+  let out = text;
+  for (const [re, replacement] of SHARED_PATTERNS) out = out.replace(re, replacement);
+  for (const [english, he] of SHARED_TERMS) {
+    if (out.includes(english)) out = out.split(english).join(he);
+  }
+  return out;
+}
 
 interface Rule {
   re: RegExp;
@@ -195,7 +242,10 @@ function applyRules(text: string, rules: Rule[]): string {
   for (const r of rules) {
     out = out.replace(r.re, r.he);
   }
-  return out;
+  // The shared table last, so this file's own rules — which are more
+  // specific, and some of which match a whole string — win where both
+  // could apply.
+  return applyShared(out);
 }
 
 /** Translate a single ``criteria_met`` entry. */
@@ -209,7 +259,11 @@ export function translateRationale(text: string, locale: Locale): string {
   if (locale !== "he") return text;
   for (const r of RATIONALE_RULES) {
     if (r.re.test(text)) {
-      return text.replace(r.re, r.he);
+      // Through the shared table as well. This returned early, which
+      // meant a rationale matching one of the rules above skipped the
+      // table completely — 194 of them, every one translated by the
+      // notifier and half-translated here.
+      return applyShared(text.replace(r.re, r.he));
     }
   }
   // Fall through to per-fragment translation for unknown rationales.
@@ -221,7 +275,11 @@ export function translateTrigger(text: string, locale: Locale): string {
   if (locale !== "he") return text;
   for (const r of TRIGGER_RULES) {
     if (r.re.test(text)) {
-      return text.replace(r.re, r.he);
+      // Through the shared table as well. This returned early, which
+      // meant a rationale matching one of the rules above skipped the
+      // table completely — 194 of them, every one translated by the
+      // notifier and half-translated here.
+      return applyShared(text.replace(r.re, r.he));
     }
   }
   return applyRules(text, CRITERIA_RULES);
@@ -232,7 +290,11 @@ export function translateExitTrigger(text: string, locale: Locale): string {
   if (locale !== "he") return text;
   for (const r of EXIT_RULES) {
     if (r.re.test(text)) {
-      return text.replace(r.re, r.he);
+      // Through the shared table as well. This returned early, which
+      // meant a rationale matching one of the rules above skipped the
+      // table completely — 194 of them, every one translated by the
+      // notifier and half-translated here.
+      return applyShared(text.replace(r.re, r.he));
     }
   }
   return applyRules(text, CRITERIA_RULES);

@@ -8,11 +8,33 @@ the dashboard can render either without round-trip.
 These functions are deliberately mechanical — they format the numbers
 the strategy already computed; they do not call an LLM. Free-text
 narrative summaries belong in a separate (slower, more expensive) path.
+
+The Hebrew half is finished by :mod:`core.live.hebrew_terms`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Several of these build a Hebrew sentence and then interpolate an
+English label the strategy produced into it: Lynch's category
+("Fast Grower: PEG 0.07, צמיחת EPS 5 שנתית 247.4%"), Marks' posture
+("מיצוב Cool: תשואת רווח 66.4%"), Pabrai's floor reason
+("רצפה מבנית: held from a prior rebalance"). 71 of the positions on
+the thirteen live books carried one, and every page and notification
+that showed the Hebrew showed that word in English.
+
+Rather than chase the interpolations through twenty-four builders, the
+Hebrew element of every one is passed through the shared phrase table
+on the way out — see ``_in_hebrew`` at the foot of this module. A
+builder added later is wrapped by being listed in ``__all__``, and a
+test asserts that every ``*_why`` there is.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from functools import wraps
+from typing import Any, TypeVar
+
+from core.live.hebrew_terms import translate
+
+_WhyFn = TypeVar("_WhyFn", bound="object")
 
 
 def fmt_pct(v: float | None) -> str:
@@ -393,6 +415,22 @@ def fisher_watch_why(score: Any) -> tuple[str, str]:
     return en, he
 
 
+def _in_hebrew(fn: Any) -> Any:
+    """``fn``, with the Hebrew half of its result finished.
+
+    Wraps a ``(english, hebrew)`` builder so the Hebrew goes through the
+    shared phrase table. The English is untouched: it is the audit
+    string, and the dashboard's English pages show it as written.
+    """
+
+    @wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> tuple[str, str]:
+        english, hebrew = fn(*args, **kwargs)
+        return english, translate(hebrew)
+
+    return wrapper
+
+
 __all__ = [
     "buffett_watch_why",
     "buffett_why",
@@ -419,3 +457,14 @@ __all__ = [
     "schloss_watch_why",
     "schloss_why",
 ]
+
+
+# Applied here rather than as a decorator on each builder: twenty-four
+# decorators are twenty-four chances to forget one, and the thing that
+# must not be forgotten is exactly the thing a reader cannot see is
+# missing. Driven off ``__all__`` so a builder exported from this module
+# is a builder whose Hebrew is finished — which a test asserts.
+for _name in __all__:
+    if _name.endswith("_why"):
+        globals()[_name] = _in_hebrew(globals()[_name])
+del _name
