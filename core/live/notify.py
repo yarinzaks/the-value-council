@@ -328,6 +328,33 @@ _FALLBACK_WITNESS_BY_MODE: Mapping[str, str] = {
 }
 
 
+#: Journal kinds that record a decision to be *in* a name.
+#:
+#: Paired with a trade's side before the reason is printed. The join
+#: between a trade and its journal row is on the ticker alone, so a sale
+#: can be handed the row that justified the purchase — and the message
+#: then read "why it left: P/E 11.23 < 15", which is the test the
+#: company passed on the way in. A rebalance trim does exactly this: it
+#: is a SELL that writes no exit row, while the name is still a target
+#: and still carries the BUY row that bought it.
+_ENTRY_KINDS: frozenset[str] = frozenset({"BUY", "ADD", "HOLD", "WATCH"})
+
+#: Journal kinds that record a decision to be *out* of one.
+_EXIT_KINDS: frozenset[str] = frozenset({"EXIT", "SELL", "TRIM"})
+
+
+def _explains(kind: str, side: str) -> bool:
+    """Whether a row of ``kind`` may be read as the reason for ``side``.
+
+    A kind in neither set explains nothing. Guessing from an unknown
+    kind is how the wrong reason reaches the reader in the first place,
+    and a fill reported without a reason is still true.
+    """
+    if side == "BUY":
+        return kind in _ENTRY_KINDS
+    return kind in _EXIT_KINDS
+
+
 def _money(value: float) -> str:
     """A dollar figure, isolated so a Hebrew line cannot reorder it.
 
@@ -492,7 +519,13 @@ def format_action(
         word = "רווח מומש" if realized >= 0 else "הפסד מומש"
         lines.append(_field(word, _money(abs(realized))))
 
-    if decision is None:
+    kind = str(getattr(decision, "decision", "") or "").upper()
+    if decision is None or not _explains(kind, side):
+        if decision is not None:
+            logger.debug(
+                f"{ticker}: a {kind or 'blank'} row does not explain a "
+                f"{side}; reporting the fill alone"
+            )
         return "\n".join(lines)
 
     met = list(getattr(decision, "criteria_met", None) or [])

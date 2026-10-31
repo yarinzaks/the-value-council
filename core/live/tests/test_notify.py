@@ -521,7 +521,15 @@ def test_a_sell_does_not_label_the_exit_reason_as_what_it_spotted():
     target list" — so heading it "what it spotted" would describe a sale
     by the reasoning that justified the purchase.
     """
-    decision = FakeDecision(ticker="UFPI", criteria_met=["left today's target list"])
+    # decision="EXIT", because that is the kind the runner writes for a
+    # disposal — and since the reason is only read off a row whose kind
+    # matches the trade's side, the kind is now part of the fixture
+    # rather than an unused default.
+    decision = FakeDecision(
+        ticker="UFPI",
+        decision="EXIT",
+        criteria_met=["left today's target list"],
+    )
     text = rendered(
         FakeResult(agent="benjamin_graham", trades=[a_sell(ticker="UFPI")]),
         {"UFPI": decision},
@@ -1283,6 +1291,102 @@ class TestTheFiguresSayWhatHappened:
         assert "מחיר למניה: $31.22" in text
         assert "כמות מניות: 61" in text
         assert "סכום העסקה: $1,904.42" in text
+
+
+class TestAReasonMustMatchTheTradeItExplains:
+    """The join is on the ticker, so nothing stops a sale being handed
+    the row that justified the purchase."""
+
+    def a_defensive_buy_row(self):
+        return FakeDecision(
+            ticker="HOG",
+            decision="BUY",
+            criteria_met=["mode=DEFENSIVE", "P/E 11.23 < 15", "P/B 1.11 < 1.50"],
+            criteria_values={
+                "mode": "DEFENSIVE",
+                "graham_number": 43.68,
+                "pe_times_pb": 12.46,
+            },
+        )
+
+    def test_a_sale_is_never_explained_by_the_reasons_it_was_bought(self):
+        """A rebalance trim is a SELL that writes no exit row, so the
+        only row in the journal for that ticker is the BUY which put it
+        there — the name is still a target. The message said "why it
+        left: P/E 11.23 < 15", which is the test the company passed on
+        the way in, printed as the reason it was sold.
+        """
+        text = rendered(
+            watch_result(trades=[a_sell(ticker="HOG", realized=63.12)]),
+            decisions={"HOG": self.a_defensive_buy_row()},
+        )
+
+        assert "למה יצא" not in text
+        assert "P/E 11.23 < 15" not in text
+        # The fill itself is still reported in full.
+        assert "פעולה: מכירה" in text
+        assert "רווח מומש: $326.08" not in text  # the realised figure passed in
+        assert "רווח מומש: $63.12" in text
+
+    def test_a_real_exit_row_does_explain_the_sale(self):
+        text = rendered(
+            watch_result(trades=[a_sell(ticker="HOG", realized=63.12)]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG",
+                    decision="EXIT",
+                    criteria_met=["left today's target list"],
+                )
+            },
+        )
+
+        assert "למה יצא:" in text
+        assert "left today's target list" in text
+
+    def test_a_purchase_is_never_explained_by_an_exit(self):
+        """The symmetric case. It should not arise, but the guard costs
+        nothing and the join that produced the first one produces this
+        one just as easily."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG",
+                    decision="EXIT",
+                    criteria_met=["left today's target list"],
+                )
+            },
+        )
+
+        assert "מה זיהה" not in text
+        assert "left today's target list" not in text
+
+    def test_a_buy_row_still_explains_a_purchase(self):
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_defensive_buy_row()},
+        )
+
+        assert "מה זיהה:" in text
+        assert "P/E 11.23 < 15" in text
+        assert "יעד מכירה: $43.68" in text
+
+    def test_a_row_of_an_unknown_kind_explains_nothing(self):
+        """A kind this module has not been taught is not assumed to be
+        either an entry or an exit. The fill is reported and the reason
+        is left out rather than guessed."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG", decision="SOMETHING_NEW",
+                    criteria_met=["whatever it was"],
+                )
+            },
+        )
+
+        assert "whatever it was" not in text
+        assert "פעולה: קנייה" in text
 
 
 class TestAWatchIsAnEvent:
