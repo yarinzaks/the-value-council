@@ -979,6 +979,7 @@ class DailyRunner:
                 current_rank=w.rank,
                 entry_trigger=w.entry_trigger,
                 entry_price_target=w.entry_price_target,
+                last_price=w.last_price,
                 why_en=w.why_en,
                 why_he=w.why_he,
             )

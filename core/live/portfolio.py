@@ -78,6 +78,13 @@ class WatchEntry:
     waiting for ("rank enters top 30", "P/B drops below 0.75", etc.) —
     each agent adapter writes its own. ``entry_price_target`` is
     optional and populated only when the trigger is price-based.
+
+    ``last_price`` is the quotation the screen saw when it put the name
+    here. With the target beside it the distance to the trigger is a
+    subtraction rather than a second lookup, and the list is rewritten
+    whole on every run, so it is never more than a day old. Absent on
+    every entry written before it existed, and on every agent whose
+    trigger is not a price.
     """
 
     ticker: str
@@ -85,6 +92,7 @@ class WatchEntry:
     current_rank: int | None = None
     entry_trigger: str = ""
     entry_price_target: float | None = None
+    last_price: float | None = None
     why_en: str = ""
     why_he: str = ""
 
@@ -551,6 +559,11 @@ class LivePortfolio:
                 entry_price_target=(
                     float(w["entry_price_target"])
                     if w.get("entry_price_target") is not None
+                    else None
+                ),
+                last_price=(
+                    float(w["last_price"])
+                    if w.get("last_price") is not None
                     else None
                 ),
                 why_en=str(w.get("why_en", "")),
