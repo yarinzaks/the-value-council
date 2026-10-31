@@ -1861,6 +1861,46 @@ class TestTheQuarterlyRebalanceTradesACooledOffList:
         assert bought == ["COOLED"]
         assert "FRESH" not in bought
 
+    def test_a_name_on_both_lists_is_rebalanced_to_its_published_weight(
+        self, runner: DailyRunner
+    ) -> None:
+        """The common case, and it used to raise.
+
+        Most names survive a quarter, so most of a published list is
+        still in today's scan. The code reused today's LiveTarget and
+        assigned the published weight onto it — but LiveTarget is
+        frozen, so that is a FrozenInstanceError, caught by the
+        per-agent guard and reported as a failed run. Every quarterly
+        rebalance whose list overlapped the current scan failed this
+        way, and the only reason the suite stayed green is that its one
+        test published a ticker today's scan did not name.
+        """
+        self._fresh_book().save(directory=runner.portfolio_dir)
+        publish(
+            PublishedList(
+                published_on=AS_OF - timedelta(days=30),
+                as_of=AS_OF - timedelta(days=30),
+                tickers=("BOTH",),
+                # Deliberately not the weight today's scan carries.
+                weights={"BOTH": 0.25},
+                note="last quarter's rank",
+            ),
+            directory=runner.published_dir,
+        )
+
+        result = self._run(
+            runner,
+            self._council([_target("BOTH", weight=0.5)]),
+            {"BOTH": 50.0},
+        )
+
+        assert result.error is None
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert [t.ticker for t in buys] == ["BOTH"]
+        # $10,000 at the published 25% is $2,500, which buys 50 shares
+        # at $50 — fractional sizing makes that 49.95.
+        assert buys[0].shares == pytest.approx(49.95, abs=0.01)
+
     def test_the_rebalance_is_stamped_so_it_happens_once(
         self, runner: DailyRunner
     ) -> None:

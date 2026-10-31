@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 
@@ -1173,8 +1173,12 @@ class DailyRunner:
         for rank, ticker in enumerate(published.tickers, start=1):
             existing = by_ticker.get(ticker)
             if existing is not None:
-                existing.weight = published.weights[ticker]
-                rebalanced.append(existing)
+                # replace(), not assignment: LiveTarget is frozen, and
+                # assigning raised FrozenInstanceError on every name
+                # that survived the quarter — which is most of them.
+                rebalanced.append(
+                    replace(existing, weight=published.weights[ticker])
+                )
                 continue
             # On the published list and no longer in today's scan. It is
             # still what the cooled-off decision named, so it is bought —
