@@ -122,8 +122,17 @@ export interface BrainMemo {
   timestamp: string;
   model: string;
   memo: Record<string, unknown>;
+  /** Uncached input only. On a call that sends an agent's playbook as
+   *  cacheable reference material this is the per-candidate remainder
+   *  and nothing else — 30 tokens against a 14,622-token playbook. */
   input_tokens: number | null;
   output_tokens: number | null;
+  /** The cached block's two costs: written once per run per agent,
+   *  read by every candidate after the first. Both are billed, and
+   *  adding up input_tokens alone reported a thousandth of the call.
+   *  Optional: absent from every record written before they were. */
+  cache_write_tokens?: number | null;
+  cache_read_tokens?: number | null;
   prompt_chars: number | null;
   prompt_sha256: string | null;
 }

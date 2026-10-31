@@ -7,6 +7,21 @@ import type { BrainMemo } from "@/lib/types";
 
 // Static in the two-language export, where "force-dynamic" is a hard
 // error; dynamic under a live server. Same pattern as every other page.
+/** Every input and output token a call was billed for.
+ *
+ *  Cached input is reported in its own fields rather than folded into
+ *  `input_tokens`, so a sum that reads only the latter misses the
+ *  playbook entirely — which is most of what each call costs.
+ */
+function billedTokens(memo: BrainMemo): number {
+  return (
+    (memo.input_tokens ?? 0) +
+    (memo.output_tokens ?? 0) +
+    (memo.cache_write_tokens ?? 0) +
+    (memo.cache_read_tokens ?? 0)
+  );
+}
+
 export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
   ? "force-static"
   : "force-dynamic";
@@ -83,10 +98,11 @@ export default async function BrainPage() {
     );
   }
 
-  const tokens = memos.reduce(
-    (sum, m) => sum + (m.input_tokens ?? 0) + (m.output_tokens ?? 0),
-    0,
-  );
+  // Every token the calls were billed for, cached or not. The API
+  // reports cached input in its own fields, so input_tokens is the
+  // uncached remainder alone — 30 of them against a 14,622-token
+  // playbook. Summing only that reported a thousandth of the bill.
+  const tokens = memos.reduce((sum, m) => sum + billedTokens(m), 0);
   const books = new Set(memos.map((m) => m.agent)).size;
 
   return (
@@ -130,8 +146,8 @@ function MemoCard({
 }) {
   const meta = metaLocalized(memo.agent, locale);
   const when = memo.timestamp?.slice(0, 16).replace("T", " ") ?? "";
-  const spent =
-    (memo.input_tokens ?? 0) + (memo.output_tokens ?? 0) || null;
+  const spent = billedTokens(memo) || null;
+  const cached = (memo.cache_write_tokens ?? 0) + (memo.cache_read_tokens ?? 0);
 
   return (
     <Card>
@@ -168,6 +184,12 @@ function MemoCard({
                 {" "}
                 ({memo.input_tokens.toLocaleString()} →{" "}
                 {memo.output_tokens.toLocaleString()})
+              </span>
+            )}
+            {cached > 0 && (
+              <span className="tabular">
+                {" "}
+                · {t("brain_cached")} {cached.toLocaleString()}
               </span>
             )}
           </span>

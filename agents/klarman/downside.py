@@ -155,7 +155,6 @@ NEVER fabricate financial data.
 
 def _render_prompt(
     *,
-    playbook: str,
     stock_data: dict[str, Any] | str,
     portfolio_state: dict[str, Any] | str,
 ) -> str:
@@ -167,8 +166,6 @@ def _render_prompt(
         return _json.dumps(value, indent=2, default=str)
 
     return (
-        "## Klarman Playbook\n"
-        f"{playbook}\n\n"
         "## Stock + Valuation Data\n"
         f"{_stringify(stock_data)}\n\n"
         "## Portfolio State\n"
@@ -178,6 +175,17 @@ def _render_prompt(
         "Output a single JSON object matching the KlarmanMemo schema "
         "in §12.4. Nothing else."
     )
+
+
+#: The playbook, headed exactly as the prompt used to head it.
+#:
+#: It moved out of the user message and into a cached system block
+#: without changing a byte of what the model reads. The cache matches
+#: on an exact prefix and an agent's playbook is identical for every
+#: candidate in a run, so carrying it afresh in each call was most of
+#: what a shadow run cost.
+def _reference(playbook: str) -> str:
+    return f"## Klarman Playbook\n{playbook}"
 
 
 @dataclass
@@ -196,7 +204,6 @@ class DownsideAnalyzer:
         portfolio_state: dict[str, Any] | str,
     ) -> KlarmanMemo:
         prompt = _render_prompt(
-            playbook=self.playbook,
             stock_data=stock_data,
             portfolio_state=portfolio_state,
         )
@@ -208,6 +215,7 @@ class DownsideAnalyzer:
         return self.client.complete_memo(
             system=with_evidence_rules(_KLARMAN_SYSTEM_PROMPT),
             prompt=prompt,
+            reference=_reference(self.playbook),
             schema=KlarmanMemo,
         )
 

@@ -186,7 +186,7 @@ class TestAnalyze:
         assert "temperature" not in sent, "the parameter no longer exists"
         assert "config" not in sent, "no vendor config object survives"
 
-    def test_the_prompt_carries_the_playbook_and_the_stock(
+    def test_the_playbook_is_cacheable_and_the_candidate_is_not(
         self, fake_client: MagicMock
     ) -> None:
         fake_client.complete_memo.return_value = self.a_memo()
@@ -196,9 +196,17 @@ class TestAnalyze:
         )
 
         prompt = fake_client.complete_memo.call_args.kwargs["prompt"]
-        assert "THE PLAYBOOK TEXT" in prompt
+        reference = fake_client.complete_memo.call_args.kwargs["reference"]
+        # The playbook is identical for every candidate in a run, so it
+        # travels as cacheable reference material. Anything that varies
+        # per candidate must stay out of it, or the cache misses on the
+        # second call and the whole exercise costs more than it saved.
+        assert "THE PLAYBOOK TEXT" in reference
+        assert "THE PLAYBOOK TEXT" not in prompt
         assert "ZZZZ" in prompt
+        assert "ZZZZ" not in reference
         assert "4321" in prompt
+        assert "4321" not in reference
 
     def test_an_error_from_the_client_is_not_swallowed(
         self, fake_client: MagicMock
