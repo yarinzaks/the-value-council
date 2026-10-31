@@ -46,9 +46,10 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
+from core.live.rtl import ltr, rtl_line
 from core.logger import get_logger
 from core.text import titlecase
 from core.watchlist import diff_watchlist
@@ -328,7 +329,53 @@ _FALLBACK_WITNESS_BY_MODE: Mapping[str, str] = {
 
 
 def _money(value: float) -> str:
-    return f"${value:,.2f}"
+    """A dollar figure, isolated so a Hebrew line cannot reorder it.
+
+    Every price in this module goes through here, which is why the
+    isolate belongs here rather than at each of the dozen call sites:
+    one of them forgotten is one line of the message laid out wrongly,
+    and nobody reads a notification closely enough to notice which.
+    """
+    return ltr(f"${value:,.2f}")
+
+
+def _shares(value: float) -> str:
+    """A share count, isolated, and without decimals it does not have.
+
+    Sizing buys whole shares, so "61.0000" is four characters of noise
+    on the one figure a reader checks against their own broker. The
+    books still hold fractional lots bought before that change, and a
+    sale of one reports the fraction it really sold rather than a
+    rounded number that would not reconcile against the cash.
+    """
+    whole = f"{value:,.0f}"
+    if abs(value - round(value)) < 5e-5:
+        return ltr(whole)
+    return ltr(f"{value:,.4f}".rstrip("0").rstrip("."))
+
+
+#: Telegram renders plain text in a proportional font, so padding with
+#: spaces does not align a column. The labels are kept to one line each
+#: instead, and the reader's eye finds the colon rather than a grid.
+def _field(label: str, value: str) -> str:
+    """One ``label: value`` line, laid out right to left."""
+    return rtl_line(f"{label}: {value}")
+
+
+def _bullet(text: str) -> str:
+    """One item under a heading."""
+    return rtl_line(f"\u2022 {ltr(text) if _is_latin(text) else text}")
+
+
+def _is_latin(text: str) -> bool:
+    """Whether a string is left-to-right enough to need isolating.
+
+    The criteria come from the agents' own English ("P/E=7.41 (≤ 15.0)")
+    and the exit reasons likewise, so inside a right-to-left message
+    each is an island. A Hebrew sentence is not and must not be wrapped,
+    or the isolate would fight the paragraph it sits in.
+    """
+    return not any("\u0590" <= c <= "\u05ff" for c in text)
 
 
 def format_trade(trade: Any) -> str:
@@ -344,7 +391,7 @@ def format_trade(trade: Any) -> str:
     shares = float(getattr(trade, "shares", 0.0) or 0.0)
     price = float(getattr(trade, "price", 0.0) or 0.0)
     gross = float(getattr(trade, "gross_value", 0.0) or 0.0)
-    line = f"{side} {ticker}  {shares:,.4f} @ {_money(price)}  = {_money(gross)}"
+    line = f"{side} {ticker}  {_shares(shares)} @ {_money(price)}  = {_money(gross)}"
 
     realized = getattr(trade, "realized_pnl_usd", None)
     if side == "SELL" and realized is not None:
@@ -385,7 +432,7 @@ def _company_line(ticker: str, *, names: Mapping[str, str], industry: str | None
     raw = names.get(ticker.upper(), "").strip()
     parts = [clean_company_name(raw) if raw else "", (industry or "").strip()]
     body = " · ".join(p for p in parts if p)
-    return body or ticker
+    return rtl_line(ltr(body or ticker))
 
 
 def format_action(
@@ -396,13 +443,17 @@ def format_action(
     names: Mapping[str, str],
     industry: str | None,
 ) -> str:
-    """One executed trade, with what triggered it and what ends it.
+    """One executed trade, as labelled fields rather than prose.
 
-    The trade record carries the fill; everything a reader actually wants
-    — which test the company passed, at what level the position is meant
-    to close — is in the decision the same run wrote to the journal. The
-    two are joined on the ticker rather than restated, so the message
-    cannot disagree with the audit trail.
+    Prose read fluently and scanned badly: the figure a reader wanted
+    was somewhere inside a sentence, in a different place each time. A
+    field per line puts every answer where the eye already is.
+
+    The trade record carries the fill; everything else — which test the
+    company passed, at what level the position is meant to close — is in
+    the decision the same run wrote to the journal. The two are joined
+    on the ticker rather than restated, so the message cannot disagree
+    with the audit trail.
 
     ``decision`` may be ``None``: a trade without a matching journal
     entry still reports the fill rather than being dropped.
@@ -413,24 +464,33 @@ def format_action(
     price = float(getattr(trade, "price", 0.0) or 0.0)
     gross = float(getattr(trade, "gross_value", 0.0) or 0.0)
 
-    verb = "קנה" if side == "BUY" else "מכר"
+    name = names.get(ticker.upper(), "").strip()
     lines = [
         # The actor is passed in, never hard-coded: this module is the
         # channel for every agent, and the subscription list is one set.
         # A fixed name here would have had Buffett's trades announced
         # under Graham's.
-        f"{actor} {verb} {ticker}",
-        _company_line(ticker, names=names, industry=industry),
+        _field("פעולה", "קנייה" if side == "BUY" else "מכירה"),
+        _field("סוכן", ltr(actor)),
+        _field("טיקר", ltr(ticker)),
+    ]
+    if name:
+        lines.append(_field("חברה", ltr(clean_company_name(name))))
+    if industry:
+        lines.append(_field("תחום", ltr(industry.strip())))
+
+    lines += [
         "",
-        f"{'קנייה' if side == 'BUY' else 'מכירה'}   "
-        f"{shares:,.4f} @ {_money(price)}  =  {_money(gross)}",
+        _field("מחיר למניה", _money(price)),
+        _field("כמות מניות", _shares(shares)),
+        _field("סכום העסקה", _money(gross)),
     ]
 
     realized = getattr(trade, "realized_pnl_usd", None)
     if side == "SELL" and realized is not None:
         realized = float(realized)
-        word = "רווח" if realized >= 0 else "הפסד"
-        lines.append(f"{word} מומש   {_money(abs(realized))}")
+        word = "רווח מומש" if realized >= 0 else "הפסד מומש"
+        lines.append(_field(word, _money(abs(realized))))
 
     if decision is None:
         return "\n".join(lines)
@@ -463,22 +523,19 @@ def format_action(
             # list"), so labelling both "what it spotted" would describe
             # a sale by the criteria that justified the purchase.
             heading = "מה זיהה" if side == "BUY" else "למה יצא"
-            lines += ["", heading] + [f"  {c}" for c in shown]
+            lines += ["", rtl_line(f"{heading}:")] + [_bullet(str(c)) for c in shown]
 
     if side == "BUY" and target is not None:
         target = float(target)
         label = _TARGET_LABEL_BY_MODE.get(mode, "יעד")
         upside = ((target / price) - 1.0) * 100.0 if price else None
-        plan = [
-            "",
-            "התוכנית",
-            f"  יעד מכירה   {_money(target)}  ({label})"
-            + (f"  {upside:+.1f}%" if upside is not None else ""),
-        ]
+        lines += ["", rtl_line("התוכנית")]
+        lines.append(_field("יעד מכירה", f"{_money(target)} ({label})"))
+        if upside is not None:
+            lines.append(_field("רווח אפשרי", ltr(f"{upside:+.1f}%")))
         rule = _PLAN_BY_MODE.get(mode)
         if rule:
-            plan.append(f"  {rule}")
-        lines += plan
+            lines.append(_field("כלל היציאה", rule))
 
     return "\n".join(lines)
 
@@ -492,39 +549,57 @@ def format_watch_entry(
 ) -> str:
     """One company the agent has started waiting for.
 
-    Shorter than a trade block on purpose. A watch is the smaller
-    event, and giving it equal weight would make the purchase harder to
-    find in the same message.
+    The same fields as a trade, because it is the same question asked
+    earlier: which company, and at what price. The screen records the
+    quotation it saw beside the price it wants, so the distance between
+    them is a subtraction rather than something the reader has to do.
 
     The reasoning is the agent's own ``why_he``, which already names
-    what blocks the company and the price that would unblock it.
-    Rebuilding that sentence here would put one claim in two places and
-    let them disagree.
+    what blocks the company. Rebuilding that sentence here would put one
+    claim in two places and let them disagree.
     """
     ticker = str(getattr(watch, "ticker", "?"))
+    name = names.get(ticker.upper(), "").strip()
     lines = [
-        f"{actor} עוקב {ticker}",
-        _company_line(ticker, names=names, industry=industry),
+        _field("פעולה", "נוסף למעקב"),
+        _field("סוכן", ltr(actor)),
+        _field("טיקר", ltr(ticker)),
     ]
+    if name:
+        lines.append(_field("חברה", ltr(clean_company_name(name))))
+    if industry:
+        lines.append(_field("תחום", ltr(industry.strip())))
+
+    target = getattr(watch, "entry_price_target", None)
+    last = getattr(watch, "last_price", None)
+    if target is not None:
+        prices = ["", _field("מחיר כניסה", _money(float(target)))]
+        if last:
+            prices.append(_field("מחיר נוכחי", _money(float(last))))
+            fall = (1.0 - float(target) / float(last)) * 100.0
+            prices.append(_field("צריך לרדת", ltr(f"{fall:.1f}%")))
+        lines += prices
+
     why = str(getattr(watch, "why_he", "") or "").strip()
     if why:
-        lines += ["", why]
-    else:
-        # No prose from the agent, but the number is the point.
-        target = getattr(watch, "entry_price_target", None)
-        if target is not None:
-            lines += ["", f"נכנס ב-{_money(float(target))}"]
+        lines += ["", rtl_line("למה:"), rtl_line(why)]
     return "\n".join(lines)
 
 
 def format_watch_exit(ticker: str, *, actor: str) -> str:
     """One company the agent has stopped waiting for.
 
-    A line, and no more. It left because it stopped qualifying, so
-    whatever described it is no longer true — and a paragraph
-    explaining an absence is not worth the attention it costs.
+    Three fields and no more. It left because it stopped qualifying, so
+    whatever described it is no longer true — and a paragraph explaining
+    an absence is not worth the attention it costs.
     """
-    return f"{actor} הסיר מהמעקב {ticker}"
+    return "\n".join(
+        [
+            _field("פעולה", "הוסר מהמעקב"),
+            _field("סוכן", ltr(actor)),
+            _field("טיקר", ltr(ticker)),
+        ]
+    )
 
 
 def format_result(
@@ -535,6 +610,7 @@ def format_result(
     decisions: Mapping[str, Any] | None = None,
     names: Mapping[str, str] | None = None,
     industry: Callable[[str], str | None] | None = None,
+    at: datetime | None = None,
 ) -> str | None:
     """The message for one agent's run, or ``None`` when there is nothing to say.
 
@@ -551,19 +627,27 @@ def format_result(
     # Derived from the slug rather than read from the dashboard registry:
     # that registry is TypeScript, and duplicating its labels in Python
     # would give two places to change a name and one of them to forget.
-    # Derived from the slug rather than read from the dashboard registry:
-    # that registry is TypeScript, and duplicating its labels in Python
-    # would give two places to change a name and one of them to forget.
     # It also means a new agent needs no entry here at all.
     actor = display_name or result.agent.replace("_", " ").title()
-    name = actor
     trades = list(result.trades or [])
 
     if result.error:
         # Reported even though it is not an action: a book that stopped
         # trading because of a fault is indistinguishable, from the
         # outside, from a book that decided to hold.
-        return f"{name} — {as_of.isoformat()}\n\nההרצה נכשלה: {result.error}"
+        stamp = at or datetime.now(UTC)
+        return "\n".join(
+            [
+                rtl_line(
+                    f"{ltr(as_of.strftime('%d/%m/%Y'))}  "
+                    f"שעה {ltr(stamp.strftime('%H:%M'))}"
+                ),
+                "",
+                _field("פעולה", "ההרצה נכשלה"),
+                _field("סוכן", ltr(actor)),
+                _field("הסיבה", ltr(str(result.error))),
+            ]
+        )
 
     change = diff_watchlist(
         getattr(result, "previous_watchlist", None) or (),
@@ -604,13 +688,21 @@ def format_result(
     rest = [str(getattr(w, "ticker", "?")) for w in change.entered[len(shown):]]
     if rest:
         blocks.append(
-            f"{actor} עוקב גם אחרי {len(rest)} נוספים: " + ", ".join(rest)
+            rtl_line(
+                f"{ltr(actor)} עוקב גם אחרי {ltr(str(len(rest)))} נוספים: "
+                + ", ".join(ltr(t) for t in rest)
+            )
         )
     blocks += [format_watch_exit(t, actor=actor) for t in change.left]
 
-    # Date only. Each action block names the agent itself, so that a
-    # message Telegram truncates still says who acted.
-    header = as_of.isoformat()
+    # The session's date, and the clock time the run wrote it. Both,
+    # because they can differ: a session the schedule missed is caught
+    # up on a later day, and a reader who sees only one of the two
+    # cannot tell which day the figures belong to.
+    stamp = at or datetime.now(UTC)
+    header = rtl_line(
+        f"{ltr(as_of.strftime('%d/%m/%Y'))}  שעה {ltr(stamp.strftime('%H:%M'))}"
+    )
     body = SEPARATOR.join(blocks)
 
     portfolio = getattr(result, "portfolio", None)
@@ -619,9 +711,11 @@ def format_result(
         nav = getattr(portfolio, "total_nav", None)
         ret = getattr(portfolio, "cumulative_return_pct", None)
         if nav is not None and ret is not None:
-            footer = (
-                f"{SEPARATOR}התיק   {_money(float(nav))}  "
-                f"({float(ret):+.2f}% מההתחלה)"
+            footer = SEPARATOR + "\n".join(
+                [
+                    _field("שווי התיק", _money(float(nav))),
+                    _field("תשואה מההתחלה", ltr(f"{float(ret):+.2f}%")),
+                ]
             )
     return f"{header}\n\n{body}{footer}"
 
