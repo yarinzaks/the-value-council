@@ -86,10 +86,30 @@ class MemoRecord:
     timestamp: str
     model: str
     memo: dict[str, Any] = field(default_factory=dict)
+    #: Uncached input only. On a call that sends an agent's playbook as
+    #: cacheable reference material this is the per-candidate remainder
+    #: and nothing else — measured at 30 tokens against a 14,622-token
+    #: playbook, so a page adding these up was reporting a thousandth of
+    #: what the call actually billed.
     input_tokens: int | None = None
     output_tokens: int | None = None
+    #: The two halves of the cached block's cost. A write is charged
+    #: once per run per agent at 1.25x the input price; every candidate
+    #: after the first is a read at a twentieth of it. Both are real
+    #: tokens on a real invoice, so both are recorded.
+    cache_write_tokens: int | None = None
+    cache_read_tokens: int | None = None
     prompt_chars: int | None = None
     prompt_sha256: str | None = None
+
+    @property
+    def billed_input_tokens(self) -> int:
+        """Every input token the call was charged for, cached or not."""
+        return (
+            (self.input_tokens or 0)
+            + (self.cache_write_tokens or 0)
+            + (self.cache_read_tokens or 0)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

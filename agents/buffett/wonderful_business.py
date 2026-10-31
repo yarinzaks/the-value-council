@@ -33,6 +33,8 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 from .filters import (
@@ -105,6 +107,7 @@ class WarrenBuffett(Strategy):
         max_de: float = DEFAULT_MAX_DE,
         min_mos_pct: float = DEFAULT_MIN_MARGIN_OF_SAFETY_PCT,
         moat_analyzer: MoatAnalyzer | None = None,
+        llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -122,6 +125,7 @@ class WarrenBuffett(Strategy):
         self.max_de = max_de
         self.min_mos_pct = min_mos_pct
         self.moat_analyzer = moat_analyzer
+        self.llm_mode = llm_mode
         self.decision_logger = decision_logger
         self.selection_history: list[BuffettSelection] = []
         self.last_memos: list[BuffettMemo] = []
@@ -233,7 +237,7 @@ class WarrenBuffett(Strategy):
         memos: list[BuffettMemo] = []
         analyzer = self.moat_analyzer
         assert analyzer is not None  # narrow Optional
-        for s in top:
+        def ask(s: BuffettScore) -> BuffettMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -249,19 +253,27 @@ class WarrenBuffett(Strategy):
                 "debt_to_equity": s.debt_to_equity,
                 "valuation_notes": list(s.valuation_notes),
             }
-            try:
-                memo = analyzer.analyze(
-                    stock_data=stock_data,
-                    portfolio_state={"as_of": as_of.isoformat()},
-                )
-            except Exception as exc:
+            return analyzer.analyze(
+                stock_data=stock_data,
+                portfolio_state={"as_of": as_of.isoformat()},
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: moat analyzer failed ({exc}); "
+                    f"{as_of} {s.ticker}: moat analyzer failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
+            if not self.llm_mode.may_drop_a_name:
+                # Shadow: the memo is on disk and on /brain, and the
+                # screen's own selection stands. Asking what the layer
+                # would have said used to mean living with the answer.
+                kept.append(s)
+                continue
             if memo.decision in ("BUY", "HOLD"):
                 kept.append(s)
             else:

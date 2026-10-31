@@ -139,7 +139,6 @@ criteria_failed.
 # ---- Prompt rendering -----------------------------------------------------
 def _render_prompt(
     *,
-    playbook: str,
     stock_data: dict[str, Any] | str,
     portfolio_state: dict[str, Any] | str,
 ) -> str:
@@ -156,8 +155,6 @@ def _render_prompt(
         return _json.dumps(value, indent=2, default=str)
 
     return (
-        "## Buffett Playbook\n"
-        f"{playbook}\n\n"
         "## Stock Data\n"
         f"{_stringify(stock_data)}\n\n"
         "## Portfolio State\n"
@@ -170,6 +167,17 @@ def _render_prompt(
 
 
 # ---- Analyzer class -------------------------------------------------------
+#: The playbook, headed exactly as the prompt used to head it.
+#:
+#: It moved out of the user message and into a cached system block
+#: without changing a byte of what the model reads. The cache matches
+#: on an exact prefix and an agent's playbook is identical for every
+#: candidate in a run, so carrying it afresh in each call was most of
+#: what a shadow run cost.
+def _reference(playbook: str) -> str:
+    return f"## Buffett Playbook\n{playbook}"
+
+
 @dataclass
 class MoatAnalyzer:
     """Wraps :class:`ClaudeClient` with the Buffett persona prompt.
@@ -195,7 +203,6 @@ class MoatAnalyzer:
                 doesn't match the BuffettMemo schema.
         """
         prompt = _render_prompt(
-            playbook=self.playbook,
             stock_data=stock_data,
             portfolio_state=portfolio_state,
         )
@@ -210,6 +217,7 @@ class MoatAnalyzer:
         return self.client.complete_memo(
             system=with_evidence_rules(_BUFFETT_SYSTEM_PROMPT),
             prompt=prompt,
+            reference=_reference(self.playbook),
             schema=BuffettMemo,
         )
 

@@ -42,6 +42,8 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 from .category_classifier import CategoryClassifier, LynchMemo
@@ -171,6 +173,7 @@ class PeterLynch(Strategy):
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
         max_de: float = DEFAULT_MAX_DE,
         category_classifier: CategoryClassifier | None = None,
+        llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -186,6 +189,7 @@ class PeterLynch(Strategy):
         self.min_market_cap = min_market_cap
         self.max_de = max_de
         self.category_classifier = category_classifier
+        self.llm_mode = llm_mode
         self.decision_logger = decision_logger
         self.selection_history: list[LynchSelection] = []
         self.last_memos: list[LynchMemo] = []
@@ -311,7 +315,7 @@ class PeterLynch(Strategy):
         memos: list[LynchMemo] = []
         classifier = self.category_classifier
         assert classifier is not None
-        for s in top:
+        def ask(s: LynchScore) -> LynchMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -327,19 +331,27 @@ class PeterLynch(Strategy):
                 "debt_to_equity": s.debt_to_equity,
                 "heuristic_category": s.lynch_category,
             }
-            try:
-                memo = classifier.classify(
-                    stock_data=stock_data,
-                    portfolio_state={"as_of": as_of.isoformat()},
-                )
-            except Exception as exc:
+            return classifier.classify(
+                stock_data=stock_data,
+                portfolio_state={"as_of": as_of.isoformat()},
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: classifier failed ({exc}); "
+                    f"{as_of} {s.ticker}: classifier failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
+            if not self.llm_mode.may_drop_a_name:
+                # Shadow: the memo is on disk and on /brain, and the
+                # screen's own selection stands. Asking what the layer
+                # would have said used to mean living with the answer.
+                kept.append(s)
+                continue
             if memo.decision in ("BUY", "HOLD"):
                 kept.append(s)
             else:

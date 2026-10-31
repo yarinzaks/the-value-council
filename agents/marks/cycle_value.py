@@ -35,6 +35,8 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 from .filters import (
@@ -94,6 +96,7 @@ class HowardMarks(Strategy):
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
         max_de: float = DEFAULT_MAX_DE,
         second_level_analyzer: SecondLevelAnalyzer | None = None,
+        llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if min_market_cap <= 0:
@@ -106,6 +109,7 @@ class HowardMarks(Strategy):
         self.min_market_cap = min_market_cap
         self.max_de = max_de
         self.second_level_analyzer = second_level_analyzer
+        self.llm_mode = llm_mode
         self.decision_logger = decision_logger
         self.selection_history: list[MarksSelection] = []
         self.last_temperature: TemperatureAssessment | None = None
@@ -265,7 +269,7 @@ class HowardMarks(Strategy):
         memos: list[MarksMemo] = []
         analyzer = self.second_level_analyzer
         assert analyzer is not None
-        for s in top:
+        def ask(s: MarksScore) -> MarksMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -286,22 +290,30 @@ class HowardMarks(Strategy):
                     "median_yield_pct": temperature.signals.median_yield_pct,
                 },
             }
-            try:
-                memo = analyzer.analyze(
-                    stock_data=stock_data,
-                    portfolio_state={
-                        "as_of": as_of.isoformat(),
-                        "posture": temperature.posture,
-                    },
-                )
-            except Exception as exc:
+            return analyzer.analyze(
+                stock_data=stock_data,
+                portfolio_state={
+                    "as_of": as_of.isoformat(),
+                    "posture": temperature.posture,
+                },
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: second-level analyzer failed ({exc}); "
+                    f"{as_of} {s.ticker}: second-level analyzer failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
+            if not self.llm_mode.may_drop_a_name:
+                # Shadow: the memo is on disk and on /brain, and the
+                # screen's own selection stands. Asking what the layer
+                # would have said used to mean living with the answer.
+                kept.append(s)
+                continue
             if memo.decision in ("BUY", "HOLD", "ADD"):
                 kept.append(s)
             else:

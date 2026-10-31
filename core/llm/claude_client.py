@@ -46,6 +46,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections.abc import Mapping
 from typing import Any
 
 import anthropic
@@ -68,10 +69,23 @@ from core.logger import get_logger
 
 logger = get_logger("core.llm.claude_client")
 
-#: Opus 5.5 — the judgment these memos ask for is the kind worth the
-#: better model, and the brain runs once a day per agent rather than
-#: once per quote.
-DEFAULT_MODEL: str = "claude-opus-5-5"
+#: Sonnet 5.5, chosen against Opus on a measured comparison rather than
+#: on the usual assumption that the better model is worth it here.
+#:
+#: Both were asked for the same Buffett memo on the same holding. Opus
+#: took 40.2 seconds and 3,222 output tokens to return HOLD. Sonnet took
+#: 14.6 and 1,794 to return REJECT — and gave the better answer: the
+#: snapshot carries no earnings history, so an intrinsic value cannot be
+#: computed from it, and Sonnet said so in as many words where Opus
+#: silently reported $0.00.
+#:
+#: Across the five hybrid agents a run is about ninety-eight calls.
+#: Opus: $7.19 a run, $151 a month, 65 minutes if run end to end.
+#: Sonnet: $2.20, $46, and 24 minutes. The judgment is not obviously
+#: worse and the budget and the clock are both comfortable instead of
+#: both strained, so a daily job that must finish inside a scan's
+#: remaining time gets the faster one.
+DEFAULT_MODEL: str = "claude-sonnet-5-5"
 
 #: Enough for the longest memo any agent defines. Fisher's carries a
 #: verdict and a note for each of fifteen points; the rest are shorter.
@@ -100,6 +114,38 @@ class InvestmentMemo(BaseModel):
     position_size_pct: float = Field(ge=0.0, le=100.0)
     expected_holding: str
     exit_triggers: list[str] = Field(default_factory=list)
+
+
+#: What a cached block costs to write, against what it costs to read.
+#: On this model family a cache hit is 5% of the base input price, so a
+#: block written once and read twice has already paid for itself. An
+#: agent's playbook is read once per candidate — eight times for
+#: Buffett, thirty for Lynch — so it pays many times over.
+#:
+#: Five minutes is the shorter of the two durations and the right one:
+#: a run's calls for one agent are seconds apart, and the next run is a
+#: day away, by which time the playbook may have been edited anyway.
+CACHE_CONTROL: Mapping[str, str] = {"type": "ephemeral"}
+
+
+def _system_blocks(system: str, reference: str | None) -> Any:
+    """The system prompt, with any reference material marked cacheable.
+
+    Returned as a plain string when there is no reference, so a caller
+    that never passes one sends exactly the request it sent before.
+
+    The order matters: the cache matches on a prefix, so the stable
+    material has to come first. The persona and the evidence rules are
+    stable too, which is why they lead; the breakpoint sits after the
+    reference, and everything that varies per candidate is in the user
+    message where it cannot disturb either.
+    """
+    if not reference:
+        return system
+    return [
+        {"type": "text", "text": system},
+        {"type": "text", "text": reference, "cache_control": dict(CACHE_CONTROL)},
+    ]
 
 
 class ClaudeClient:
@@ -144,6 +190,13 @@ class ClaudeClient:
         self._sdk = anthropic.Anthropic(api_key=key.get_secret_value())
 
     # --- Rate floor ----------------------------------------------------------
+    @property
+    def model_name(self) -> str:
+        """Which model this client speaks to. Read by the log line that
+        says what the analyst layer is running on, so a change of model
+        is visible in a run's output rather than only in a constant."""
+        return self._model_name
+
     def _throttle(self) -> None:
         with ClaudeClient._lock:
             elapsed = time.monotonic() - ClaudeClient._last_call_at
@@ -162,8 +215,22 @@ class ClaudeClient:
         schema: type[MemoT],
         agent: str = "",
         ticker: str = "",
+        reference: str | None = None,
     ) -> MemoT:
         """Send one prompt and return a validated instance of ``schema``.
+
+        ``reference`` is material identical across a run's calls — in
+        practice an agent's playbook, nine to twelve thousand tokens of
+        it. It is sent as a cached system block, so the first candidate
+        of a run pays to write it and every candidate after reads it at
+        a twentieth of the input price. A shadow run over the five
+        hybrid agents is about ninety-eight calls; carrying the playbook
+        afresh in each is most of what such a run costs.
+
+        It must be byte-identical between calls or the cache misses, so
+        it is a separate argument rather than a prefix of ``prompt``:
+        anything per-candidate belongs in the prompt, and the split is
+        the one thing keeping the two from being accidentally mixed.
 
         Raises:
             LLMError: on an API failure, on a truncated or refused
@@ -188,7 +255,7 @@ class ClaudeClient:
             response = self._sdk.messages.parse(
                 model=self._model_name,
                 max_tokens=self._max_tokens,
-                system=system,
+                system=_system_blocks(system, reference),
                 messages=[{"role": "user", "content": prompt}],
                 output_format=schema,
                 **kwargs,
@@ -257,6 +324,17 @@ class ClaudeClient:
                     memo=memo.model_dump(mode="json"),
                     input_tokens=getattr(usage, "input_tokens", None),
                     output_tokens=getattr(usage, "output_tokens", None),
+                    # The API reports cached input in its own fields, so
+                    # `input_tokens` is the uncached remainder alone —
+                    # 30 of them against a 14,622-token playbook. A page
+                    # summing only that was reporting a thousandth of
+                    # what the call billed.
+                    cache_write_tokens=getattr(
+                        usage, "cache_creation_input_tokens", None
+                    ),
+                    cache_read_tokens=getattr(
+                        usage, "cache_read_input_tokens", None
+                    ),
                     prompt_chars=len(prompt),
                     prompt_sha256=digest(prompt),
                 )
@@ -298,4 +376,5 @@ __all__ = [
     "DEFAULT_MODEL",
     "ClaudeClient",
     "InvestmentMemo",
+    "LLMError",
 ]

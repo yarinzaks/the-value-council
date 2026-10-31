@@ -10,6 +10,7 @@ import pytest
 from agents.buffett.moat_analyzer import BuffettMemo
 from agents.buffett.wonderful_business import WarrenBuffett
 from core.data.edgar_cache import EdgarCache
+from core.llm.mode import LLMMode
 
 from .conftest import make_pit
 from .test_moat_analyzer import SAMPLE_MEMO_JSON
@@ -271,3 +272,111 @@ class TestSelectionHistory:
         assert rec["as_of"] == "2024-06-30"
         assert "WONDERFUL" in rec["selected_tickers"]
         assert rec["top_mos_pct"] is not None
+
+
+class TestShadowModeObservesWithoutDeciding:
+    """The switch that turned the layer on used to hand it the veto.
+
+    Both were the same switch — passing an analyzer — so "what would it
+    have said?" could not be asked without already living with the
+    answer. Shadow separates them: the memo is produced and kept, and
+    the quantitative screen's selection stands.
+    """
+
+    def _rejecting_analyzer(self) -> tuple[MagicMock, BuffettMemo]:
+        payload = dict(SAMPLE_MEMO_JSON)
+        payload["ticker"] = "WONDERFUL"
+        payload["decision"] = "REJECT"
+        memo = BuffettMemo.model_validate(payload)
+        analyzer = MagicMock()
+        analyzer.analyze.return_value = memo
+        return analyzer, memo
+
+    def _run(
+        self,
+        cache: EdgarCache,
+        monkeypatch: pytest.MonkeyPatch,
+        **kwargs: object,
+    ) -> tuple[dict[str, float], WarrenBuffett]:
+        monkeypatch.setattr("agents.buffett.filters.sic_for", lambda _t: 2080)
+        f = make_pit(
+            "WONDERFUL",
+            net_income=1_700_000_000,
+            total_equity=6_400_000_000,
+            total_debt=1_500_000_000,
+            shares=1_000_000_000,
+        )
+        strategy = WarrenBuffett(edgar_cache=cache, **kwargs)  # type: ignore[arg-type]
+        out = strategy.select(
+            as_of=date(2024, 6, 30),
+            universe=["WONDERFUL"],
+            prices=_StaticPriceLookup({"WONDERFUL": 20.0}),  # type: ignore[arg-type]
+            fundamentals=_StaticFundamentalsLookup(  # type: ignore[arg-type]
+                {"WONDERFUL": f}
+            ),
+        )
+        return out, strategy
+
+    def test_a_rejection_does_not_remove_the_name(
+        self, buffett_quality_cache: EdgarCache, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        analyzer, _memo = self._rejecting_analyzer()
+
+        out, _s = self._run(
+            buffett_quality_cache,
+            monkeypatch,
+            moat_analyzer=analyzer,
+            llm_mode=LLMMode.SHADOW,
+        )
+
+        assert "WONDERFUL" in out, "shadow mode changed the book"
+
+    def test_the_memo_is_still_produced_and_kept(
+        self, buffett_quality_cache: EdgarCache, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Otherwise it is an expensive way to do nothing."""
+        analyzer, memo = self._rejecting_analyzer()
+
+        _out, strategy = self._run(
+            buffett_quality_cache,
+            monkeypatch,
+            moat_analyzer=analyzer,
+            llm_mode=LLMMode.SHADOW,
+        )
+
+        analyzer.analyze.assert_called_once()
+        assert strategy.last_memos == [memo]
+
+    def test_enforce_is_what_passing_an_analyzer_still_means(
+        self, buffett_quality_cache: EdgarCache, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A flag that silently disarmed a configured veto is the worse
+        surprise, so the default has to stay what every caller means."""
+        analyzer, _memo = self._rejecting_analyzer()
+
+        out, strategy = self._run(
+            buffett_quality_cache, monkeypatch, moat_analyzer=analyzer
+        )
+
+        assert strategy.llm_mode is LLMMode.ENFORCE
+        assert out == {}
+
+    def test_the_same_run_differs_only_in_the_mode(
+        self, buffett_quality_cache: EdgarCache, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The pair, side by side: one memo, two books."""
+        shadow_out, shadow = self._run(
+            buffett_quality_cache,
+            monkeypatch,
+            moat_analyzer=self._rejecting_analyzer()[0],
+            llm_mode=LLMMode.SHADOW,
+        )
+        enforce_out, enforce = self._run(
+            buffett_quality_cache,
+            monkeypatch,
+            moat_analyzer=self._rejecting_analyzer()[0],
+            llm_mode=LLMMode.ENFORCE,
+        )
+
+        assert shadow.last_memos == enforce.last_memos
+        assert shadow_out != enforce_out

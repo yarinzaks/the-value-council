@@ -36,6 +36,8 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.llm.concurrency import analyze_all
+from core.llm.mode import LLMMode
 from core.logger import get_logger
 
 from .filters import (
@@ -97,6 +99,7 @@ class PhilipFisher(Strategy):
         max_de: float = DEFAULT_MAX_DE,
         max_portfolio_size: int = DEFAULT_MAX_PORTFOLIO_SIZE,
         scuttlebutt_analyzer: ScuttlebuttAnalyzer | None = None,
+        llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if min_market_cap <= 0:
@@ -114,6 +117,7 @@ class PhilipFisher(Strategy):
         self.max_de = max_de
         self.max_portfolio_size = max_portfolio_size
         self.scuttlebutt_analyzer = scuttlebutt_analyzer
+        self.llm_mode = llm_mode
         self.decision_logger = decision_logger
         self.selection_history: list[FisherSelection] = []
         self.last_memos: list[FisherMemo] = []
@@ -238,7 +242,7 @@ class PhilipFisher(Strategy):
         memos: list[FisherMemo] = []
         analyzer = self.scuttlebutt_analyzer
         assert analyzer is not None
-        for s in top:
+        def ask(s: FisherScore) -> FisherMemo:
             stock_data = {
                 "ticker": s.ticker,
                 "as_of": as_of.isoformat(),
@@ -279,19 +283,27 @@ class PhilipFisher(Strategy):
                     ),
                 },
             }
-            try:
-                memo = analyzer.analyze(
-                    stock_data=stock_data,
-                    portfolio_state={"as_of": as_of.isoformat()},
-                )
-            except Exception as exc:
+            return analyzer.analyze(
+                stock_data=stock_data,
+                portfolio_state={"as_of": as_of.isoformat()},
+            )
+
+        for s, outcome in analyze_all(top, ask):
+            if isinstance(outcome, Exception):
                 logger.warning(
-                    f"{as_of} {s.ticker}: scuttlebutt analyzer failed ({exc}); "
+                    f"{as_of} {s.ticker}: scuttlebutt analyzer failed ({outcome}); "
                     "keeping quant-only verdict"
                 )
                 kept.append(s)
                 continue
+            memo = outcome
             memos.append(memo)
+            if not self.llm_mode.may_drop_a_name:
+                # Shadow: the memo is on disk and on /brain, and the
+                # screen's own selection stands. Asking what the layer
+                # would have said used to mean living with the answer.
+                kept.append(s)
+                continue
             # Fisher's hard rule: integrity is non-negotiable.
             if not memo.integrity_check_passed:
                 logger.info(

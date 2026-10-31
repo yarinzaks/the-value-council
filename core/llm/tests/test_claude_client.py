@@ -23,7 +23,7 @@ import pytest
 from pydantic import BaseModel, SecretStr
 
 from core.exceptions import LLMError
-from core.llm.claude_client import ClaudeClient
+from core.llm.claude_client import DEFAULT_MODEL, ClaudeClient
 from core.llm.memo_log import MemoLog
 
 
@@ -49,11 +49,13 @@ class _FakeMessages:
         parsed: Any = A_MEMO,
         stop_reason: str = "end_turn",
         raises: BaseException | None = None,
+        usage: Any = None,
     ) -> None:
         self.calls: list[dict[str, Any]] = []
         self._parsed = parsed
         self._stop = stop_reason
         self._raises = raises
+        self._usage = usage
 
     def parse(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
@@ -63,6 +65,7 @@ class _FakeMessages:
         class _Response:
             stop_reason = self._stop
             parsed_output = self._parsed
+            usage = self._usage
 
         return _Response()
 
@@ -269,7 +272,10 @@ class TestEveryMemoIsRecorded:
         c.complete_memo(system="s", prompt="p" * 40, schema=Memo, agent="a_book")
 
         got = c._memo_log.read_all_for_agent("a_book")[0]
-        assert got.model == "claude-opus-5-5"
+        # Against the constant, not a literal: which model the layer
+        # runs on is a decision that gets revisited, and a record that
+        # named the wrong one would be worse than one naming none.
+        assert got.model == DEFAULT_MODEL
         assert got.prompt_chars == 40
         assert got.prompt_sha256 and len(got.prompt_sha256) == 64
 
@@ -323,3 +329,107 @@ class TestEveryMemoIsRecorded:
         )
         source = inspect.getsource(mod.ClaudeClient._record)
         assert "self._memo_log.log" in source
+
+
+class _Usage:
+    """Shaped like the SDK's usage, including the fields it reports
+    cached input under rather than folding into ``input_tokens``."""
+
+    def __init__(
+        self,
+        input_tokens: int = 31,
+        output_tokens: int = 107,
+        cache_creation_input_tokens: int | None = None,
+        cache_read_input_tokens: int | None = None,
+    ) -> None:
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.cache_creation_input_tokens = cache_creation_input_tokens
+        self.cache_read_input_tokens = cache_read_input_tokens
+
+
+class TestReferenceMaterialIsSentCached:
+    """The playbook travels as a cached system block, or not at all.
+
+    Nine to twelve thousand tokens, identical for every candidate in a
+    run. Measured on the real API: 14,622 written on the first call and
+    14,622 read on the next.
+    """
+
+    def test_without_a_reference_the_system_prompt_is_unchanged(
+        self, client: ClientFactory
+    ) -> None:
+        c, fake = client()
+        c.complete_memo(system="SYS", prompt="P", schema=type(A_MEMO))
+
+        assert fake.calls[0]["system"] == "SYS"
+
+    def test_a_reference_becomes_a_cached_block_after_the_system_prompt(
+        self, client: ClientFactory
+    ) -> None:
+        c, fake = client()
+        c.complete_memo(
+            system="SYS", prompt="P", schema=type(A_MEMO), reference="PLAYBOOK"
+        )
+
+        blocks = fake.calls[0]["system"]
+        assert blocks[0] == {"type": "text", "text": "SYS"}
+        assert blocks[1]["text"] == "PLAYBOOK"
+        assert blocks[1]["cache_control"] == {"type": "ephemeral"}
+
+    def test_the_candidate_stays_in_the_user_message(
+        self, client: ClientFactory
+    ) -> None:
+        """Anything per-candidate inside the cached block misses the
+        cache on every call after the first, and pays to write a new
+        one — worse than not caching at all."""
+        c, fake = client()
+        c.complete_memo(
+            system="SYS", prompt="ZZZZ", schema=type(A_MEMO), reference="PLAYBOOK"
+        )
+
+        assert "ZZZZ" not in str(fake.calls[0]["system"])
+        assert fake.calls[0]["messages"][0]["content"] == "ZZZZ"
+
+
+class TestCachedTokensAreRecorded:
+    """`input_tokens` is the uncached remainder alone.
+
+    On the call that exposed this it was 31, against 14,879 read from
+    cache — so a page summing input and output reported 138 of a real
+    14,910.
+    """
+
+    def _logged(self, c: Any, fake: Any) -> dict[str, Any]:
+        c.complete_memo(system="SYS", prompt="P", schema=type(A_MEMO), agent="a")
+        import json
+
+        day = next((Path(c._memo_log.root) / "a").glob("*.json"))
+        return json.loads(day.read_text())[-1]
+
+    def test_a_cache_read_reaches_the_log(self, client: ClientFactory) -> None:
+        c, fake = client(usage=_Usage(cache_read_input_tokens=14_879))
+
+        assert self._logged(c, fake)["cache_read_tokens"] == 14_879
+
+    def test_a_cache_write_reaches_the_log(self, client: ClientFactory) -> None:
+        c, fake = client(usage=_Usage(cache_creation_input_tokens=14_622))
+
+        assert self._logged(c, fake)["cache_write_tokens"] == 14_622
+
+    def test_the_uncached_remainder_is_still_recorded_separately(
+        self, client: ClientFactory
+    ) -> None:
+        c, fake = client(usage=_Usage(input_tokens=31, cache_read_input_tokens=14_879))
+        row = self._logged(c, fake)
+
+        assert row["input_tokens"] == 31
+        assert row["output_tokens"] == 107
+
+    def test_a_usage_without_the_fields_records_none_not_an_error(
+        self, client: ClientFactory
+    ) -> None:
+        """Every call that sends no reference has no cache fields."""
+        c, fake = client(usage=_Usage())
+
+        assert self._logged(c, fake)["cache_write_tokens"] is None
