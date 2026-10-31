@@ -5,8 +5,9 @@ import { getServerI18n } from "@/lib/locale-server";
 import type { Locale } from "@/lib/i18n";
 import type { BrainMemo } from "@/lib/types";
 import {
-  memoEntries,
+  memoDigest,
   memoFieldLabel,
+  memoRest,
   memoValue,
 } from "@/lib/translate-dynamic";
 
@@ -39,19 +40,28 @@ export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
  * shows up here with no change to this page, which is the only way a
  * page like this stays honest about "everything it said".
  */
+/** Colour by what the verdict does, not by sentiment. */
+const VERDICT_STYLE: Record<string, string> = {
+  BUY: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  ADD: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  HOLD: "bg-council-100 text-council-700 dark:bg-council-800 dark:text-council-200",
+  WATCH: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+  TRIM: "bg-red-50 text-red-700 dark:bg-red-900/25 dark:text-red-400",
+  SELL: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  RARE_SELL: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  REJECT: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  DEFAULT: "bg-council-100 text-council-700 dark:bg-council-800 dark:text-council-200",
+};
+
 function MemoBody({
-  memo,
+  entries,
   locale,
   t,
 }: {
-  memo: Record<string, unknown>;
+  entries: [string, unknown][];
   locale: Locale;
   t: (key: string) => string;
 }) {
-  // memoEntries drops the language twin the reader did not ask for:
-  // five schemas write `thesis_en` and `thesis_he`, and this page used
-  // to print both.
-  const entries = memoEntries(memo ?? {}, locale);
   if (entries.length === 0) return null;
 
   return (
@@ -177,72 +187,86 @@ function MemoCard({
   t: (k: string) => string;
 }) {
   const meta = metaLocalized(memo.agent, locale);
-  const when = memo.timestamp?.slice(0, 16).replace("T", " ") ?? "";
-  const spent = billedTokens(memo) || null;
-  const cached = (memo.cache_write_tokens ?? 0) + (memo.cache_read_tokens ?? 0);
+  const when = memo.timestamp?.slice(0, 10) ?? "";
+  const body = (memo.memo ?? {}) as Record<string, unknown>;
+  // Verdict, thesis, three figures. Everything else folds away: the
+  // page printed all 123 fields of every memo as a grid, and a reader
+  // looking for the verdict had to find it among them.
+  const { decision, thesis, figures } = memoDigest(body, locale);
+  const rest = memoRest(body, locale);
 
   return (
     <Card>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <div className="min-w-0">
-          <span className="font-medium">{meta?.display ?? memo.agent}</span>
-          {memo.ticker && memo.ticker !== "?" && (
-            <>
-              <span className="mx-2 text-muted">·</span>
-              <span className="font-mono font-medium tabular">
-                {memo.ticker}
-              </span>
-              {companyName && (
-                <span className="ms-2 text-xs text-muted">{companyName}</span>
-              )}
-            </>
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+          {decision && (
+            <span
+              className={`text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
+                VERDICT_STYLE[decision.toUpperCase()] ?? VERDICT_STYLE.DEFAULT
+              }`}
+            >
+              {memoValue(decision, locale)}
+            </span>
           )}
+          <span className="font-mono font-medium tabular">{memo.ticker}</span>
+          {companyName && (
+            <span className="text-xs text-muted truncate">{companyName}</span>
+          )}
+          <span className="text-xs text-muted">
+            · {meta?.display ?? memo.agent}
+          </span>
         </div>
-        <div className="text-xs text-muted tabular whitespace-nowrap">
-          {when}
-        </div>
+        <div className="text-xs text-muted tabular whitespace-nowrap">{when}</div>
       </div>
 
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-        <span>
-          {t("brain_col_model")}: <span className="font-mono">{memo.model}</span>
-        </span>
-        {spent !== null && (
-          <span>
-            {t("brain_col_tokens")}:{" "}
-            <span className="tabular">{spent.toLocaleString()}</span>
-            {memo.input_tokens !== null && memo.output_tokens !== null && (
-              <span className="tabular">
-                {" "}
-                ({memo.input_tokens.toLocaleString()} →{" "}
-                {memo.output_tokens.toLocaleString()})
-              </span>
-            )}
-            {cached > 0 && (
-              <span className="tabular">
-                {" "}
-                · {t("brain_cached")} {cached.toLocaleString()}
-              </span>
-            )}
-          </span>
-        )}
-        {memo.prompt_chars !== null && (
-          <span>
-            {t("brain_prompt_digest")}:{" "}
-            <span className="tabular">
-              {memo.prompt_chars.toLocaleString()} {t("brain_chars")}
+      {thesis && (
+        <p className="mt-2 text-sm leading-relaxed text-council-700 dark:text-council-200">
+          {thesis}
+        </p>
+      )}
+
+      {figures.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+          {figures.map(([key, value]) => (
+            <div key={key}>
+              <div className="text-[11px] text-muted">
+                {memoFieldLabel(key, locale)}
+              </div>
+              <div className="text-sm font-medium tabular">
+                {renderValue(value, key, locale, t)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {rest.length > 0 && (
+        // <details>, so the fold costs no JavaScript and survives a
+        // reader who prints the page.
+        <details className="mt-3 group">
+          <summary className="text-xs text-muted cursor-pointer hover:underline list-none">
+            {t("brain_show_all")} ({rest.length})
+          </summary>
+          <MemoBody entries={rest} locale={locale} t={t} />
+          <div className="mt-3 pt-2 border-t border-council-100 dark:border-council-800 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+            <span>
+              {t("brain_col_model")}:{" "}
+              <span className="font-mono">{memo.model}</span>
             </span>
+            {billedTokens(memo) > 0 && (
+              <span className="tabular">
+                {t("brain_col_tokens")}: {billedTokens(memo).toLocaleString()}
+              </span>
+            )}
             {memo.prompt_sha256 && (
-              <span className="font-mono ms-1">
+              <span className="font-mono">
                 {memo.prompt_sha256.slice(0, 12)}
               </span>
             )}
-          </span>
-        )}
-        <span className="font-mono">{memo.schema}</span>
-      </div>
-
-      <MemoBody memo={memo.memo} locale={locale} t={t} />
+            <span className="font-mono">{memo.schema}</span>
+          </div>
+        </details>
+      )}
     </Card>
   );
 }

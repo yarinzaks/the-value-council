@@ -14,10 +14,17 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import {
+  memoDigest,
   memoEntries,
   memoFieldLabel,
+  memoRest,
   memoValue,
 } from "../src/lib/translate-dynamic.ts";
+
+/** The digest helpers, so each test reads like the others. */
+function require_digest() {
+  return { memoDigest, memoRest };
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "../..");
@@ -230,4 +237,126 @@ test("the two memo maps are well formed", () => {
       }
     }
   }
+});
+
+// --------------------------------------------------- the digest
+
+test("the digest leads with the verdict, the thesis and three figures", () => {
+  const { memoDigest } = require_digest();
+  const memo = {
+    ticker: "GIS",
+    decision: "WATCH",
+    thesis_en: "English",
+    thesis_he: "תזה בעברית",
+    margin_of_safety_pct: 32,
+    intrinsic_value_estimate_usd_per_share: 72.42,
+    confidence: 0.45,
+    moat_analysis: "long prose nobody reads first",
+  };
+  const d = memoDigest(memo, "he");
+  assert.equal(d.decision, "WATCH");
+  assert.equal(d.thesis, "תזה בעברית");
+  assert.deepEqual(d.figures.map(([k]) => k), [
+    "margin_of_safety_pct",
+    "intrinsic_value_estimate_usd_per_share",
+    "confidence",
+  ]);
+});
+
+test("a valuation of zero is not shown as a figure", () => {
+  // 72 of 120 memos carry `intrinsic_value_estimate_usd` as zero: the
+  // snapshot did not give the analyst what a valuation needs. "$0" as
+  // the headline reads as "worth nothing", which is a much stronger
+  // claim than the memo is making.
+  const { memoDigest } = require_digest();
+  const d = memoDigest(
+    {
+      decision: "WATCH",
+      margin_of_safety_pct: 0,
+      intrinsic_value_estimate_usd: 0,
+      peg_ratio: 1.4,
+      confidence: 0.3,
+    },
+    "he",
+  );
+  const keys = d.figures.map(([k]) => k);
+  assert.ok(!keys.includes("intrinsic_value_estimate_usd"), keys.join(","));
+  assert.ok(!keys.includes("margin_of_safety_pct"), keys.join(","));
+  // It falls through to the next candidate in the same group.
+  assert.ok(keys.includes("peg_ratio"), keys.join(","));
+});
+
+test("a score of zero IS shown — it is a verdict", () => {
+  // Fisher scoring a company 0 out of 15 is a judgement, and six memos
+  // say exactly that.
+  const { memoDigest } = require_digest();
+  const d = memoDigest({ decision: "REJECT", total_score_out_of_15: 0 }, "he");
+  assert.deepEqual(d.figures, [["total_score_out_of_15", 0]]);
+});
+
+test("what the digest showed is not repeated in the fold", () => {
+  const { memoDigest, memoRest } = require_digest();
+  const memo = {
+    ticker: "GIS",
+    decision: "WATCH",
+    thesis_en: "English",
+    thesis_he: "עברית",
+    confidence: 0.45,
+    moat_analysis: "prose",
+  };
+  const shown = new Set([
+    "decision",
+    ...memoDigest(memo, "he").figures.map(([k]) => k),
+    "thesis_he",
+    "thesis_en",
+  ]);
+  for (const [key] of memoRest(memo, "he")) {
+    assert.ok(!shown.has(key), `${key} appears twice`);
+  }
+  // And nothing is lost: the fold still carries the rest.
+  assert.deepEqual(memoRest(memo, "he").map(([k]) => k), ["ticker", "moat_analysis"]);
+});
+
+test("a memo with no thesis and no figures still has a verdict", () => {
+  const { memoDigest } = require_digest();
+  const d = memoDigest({ decision: "REJECT" }, "he");
+  assert.equal(d.decision, "REJECT");
+  assert.equal(d.thesis, null);
+  assert.deepEqual(d.figures, []);
+});
+
+test("every live memo produces a digest with something in it", () => {
+  const { memoDigest } = require_digest();
+  const dir = join(ROOT, "data/memos");
+  if (!existsSync(dir)) {
+    console.log("    (no memos in this checkout — skipped)");
+    return;
+  }
+  let checked = 0;
+  let thin = 0;
+  for (const agent of readdirSync(dir)) {
+    let files;
+    try {
+      files = readdirSync(join(dir, agent)).filter((f) => f.endsWith(".json"));
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      let rows;
+      try {
+        rows = JSON.parse(readFileSync(join(dir, agent, file), "utf8"));
+      } catch {
+        continue;
+      }
+      for (const row of Array.isArray(rows) ? rows : [rows]) {
+        const memo = row?.memo;
+        if (!memo || typeof memo !== "object") continue;
+        checked++;
+        const d = memoDigest(memo, "he");
+        if (!d.decision && !d.thesis && d.figures.length === 0) thin++;
+      }
+    }
+  }
+  assert.ok(checked > 100, `only ${checked} memos checked`);
+  assert.equal(thin, 0, `${thin} memos would render as an empty card`);
 });
