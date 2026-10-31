@@ -729,6 +729,15 @@ class DailyRunner:
         as_of = as_of or date.today()
         if self._market_shut("scan", as_of):
             return []
+        if as_of != date.today():
+            # Said once, at the top, because everything below writes
+            # files dated to the session rather than to today and a
+            # reader of those files should not have to deduce it.
+            logger.warning(
+                f"catching up the {as_of} session on {date.today()}: prices and "
+                f"filings are read as of {as_of}, and every row written is "
+                f"dated to it. The ledger marks these rows 'caught-up'."
+            )
         logger.info(f"daily run for {as_of}")
         self.universe._ensure_loaded()
         members = self.universe.constituents_at(as_of)
@@ -1079,7 +1088,19 @@ class DailyRunner:
         # Never fatal: the trades already happened and the book is
         # already saved, so failing here costs attribution, not money.
         try:
-            record_day(adapter.name, as_of, trades, directory=self.ledger_dir)
+            record_day(
+                adapter.name,
+                as_of,
+                trades,
+                directory=self.ledger_dir,
+                # Only written down when the two differ, which marks a
+                # session caught up later rather than traded on the day.
+                # The rows stay dated to the session either way, so the
+                # ledger never claims a trade on a shut market; this is
+                # so a reader who notices a Friday book written on a
+                # Saturday finds the answer rather than a puzzle.
+                recorded_on=date.today(),
+            )
         except Exception as exc:
             logger.warning(f"{as_of}: ledger write for {adapter.name} failed: {exc}")
 
