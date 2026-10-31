@@ -1340,6 +1340,117 @@ class TestTheFiguresSayWhatHappened:
         assert "סכום העסקה: $1,904.42" in text
 
 
+class TestTheReasoningIsInHebrew:
+    """The message is Hebrew; its reasoning was arriving in English —
+    the part the reader studies most closely, in the language they read
+    least comfortably."""
+
+    def a_row(self, *criteria: str):
+        return FakeDecision(
+            ticker="HOG",
+            decision="BUY",
+            criteria_met=list(criteria),
+            criteria_values={"mode": "DEFENSIVE", "graham_number": 43.68,
+                             "pe_times_pb": 12.46},
+        )
+
+    def test_a_phrase_criterion_is_translated(self) -> None:
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_row("positive trailing net income")},
+        )
+
+        assert "רווח נקי חיובי בשנה החולפת" in text
+        assert "positive trailing net income" not in text
+
+    def test_a_labelled_figure_keeps_its_number_untouched(self) -> None:
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_row("current ratio=2.10 (≥ 2.0)")},
+        )
+
+        assert "יחס שוטף=2.10 (≥ 2.0)" in text
+
+    def test_a_figure_whose_hebrew_moves_the_number(self) -> None:
+        """"5yr avg FCF" reads in Hebrew with the 5 before the word."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_row("5yr avg FCF $217,127,200")},
+        )
+
+        assert "FCF ממוצע ל-5 שנים: $217,127,200" in text
+
+    def test_the_ratio_abbreviations_are_left_alone(self) -> None:
+        """P/E and D/E are what a Hebrew-speaking investor calls them.
+        Rendering them as "מכפיל רווח" would translate past the reader."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_row("P/E=11.23 (≤ 15.0)", "D/E=0.94 (≤ 1.0)")},
+        )
+
+        assert "P/E=11.23 (≤ 15.0)" in text
+        assert "D/E=0.94 (≤ 1.0)" in text
+
+    def test_an_unknown_phrase_arrives_readable_rather_than_mangled(self) -> None:
+        """A criterion from a strategy added later has no entry in the
+        table. English is a worse message than Hebrew and a far better
+        one than half of each."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_row("some brand new test passed")},
+        )
+
+        assert "some brand new test passed" in text
+
+    def test_a_longer_phrase_is_not_pre_empted_by_a_shorter_one(self) -> None:
+        """"yield=" would otherwise match inside "yield=12.0% (top
+        quintile)" and leave the qualifier in English."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={"HOG": self.a_row("yield=12.0% (top quintile)")},
+        )
+
+        assert "תשואה=12.0% (בחמישון העליון)" in text
+        assert "quintile" not in text
+
+
+class TestAMissingFigureIsNotACriterion:
+    def test_a_nan_criterion_is_not_shown(self) -> None:
+        """"P/B=nan (< 1.5)" is not a test the company passed, it is a
+        figure that never arrived — and 90 rows of the journal carry
+        one. Printed, it reads as a fault in the system that wrote it."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG", decision="BUY",
+                    criteria_met=["P/B=nan (< 1.5)", "P/E=11.23 (≤ 15.0)"],
+                    criteria_values={"mode": "DEFENSIVE", "pe_times_pb": 12.46},
+                )
+            },
+        )
+
+        assert "nan" not in text
+        assert "P/E=11.23 (≤ 15.0)" in text, "the measured one still shows"
+
+    def test_a_row_of_nothing_but_gaps_drops_the_heading_too(self) -> None:
+        """An empty "what it spotted:" is worse than no heading."""
+        text = rendered(
+            watch_result(trades=[a_buy(ticker="HOG")]),
+            decisions={
+                "HOG": FakeDecision(
+                    ticker="HOG", decision="BUY",
+                    criteria_met=["P/B=nan (< 1.5)", "yield=nan%"],
+                    criteria_values={"mode": "DEFENSIVE", "pe_times_pb": 12.46},
+                )
+            },
+        )
+
+        assert "מה זיהה" not in text
+        assert "nan" not in text
+        assert "פעולה: קנייה" in text, "the fill is still reported"
+
+
 class TestAReasonMustMatchTheTradeItExplains:
     """The join is on the ticker, so nothing stops a sale being handed
     the row that justified the purchase."""
@@ -1388,7 +1499,11 @@ class TestAReasonMustMatchTheTradeItExplains:
         )
 
         assert "למה יצא:" in text
-        assert "left today's target list" in text
+        # In Hebrew, like the rest of the message. The journal keeps the
+        # English — see core.live.hebrew_terms for why the translation
+        # lives at this edge and not at the twelve strategies.
+        assert "לא נמצאת ברשימת היעד של היום" in text
+        assert "left today's target list" not in text
 
     def test_a_purchase_is_never_explained_by_an_exit(self):
         """The symmetric case. It should not arise, but the guard costs
