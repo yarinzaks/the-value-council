@@ -525,6 +525,82 @@ test("TRUSTED_DOMAINS holds out the domains that block Anthropic's crawler", () 
   }
 });
 
+// ---- how an answer is shaped -----------------------------------------------
+//
+// The whole instruction used to be one line — "Lead with the answer.
+// Keep it short unless a discrepancy needs explaining." — at the end of
+// a 56-line prompt. The model filled the gap with its own defaults, and
+// a question about which holdings were underwater came back at 400
+// words: a four-sentence paragraph of disclaimers, a second paragraph
+// of data-freshness caveats, then a table, then five multi-line
+// bullets, with every other phrase in bold.
+//
+// None of these tests can prove what the model will write. They pin the
+// instruction, which is the part that regresses silently — a prompt edit
+// that drops a rule leaves no trace anywhere else.
+
+test("the prompt tells the model to answer in the first sentence", () => {
+  assert.match(SYSTEM, /First sentence answers the question/i);
+});
+
+test("the prompt sets a length to aim at", () => {
+  // A target, not a cap: "keep it short" is not actionable and the
+  // model had been reading it as "write less than you otherwise would".
+  assert.match(SYSTEM, /\b\d{2,3} words\b/);
+});
+
+test("the prompt forbids opening with a disclaimer", () => {
+  // The failure that prompted this. Four sentences of "I cannot
+  // recommend, I cannot execute, what I can do is" ahead of any
+  // content, in an answer to a specific question.
+  assert.match(SYSTEM, /Never open with what you are not/i);
+  // And says where they do belong, so the model does not simply drop
+  // them: a refusal is still the answer when the question asks for
+  // advice or for a trade.
+  // \s+ because the prompt is wrapped and the phrase straddles a line
+  // break — which is exactly the kind of thing a literal-string match
+  // would have passed on yesterday and failed on after a reflow.
+  assert.match(SYSTEM, /refusing \*is\*\s+the answer/i);
+});
+
+test("the prompt caps the caveats", () => {
+  assert.match(SYSTEM, /One caveat, at most/i);
+  // And explains the cost of repeating the snapshot caveat, because the
+  // rule without the reason is the kind a model argues itself out of.
+  assert.match(SYSTEM, /skip your first paragraph/i);
+});
+
+test("the prompt says when a table is worth it, and that a column is one kind of figure", () => {
+  assert.match(SYSTEM, /table when there are three or more/i);
+  // The sample answer had a column holding a P/E in one row and a
+  // return in the next.
+  assert.match(SYSTEM, /is not a column/i);
+});
+
+test("the prompt rations bold, headings and bullets", () => {
+  assert.match(SYSTEM, /Bold the one thing that matters most, or nothing/i);
+  assert.match(SYSTEM, /No section headers under/i);
+  assert.match(SYSTEM, /at most four of them, each one line/i);
+});
+
+test("the prompt still forbids personalised advice", () => {
+  // The brevity rules must not have loosened this. It is the one limit
+  // that is not a style preference.
+  assert.match(SYSTEM, /not a licensed financial adviser/i);
+  assert.match(SYSTEM, /must not give personalised investment advice/i);
+  assert.match(SYSTEM, /cannot place trades/i);
+});
+
+test("the prompt still requires a source for every figure", () => {
+  // Shortening an answer must not come out of the sourcing.
+  assert.match(SYSTEM, /Name your source for every figure/i);
+  assert.match(SYSTEM, /Never invent a number/i);
+});
+
+test("the prompt answers in the reader's language", () => {
+  assert.match(SYSTEM, /Answer in the language the question was asked in/i);
+});
+
 test("the system prompt does not tell the model to search a blocked domain", () => {
   for (const blocked of [
     "barrons.com",
