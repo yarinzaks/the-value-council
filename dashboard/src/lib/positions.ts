@@ -335,6 +335,13 @@ export function movements(story: PositionStory): Movement[] {
     } else if (isBuy && !holding) {
       kind = "reopened";
       holding = true;
+    } else if (isBuy) {
+      // Already long, and the agent has said buy again in a different
+      // word — BUY is the intent, FILL its execution, ADD a top-up.
+      // None of them is a change of view, and rendering them as one
+      // put two "Changed its view" rows on the same date for 75 of
+      // the book's names.
+      continue;
     } else {
       kind = "changed";
     }

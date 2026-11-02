@@ -225,10 +225,17 @@ export function PositionStoryCard({
           entry, which is the truth about it. */}
       {events.length > 0 && (
         <ol className="mt-3 space-y-1.5 border-s-2 border-council-100 dark:border-council-800 ps-3">
-          {events.map((m) => {
+          {/* The index is part of the key because a date and a kind
+              do not identify a movement: two different decisions on
+              one day — a WATCH after a REJECT, a SELL after an EXIT —
+              are two real entries that collide on `date-kind`, and a
+              duplicate key lets React drop one of them. The list is
+              rebuilt whole on every render and never reordered, so
+              the index is stable for as long as the key needs to be. */}
+          {events.map((m, i) => {
             const shut = marketClosures?.[m.date];
             return (
-            <li key={`${m.date}-${m.kind}`} className="text-xs">
+            <li key={`${i}-${m.date}-${m.kind}`} className="text-xs">
               <span className="tabular text-muted">{m.date}</span>{" "}
               {shut && (
                 <span

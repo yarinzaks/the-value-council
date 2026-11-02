@@ -15,7 +15,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildPositionStories } from "../src/lib/positions.ts";
+import { buildPositionStories, movements } from "../src/lib/positions.ts";
 
 const AGENT = "benjamin_graham";
 
@@ -120,4 +120,39 @@ test("a sale after the last buy leaves the run at zero", () => {
   );
   assert.equal(s.lifecycle, "closed");
   assert.equal(s.daysHeldUnbroken, 0);
+});
+
+test("an execution on a day already held is not a change of view", () => {
+  // BUY is the intent, FILL the execution of that same intent. Both
+  // are buy-kinds, so the transition between them used to render as
+  // "Changed its view" — twice, on the same date, which is also two
+  // list items sharing a React key.
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-09-04", "BUY"),
+    row("2026-09-04", "FILL"),
+  ]);
+  const m = movements(s);
+  assert.equal(
+    m.filter((x) => x.kind === "changed").length,
+    0,
+    `nothing changed: ${JSON.stringify(m)}`,
+  );
+});
+
+test("a real change of view is still reported", () => {
+  // BUY -> WATCH is the agent stepping back, and must survive.
+  const s = storyFor([row("2026-09-03", "BUY"), row("2026-09-04", "WATCH")]);
+  assert.equal(movements(s).filter((x) => x.kind === "changed").length, 1);
+});
+
+test("movements never repeat a date and kind", () => {
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-09-04", "BUY"),
+    row("2026-09-04", "FILL"),
+    row("2026-09-05", "ADD"),
+  ]);
+  const keys = movements(s).map((m) => `${m.date}-${m.kind}`);
+  assert.equal(new Set(keys).size, keys.length, keys.join(", "));
 });
