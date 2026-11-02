@@ -48,6 +48,61 @@ class TestSaveAndLoad:
         values = sorted(f.value for f in loaded)
         assert values == [1.0, 2.0]
 
+    def test_round_trip_preserves_every_field(self, tmp_path: Path) -> None:
+        """Exact equality, field by field, in the order written.
+
+        ``test_round_trip`` above checks the count and the values, which
+        a converter that mislabelled a column would still pass. This one
+        pins the whole object, because the loader is read ~8,290 times a
+        run and is the one place a column swap would be invisible: every
+        downstream number would still be a number.
+        """
+        cache = EdgarCache(cache_dir=tmp_path)
+        facts = [
+            _fact(),
+            # Instant fact: no period_start.
+            _fact(
+                concept="Assets",
+                period_start=None,
+                period_end=date(2021, 6, 30),
+                form="10-Q",
+                fiscal_year=2021,
+                fiscal_period="Q2",
+                accession_number="acc-2",
+            ),
+            # A filer that tags neither fiscal year nor period.
+            _fact(
+                concept="OperatingIncomeLoss",
+                namespace="dei",
+                unit="shares",
+                value=-12.5,
+                fiscal_year=None,
+                fiscal_period=None,
+                accession_number="acc-3",
+            ),
+        ]
+        cache.save_facts("AAPL", facts)
+        assert cache.load_facts("AAPL") == facts
+
+    def test_round_trip_keeps_row_order(self, tmp_path: Path) -> None:
+        """Order is part of the contract.
+
+        ``assemble_one`` takes ``max`` over filing dates and counts
+        distinct periods, so order does not change its answers — but
+        ``latest_value_at``'s tie-break on equal ``filed`` does, and a
+        reordering loader would make it non-deterministic rather than
+        wrong, which is worse to find.
+        """
+        cache = EdgarCache(cache_dir=tmp_path)
+        facts = [
+            _fact(value=float(i), accession_number=f"acc-{i}")
+            for i in range(50)
+        ]
+        cache.save_facts("AAPL", facts)
+        assert [f.value for f in cache.load_facts("AAPL")] == [
+            float(i) for i in range(50)
+        ]
+
     def test_save_empty_is_noop(self, tmp_path: Path) -> None:
         cache = EdgarCache(cache_dir=tmp_path)
         cache.save_facts("AAPL", [])
