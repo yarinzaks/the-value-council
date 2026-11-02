@@ -262,7 +262,7 @@ export function PositionStoryCard({
             <li className="text-xs text-muted">
               {t("pos_still_held").replace(
                 "{days}",
-                String(story.daysAffirmed),
+                String(story.daysHeldUnbroken),
               )}
             </li>
           )}
