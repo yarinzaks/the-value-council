@@ -41,6 +41,7 @@ import json
 import threading
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime
+from math import isfinite
 from pathlib import Path
 from typing import Any, Literal
 
@@ -142,6 +143,30 @@ def _optional_float(value: Any) -> float | None:
         return None
 
 
+def _json_safe(value: Any) -> Any:
+    """``value`` with every non-finite float replaced by ``None``.
+
+    ``json.dumps`` writes NaN and the infinities as the bare tokens
+    ``NaN``, ``Infinity`` and ``-Infinity``. Python's own loader accepts
+    them, so a file written this way round-trips here and looks healthy;
+    they are not JSON, and ``JSON.parse`` refuses the whole document.
+    The dashboard's loader tolerates a file it cannot read by skipping
+    it, so one absent metric cost a reader the entire agent-day — five
+    of them on 2026-06-19, where the visible symptom was a position card
+    showing six exits against the seven the journal held.
+
+    A metric that could not be computed is absent, and ``null`` is how
+    the rest of this schema already says so.
+    """
+    if isinstance(value, float):
+        return value if isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
 class DecisionLogger:
     """Per-agent append-only logger writing to ``<root>/<agent>/<YYYY-MM-DD>.json``.
 
@@ -202,9 +227,40 @@ class DecisionLogger:
                     logger.warning(
                         f"corrupt decisions file {path}; starting fresh: {exc}"
                     )
-            entries.append(decision.to_dict())
+            # A day gets more than one run — the US open and the US
+            # close both scan the whole book, and a retry or a manual
+            # dispatch adds more. Each run re-emits the strategy's
+            # intent for every held name, so the file grew a second
+            # byte-identical copy of every row and the journal showed
+            # each ticker twice.
+            #
+            # Equality is on the whole payload, so only a re-emission
+            # of the same reading is dropped: a changed price, a
+            # changed confidence or the execution that follows an
+            # intent all differ somewhere and are kept. Rows already
+            # duplicated on disk stay — this stops the logger adding
+            # more, it does not edit an audit trail it did not write.
+            row = _json_safe(decision.to_dict())
+            if row in [_json_safe(e) for e in entries]:
+                logger.debug(
+                    f"skipped duplicate {decision.agent}.{decision.decision} "
+                    f"{decision.ticker} → {path.name}"
+                )
+                return
+            entries.append(row)
             tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(entries, indent=2, default=str))
+            # allow_nan=False is the guard, not the fix: _json_safe has
+            # already removed the non-finite values, and this makes a
+            # path that grows a new one fail here rather than write a
+            # file no browser can read.
+            tmp.write_text(
+                json.dumps(
+                    _json_safe(entries),
+                    indent=2,
+                    default=str,
+                    allow_nan=False,
+                )
+            )
             tmp.replace(path)
         logger.debug(
             f"logged {decision.agent}.{decision.decision} {decision.ticker} → {path.name}"
