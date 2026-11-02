@@ -140,123 +140,73 @@ env:
   # than on the day of the cutover.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
-concurrency:
-  # One queue for every run of this workflow, so no two can be inside
-  # the commit-and-push step at once.
-  #
-  # This was previously keyed per cron, on the reasoning that US and
-  # TASE runs should not block each other on the Mon-Thu overlap days.
-  # That held while they were 55 minutes apart. Moving the US scan to
-  # 14:00 UTC put it 30 minutes ahead of the TASE close, and the
-  # slowest run measured took 29.7 — close enough that two jobs would
-  # eventually race on `git push` and one would fail.
-  #
-  # Blocking is the right behaviour here rather than something to
-  # avoid: a run that waits its turn is strictly better than a run that
-  # fails on a non-fast-forward. cancel-in-progress stays false so the
-  # queued run still happens.
-  #
-  # The hold makes the lock coarser — a US job now owns this group from
-  # the moment its cron fires until its scan finishes, up to three hours
-  # under EST. The only thing that can queue behind it is the TASE
-  # close, which is exactly why TASE is not held: it trades nothing, so
-  # arriving late costs nothing, and letting it hold the lock instead
-  # would delay the run that does move a book.
-  group: daily-paper-trading
-  cancel-in-progress: false
+# No workflow-level concurrency. The lock lives on the `scan` job alone,
+# and `wait` runs outside it — see the comment on each.
+
 
 jobs:
-  run:
+  # Waiting, outside the lock.
+  #
+  # This used to be a step inside the job that scans, and the two
+  # together were why only one of Monday's four US runs completed. The
+  # cron fires up to two hours before the anchor and the hold absorbs
+  # the difference, so a run owned the concurrency group from the moment
+  # its cron fired: 118 minutes idle, then 131 scanning, 250 in all. The
+  # 15:00 cron queued behind it and the 17:00 cron displaced the queued
+  # one, because a group keeps a single queued run however
+  # `cancel-in-progress` is set. Two of four US runs were cancelled
+  # without ever starting, and the one that did run landed its data at
+  # 17:11 UTC — 19:11 in Israel, two hours after the dashboard's own
+  # advertised time.
+  #
+  # The workflow's previous comment said the only thing that could queue
+  # behind a held run was the TASE close. That was true at a 60-minute
+  # lead and stopped being true on 2026-11-01, when US daylight saving
+  # ended and the lead became 120 — longer than the 120-minute spacing
+  # between the US crons themselves, which is the collision it missed.
+  #
+  # Splitting the wait out fixes it structurally rather than by budget:
+  # what the lock protects is the `git push` at the end of the scan, and
+  # a job sleeping until 15:00 UTC is not pushing anything. Four jobs
+  # can wait at once; only one can scan.
+  #
+  # Checkout and Python but no `pip install` — scripts.hold_until_anchor
+  # imports argparse, sys, time, datetime and zoneinfo, all stdlib, and
+  # a test below pins that so a dependency added to it fails here rather
+  # than at 13:02 on a Monday.
+  wait:
     runs-on: ubuntu-latest
-    # 60 min absorbed normal yfinance variance (measured 0.8 min for a
-    # mark-only run, 24.7 at p90, 45.2 at worst — the bottleneck is the
-    # per-ticker fetch loop in core.live.runner, and batching is the
-    # proper fix, tracked separately). "Hold until the anchor" now adds
-    # up to 120 on top of that under EST, so: 120 waiting plus 45
-    # working plus setup still leaves headroom inside 180.
-    #
-    # That arithmetic stopped holding. The scanning run is the only one
-    # that moves a book, and on 2026-10-30 it was killed at exactly 180
-    # minutes with the scan unfinished — so the agents last scanned on
-    # 2026-10-29, Graham's watch list stayed empty and the second Graham
-    # never opened, none of which looks like a fault from the outside.
-    #
-    # The margin had been gone for a while rather than disappearing that
-    # day. Job durations for cron '0 13': 177 min on 10-22, 175 on
-    # 10-23, then 94, 114, 132 and 116 — the last four inside a budget
-    # that the first two came within three minutes of. Which part grew
-    # is not established: the retrievable log ends at the same line on a
-    # run that finished and on the one that did not.
-    #
-    # And it was about to get worse on a date rather than on a trend.
-    # The hold is 60 minutes under EDT and 120 under EST, out of the
-    # same budget, so 180 left two hours to scan in summer and one in
-    # winter. US daylight saving ends on 2026-11-01, which would have
-    # taken the next working hour away from the first run after it —
-    # and the scan has not finished inside two.
-    #
-    # 300 restores the headroom without touching the anchor arithmetic,
-    # which is what encodes daylight saving and is the one thing here
-    # worth being slow to change. It treats the symptom on purpose. The
-    # causes — an hour of this budget spent idle before the anchor, two
-    # Grahams running an identical screen twice, and the unbatched fetch
-    # loop — are each worth their own change, and none of them should be
-    # made in a hurry to get Monday's run through.
-    timeout-minutes: 300
+    # The largest lead any cron asks for is 120 minutes, under EST.
+    # 150 covers it with setup and leaves the runaway case to
+    # scripts.hold_until_anchor's own MAX_HOLD, which reports it.
+    timeout-minutes: 150
+
+    # What the scan job needs to know, decided here because the anchor
+    # is decided here and all three come out of one `case`. The anchor
+    # itself is not published: it is consumed by the hold step in this
+    # job and the scan has no use for it.
+    outputs:
+      mode: ${{ steps.dispatch.outputs.mode }}
+      market: ${{ steps.dispatch.outputs.market }}
 
     env:
       TRIGGER_SCHEDULE: ${{ github.event.schedule }}
       TRIGGER_INPUT_MODE: ${{ inputs.mode }}
       TRIGGER_INPUT_MARKET: ${{ inputs.market }}
       TRIGGER_NAME: ${{ github.event_name }}
-      TARGET_REF: ${{ github.ref_name }}
-      SEC_USER_AGENT: 'value-council research@yarinzaks.dev'
-      VALUE_COUNCIL_DATA_DIR: ${{ github.workspace }}/data
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Telegram notifications. Both are empty in a fork — GitHub does
-      # not pass secrets to a workflow triggered from one — and empty
-      # before they are first set. `core.live.notify` treats either case
-      # as "off" and sends nothing, rather than failing a run that has
-      # already traded.
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      # The analyst layer. Empty in a fork and empty before the secret
-      # is first set; `core.llm.wiring` reads either as "no layer" and
-      # the books trade on their quantitative screens exactly as they
-      # did before there was one, rather than failing a run.
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # Whether the layer runs at all, and whether it decides.
-      #
-      # A repository variable rather than a literal, so turning it off
-      # is a click rather than a pull request. That matters because
-      # this is the one setting here that spends money per run —
-      # measured at about $2.20 a scan on Sonnet, some $46 a month —
-      # and the first surprising invoice should not have to wait for a
-      # merge.
-      #
-      # Unset is the same as "off", which is what every run before this
-      # did. "shadow" asks the five hybrid agents' candidates and writes
-      # the memos to /brain without touching any selection; "enforce"
-      # lets a verdict remove a name, and no book should reach that
-      # before someone has read a fortnight of shadow output.
-      LLM_MODE: ${{ vars.LLM_MODE }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Only scripts/hold_until_anchor.py is read here. The scan job
+          # does its own full-history checkout for the commit.
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e '.[dev]'
 
       - name: Decide run mode + market
         id: dispatch
@@ -316,36 +266,6 @@ jobs:
               ;;
           esac
 
-      - name: Prepare data directories
-        run: mkdir -p data/portfolios data/decisions data/snapshots data/cache data/cron_logs data/fundamentals_cache
-
-      - name: Download EDGAR cache from release (US runs only)
-        # TASE runs don't need the EDGAR cache — the Israeli scanner
-        # uses Maya, not SEC. Skip the download to save ~30 sec.
-        if: steps.dispatch.outputs.market != 'TASE'
-        run: |
-          if ! gh release download cache-latest --pattern 'fundamentals_cache.tar.gz' --dir /tmp; then
-            echo "::error::cache-latest release missing. Run the 'Refresh EDGAR cache' workflow first."
-            exit 1
-          fi
-          tar -xzf /tmp/fundamentals_cache.tar.gz -C data/
-          find data/fundamentals_cache -name '._*' -delete 2>/dev/null || true
-          n=$(find data/fundamentals_cache -name '*.parquet' -not -name '._*' 2>/dev/null | wc -l)
-          echo "::notice::extracted $n parquet files from release"
-          if [ "$n" -lt 500 ]; then
-            echo "::error::release contained too few parquet files ($n). Refresh workflow may have published a corrupt asset."
-            exit 1
-          fi
-
-      - name: Restore price + universe-index cache
-        uses: actions/cache@v4
-        with:
-          path: data/cache
-          key: prices-v2-${{ steps.dispatch.outputs.market }}-${{ github.run_id }}
-          restore-keys: |
-            prices-v2-${{ steps.dispatch.outputs.market }}-
-            prices-v2-
-
       - name: Hold until the anchor
         # GitHub treats scheduled events as best-effort, and for this
         # repository that is not a small effect. Measured over 51
@@ -382,14 +302,143 @@ jobs:
           ANCHOR: ${{ steps.dispatch.outputs.anchor }}
         run: python -m scripts.hold_until_anchor --anchor "$ANCHOR"
 
+  scan:
+    needs: wait
+    runs-on: ubuntu-latest
+
+    # One queue for every run of this workflow, so no two can be inside
+    # the commit-and-push step at once.
+    #
+    # On the job rather than the workflow, which is the whole point: the
+    # `wait` job above is outside this group, so a run that is sleeping
+    # until its anchor queues nothing behind it. Only jobs that are
+    # about to scan and push contend here.
+    #
+    # This was previously keyed per cron, on the reasoning that US and
+    # TASE runs should not block each other on the Mon-Thu overlap days.
+    # That held while they were 55 minutes apart. Moving the US scan to
+    # 14:00 UTC put it 30 minutes ahead of the TASE close, and the
+    # slowest run measured took 29.7 — close enough that two jobs would
+    # eventually race on `git push` and one would fail.
+    #
+    # Blocking is the right behaviour here rather than something to
+    # avoid: a run that waits its turn is strictly better than a run
+    # that fails on a non-fast-forward. cancel-in-progress stays false
+    # so the queued run still happens.
+    concurrency:
+      group: daily-paper-trading
+      cancel-in-progress: false
+    # Working time only. The hold is the `wait` job's budget now, so
+    # this no longer has to cover an idle hour before it covers any
+    # work — which is what made the old number so hard to set.
+    #
+    # The history is worth keeping, because it is the same mistake
+    # twice. The ceiling was 180 with the hold inside it, leaving two
+    # hours to scan in summer and one in winter; on 2026-10-30 the only
+    # run that moves a book was killed at exactly 180 with the scan
+    # unfinished, so the agents last scanned on 10-29, Graham's watch
+    # list stayed empty and the second Graham never opened — none of
+    # which looks like a fault from outside. Raising it to 300 bought
+    # the run through, at the price of a lock held for four hours, and
+    # that price was two of Monday's four US runs.
+    #
+    # Measured scan times for cron '0 13', hold excluded: 34, 54, 56,
+    # 72, and — once the Council began ranking the whole 8,290-name
+    # universe — 131. Ninety-six minutes of that 131 was one agent
+    # reading the fact cache row by row; the commit before this one
+    # makes that read 6.1x faster. 150 is above every scan ever
+    # observed, including that one, and it is now a budget for scanning
+    # rather than for scanning minus whatever the scheduler did.
+    timeout-minutes: 150
+
+    env:
+      TARGET_REF: ${{ github.ref_name }}
+      SEC_USER_AGENT: 'value-council research@yarinzaks.dev'
+      VALUE_COUNCIL_DATA_DIR: ${{ github.workspace }}/data
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Telegram notifications. Both are empty in a fork — GitHub does
+      # not pass secrets to a workflow triggered from one — and empty
+      # before they are first set. `core.live.notify` treats either case
+      # as "off" and sends nothing, rather than failing a run that has
+      # already traded.
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # The analyst layer. Empty in a fork and empty before the secret
+      # is first set; `core.llm.wiring` reads either as "no layer" and
+      # the books trade on their quantitative screens exactly as they
+      # did before there was one, rather than failing a run.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Whether the layer runs at all, and whether it decides.
+      #
+      # A repository variable rather than a literal, so turning it off
+      # is a click rather than a pull request. That matters because
+      # this is the one setting here that spends money per run —
+      # measured at about $2.20 a scan on Sonnet, some $46 a month —
+      # and the first surprising invoice should not have to wait for a
+      # merge.
+      #
+      # Unset is the same as "off", which is what every run before this
+      # did. "shadow" asks the five hybrid agents' candidates and writes
+      # the memos to /brain without touching any selection; "enforce"
+      # lets a verdict remove a name, and no book should reach that
+      # before someone has read a fortnight of shadow output.
+      LLM_MODE: ${{ vars.LLM_MODE }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Prepare data directories
+        run: mkdir -p data/portfolios data/decisions data/snapshots data/cache data/cron_logs data/fundamentals_cache
+
+      - name: Download EDGAR cache from release (US runs only)
+        # TASE runs don't need the EDGAR cache — the Israeli scanner
+        # uses Maya, not SEC. Skip the download to save ~30 sec.
+        if: needs.wait.outputs.market != 'TASE'
+        run: |
+          if ! gh release download cache-latest --pattern 'fundamentals_cache.tar.gz' --dir /tmp; then
+            echo "::error::cache-latest release missing. Run the 'Refresh EDGAR cache' workflow first."
+            exit 1
+          fi
+          tar -xzf /tmp/fundamentals_cache.tar.gz -C data/
+          find data/fundamentals_cache -name '._*' -delete 2>/dev/null || true
+          n=$(find data/fundamentals_cache -name '*.parquet' -not -name '._*' 2>/dev/null | wc -l)
+          echo "::notice::extracted $n parquet files from release"
+          if [ "$n" -lt 500 ]; then
+            echo "::error::release contained too few parquet files ($n). Refresh workflow may have published a corrupt asset."
+            exit 1
+          fi
+
+      - name: Restore price + universe-index cache
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: prices-v2-${{ needs.wait.outputs.market }}-${{ github.run_id }}
+          restore-keys: |
+            prices-v2-${{ needs.wait.outputs.market }}-
+            prices-v2-
+
       - name: Run paper-trading scanner
         # `shell: bash` is load-bearing, not style. The default shell runs
         # `bash -e` without pipefail, so `python ... | tee` reported tee's
         # exit code and a scanner that died mid-run looked successful.
         shell: bash
         env:
-          MODE: ${{ steps.dispatch.outputs.mode }}
-          MARKET: ${{ steps.dispatch.outputs.market }}
+          MODE: ${{ needs.wait.outputs.mode }}
+          MARKET: ${{ needs.wait.outputs.market }}
         run: |
           python -m scripts.run_daily_paper_trading \
             --mode "$MODE" --market "$MARKET" \
@@ -403,9 +452,9 @@ jobs:
       # leave the dashboard's council page stale, not fail the run that
       # actually moved the books.
       - name: Run the Council (US only, never trades)
-        if: steps.dispatch.outputs.market != 'TASE'
+        if: needs.wait.outputs.market != 'TASE'
         env:
-          MODE: ${{ steps.dispatch.outputs.mode }}
+          MODE: ${{ needs.wait.outputs.mode }}
         run: |
           # The scanner's modes are open and close; the Council's are
           # heartbeat and close. Handing it "open" raised argparse error
@@ -422,15 +471,15 @@ jobs:
             2>&1 | tee "data/cron_logs/council.${COUNCIL_MODE}.log" || true
 
       - name: Verify run produced real trading state (US only)
-        if: steps.dispatch.outputs.market != 'TASE'
+        if: needs.wait.outputs.market != 'TASE'
         env:
-          MODE: ${{ steps.dispatch.outputs.mode }}
+          MODE: ${{ needs.wait.outputs.mode }}
         run: python -m scripts.verify_run_state --mode "$MODE"
 
       - name: Commit updated state back to the repo
         env:
-          MODE: ${{ steps.dispatch.outputs.mode }}
-          MARKET: ${{ steps.dispatch.outputs.market }}
+          MODE: ${{ needs.wait.outputs.mode }}
+          MARKET: ${{ needs.wait.outputs.market }}
         run: |
           # GitHub's own Actions identity, with the canonical
           # ID-prefixed noreply. The previous value,
@@ -466,6 +515,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: paper-trading-logs-${{ steps.dispatch.outputs.market }}-${{ steps.dispatch.outputs.mode }}-${{ github.run_id }}
+          name: paper-trading-logs-${{ needs.wait.outputs.market }}-${{ needs.wait.outputs.mode }}-${{ github.run_id }}
           path: data/cron_logs/daily.*.log
           retention-days: 30
