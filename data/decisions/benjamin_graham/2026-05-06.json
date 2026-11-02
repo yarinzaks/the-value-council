@@ -938,38 +938,6 @@
     "rationale": "Graham Defensive: P/E 8.00, P/B 0.48, CR 2.16, Graham # 3.81"
   },
   {
-    "ticker": "ASGN",
-    "decision": "BUY",
-    "agent": "benjamin_graham",
-    "timestamp": "2026-05-06T00:00:00+00:00",
-    "criteria_met": [
-      "P/E=8.08 (\u2264 15.0)",
-      "P/B=0.48 (\u2264 1.5)",
-      "current ratio=2.16 (\u2265 2.0)",
-      "D/E=0.65 (\u2264 1.0)",
-      "positive trailing net income",
-      "mode=DEFENSIVE"
-    ],
-    "criteria_failed": [],
-    "criteria_values": {
-      "mode": "DEFENSIVE",
-      "pe": 8.0846,
-      "pb": 0.4812,
-      "current_ratio": 2.1593,
-      "graham_number": 3.8905,
-      "debt_to_equity": 0.6482,
-      "net_income": 113500000.0,
-      "market_cap": 868126018.9056396,
-      "price": 21.020000457763672
-    },
-    "market_conditions": {},
-    "confidence": 0.8270888119961993,
-    "entry_price": 21.020000457763672,
-    "target_price": null,
-    "exit_trigger": "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
-    "rationale": "Graham Defensive: P/E 8.08, P/B 0.48, CR 2.16, Graham # 3.89"
-  },
-  {
     "ticker": "TASK",
     "decision": "BUY",
     "agent": "benjamin_graham",
