@@ -1,29 +1,20 @@
 {
  "agent": "mohnish_pabrai",
- "all_clear": null,
+ "all_clear": false,
  "breaches": [],
- "cash": 5824.26,
- "cash_weight": 0.585318511000715,
+ "cash": 5878.55,
+ "cash_weight": 0.5882582510310818,
  "circuit_breaker": false,
- "drawdown_from_peak": null,
+ "drawdown_from_peak": -0.0006855000000000055,
  "filings_flagged": [
   {
-   "accession": "0000099780-26-000131",
-   "code": "1.01",
-   "filed": "2026-10-22",
-   "form": "8-K",
-   "meaning": "entry into a material agreement",
-   "severity": "investigate",
-   "ticker": "TRN"
-  },
-  {
-   "accession": "0001437749-26-033185",
-   "code": "1.01",
-   "filed": "2026-10-22",
-   "form": "8-K",
-   "meaning": "entry into a material agreement",
-   "severity": "investigate",
-   "ticker": "CLMB"
+   "accession": "0001104659-26-120673",
+   "code": "5.02",
+   "filed": "2026-10-30",
+   "form": "8-K/A",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "HRMY"
   },
   {
    "accession": "0000099780-26-000135",
@@ -53,15 +44,6 @@
    "ticker": "STRT"
   },
   {
-   "accession": "0001576427-26-000101",
-   "code": "5.02",
-   "filed": "2026-10-29",
-   "form": "8-K",
-   "meaning": "officer or director departure",
-   "severity": "note",
-   "ticker": "CRTO"
-  },
-  {
    "accession": "0001050797-26-000148",
    "code": "2.02",
    "filed": "2026-10-29",
@@ -71,49 +53,13 @@
    "ticker": "COLM"
   },
   {
-   "accession": "0000793952-26-000065",
+   "accession": "0001193125-26-437812",
    "code": "5.02",
    "filed": "2026-10-29",
    "form": "8-K",
    "meaning": "officer or director departure",
    "severity": "note",
-   "ticker": "HOG"
-  },
-  {
-   "accession": "0000793952-26-000065",
-   "code": "2.02",
-   "filed": "2026-10-29",
-   "form": "8-K",
-   "meaning": "results of operations \u2014 PEAD window opens",
-   "severity": "note",
-   "ticker": "HOG"
-  },
-  {
-   "accession": "0001437749-26-033785",
-   "code": "2.02",
-   "filed": "2026-10-28",
-   "form": "8-K",
-   "meaning": "results of operations \u2014 PEAD window opens",
-   "severity": "note",
-   "ticker": "CLMB"
-  },
-  {
-   "accession": "0001096906-26-001602",
-   "code": "2.02",
-   "filed": "2026-10-22",
-   "form": "8-K",
-   "meaning": "results of operations \u2014 PEAD window opens",
-   "severity": "note",
-   "ticker": "UTMD"
-  },
-  {
-   "accession": "0000799292-26-000030",
-   "code": "2.02",
-   "filed": "2026-10-21",
-   "form": "8-K",
-   "meaning": "results of operations \u2014 PEAD window opens",
-   "severity": "note",
-   "ticker": "MHO"
+   "ticker": "KSS"
   }
  ],
  "journal": {
@@ -131,50 +77,222 @@
    "used": 0
   }
  },
- "limits": [],
- "nav": 9950.582273644999,
+ "limits": [
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:KSS",
+   "note": "",
+   "observed": 0.024897066939386946,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UPBD",
+   "note": "",
+   "observed": 0.0248770532199823,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:ASO",
+   "note": "",
+   "observed": 0.024490788435472515,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:LRN",
+   "note": "",
+   "observed": 0.02380481820287807,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:GCO",
+   "note": "",
+   "observed": 0.023337998197764564,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:HRMY",
+   "note": "",
+   "observed": 0.022851664816231528,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PLAB",
+   "note": "",
+   "observed": 0.022431376708733835,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NGVT",
+   "note": "",
+   "observed": 0.022425372592912444,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SD",
+   "note": "",
+   "observed": 0.022087140734973823,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PRDO",
+   "note": "",
+   "observed": 0.021536263108360782,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:TRN",
+   "note": "",
+   "observed": 0.02140667427521566,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UTMD",
+   "note": "",
+   "observed": 0.02066316459933284,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:COLM",
+   "note": "",
+   "observed": 0.02066316459933284,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:REPX",
+   "note": "",
+   "observed": 0.0204039869330426,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:STRT",
+   "note": "",
+   "observed": 0.019034548182779294,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:RMR",
+   "note": "",
+   "observed": 0.018525699366916018,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NATR",
+   "note": "",
+   "observed": 0.017392922848612723,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:POWL",
+   "note": "",
+   "observed": 0.015725780022205222,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:MHO",
+   "note": "",
+   "observed": 0.013176532513037688,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIG",
+   "note": "",
+   "observed": 0.012009732671746482,
+   "state": "pass"
+  },
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "41.2% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.41174174896891813,
+   "state": "unknown"
+  },
+  {
+   "cap": 0.2,
+   "forces_action": false,
+   "limit": "illiquid_aggregate",
+   "note": "",
+   "observed": 0.0786689275498354,
+   "state": "pass"
+  },
+  {
+   "cap": 0.05,
+   "forces_action": false,
+   "limit": "cash_floor",
+   "note": "",
+   "observed": 0.5882582510310818,
+   "state": "pass"
+  },
+  {
+   "cap": 1.0,
+   "forces_action": false,
+   "limit": "leverage",
+   "note": "",
+   "observed": 0.4117417489689182,
+   "state": "pass"
+  },
+  {
+   "cap": -0.25,
+   "forces_action": false,
+   "limit": "drawdown_circuit_breaker",
+   "note": "",
+   "observed": -0.0006855000000000055,
+   "state": "pass"
+  }
+ ],
+ "nav": 9993.145,
  "peak_nav": 10000.0,
- "positions": 18,
- "regime": {
-  "as_of": "2026-10-30",
-  "risk_on_count": 0,
-  "signals": [
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "BAMLH0A0HYM2",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   },
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "T10Y3M",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   },
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "SP500",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   },
-   {
-    "as_of": null,
-    "reason": "series could not be fetched",
-    "series": "VIXCLS",
-    "stance": "unknown",
-    "threshold": null,
-    "value": null
-   }
-  ],
-  "unknown_count": 4
- },
- "run": "close",
- "unknown_limits": [],
- "updated": "2026-10-30T20:32:51+00:00"
+ "positions": 20,
+ "regime": null,
+ "run": "heartbeat",
+ "unknown_limits": [
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "41.2% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.41174174896891813,
+   "state": "unknown"
+  }
+ ],
+ "updated": "2026-11-02T17:11:31+00:00"
 }
