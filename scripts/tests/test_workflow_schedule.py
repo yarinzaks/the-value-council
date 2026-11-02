@@ -210,53 +210,151 @@ def test_hold_ceiling_clears_the_largest_lead() -> None:
     assert worst < MAX_HOLD, f"ceiling {MAX_HOLD} would abort a real {worst} hold"
 
 
-#: What the scan is allowed to need, after the hold has been paid for.
+#: What a scan is allowed to need, hold excluded.
 #:
-#: The job's clock starts when the cron fires and the scan does not
-#: start until the anchor, so the hold is spent out of the same budget.
-#: Observed scan times for cron '0 13' are 34, 54, 72 and 56 minutes;
-#: the run on 2026-10-30 was killed at 180 with the scan unfinished,
-#: which puts it past 121. 150 is above everything measured, including
-#: the one that did not finish.
+#: Observed times for cron '0 13' are 34, 54, 56, 72 and 131 minutes.
+#: The 131 was the Council ranking all 8,290 names with a fact loader
+#: that read parquet row by row; it is 6.1x faster since, but the
+#: ceiling is set above what was actually measured rather than above
+#: what the fix predicts.
 MIN_WORKING_BUDGET = timedelta(minutes=150)
 
+#: Each job's declared ceiling, keyed by job name. Both are needed, and
+#: for different reasons: see the two tests below.
+JOB_HEAD = re.compile(r"^  (?P<name>[a-z][\w-]*):\s*$", re.M)
 JOB_TIMEOUT = re.compile(r"^\s{4}timeout-minutes:\s*(?P<minutes>\d+)\s*$", re.M)
 
 
-def test_the_job_timeout_leaves_the_scan_room_after_the_hold() -> None:
-    """The budget covers an idle hour before it covers any work.
+def _jobs(text: str) -> dict[str, str]:
+    """Job name -> the text of that job, up to the next job."""
+    heads = [m for m in JOB_HEAD.finditer(text[text.index("\njobs:") :])]
+    base = text.index("\njobs:")
+    out: dict[str, str] = {}
+    for i, m in enumerate(heads):
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(text) - base
+        out[m["name"]] = text[base + m.start() : base + end]
+    return out
 
-    This failed in production rather than here: on 2026-10-30 the only
-    run that moves a book was killed at exactly its 180-minute ceiling
-    with the scan unfinished, so the agents last scanned the day before,
-    Graham's watch list stayed empty and the second Graham never opened
-    — none of which looks like a fault from outside. The margin had been
-    gone for a while; two runs the week before came within three minutes
-    of the same ceiling.
 
-    Asserted against the largest hold any cron here actually asks for,
+JOBS = _jobs(DAILY_TEXT)
+
+
+def _ceiling(job: str) -> timedelta:
+    match = JOB_TIMEOUT.search(JOBS[job])
+    assert match is not None, f"job {job!r} declares no timeout-minutes"
+    return timedelta(minutes=int(match["minutes"]))
+
+
+def test_the_parser_finds_both_jobs() -> None:
+    """Without this, a renamed job would empty every test below."""
+    assert set(JOBS) == {"wait", "scan"}, sorted(JOBS)
+
+
+def test_the_wait_ceiling_covers_the_largest_lead() -> None:
+    """The waiting job must outlive the longest wait it is asked for.
+
+    Asserted against the largest lead any cron here actually asks for,
     so moving a cron earlier without raising the ceiling fails here
-    instead of nine days later in a log nobody reads.
+    rather than as a cancelled job in a log nobody reads.
     """
-    match = JOB_TIMEOUT.search(DAILY_TEXT)
-    assert match is not None, "the job declares no timeout-minutes"
-    ceiling = timedelta(minutes=int(match["minutes"]))
-
-    worst_hold = max(
+    ceiling = _ceiling("wait")
+    worst = max(
         _anchor_utc(CRONS[c], EST_MONDAY) - _cron_utc(c, EST_MONDAY)
         for c in US_CRONS
     )
-    working = ceiling - worst_hold
+    assert ceiling > worst, (
+        f"a {ceiling} ceiling would kill a legitimate {worst} hold"
+    )
 
-    assert working >= MIN_WORKING_BUDGET, (
-        f"a {ceiling} ceiling minus a {worst_hold} hold leaves {working} "
-        f"to scan in, and the scan has needed more than that"
+
+def test_the_scan_ceiling_covers_a_whole_scan() -> None:
+    """And it is a scan's budget, with nothing deducted for waiting.
+
+    This failed in production twice, the same way both times. The
+    ceiling was 180 with the hold inside the same job, which left two
+    hours to scan in summer and one in winter; on 2026-10-30 the only
+    run that moves a book was killed at exactly 180 with the scan
+    unfinished, so the agents last scanned the day before, Graham's
+    watch list stayed empty and the second Graham never opened — none
+    of which looks like a fault from outside. Raising it to 300 got the
+    run through and made the lock four hours wide, which cancelled two
+    of the four US runs on 2026-11-02.
+
+    The hold is a separate job now, so this subtracts nothing: the
+    number has one meaning, and the test that keeps it that way is the
+    next one.
+    """
+    ceiling = _ceiling("scan")
+    assert ceiling >= MIN_WORKING_BUDGET, (
+        f"a {ceiling} ceiling is under the {MIN_WORKING_BUDGET} a scan "
+        f"has needed"
+    )
+
+
+def test_the_hold_waits_outside_the_lock() -> None:
+    """Whatever waits must not be holding the concurrency group.
+
+    This is the 2026-11-02 bug stated as a property. The hold absorbs
+    up to two hours of scheduler drift, and while it was a step of the
+    scanning job it absorbed them inside the lock: the 13:01 run owned
+    the group until 17:11, the 15:00 cron queued behind it, and the
+    17:10 cron displaced the queued one — a group keeps one queued run
+    whatever `cancel-in-progress` says. Two of four US runs were
+    cancelled without starting.
+
+    What the lock protects is the `git push` at the end of a scan. A
+    job asleep until 15:00 UTC is not pushing anything, so it has no
+    business in the group.
+    """
+    assert not re.search(r"^concurrency:", DAILY_TEXT, re.M), (
+        "concurrency declared at workflow level puts every job, "
+        "including the one that only waits, into one queue"
+    )
+
+    holding = [name for name, body in JOBS.items() if "hold_until_anchor" in body]
+    assert holding == ["wait"], f"the hold lives in {holding}"
+    assert "concurrency:" not in JOBS["wait"], (
+        "the waiting job is inside the concurrency group again"
+    )
+    assert "concurrency:" in JOBS["scan"], (
+        "the scanning job must still serialise on the push"
     )
 
 
 def test_the_workflow_calls_the_module_that_holds() -> None:
     """A hold step that stopped invoking it would fail silently open."""
     assert "scripts.hold_until_anchor" in DAILY_TEXT
+
+
+def test_the_waiting_job_needs_no_installed_dependency() -> None:
+    """It skips `pip install`, so the hold must stay on the stdlib.
+
+    ``wait`` runs checkout and setup-python and nothing else, because
+    the alternative is paying a 30-second install to sleep for two
+    hours. That only holds while scripts.hold_until_anchor imports
+    nothing from the environment — asserted here so an import added to
+    it fails in the suite rather than at 13:02 on a Monday.
+    """
+    import ast
+    import sys
+
+    source = (
+        Path(__file__).resolve().parents[1] / "hold_until_anchor.py"
+    ).read_text()
+    roots: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            roots.update(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            roots.add(node.module.split(".")[0])
+
+    outside = sorted(roots - sys.stdlib_module_names)
+    assert not outside, f"the hold now imports {outside}, which wait does not install"
+
+    assert "Install dependencies" not in JOBS["wait"], (
+        "wait installs dependencies again — either drop the step or "
+        "drop this test, but not silently"
+    )
 
 
 # ------------------------------------------------ anchors sit where they
