@@ -140,6 +140,10 @@
   },
   "patterns": [
     [
+      "\\bquarterly rebalance, from the list published (\\d{4}-\\d{2}-\\d{2})",
+      "איזון מחדש רבעוני, מהרשימה שפורסמה ב-\\1"
+    ],
+    [
       "\\b(\\d+)-?yr avg ROE\\b",
       "ROE ממוצע ל-\\1 שנים:"
     ],
