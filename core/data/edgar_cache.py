@@ -352,9 +352,19 @@ class EdgarCache:
         A null ``value`` is filled with NaN rather than left as None,
         which is what the pandas path produced and what the arithmetic
         downstream expects. Our writer cannot emit one; a cache tarball
-        restored from a release is not ours to vouch for.
+        restored from a release is not ours to vouch for. It is read
+        from the Arrow column for that reason and dropped from the
+        ``to_pydict`` call, so the two sources stay disjoint and the
+        eleven columns are each materialised once.
+
+        One coercion is deliberately not carried over. The old path
+        wrapped the string fields in ``str()``, which turned a null
+        concept into the literal ``"None"``; here it stays ``None``.
+        Neither matches anything downstream, and a per-row branch over
+        91 million facts is the wrong price for a state ``save_facts``
+        cannot produce — over 4,360,598 real facts there were none.
         """
-        columns = table.to_pydict()
+        columns = table.drop(["value"]).to_pydict()
         concept = columns["concept"]
         namespace = columns["namespace"]
         unit = columns["unit"]
