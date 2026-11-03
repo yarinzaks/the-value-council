@@ -174,7 +174,7 @@ const RATIONALE_RULES: Rule[] = [
   // Graham Net-Net (live adapter)
   {
     re: /^P\/NCAV ([\d.]+) \(≤ ⅔\), NCAV\/share \$([\d.]+)\. Classic Graham Net-Net\.$/,
-    he: "P/NCAV $1 (≤ ⅔), NCAV למניה ‎$$2‎. Net-Net קלאסי לפי גראהם.",
+    he: "P/NCAV $1 (≤ ⅔), NCAV למניה ‎$$$2‎. Net-Net קלאסי לפי גראהם.",
   },
   // Graham Defensive (live adapter)
   {
@@ -206,9 +206,15 @@ const RATIONALE_RULES: Rule[] = [
     he: "פורמולה קסומה דירוג משולב #$1. EY $2, ROC $3.",
   },
   // Closed position rationale (from runner._log_sell)
+  //
+  // The prices need `$$$N`, not `$$N`. In a replacement string `$$` is
+  // an escaped dollar sign, so `$$1` emits the two characters "$1" and
+  // the price never arrives; the sign and the group each need their
+  // own token. `$3` carries no sign and so was never affected, which
+  // is why only the money went missing.
   {
     re: /^Closed live position: entry \$([\d.]+), exit \$([\d.]+) \(([+\-−][\d.]+)%\)$/,
-    he: "סגירת פוזיציה חיה: כניסה ‎$$1, יציאה ‎$$2 ($3%)",
+    he: "סגירת פוזיציה חיה: כניסה ‎$$$1, יציאה ‎$$$2 ($3%)",
   },
 ];
 

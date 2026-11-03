@@ -11,6 +11,7 @@ import path from "node:path";
 import { parse as parseCsvSync } from "csv-parse/sync";
 
 import { AGENTS, metaFor } from "./agents";
+import { canonicalDayFiles } from "./day-files";
 import { mergeWatchSignals } from "./watchlist-merge";
 import type { WatchEntry, WatchSignal } from "./watchlist-merge";
 import type {
@@ -235,7 +236,7 @@ async function loadDecisionsForAgent(
     return [];
   }
   const decisions: DecisionRow[] = [];
-  for (const f of files.filter((x) => x.endsWith(".json")).sort()) {
+  for (const f of canonicalDayFiles(files)) {
     try {
       const rows = await readJson<DecisionRow[]>(path.join(dir, f));
       decisions.push(...rows);
@@ -301,7 +302,7 @@ export async function loadBrainMemos(limit = 400): Promise<BrainMemo[]> {
     const dir = path.join(root, agent);
     let files: string[];
     try {
-      files = (await fs.readdir(dir)).filter((f) => f.endsWith(".json"));
+      files = canonicalDayFiles(await fs.readdir(dir));
     } catch {
       continue;
     }
@@ -401,7 +402,7 @@ export async function loadTradeLedger(slug: AgentSlug): Promise<LedgerRow[]> {
     return [];
   }
   const out: LedgerRow[] = [];
-  for (const file of files.filter((f) => f.endsWith(".json")).sort()) {
+  for (const file of canonicalDayFiles(files)) {
     try {
       out.push(...(await readJson<LedgerRow[]>(path.join(dir, file))));
     } catch {
@@ -422,7 +423,7 @@ export async function loadSnapshots(slug: AgentSlug): Promise<DailySnapshot[]> {
     return [];
   }
   const out: DailySnapshot[] = [];
-  for (const f of files.filter((x) => x.endsWith(".json")).sort()) {
+  for (const f of canonicalDayFiles(files)) {
     try {
       out.push(await readJson<DailySnapshot>(path.join(dir, f)));
     } catch {

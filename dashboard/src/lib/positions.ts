@@ -75,9 +75,15 @@ export interface PositionStory {
   firstFlagged: string;
   /** Most recent verdict. */
   lastFlagged: string;
-  /** Distinct dates the agent reaffirmed the thesis. The headline
-   *  number: "held to for 47 trading days". */
+  /** Distinct dates the agent reaffirmed the thesis, across the whole
+   *  retained journal. The headline number: "held to for 47 trading
+   *  days". It does not reset on a sale, so for a name the agent has
+   *  rotated through more than once it is a sum over stretches. */
   daysAffirmed: number;
+  /** Affirmed dates since the last exit — the current unbroken run.
+   *  What "held since, unchanged" is actually claiming. Equals
+   *  ``daysAffirmed`` for a name that was never sold. */
+  daysHeldUnbroken: number;
   /** When it entered the book, when known. */
   openedAt: string | null;
   openedEvidence: Evidence | null;
@@ -137,6 +143,18 @@ export function buildPositionStories(
     const newest = rows[0] ?? null;
     const oldest = rows[rows.length - 1] ?? null;
 
+    // Affirmed days since the last exit. `affirmed` spans the whole
+    // retained journal and never resets, which is right for "days this
+    // agent has said yes" and wrong for "held unchanged since" — a
+    // name sold and rebought six times reported the sum of its six
+    // stretches as one unbroken run.
+    const unbroken = new Set<string>();
+    for (const r of rows) {
+      // rows are newest first; stop at the first exit walking back.
+      if (r.decision === "SELL" || r.decision === "EXIT") break;
+      if (BUY_KINDS.has(r.decision)) unbroken.add(dayOf(r.timestamp));
+    }
+
     let lifecycle: Lifecycle;
     if (position) lifecycle = "held";
     else if (buys.length > 0) lifecycle = "closed";
@@ -159,6 +177,7 @@ export function buildPositionStories(
       firstFlagged: oldest ? dayOf(oldest.timestamp) : (position?.entry_date ?? ""),
       lastFlagged: newest ? dayOf(newest.timestamp) : (position?.entry_date ?? ""),
       daysAffirmed: affirmed.size,
+      daysHeldUnbroken: unbroken.size,
       openedAt,
       openedEvidence,
       entryPrice: position?.entry_price ?? newest?.entry_price ?? null,
@@ -316,6 +335,13 @@ export function movements(story: PositionStory): Movement[] {
     } else if (isBuy && !holding) {
       kind = "reopened";
       holding = true;
+    } else if (isBuy) {
+      // Already long, and the agent has said buy again in a different
+      // word — BUY is the intent, FILL its execution, ADD a top-up.
+      // None of them is a change of view, and rendering them as one
+      // put two "Changed its view" rows on the same date for 75 of
+      // the book's names.
+      continue;
     } else {
       kind = "changed";
     }
