@@ -1521,6 +1521,9 @@ class DailyRunner:
                     )
                 )
                 logger.info(f"{as_of}: {agent} trimmed {ticker} back to target")
+                self._log_rebalance(
+                    agent, ticker, "TRIM", price, shares, band, as_of
+                )
             except LivePortfolioError as exc:
                 logger.warning(f"{as_of}: trim of {ticker} failed: {exc}")
 
@@ -1544,10 +1547,60 @@ class DailyRunner:
                     )
                 )
                 logger.info(f"{as_of}: {agent} added to {ticker} back to target")
+                self._log_rebalance(
+                    agent, ticker, "ADD", price, spend / price, band, as_of
+                )
             except LivePortfolioError as exc:
                 logger.warning(f"{as_of}: add to {ticker} failed: {exc}")
 
         return out
+
+    def _log_rebalance(
+        self,
+        agent: str,
+        ticker: str,
+        decision: str,
+        price: float,
+        shares: float,
+        band: float,
+        as_of: date,
+    ) -> None:
+        """Record a rebalance trade in the decision journal.
+
+        The rotation path has logged its executions since 4107142c;
+        this one never did, while trading through the same portfolio.
+        Both halves already reached ``data/trades`` and the Telegram
+        message, so the notifier could report a purchase the journal
+        held no row for — and the dashboard, which reads the journal,
+        could neither show it nor count it.
+
+        ``ADD`` and ``TRIM`` are not new vocabulary. Both are in
+        ``VALID_DECISION_TYPES``; the dashboard already counts ADD as a
+        buy-kind, and the notifier already files ADD under its entry
+        kinds and TRIM under its exits. Using them rather than
+        FILL/EXIT keeps the distinction that matters to a reader: this
+        did not open or close a position, it resized one.
+        """
+        try:
+            self.decision_logger.log(
+                make_decision(
+                    ticker=ticker,
+                    decision=decision,  # type: ignore[arg-type]
+                    agent=agent,
+                    timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
+                    criteria_met=[
+                        f"drifted outside the {band:.0%} rebalance band"
+                    ],
+                    rationale=(
+                        f"Rebalance {'trim' if decision == 'TRIM' else 'add'}: "
+                        f"{shares:.4f} shares at ${price:.2f} "
+                        f"to restore the target weight"
+                    ),
+                    entry_price=price,
+                )
+            )
+        except Exception as exc:
+            logger.debug(f"decision log {decision} {ticker} failed: {exc}")
 
     # ------------------------------------------------------------------
     # Helpers

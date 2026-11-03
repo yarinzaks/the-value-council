@@ -2278,3 +2278,112 @@ class TestThePreviousWatchlistSurvivesTheRun:
         )
 
         assert result.previous_watchlist == ()
+
+
+class TestARebalanceIsRecorded:
+    """A trade the journal does not hold is a trade nobody can audit.
+
+    The rotation path logs FILL and EXIT; the rebalance path logged
+    nothing at all, while executing real buys and sells through the
+    same portfolio. Both halves of a run reached data/trades and the
+    Telegram message, so the notifier reported a purchase the journal
+    had no row for — the dashboard, which reads the journal, could not
+    show it and the count it produced was wrong.
+
+    ADD and TRIM are not new vocabulary: both are already in
+    VALID_DECISION_TYPES, already buy-kinds and sell-kinds to the
+    dashboard, and already entry and exit kinds to the notifier.
+    """
+
+    def _drifted(
+        self, runner: DailyRunner, *, shares: float, now: float, cash: float
+    ) -> None:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFT",
+                shares=shares,
+                entry_price=100.0,
+                entry_date="2026-07-01",
+                current_price=now,
+                why_en="",
+                why_he="",
+            )
+        )
+        p.cash = cash
+        p.save(directory=runner.portfolio_dir)
+
+    def _run(self, runner: DailyRunner, price: float):
+        adapter = _StubAdapter("stub_agent", [_target("DRIFT", weight=0.5)])
+        runner.price_loader = _StubPriceLoader({"DRIFT": price})  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DRIFT"],
+            {"DRIFT": price},
+            {"DRIFT": None},
+        )
+
+    def _journal(self, runner: DailyRunner) -> list:
+        return runner.decision_logger.read_day("stub_agent", AS_OF)
+
+    def test_a_trim_is_written_to_the_journal(self, runner: DailyRunner) -> None:
+        # 50 × $300 = $15,000 against $5,000 cash: drift +50%.
+        self._drifted(runner, shares=50.0, now=300.0, cash=5_000.0)
+
+        result = self._run(runner, 300.0)
+
+        assert [t.side for t in result.trades] == ["SELL"]
+        rows = [r for r in self._journal(runner) if r.decision == "TRIM"]
+        assert len(rows) == 1, [r.decision for r in self._journal(runner)]
+        assert rows[0].ticker == "DRIFT"
+
+    def test_an_add_is_written_to_the_journal(self, runner: DailyRunner) -> None:
+        # 10 × $100 = $1,000 against $9,000 cash: NAV 10,000, target
+        # 5,000, drift -80%.
+        self._drifted(runner, shares=10.0, now=100.0, cash=9_000.0)
+
+        result = self._run(runner, 100.0)
+
+        assert [t.side for t in result.trades] == ["BUY"]
+        rows = [r for r in self._journal(runner) if r.decision == "ADD"]
+        assert len(rows) == 1, [r.decision for r in self._journal(runner)]
+        assert rows[0].ticker == "DRIFT"
+
+    def test_the_row_carries_the_shares_and_the_price(
+        self, runner: DailyRunner
+    ) -> None:
+        # Without these the row says a trade happened and nothing more,
+        # which is the complaint that started this.
+        self._drifted(runner, shares=10.0, now=100.0, cash=9_000.0)
+
+        self._run(runner, 100.0)
+
+        row = next(r for r in self._journal(runner) if r.decision == "ADD")
+        assert row.entry_price == pytest.approx(100.0)
+        assert "rebalance" in (row.rationale or "").lower()
+
+    def test_a_book_inside_the_band_writes_no_rebalance_row(
+        self, runner: DailyRunner
+    ) -> None:
+        self._drifted(runner, shares=50.0, now=110.0, cash=5_000.0)
+
+        result = self._run(runner, 110.0)
+
+        assert result.trades == []
+        kinds = {r.decision for r in self._journal(runner)}
+        assert "TRIM" not in kinds and "ADD" not in kinds
+
+    def test_the_journal_and_the_ledger_agree(self, runner: DailyRunner) -> None:
+        # The two stores are written by different calls; a trade in one
+        # and not the other is how this started.
+        self._drifted(runner, shares=50.0, now=300.0, cash=5_000.0)
+
+        result = self._run(runner, 300.0)
+
+        ledger = read_ledger("stub_agent", directory=runner.ledger_dir)
+        rebalance_rows = [
+            r for r in self._journal(runner) if r.decision in {"ADD", "TRIM"}
+        ]
+        assert len(ledger) == len(result.trades) == len(rebalance_rows) == 1
+        assert ledger[0].ticker == rebalance_rows[0].ticker
