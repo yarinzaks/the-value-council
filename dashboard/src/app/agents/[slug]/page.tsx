@@ -124,6 +124,30 @@ export default async function AgentDrillPage({
   // sized. Built here rather than in the component because it needs the
   // price files, and every fs read happens at build time in the static
   // export. Iterates sectorSlices in order so the colours line up.
+  // The comparison chart's input: a year of closes per held name,
+  // plus the two indices. These are the same published files the
+  // sector trends below already read, so the only new reads are the
+  // benchmarks.
+  const compareSeries = await (async () => {
+    const tickers = [
+      ...new Set([
+        "SPY",
+        "QQQ",
+        ...(live?.positions ?? []).map((p) => p.ticker),
+      ]),
+    ];
+    const loaded = await Promise.all(
+      tickers.map(async (t) => [t, await loadPriceSeries(t)] as const),
+    );
+    const out: Record<string, { d: string; c: number }[]> = {};
+    for (const [ticker, series] of loaded) {
+      // A ticker with no published file is simply not selectable; the
+      // chart offers no chip for it rather than an empty line.
+      if (series?.points?.length) out[ticker] = series.points;
+    }
+    return out;
+  })();
+
   const sectorTrends = await (async () => {
     const positions = live?.positions ?? [];
     if (sectorSlices.length === 0) return [];
@@ -229,6 +253,8 @@ export default async function AgentDrillPage({
                 benchmark={run?.nav ?? []}
                 agentColor={meta.color}
                 agentName={meta.display}
+                series={compareSeries}
+                holdings={(live?.positions ?? []).map((p) => p.ticker)}
               />
             </div>
           )}
