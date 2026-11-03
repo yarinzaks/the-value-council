@@ -200,3 +200,82 @@ test("a buy after a trim is not a re-entry", () => {
   ]);
   assert.equal(movements(s).filter((x) => x.kind === "reopened").length, 0);
 });
+
+// The oldest row is where the story starts, and the card used to call
+// it "Opened the position" whatever it said. A name is screened and
+// watched before it is ever bought, so on the live store that claim
+// was false for 565 of 1,057 stories — including 406 cards that said
+// "never opened" and "Opened the position" at once.
+
+test("a story that starts on a watch row says so", () => {
+  const s = storyFor([row("2026-09-03", "WATCH")], []);
+  const m = movements(s);
+  assert.equal(m.at(-1).kind, "watched", JSON.stringify(m));
+  assert.equal(
+    m.filter((x) => x.kind === "opened").length,
+    0,
+    "nothing was opened",
+  );
+});
+
+test("the first purchase after a watch is an opening, not a re-entry", () => {
+  // "Bought back in" is a claim about the past. Holding started out
+  // false on a watch row, so the first real buy fell into the re-entry
+  // branch and 158 first purchases read "נקנתה מחדש".
+  const s = storyFor([row("2026-09-03", "WATCH"), row("2026-09-04", "BUY")]);
+  const m = movements(s);
+  assert.deepEqual(
+    m.map((x) => x.kind),
+    ["opened", "watched"], // newest first
+    JSON.stringify(m),
+  );
+});
+
+test("a watch stretch before the buy collapses to one row", () => {
+  const s = storyFor([
+    row("2026-09-03", "WATCH"),
+    row("2026-09-04", "WATCH"),
+    row("2026-09-07", "WATCH"),
+    row("2026-09-08", "FILL"),
+  ]);
+  assert.deepEqual(
+    movements(s).map((x) => x.kind),
+    ["opened", "watched"],
+  );
+});
+
+test("a genuine re-entry is still called one", () => {
+  // The branch has to keep working: held, sold, bought again.
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-09-04", "SELL"),
+    row("2026-09-07", "BUY"),
+  ]);
+  assert.deepEqual(
+    movements(s).map((x) => x.kind),
+    ["reopened", "exited", "opened"],
+  );
+});
+
+test("a story that starts on a purchase is unchanged", () => {
+  const s = storyFor([row("2026-09-03", "BUY"), row("2026-09-04", "BUY")]);
+  assert.deepEqual(
+    movements(s).map((x) => x.kind),
+    ["opened"],
+  );
+});
+
+test("a story whose window opens on a trim does not call it an opening", () => {
+  // The journal is missing 561 purchases, so a story can begin at a
+  // rebalance on a name bought before the window. It was held — the
+  // trim proves it — and a later buy is a re-entry, not a first one.
+  const s = storyFor([
+    row("2026-09-03", "TRIM"),
+    row("2026-09-04", "SELL"),
+    row("2026-09-07", "BUY"),
+  ]);
+  assert.deepEqual(
+    movements(s).map((x) => x.kind),
+    ["reopened", "exited", "trimmed"],
+  );
+});
