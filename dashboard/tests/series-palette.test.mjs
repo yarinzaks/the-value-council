@@ -8,7 +8,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { seriesPalette, seriesStyle } from "../src/lib/series-palette.ts";
+import {
+  contrast,
+  distinctCapacity,
+  readableOn,
+  seriesPalette,
+  seriesStyle,
+} from "../src/lib/series-palette.ts";
 
 const LIGHT = { dark: false };
 const DARK = { dark: true };
@@ -50,16 +56,25 @@ test("the palette holds ten colours, so a nine-name book plus two indices fits",
   }
 });
 
-test("no two lines on one chart ever look alike", () => {
-  // Colour alone runs out; past the palette the dash changes.
-  const palette = seriesPalette(LIGHT, "#059669"); // 9 left
-  const seen = new Set();
-  for (let i = 0; i < 25; i++) {
-    const s = seriesStyle(i, palette);
-    const key = `${s.stroke}|${s.strokeDasharray ?? "solid"}`;
-    assert.ok(!seen.has(key), `line ${i} repeats ${key}`);
-    seen.add(key);
+test("no two lines on one chart look alike, up to the stated capacity", () => {
+  // An earlier version dashed every lap past the first the same way,
+  // which only moved the collision from line 11 to line 31. John
+  // Neff holds 34 names, so 36 lines is reachable with one click.
+  for (const exclude of [undefined, "#059669"]) {
+    const palette = seriesPalette(LIGHT, exclude);
+    const seen = new Set();
+    for (let i = 0; i < distinctCapacity(palette); i++) {
+      const s = seriesStyle(i, palette);
+      const key = `${s.stroke}|${s.strokeDasharray ?? "solid"}`;
+      assert.ok(!seen.has(key), `line ${i} repeats ${key} (exclude=${exclude})`);
+      seen.add(key);
+    }
   }
+});
+
+test("capacity covers the widest book here", () => {
+  // 34 holdings + SPY + QQQ.
+  assert.ok(distinctCapacity(seriesPalette(LIGHT, "#059669")) >= 36);
 });
 
 test("the first lap is solid", () => {
@@ -73,7 +88,31 @@ test("the first lap is solid", () => {
 test("a wrapped line is dashed, not a silent duplicate", () => {
   const palette = seriesPalette(LIGHT);
   const first = seriesStyle(0, palette);
-  const wrapped = seriesStyle(palette.length, palette);
-  assert.equal(wrapped.stroke, first.stroke);
-  assert.ok(wrapped.strokeDasharray, "wrapped line must differ somehow");
+  for (let lap = 1; lap < 4; lap++) {
+    const wrapped = seriesStyle(palette.length * lap, palette);
+    assert.equal(wrapped.stroke, first.stroke);
+    assert.ok(wrapped.strokeDasharray, `lap ${lap} must differ somehow`);
+  }
+});
+
+test("every chip label clears 4.5:1 on its own colour", () => {
+  // The palette's own comment claims only the 3:1 a line needs; a
+  // chip puts text on it. #0284c7 is 4.10:1 against white and
+  // #059669 is 3.77:1, so white alone is not enough.
+  for (const theme of [LIGHT, DARK]) {
+    for (const colour of seriesPalette(theme)) {
+      const ink = readableOn(colour);
+      const ratio = contrast(colour, ink);
+      assert.ok(ratio >= 4.5, `${colour} on ${ink} is ${ratio.toFixed(2)}:1`);
+    }
+  }
+});
+
+test("the two known failures pick dark ink", () => {
+  assert.equal(readableOn("#0284c7"), "#0a1020");
+  assert.equal(readableOn("#059669"), "#0a1020");
+});
+
+test("a dark colour still takes white", () => {
+  assert.equal(readableOn("#7c3aed"), "#ffffff");
 });

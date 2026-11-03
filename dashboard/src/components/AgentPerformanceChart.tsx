@@ -26,6 +26,7 @@ import {
   ChartTooltip,
   axisProps,
   rowNumber,
+  readableOn,
   seriesPalette,
   seriesStyle,
   useChartTheme,
@@ -333,12 +334,12 @@ export function AgentPerformanceChart({
             const on = selected.includes(key);
             const palette = seriesPalette(theme, agentColor);
             // Position among the drawn lines, less the portfolio, so a
-            // chip carries the colour of its own line.
+            // chip carries the colour AND the dash of its own line.
+            // Dropping the dash made every chip past the tenth claim a
+            // line it could not be told apart from.
             const drawn = comparison.keys.indexOf(key);
-            const colour = seriesStyle(
-              drawn > 0 ? drawn - 1 : i,
-              palette,
-            ).stroke;
+            const style = seriesStyle(drawn > 0 ? drawn - 1 : i, palette);
+            const colour = style.stroke;
             return (
               <button
                 key={key}
@@ -350,13 +351,31 @@ export function AgentPerformanceChart({
                   )
                 }
                 aria-pressed={on}
-                className={`pressable focus-ring px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                className={`pressable focus-ring inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   on
-                    ? "border-transparent text-white dark:text-council-900"
+                    ? "border-transparent"
                     : "border-council-200 dark:border-council-700 text-muted hover:text-council-700 dark:hover:text-council-300"
                 }`}
-                style={on ? { backgroundColor: colour } : undefined}
+                style={
+                  on
+                    ? { backgroundColor: colour, color: readableOn(colour) }
+                    : undefined
+                }
               >
+                {/* The line as it is actually drawn — the dash is what
+                    tells two same-coloured lines apart once a book is
+                    wider than the palette. */}
+                <svg width="14" height="8" aria-hidden="true">
+                  <line
+                    x1="0"
+                    y1="4"
+                    x2="14"
+                    y2="4"
+                    stroke={on ? readableOn(colour) : colour}
+                    strokeWidth="2"
+                    strokeDasharray={style.strokeDasharray}
+                  />
+                </svg>
                 {labelFor(key)}
               </button>
             );
