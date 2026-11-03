@@ -97,8 +97,9 @@ def export_prices(
     """
     price_loader = loader or PriceDataLoader()
     held = {p.ticker for portfolio in portfolios for p in portfolio.positions}
+    wanted_benchmarks = {b.upper() for b in benchmarks}
     # A union, so a benchmark an agent happens to hold is fetched once.
-    tickers = sorted(held | {b.upper() for b in benchmarks})
+    tickers = sorted(held | wanted_benchmarks)
     if not tickers:
         return 0
 
@@ -106,13 +107,23 @@ def export_prices(
     start = as_of - timedelta(days=window_days)
     written = 0
     for ticker in tickers:
+        is_benchmark = ticker in wanted_benchmarks
         try:
             df = price_loader.get_history(ticker, start=start, end=as_of)
         except Exception as exc:
-            # One unreadable ticker must not cost the others their charts.
-            logger.debug(f"price export {ticker}: {exc}")
+            # One unreadable ticker must not cost the others their
+            # charts. A benchmark is louder than a holding: every agent
+            # page reads the same two files, so one failure takes the
+            # comparison off thirteen pages, and at DEBUG nobody would
+            # see it until a reader noticed the line was gone.
+            if is_benchmark:
+                logger.warning(f"benchmark export {ticker} failed: {exc}")
+            else:
+                logger.debug(f"price export {ticker}: {exc}")
             continue
         if df.empty or "adj_close" not in df:
+            if is_benchmark:
+                logger.warning(f"benchmark export {ticker}: no usable history")
             continue
         points = [
             {"d": idx.date().isoformat(), "c": round(float(v), 4)}
