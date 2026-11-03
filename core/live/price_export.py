@@ -13,19 +13,41 @@ UI can draw the line from entry to today with the entry marked on it.
 Held names only: the universe is 6,601 tickers and nobody is looking at
 the ones nobody owns.
 
+The benchmarks
+~~~~~~~~~~~~~~
+
+``SPY`` and ``QQQ`` are written beside the holdings, because the
+dashboard's performance chart has promised a comparison since it was
+written and had no data for it. The only benchmark series in the repo
+is the backtest's, which ends 2024-12-31, while the live snapshots
+start 2026-04-01: disjoint by construction, so every lookup missed and
+the chart rendered an empty line under a "vs S&P 500" reading of "—".
+
+Writing them as ordinary price files fixes that with the machinery
+already here, and the year-wide window means the comparison arrives
+with history behind it rather than starting from the day it shipped.
+
 What it deliberately does not do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-No network. Every value comes from bars already cached by the day's
-run, so this cannot slow a run down or fail it. A ticker with no cached
-history is skipped rather than fetched, and its absence is what the UI
-reads as "no chart available" — the same
-absence-is-not-evidence rule applied everywhere else.
+Almost no network. A held ticker's bars were cached by the day's own
+run, so it is served from the cache; one with no history is skipped
+rather than fetched, and its absence is what the UI reads as "no chart
+available" — the same absence-is-not-evidence rule applied everywhere
+else.
+
+The two benchmarks are the exception, and only on the first run after
+this shipped: they are in no agent's universe, so nothing else caches
+them, and ``PriceDataLoader.get_history`` fetches a missing range and
+stores it. Two symbols, once. The call site treats this whole export
+as presentation and swallows its errors, so a failed fetch costs a
+chart line and nothing else.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -43,6 +65,16 @@ PRICES_DIR: Path = DATA_ROOT / "prices"
 #: few hundred points.
 DEFAULT_WINDOW_DAYS: int = 365
 
+#: Written alongside the held names so the performance chart can draw
+#: a comparison. SPY tracks the S&P 500 and QQQ the Nasdaq-100.
+#:
+#: A note on reading them. These agents buy value — low P/B, low P/E,
+#: industrials and banks — and the Nasdaq-100 is growth. A gap against
+#: QQQ measures which style the market favoured this season at least as
+#: much as it measures the agent, so it is the weaker of the two
+#: yardsticks and is here because a reader asked to see it.
+DEFAULT_BENCHMARKS: tuple[str, ...] = ("SPY", "QQQ")
+
 
 def export_prices(
     portfolios: list[LivePortfolio],
@@ -51,8 +83,9 @@ def export_prices(
     loader: PriceDataLoader | None = None,
     window_days: int = DEFAULT_WINDOW_DAYS,
     root: Path = PRICES_DIR,
+    benchmarks: Sequence[str] = DEFAULT_BENCHMARKS,
 ) -> int:
-    """Write ``{TICKER}.json`` for every ticker held by any portfolio.
+    """Write ``{TICKER}.json`` for every held ticker, and the benchmarks.
 
     Returns the number of files written. Each file is::
 
@@ -63,9 +96,9 @@ def export_prices(
     series repeats them 250 times.
     """
     price_loader = loader or PriceDataLoader()
-    tickers = sorted(
-        {p.ticker for portfolio in portfolios for p in portfolio.positions}
-    )
+    held = {p.ticker for portfolio in portfolios for p in portfolio.positions}
+    # A union, so a benchmark an agent happens to hold is fetched once.
+    tickers = sorted(held | {b.upper() for b in benchmarks})
     if not tickers:
         return 0
 
@@ -95,7 +128,10 @@ def export_prices(
         )
         written += 1
 
-    logger.info(f"{as_of}: exported price series for {written}/{len(tickers)} held tickers")
+    logger.info(
+        f"{as_of}: exported price series for {written}/{len(tickers)} tickers "
+        f"({len(held)} held, {len(benchmarks)} benchmark)"
+    )
     return written
 
 

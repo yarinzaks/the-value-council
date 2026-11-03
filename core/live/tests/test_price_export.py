@@ -96,7 +96,9 @@ class TestExport:
             root=tmp_path,
         )
 
-        assert loader.asked == ["AAPL"]
+        # Count rather than equality: the benchmarks are asked for too,
+        # and this test is about one name not being asked for twice.
+        assert loader.asked.count("AAPL") == 1
 
     def test_an_uncached_ticker_is_skipped_not_fetched(
         self, tmp_path: Path
@@ -116,6 +118,9 @@ class TestExport:
         assert not (tmp_path / "NOPE.json").exists()
 
     def test_nothing_held_writes_nothing(self, tmp_path: Path) -> None:
+        # Benchmarks off, so this measures the held names alone — with
+        # them on, an empty book still publishes the comparison lines,
+        # which TestBenchmarks covers.
         loader = _StubLoader({"AAPL": [("2026-08-06", 249.0)]})
 
         assert (
@@ -124,6 +129,7 @@ class TestExport:
                 as_of=AS_OF,
                 loader=loader,  # type: ignore[arg-type]
                 root=tmp_path,
+                benchmarks=(),
             )
             == 0
         )
@@ -205,4 +211,111 @@ def test_it_scales_over_agents_without_duplicating_work(
         root=tmp_path,
     )
 
-    assert loader.asked == ["AAPL"]
+    assert loader.asked.count("AAPL") == 1
+
+
+class TestBenchmarks:
+    """The chart promises a comparison it had no data for.
+
+    The main performance chart has carried an S&P 500 line and a "vs
+    S&P 500" stat since it was written, and both rendered empty: the
+    only benchmark series in the repo is the backtest's, which ends
+    2024-12-31, while the live snapshots start 2026-04-01. The two
+    date sets are disjoint by construction, so every lookup missed.
+
+    Exporting the benchmarks as ordinary price files fixes it with the
+    machinery already here, and because the window is a year wide the
+    comparison arrives with history rather than starting from today.
+    """
+
+    def test_the_benchmarks_are_written_even_with_nothing_held(
+        self, tmp_path: Path
+    ) -> None:
+        loader = _StubLoader(
+            {
+                "SPY": [("2026-08-06", 640.0)],
+                "QQQ": [("2026-08-06", 580.0)],
+            }
+        )
+
+        written = export_prices(
+            [LivePortfolio(agent="empty", positions=[])],
+            as_of=AS_OF,
+            loader=loader,  # type: ignore[arg-type]
+            root=tmp_path,
+        )
+
+        assert written == 2
+        assert (tmp_path / "SPY.json").exists()
+        assert (tmp_path / "QQQ.json").exists()
+
+    def test_a_benchmark_is_written_beside_the_holdings(
+        self, tmp_path: Path
+    ) -> None:
+        loader = _StubLoader(
+            {
+                "AAPL": [("2026-08-06", 249.0)],
+                "SPY": [("2026-08-06", 640.0)],
+                "QQQ": [("2026-08-06", 580.0)],
+            }
+        )
+
+        export_prices(
+            [_portfolio("a", ["AAPL"])],
+            as_of=AS_OF,
+            loader=loader,  # type: ignore[arg-type]
+            root=tmp_path,
+        )
+
+        assert sorted(p.name for p in tmp_path.glob("*.json")) == [
+            "AAPL.json",
+            "QQQ.json",
+            "SPY.json",
+        ]
+        spy = json.loads((tmp_path / "SPY.json").read_text())
+        assert spy["ticker"] == "SPY"
+        assert spy["points"] == [{"d": "2026-08-06", "c": 640.0}]
+
+    def test_a_benchmark_that_is_also_held_is_fetched_once(
+        self, tmp_path: Path
+    ) -> None:
+        loader = _StubLoader(
+            {"SPY": [("2026-08-06", 640.0)], "QQQ": [("2026-08-06", 580.0)]}
+        )
+
+        export_prices(
+            [_portfolio("a", ["SPY"])],
+            as_of=AS_OF,
+            loader=loader,  # type: ignore[arg-type]
+            root=tmp_path,
+        )
+
+        assert loader.asked.count("SPY") == 1
+
+    def test_an_unavailable_benchmark_does_not_cost_the_other(
+        self, tmp_path: Path
+    ) -> None:
+        loader = _StubLoader({"SPY": [("2026-08-06", 640.0)]})
+
+        export_prices(
+            [LivePortfolio(agent="empty", positions=[])],
+            as_of=AS_OF,
+            loader=loader,  # type: ignore[arg-type]
+            root=tmp_path,
+        )
+
+        assert (tmp_path / "SPY.json").exists()
+        assert not (tmp_path / "QQQ.json").exists()
+
+    def test_the_caller_can_turn_them_off(self, tmp_path: Path) -> None:
+        loader = _StubLoader({"AAPL": [("2026-08-06", 249.0)]})
+
+        export_prices(
+            [_portfolio("a", ["AAPL"])],
+            as_of=AS_OF,
+            loader=loader,  # type: ignore[arg-type]
+            root=tmp_path,
+            benchmarks=(),
+        )
+
+        assert loader.asked == ["AAPL"]
