@@ -70,6 +70,68 @@ test("the phrases the notifier translates, this side translates too", () => {
   }
 });
 
+// Four keys this side renders differently from the table. Each is a
+// second valid Hebrew wording, not a wrong one, so they are named here
+// rather than silently tolerated — and anything NOT named fails.
+//
+// They are a real inconsistency and should be settled on one wording,
+// which is a change to what the dashboard says and so not this fix's
+// business. What is this fix's business is that the list cannot grow.
+const KNOWN_DIVERGENCES = new Set([
+  "positive trailing net income", // "in the last year" vs "in the last four quarters"
+  "rotated out of target portfolio", // "left" vs "was rotated out of"
+  "mode=DEFENSIVE", // "track:" vs "mode="
+  "mode=NET_NET", // and this one keeps Net-Net in Latin
+]);
+
+test("the phrases the notifier translates, this side words the same", () => {
+  // The test above asserts there is Hebrew in the output. It does not
+  // assert it is the SAME Hebrew, and its name claims it does — so it
+  // was green at 136/136 while the two surfaces disagreed on six keys,
+  // two of them a plain error: the table says the agents screen the
+  // cheapest fifth, and this side said the cheapest quarter.
+  const disagreeing = [];
+  for (const [english, table] of Object.entries(BUNDLE.terms)) {
+    const got = translateCriterion(english, "he");
+    if (got !== table && !KNOWN_DIVERGENCES.has(english)) {
+      disagreeing.push(`${english}\n    table: ${table}\n    here : ${got}`);
+    }
+  }
+  assert.deepEqual(disagreeing, [], disagreeing.join("\n  "));
+});
+
+test("no key is excused that already agrees", () => {
+  // An excuse outliving the disagreement it covers is how the list
+  // grows back.
+  for (const english of KNOWN_DIVERGENCES) {
+    assert.ok(english in BUNDLE.terms, `${english} is not a table key`);
+    assert.notEqual(
+      translateCriterion(english, "he"),
+      BUNDLE.terms[english],
+      `${english} agrees now — drop it from KNOWN_DIVERGENCES`,
+    );
+  }
+});
+
+test("a quintile is a fifth on both surfaces", () => {
+  // The word the reader meets. "רבעון" is a calendar quarter in Hebrew
+  // before it is anything else, and the screen is DEFAULT_QUINTILE =
+  // 0.20 in agents/dreman/filters.py.
+  for (const english of ["(bottom quintile)", "(top quintile)"]) {
+    const he = translateCriterion(english, "he");
+    assert.match(he, /חמישון/, `${english} -> ${he}`);
+    assert.doesNotMatch(he, /רבעון/, `${english} -> ${he}`);
+  }
+  // And in the sentence the Dreman adapter writes, where the phrase is
+  // embedded rather than standing alone.
+  const sentence = translateRationale(
+    "Bottom-quintile on 3/4 (P/E, P/CF, P/B). Dreman contrarian, composite rank 0.123.",
+    "he",
+  );
+  assert.match(sentence, /בחמישון התחתון/, sentence);
+  assert.doesNotMatch(sentence, /רבעון/, sentence);
+});
+
 test("a number is never altered", () => {
   for (const input of [
     "current ratio=2.10 (≥ 2.0)",

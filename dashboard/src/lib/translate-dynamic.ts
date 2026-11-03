@@ -97,9 +97,14 @@ interface Rule {
 
 // ---- Criteria fragments commonly emitted ------------------------------------
 const CRITERIA_RULES: Rule[] = [
-  // "P/E=X.XX (bottom quintile)" → "P/E=X.XX (רבעון תחתון)"
-  { re: /\(bottom quintile\)/g, he: "(רבעון תחתון)" },
-  { re: /\(top quintile\)/g, he: "(רבעון עליון)" },
+  // "(bottom quintile)" and "(top quintile)" are not here. They are
+  // keys in hebrew.json, which renders them "בחמישון התחתון" and
+  // "בחמישון העליון" — a quintile is a fifth. Local copies said
+  // "רבעון", a quarter, and local rules run first and win, so the two
+  // surfaces disagreed on what the agents screen: Telegram said the
+  // cheapest 20%, the dashboard said 25%, in a word an Israeli reader
+  // meets first as a calendar quarter. 27,873 journal rows carry one.
+  // Deleted rather than corrected, so there is one place to edit.
 
   // "P/B=X.XXX (< 0.75)" — translate the comparator phrase
   { re: /\(<\s*([\d.]+)\)/g, he: "(< $1)" },
@@ -193,12 +198,12 @@ const RATIONALE_RULES: Rule[] = [
   // Dreman (live adapter)
   {
     re: /^Bottom-quintile on (\d)\/4 \(([^)]+)\)\. Dreman contrarian, composite rank ([\d.]+)\.$/,
-    he: "רבעון תחתון על $1/4 ($2). ניגודי לפי דרמן, דירוג משולב $3.",
+    he: "בחמישון התחתון ב-$1/4 ($2). ניגודי לפי דרמן, דירוג משולב $3.",
   },
   // Dreman (Python decision-log)
   {
     re: /^Dreman contrarian: bottom-quintile on (\d)\/4 metrics, composite rank ([\d.]+)$/,
-    he: "ניגודי לפי דרמן: רבעון תחתון על $1/4 מדדים, דירוג משולב $2",
+    he: "ניגודי לפי דרמן: בחמישון התחתון ב-$1/4 מדדים, דירוג משולב $2",
   },
   // Greenblatt (live-adapter alt phrasing)
   {
@@ -234,7 +239,7 @@ const TRIGGER_RULES: Rule[] = [
   },
   {
     re: /^joins bottom-quintile cohort on 2\+ metrics$/,
-    he: "מצטרף לרבעון התחתון בלפחות 2 מדדים",
+    he: "מצטרף לחמישון התחתון בלפחות 2 מדדים",
   },
   {
     re: /^rank enters top portfolio$/,

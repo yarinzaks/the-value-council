@@ -209,6 +209,26 @@ class TestEveryRationaleBuilderFinishesItsHebrew:
         # render it as written.
         assert "Fast Grower" in english
 
+    def test_dremans_quintile_is_a_fifth(self) -> None:
+        """This Hebrew reaches Telegram without passing through the table.
+
+        It said "רבעון" — a quarter — while ``DEFAULT_QUINTILE`` in
+        ``agents/dreman/filters.py`` is 0.20. Telegram therefore named a
+        different screen from the one the agent runs, and in a word an
+        Israeli reader meets first as a calendar quarter.
+        """
+        from core.live.why_translator import dreman_why
+
+        class Score:
+            qualifying_metrics = 3
+            composite_rank = 0.123
+            qualifying_flags = (True, True, True, False)
+
+        english, hebrew = dreman_why(Score())
+        assert "בחמישון התחתון" in hebrew, hebrew
+        assert "רבעון" not in hebrew, hebrew
+        assert "Bottom-quintile" in english
+
     def test_no_live_book_carries_english_in_its_hebrew_reason(self) -> None:
         """Walks the real portfolios. The scan that found this found 71
         positions across nine distinct English fragments."""

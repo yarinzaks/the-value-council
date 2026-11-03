@@ -134,7 +134,7 @@ def dreman_why(score: Any) -> tuple[str, str]:
         f"Dreman contrarian, composite rank {score.composite_rank:.3f}."
     )
     he = (
-        f"רבעון תחתון על {score.qualifying_metrics}/4 ({', '.join(metric_names_he)}). "
+        f"בחמישון התחתון ב-{score.qualifying_metrics}/4 ({', '.join(metric_names_he)}). "
         f"ניגודי לפי דרמן, דירוג משולב {score.composite_rank:.3f}."
     )
     return en, he
