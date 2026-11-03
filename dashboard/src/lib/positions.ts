@@ -360,6 +360,14 @@ export function movements(story: PositionStory): Movement[] {
     if (isSell) {
       kind = "exited";
       holding = false;
+      // A sale is proof of prior ownership for the same reason a trim
+      // is, and a stronger one: every SELL and EXIT row in the book
+      // carries "Closed live position: entry $X, exit $Y", so none of
+      // them is an unexecuted opinion. Leaving `everHeld` alone here
+      // put "Opened the position" on the first purchase after a
+      // pre-window position was closed — on eight cards, directly
+      // above a sale of that earlier position on the same date.
+      everHeld = true;
     } else if (r.decision === "TRIM") {
       // Sold some, still holding. Not an exit, and emphatically not
       // "changed its view", which is where it used to land. A trim is

@@ -279,3 +279,22 @@ test("a story whose window opens on a trim does not call it an opening", () => {
     ["reopened", "exited", "trimmed"],
   );
 });
+
+test("a story whose window opens on a sale does not call the next buy an opening", () => {
+  // The same case as the trim above, with the stronger proof. Every
+  // SELL and EXIT row in the book says "Closed live position: entry
+  // $X, exit $Y" — the name was held, whatever the window shows.
+  const s = storyFor([row("2026-09-03", "SELL"), row("2026-09-07", "BUY")]);
+  assert.deepEqual(
+    movements(s).map((x) => x.kind),
+    ["reopened", "exited"],
+  );
+});
+
+test("an exit is proof of ownership too", () => {
+  const s = storyFor([row("2026-09-03", "EXIT"), row("2026-09-07", "BUY")]);
+  assert.deepEqual(
+    movements(s).map((x) => x.kind),
+    ["reopened", "exited"],
+  );
+});
