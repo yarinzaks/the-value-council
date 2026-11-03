@@ -56,6 +56,35 @@ export function namedShare(parts: {
   return attributed_total / realized;
 }
 
+/**
+ * Which way the remainder runs, or `null` where it is too small to
+ * say anything about.
+ *
+ * This was the sign of `unattributed`, and the sign only means
+ * "over-attributed" when the book closed a gain. Under a closed loss
+ * the two sentences swap: market_core named nothing at all against a
+ * -$102 result and was told its named trades overshot the book by
+ * $102, while walter_schloss, whose names sum to -$306 against a
+ * -$12 book, was told $294 "cannot be traced to a stock".
+ *
+ * What the reader is being told is whether the ledger accounts for
+ * more of the closed result than the book itself reports, so that is
+ * what gets measured — magnitudes, not signs. An empty ledger falls
+ * out of it: nothing named cannot overshoot anything.
+ */
+export function remainderDirection(parts: {
+  realized: number;
+  attributed_total: number;
+  unattributed: number;
+}): "untraced" | "over" | null {
+  // Under a dollar either way is rounding, and a note about it would
+  // read as a finding.
+  if (Math.abs(parts.unattributed) < 1) return null;
+  return Math.abs(parts.attributed_total) > Math.abs(parts.realized)
+    ? "over"
+    : "untraced";
+}
+
 export function buildReturnParts(
   book: LivePortfolio,
   ledger: LedgerRow[],

@@ -34,7 +34,7 @@ import {
 
 // Value import, and not a cycle: return-breakdown.ts takes the two
 // types from here with `import type`, which is erased.
-import { namedShare } from "@/lib/return-breakdown";
+import { namedShare, remainderDirection } from "@/lib/return-breakdown";
 
 export interface ReturnParts {
   initial_cash: number;
@@ -150,6 +150,8 @@ export function ReturnBreakdown({
   // null where the figure would not be a share of anything; see
   // namedShare. Printed only when it is one.
   const share = namedShare(parts);
+  // Which of the two remainder sentences is true here, or neither.
+  const direction = remainderDirection(parts);
 
   return (
     <div className="space-y-4">
@@ -231,27 +233,22 @@ export function ReturnBreakdown({
           it would look complete and be wrong by that amount.
 
           The two directions are different facts and used to share one
-          sentence. A positive remainder is closed result no stock can
-          be named for. A negative one is the opposite — the named
-          trades sum to more than the book's own closed figure — and
-          "cannot be traced to a stock" was simply false about it, as
-          was the "those trades closed before the ledger existed"
-          explanation that followed. */}
-      {parts.unattributed >= 1 && (
-        <p className="rounded border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] leading-relaxed text-muted">
-          {labels.unattributed_note.replace(
-            "{amount}",
-            money(parts.unattributed, locale),
-          )}
-        </p>
-      )}
+          sentence. One is closed result no stock can be named for;
+          the other is the opposite, the named trades accounting for
+          more than the book's own closed figure. Which is which is
+          remainderDirection's question, not this component's — the
+          sign of the remainder answered it wrongly for every book
+          that closed its trades down.
 
-      {parts.unattributed <= -1 && (
+          The amount is unsigned on purpose: the bar above already
+          carries the direction of the result, and "-$102 cannot be
+          traced" reads as a negative quantity of untraced money. */}
+      {direction !== null && (
         <p className="rounded border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] leading-relaxed text-muted">
-          {labels.over_attributed_note.replace(
-            "{amount}",
-            money(-parts.unattributed, locale),
-          )}
+          {(direction === "over"
+            ? labels.over_attributed_note
+            : labels.unattributed_note
+          ).replace("{amount}", money(Math.abs(parts.unattributed), locale))}
         </p>
       )}
 

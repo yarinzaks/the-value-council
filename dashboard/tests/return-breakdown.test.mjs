@@ -17,6 +17,7 @@ import {
   buildReturnParts,
   namedShare,
   realizedByTicker,
+  remainderDirection,
 } from "../src/lib/return-breakdown.ts";
 
 /** A book whose identity leaves `realized` at the figure asked for. */
@@ -146,5 +147,112 @@ test("contributors come back biggest first", () => {
   assert.deepEqual(
     out.map((c) => c.ticker),
     ["BIG", "SMALL", "LOSS"],
+  );
+});
+
+// ---- remainderDirection ----------------------------------------------------
+//
+// The sign of the remainder was taken for its direction, and the sign
+// only means "over-attributed" when the book closed a gain. Three of
+// the thirteen books closed down, and all three were told the wrong
+// story. The figures below are theirs.
+
+test("a gain the names under-cover is untraced", () => {
+  // benjamin_graham: $2,886.92 closed, $1,241.00 named.
+  assert.equal(
+    remainderDirection({
+      realized: 2886.92,
+      attributed_total: 1241,
+      unattributed: 1645.92,
+    }),
+    "untraced",
+  );
+});
+
+test("a gain the names overshoot is over-attributed", () => {
+  // warren_buffett: $477.79 closed, $914.98 named.
+  assert.equal(
+    remainderDirection({
+      realized: 477.79,
+      attributed_total: 914.98,
+      unattributed: -437.19,
+    }),
+    "over",
+  );
+});
+
+test("an empty ledger cannot overshoot anything", () => {
+  // market_core and mohnish_pabrai in the app-support tree: a closed
+  // loss and no trade rows at all. The card drew no names and told the
+  // reader the names overshot the book by $102.
+  assert.equal(
+    remainderDirection({
+      realized: -101.9,
+      attributed_total: 0,
+      unattributed: -101.9,
+    }),
+    "untraced",
+  );
+  assert.equal(
+    remainderDirection({
+      realized: -4.92,
+      attributed_total: 0,
+      unattributed: -4.92,
+    }),
+    "untraced",
+  );
+});
+
+test("a loss the names overshoot is over-attributed", () => {
+  // walter_schloss: -$12.26 closed, names summing to -$305.83. The
+  // card said $294 "cannot be traced to a stock" directly above "62 of
+  // the 62 named trades were reconstructed".
+  assert.equal(
+    remainderDirection({
+      realized: -12.26,
+      attributed_total: -305.83,
+      unattributed: 293.57,
+    }),
+    "over",
+  );
+});
+
+test("a loss the names under-cover is untraced", () => {
+  // market_core in the repo tree: -$101.90 closed, -$91.96 named.
+  assert.equal(
+    remainderDirection({
+      realized: -101.9,
+      attributed_total: -91.96,
+      unattributed: -9.94,
+    }),
+    "untraced",
+  );
+});
+
+test("names of the wrong sign still answer by magnitude", () => {
+  // mohnish_pabrai in the repo tree: the names sum to a gain of $271
+  // against a book that closed down $4.92.
+  assert.equal(
+    remainderDirection({
+      realized: -4.92,
+      attributed_total: 271.12,
+      unattributed: -276.04,
+    }),
+    "over",
+  );
+});
+
+test("a remainder under a dollar is not a finding", () => {
+  assert.equal(
+    remainderDirection({
+      realized: 100,
+      attributed_total: 99.5,
+      unattributed: 0.5,
+    }),
+    null,
+  );
+  assert.equal(
+    remainderDirection({ realized: 0, attributed_total: 0, unattributed: 0 }),
+    null,
   );
 });
