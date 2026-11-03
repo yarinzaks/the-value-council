@@ -223,6 +223,9 @@ const en: Dict = {
   pos_event_changed: "Changed its view",
   pos_event_added: "Topped up to target weight",
   pos_event_trimmed: "Trimmed back to target weight",
+  // Where a story starts on a watchlist row rather than a purchase,
+  // which is most of them: a name is screened before it is bought.
+  pos_event_watched: "Put on the watchlist",
   pos_still_held: "Held since, unchanged, through {days} trading days.",
   // Shown against a movement dated to a day the exchange never opened.
   // Four 2026 holidays collected them before the runner knew to decline.
@@ -326,8 +329,9 @@ const en: Dict = {
   rb_nav: "Now",
   rb_contributors: "Biggest closed trades",
   rb_named_share: "{pct} of closed gains named",
-  rb_unattributed_note: "{amount} ({pct}) of the closed-trade result cannot be traced to a stock. Those trades closed before the trade ledger existed, so only the total survives. This shrinks on its own as new trades are recorded.",
-  rb_reconstructed_note: "The named trades were reconstructed from daily book snapshots rather than recorded at execution, so their amounts are approximate. Every trade from here on is recorded exactly.",
+  rb_unattributed_note: "{amount} of the closed-trade result cannot be traced to a stock. Those trades closed before the trade ledger existed, so only the total survives. This shrinks on its own as new trades are recorded.",
+  rb_over_attributed_note: "The named trades overshoot the book's own closed-trade result by {amount}, so at least one named amount is overstated — the book's total is the figure to rely on.",
+  rb_reconstructed_note: "{n} of the {total} named trades were reconstructed from daily book snapshots rather than recorded at execution, so their amounts are approximate. Every trade from here on is recorded exactly.",
 
   // ---- Glossary page ----
   glossary_title: "Glossary",
@@ -580,6 +584,7 @@ const he: Dict = {
   pos_event_changed: "שינה את דעתו",
   pos_event_added: "הוסיף כדי לחזור למשקל היעד",
   pos_event_trimmed: "קיצץ כדי לחזור למשקל היעד",
+  pos_event_watched: "נכנסה למעקב",
   pos_still_held: "מוחזקת מאז ללא שינוי, לאורך {days} ימי מסחר.",
   market_was_closed: "השוק היה סגור",
   price_chart_title: "מחיר מאז הכניסה",
@@ -681,8 +686,9 @@ const he: Dict = {
   rb_nav: "היום",
   rb_contributors: "העסקאות הסגורות הגדולות",
   rb_named_share: "{pct} מהרווח הסגור מזוהה בשם",
-  rb_unattributed_note: "{amount} ({pct}) מתוצאת העסקאות הסגורות לא ניתנים לשיוך למניה. העסקאות האלה נסגרו לפני שיומן העסקאות היה קיים, ולכן רק הסכום הכולל שרד. הפער הזה מצטמצם מעצמו ככל שנרשמות עסקאות חדשות.",
-  rb_reconstructed_note: "העסקאות ששמן מופיע שוחזרו מתמונות יומיות של התיק ולא נרשמו ברגע הביצוע, ולכן הסכומים מקורבים. מכאן והלאה כל עסקה נרשמת במדויק.",
+  rb_unattributed_note: "{amount} מתוצאת העסקאות הסגורות לא ניתנים לשיוך למניה. העסקאות האלה נסגרו לפני שיומן העסקאות היה קיים, ולכן רק הסכום הכולל שרד. הפער הזה מצטמצם מעצמו ככל שנרשמות עסקאות חדשות.",
+  rb_over_attributed_note: "העסקאות ששמן מופיע חורגות ב-{amount} מתוצאת העסקאות הסגורות של התיק עצמו, ולכן לפחות אחד הסכומים מוגזם — הסכום הכולל של התיק הוא המספר שעליו להסתמך.",
+  rb_reconstructed_note: "{n} מתוך {total} העסקאות ששמן מופיע שוחזרו מתמונות יומיות של התיק ולא נרשמו ברגע הביצוע, ולכן הסכומים מקורבים. מכאן והלאה כל עסקה נרשמת במדויק.",
 
   // ---- Glossary page ----
   glossary_title: "מילון מונחים",

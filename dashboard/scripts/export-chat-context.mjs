@@ -131,13 +131,22 @@ for (const file of listJson(portfolioDir)) {
     nav: round2(book.total_nav ?? 0),
     attributed_total: round2(attributedTotal),
     unattributed: round2(realized - attributedTotal),
-    ledger_is_reconstructed: reconstructedCount === ledger.length && ledger.length > 0,
+    // Counts, not a flag. `reconstructedCount === ledger.length` meant
+    // one caught-up row claimed the whole ledger was recorded at
+    // execution, and 10 of the 13 books have one.
+    reconstructed_rows: reconstructedCount,
+    ledger_rows: ledger.length,
     note:
       "realized is derived from the accounting identity and is exact. " +
-      "attributed is what the trade ledger can name; unattributed is the " +
-      "rest, from trades that closed before the ledger existed. Entries " +
-      "marked reconstructed were inferred from committed books, not " +
-      "recorded at execution, so they are approximate.",
+      "attributed is what the trade ledger can name. unattributed is " +
+      "realized minus attributed, and its SIGN matters: positive means " +
+      "closed result no stock can be named for, from trades that closed " +
+      "before the ledger existed; negative means the named trades sum to " +
+      "MORE than the book's own closed result, so a reconstructed amount " +
+      "is overstated and the book's total is the one to rely on. " +
+      "reconstructed_rows of the ledger_rows named trades were inferred " +
+      "from committed books, not recorded at execution, so they are " +
+      "approximate.",
   };
 
   const decisionDir = join(DATA_DIR, "decisions", agent);

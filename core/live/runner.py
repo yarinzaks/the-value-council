@@ -1515,15 +1515,12 @@ class DailyRunner:
         out: list[TradeRecord] = []
         for ticker, price, shares in trims:
             try:
-                out.append(
-                    portfolio.sell(
-                        ticker, price=price, shares=shares, cost_bps=self.cost_bps
-                    )
+                fill = portfolio.sell(
+                    ticker, price=price, shares=shares, cost_bps=self.cost_bps
                 )
+                out.append(fill)
                 logger.info(f"{as_of}: {agent} trimmed {ticker} back to target")
-                self._log_rebalance(
-                    agent, ticker, "TRIM", price, shares, band, as_of
-                )
+                self._log_rebalance(agent, "TRIM", fill, band, as_of)
             except LivePortfolioError as exc:
                 logger.warning(f"{as_of}: trim of {ticker} failed: {exc}")
 
@@ -1535,21 +1532,18 @@ class DailyRunner:
                 # a band cannot be closed with less than one share.
                 continue
             try:
-                out.append(
-                    portfolio.buy(
-                        ticker,
-                        target_dollars=spend,
-                        price=price,
-                        entry_date=as_of.isoformat(),
-                        why_en="",
-                        why_he="",
-                        cost_bps=self.cost_bps,
-                    )
+                fill = portfolio.buy(
+                    ticker,
+                    target_dollars=spend,
+                    price=price,
+                    entry_date=as_of.isoformat(),
+                    why_en="",
+                    why_he="",
+                    cost_bps=self.cost_bps,
                 )
+                out.append(fill)
                 logger.info(f"{as_of}: {agent} added to {ticker} back to target")
-                self._log_rebalance(
-                    agent, ticker, "ADD", price, spend / price, band, as_of
-                )
+                self._log_rebalance(agent, "ADD", fill, band, as_of)
             except LivePortfolioError as exc:
                 logger.warning(f"{as_of}: add to {ticker} failed: {exc}")
 
@@ -1558,10 +1552,8 @@ class DailyRunner:
     def _log_rebalance(
         self,
         agent: str,
-        ticker: str,
         decision: str,
-        price: float,
-        shares: float,
+        fill: TradeRecord,
         band: float,
         as_of: date,
     ) -> None:
@@ -1580,11 +1572,22 @@ class DailyRunner:
         kinds and TRIM under its exits. Using them rather than
         FILL/EXIT keeps the distinction that matters to a reader: this
         did not open or close a position, it resized one.
+
+        The row is built from the ``TradeRecord`` the order returned,
+        never from the size the caller asked for. Those are different
+        numbers: a book trades whole shares, so ``buy`` and ``sell``
+        both floor, and ``buy`` floors what is left after the
+        commission rather than the gross. The first version of this
+        method took the requested size, and so wrote "16.6667 shares
+        at $300.00" for a trade that moved 16 shares and $4,800 — a
+        journal that overstates by design, on the only store the
+        dashboard reads. Taking the fill makes the row a record of
+        what happened rather than of what was intended.
         """
         try:
             self.decision_logger.log(
                 make_decision(
-                    ticker=ticker,
+                    ticker=fill.ticker,
                     decision=decision,  # type: ignore[arg-type]
                     agent=agent,
                     timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
@@ -1593,14 +1596,14 @@ class DailyRunner:
                     ],
                     rationale=(
                         f"Rebalance {'trim' if decision == 'TRIM' else 'add'}: "
-                        f"{shares:.4f} shares at ${price:.2f} "
+                        f"{fill.shares:.4f} shares at ${fill.price:.2f} "
                         f"to restore the target weight"
                     ),
-                    entry_price=price,
+                    entry_price=fill.price,
                 )
             )
         except Exception as exc:
-            logger.debug(f"decision log {decision} {ticker} failed: {exc}")
+            logger.debug(f"decision log {decision} {fill.ticker} failed: {exc}")
 
     # ------------------------------------------------------------------
     # Helpers

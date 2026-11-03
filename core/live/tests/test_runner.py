@@ -7,6 +7,7 @@ that no longer existed.
 
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -2327,6 +2328,19 @@ class TestARebalanceIsRecorded:
     def _journal(self, runner: DailyRunner) -> list:
         return runner.decision_logger.read_day("stub_agent", AS_OF)
 
+    @staticmethod
+    def _stated(rationale: str | None) -> tuple[float, float]:
+        """The shares and price the row states, read as a reader reads them.
+
+        ``Decision`` has no field for a share count, so the number lives
+        in the rationale — the string the dashboard renders. Asserting
+        on the parse rather than on a field means these tests check what
+        a human is actually shown.
+        """
+        m = re.search(r"([\d.]+) shares at \$([\d.]+)", rationale or "")
+        assert m is not None, f"no shares/price in rationale: {rationale!r}"
+        return float(m.group(1)), float(m.group(2))
+
     def test_a_trim_is_written_to_the_journal(self, runner: DailyRunner) -> None:
         # 50 × $300 = $15,000 against $5,000 cash: drift +50%.
         self._drifted(runner, shares=50.0, now=300.0, cash=5_000.0)
@@ -2363,6 +2377,51 @@ class TestARebalanceIsRecorded:
         assert row.entry_price == pytest.approx(100.0)
         assert "rebalance" in (row.rationale or "").lower()
 
+    def test_the_add_row_states_the_shares_that_were_traded(
+        self, runner: DailyRunner
+    ) -> None:
+        """A whole-share book must not be journalled in fractions.
+
+        This test is named after the share count and so was the one
+        before it — which never asserted the count, and so passed
+        against a row that overstated it. ``buy`` floors what is left
+        of the spend after the commission, so a $5,000 add at $100
+        moves 49 shares and not 50. The row said 50.0000 until the
+        number came from the fill rather than from the request, and the
+        journal is the only store the dashboard reads.
+        """
+        self._drifted(runner, shares=10.0, now=100.0, cash=9_000.0)
+
+        result = self._run(runner, 100.0)
+
+        fill = result.trades[0]
+        row = next(r for r in self._journal(runner) if r.decision == "ADD")
+        shares, price = self._stated(row.rationale)
+        assert shares == pytest.approx(fill.shares)
+        assert price == pytest.approx(fill.price)
+        assert row.entry_price == pytest.approx(fill.price)
+        # Whole shares, because whole shares are what the book trades.
+        assert fill.shares == float(int(fill.shares))
+
+    def test_the_trim_row_states_the_shares_that_were_traded(
+        self, runner: DailyRunner
+    ) -> None:
+        """The same, on the sell side, where ``sell`` floors outright.
+
+        A 50% drift on a $15,000 line at $300 is $5,000 of trim, which
+        is 16.6667 shares requested and 16 shares sold.
+        """
+        self._drifted(runner, shares=50.0, now=300.0, cash=5_000.0)
+
+        result = self._run(runner, 300.0)
+
+        fill = result.trades[0]
+        row = next(r for r in self._journal(runner) if r.decision == "TRIM")
+        shares, price = self._stated(row.rationale)
+        assert shares == pytest.approx(fill.shares)
+        assert price == pytest.approx(fill.price)
+        assert fill.shares == float(int(fill.shares))
+
     def test_a_book_inside_the_band_writes_no_rebalance_row(
         self, runner: DailyRunner
     ) -> None:
@@ -2387,3 +2446,11 @@ class TestARebalanceIsRecorded:
         ]
         assert len(ledger) == len(result.trades) == len(rebalance_rows) == 1
         assert ledger[0].ticker == rebalance_rows[0].ticker
+        # Agreeing on the ticker is not agreeing. This test passed while
+        # the journal claimed 16.6667 shares for the 16 the ledger
+        # recorded, because it compared names and counted rows and
+        # stopped there. Two stores agree when the numbers match.
+        stated_shares, stated_price = self._stated(rebalance_rows[0].rationale)
+        assert stated_shares == pytest.approx(ledger[0].shares)
+        assert stated_price == pytest.approx(ledger[0].price)
+        assert ledger[0].shares == pytest.approx(result.trades[0].shares)

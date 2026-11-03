@@ -286,6 +286,7 @@ export default async function AgentDrillPage({
                   contributors: t("rb_contributors"),
                   named_share: t("rb_named_share"),
                   unattributed_note: t("rb_unattributed_note"),
+                  over_attributed_note: t("rb_over_attributed_note"),
                   reconstructed_note: t("rb_reconstructed_note"),
                 }}
               />

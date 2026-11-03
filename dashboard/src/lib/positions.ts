@@ -305,7 +305,14 @@ export function parseConditions(criteria: string[]): WatchCondition[] {
 /** One entry in the movements list — an event, not a daily heartbeat. */
 export interface Movement {
   date: string;
-  kind: "opened" | "reopened" | "exited" | "changed" | "added" | "trimmed";
+  kind:
+    | "opened"
+    | "reopened"
+    | "exited"
+    | "changed"
+    | "added"
+    | "trimmed"
+    | "watched";
   note: string | null;
 }
 
@@ -319,16 +326,27 @@ export interface Movement {
 export function movements(story: PositionStory): Movement[] {
   const rows = [...story.timeline].reverse(); // oldest first
   if (rows.length === 0) return [];
-  const out: Movement[] = [
-    { date: dayOf(rows[0].timestamp), kind: "opened", note: rows[0].rationale ?? null },
-  ];
+  // The oldest row used to be emitted as "opened" whatever it said,
+  // which is only true when it is a purchase. A name is screened and
+  // watched before it is ever bought, so for 565 of the book's 1,057
+  // stories the oldest row is a WATCH and the card announced a
+  // position opened on a day nothing was. The first row now goes
+  // through the same rules as the rest and is labelled by what it is.
+  const out: Movement[] = [];
   // Track whether we are in or out, so a buy after a sell reads as a
   // re-entry rather than as "changed its view". CRMD showed three
   // exits and one opening, which left a reader asking where the stock
   // was bought back — the answer was there, mislabelled.
-  let prev = rows[0].decision;
-  let holding = BUY_KINDS.has(rows[0].decision);
-  for (const r of rows.slice(1)) {
+  //
+  // `everHeld` is the other half of that: "Bought back in" is a claim
+  // about the past, and it was being made about first purchases,
+  // because a story opening on a WATCH row started out not holding
+  // and the first real buy fell straight into the re-entry branch.
+  // 158 stories read "נקנתה מחדש" for a name bought once.
+  let prev: string | null = null;
+  let holding = false;
+  let everHeld = false;
+  for (const r of rows) {
     // A repeated verdict is one answer restated on many days and
     // collapses to a single entry. A repeated execution is a second
     // trade — the rebalance can top the same name up in March and
@@ -342,15 +360,28 @@ export function movements(story: PositionStory): Movement[] {
     if (isSell) {
       kind = "exited";
       holding = false;
+      // A sale is proof of prior ownership for the same reason a trim
+      // is, and a stronger one: every SELL and EXIT row in the book
+      // carries "Closed live position: entry $X, exit $Y", so none of
+      // them is an unexecuted opinion. Leaving `everHeld` alone here
+      // put "Opened the position" on the first purchase after a
+      // pre-window position was closed — on eight cards, directly
+      // above a sale of that earlier position on the same date.
+      everHeld = true;
     } else if (r.decision === "TRIM") {
       // Sold some, still holding. Not an exit, and emphatically not
-      // "changed its view", which is where it used to land.
+      // "changed its view", which is where it used to land. A trim is
+      // also proof the name was held, which matters when the journal's
+      // window opens after the purchase it cannot show.
       kind = "trimmed";
+      holding = true;
+      everHeld = true;
     } else if (r.decision === "ADD" && holding) {
       kind = "added";
     } else if (isBuy && !holding) {
-      kind = "reopened";
+      kind = everHeld ? "reopened" : "opened";
       holding = true;
+      everHeld = true;
     } else if (isBuy) {
       // Already long, and the agent has said buy again in a different
       // word — BUY is the intent, FILL its execution, ADD a top-up.
@@ -358,6 +389,11 @@ export function movements(story: PositionStory): Movement[] {
       // put two "Changed its view" rows on the same date for 75 of
       // the book's names.
       continue;
+    } else if (out.length === 0) {
+      // Where the story starts, and it is not a trade: the agent put
+      // the name on its list. Saying so is the whole point — this is
+      // the row that used to claim a position was opened.
+      kind = "watched";
     } else {
       kind = "changed";
     }

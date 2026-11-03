@@ -182,6 +182,18 @@
     [
       "\\b(\\d+)y revenue CAGR\\b",
       "צמיחת הכנסות שנתית ל-\\1 שנים"
+    ],
+    [
+      "\\bdrifted outside the (\\d+)% rebalance band",
+      "סטתה מרצועת האיזון של \\1%"
+    ],
+    [
+      "\\bRebalance trim: ([\\d.]+) shares at (\\$[\\d,.]+) to restore the target weight",
+      "איזון מחדש — מכירת \\1 מניות ב-\\2 להחזרת המשקל ליעד"
+    ],
+    [
+      "\\bRebalance add: ([\\d.]+) shares at (\\$[\\d,.]+) to restore the target weight",
+      "איזון מחדש — קניית \\1 מניות ב-\\2 להחזרת המשקל ליעד"
     ]
   ],
   "industry_by_code": {

@@ -35,6 +35,56 @@ export function realizedByTicker(ledger: LedgerRow[]): Contributor[] {
     .sort((a, b) => b.realized_usd - a.realized_usd);
 }
 
+/**
+ * The share of the closed result that carries a stock's name, or
+ * `null` where the question has no percentage answer.
+ *
+ * Dividing regardless returns a number, and the number is nonsense:
+ * where the ledger sums to more than the book's own realized figure
+ * the card read "192% of closed gains named", and the remainder note
+ * under it read "−92%". A loss divided by a loss, or a gain divided by
+ * a loss, is just as misleading. None of those is a share of anything,
+ * so none of them gets printed.
+ */
+export function namedShare(parts: {
+  realized: number;
+  attributed_total: number;
+}): number | null {
+  const { realized, attributed_total } = parts;
+  if (realized <= 0) return null;
+  if (attributed_total < 0 || attributed_total > realized) return null;
+  return attributed_total / realized;
+}
+
+/**
+ * Which way the remainder runs, or `null` where it is too small to
+ * say anything about.
+ *
+ * This was the sign of `unattributed`, and the sign only means
+ * "over-attributed" when the book closed a gain. Under a closed loss
+ * the two sentences swap: market_core named nothing at all against a
+ * -$102 result and was told its named trades overshot the book by
+ * $102, while walter_schloss, whose names sum to -$306 against a
+ * -$12 book, was told $294 "cannot be traced to a stock".
+ *
+ * What the reader is being told is whether the ledger accounts for
+ * more of the closed result than the book itself reports, so that is
+ * what gets measured — magnitudes, not signs. An empty ledger falls
+ * out of it: nothing named cannot overshoot anything.
+ */
+export function remainderDirection(parts: {
+  realized: number;
+  attributed_total: number;
+  unattributed: number;
+}): "untraced" | "over" | null {
+  // Under a dollar either way is rounding, and a note about it would
+  // read as a finding.
+  if (Math.abs(parts.unattributed) < 1) return null;
+  return Math.abs(parts.attributed_total) > Math.abs(parts.realized)
+    ? "over"
+    : "untraced";
+}
+
 export function buildReturnParts(
   book: LivePortfolio,
   ledger: LedgerRow[],
@@ -64,12 +114,17 @@ export function buildReturnParts(
       nav: book.total_nav ?? 0,
       attributed_total: attributed,
       unattributed: realized - attributed,
-      // Every entry inferred rather than recorded. Shown differently on
-      // the page, because a reconstruction presented as a record would
+      // How many of the named amounts were inferred rather than
+      // recorded, because a reconstruction presented as a record would
       // look complete and be approximate.
-      ledger_is_reconstructed:
-        ledger.length > 0 &&
-        ledger.every((r) => r.source === "reconstructed"),
+      //
+      // This was a boolean gated on `every`, so one caught-up row
+      // silenced the warning for the whole book: Neff was 87 of 94
+      // reconstructed and said nothing, and the note reached 3 of the
+      // 13 agents. A count cannot be switched off by a single row.
+      reconstructed_rows: ledger.filter((r) => r.source === "reconstructed")
+        .length,
+      ledger_rows: ledger.length,
     },
     contributors,
   };

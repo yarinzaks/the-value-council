@@ -102,7 +102,7 @@ export const GLOSSARY: Record<string, TermDefinition> = {
     term: "Dividend yield",
     term_he: "תשואת דיבידנד",
     en: "Annual dividends per share ÷ price. Top quintile = 'cheap' on this dimension for Dreman's contrarian screen.",
-    he: "דיבידנד שנתי חלקי מחיר. רבעון עליון = 'זול' לפי דרמן.",
+    he: "דיבידנד שנתי חלקי מחיר. חמישון עליון = 'זול' לפי דרמן.",
   },
   // ---- Strategy concepts ----
   net_net: {
@@ -126,7 +126,7 @@ export const GLOSSARY: Record<string, TermDefinition> = {
     term: "Contrarian (Dreman)",
     term_he: "ניגודי (דרמן)",
     en: "Buy stocks the market hates. Dreman's screen requires bottom-quintile valuation on at least 2 of 4 metrics: P/E, P/CF, P/B, dividend yield.",
-    he: "ניגודי (דרמן): קניית מניות שהשוק שונא. רבעון תחתון על לפחות 2 מתוך 4: P/E, P/CF, P/B, תשואת דיבידנד.",
+    he: "ניגודי (דרמן): קניית מניות שהשוק שונא. חמישון תחתון על לפחות 2 מתוך 4: P/E, P/CF, P/B, תשואת דיבידנד.",
   },
   hit_rate: {
     term: "Hit rate",

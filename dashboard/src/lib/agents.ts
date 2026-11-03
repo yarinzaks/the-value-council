@@ -86,7 +86,7 @@ export const AGENTS: AgentMeta[] = [
     display_name: "David Dreman",
     display_name_he: "דייוויד דרמן",
     description: "Contrarian: bottom 20% on 2+ of P/E, P/CF, P/B, dividend yield.",
-    description_he: "ניגודי: רבעון תחתון על 2+ מתוך P/E, P/CF, P/B, תשואת דיבידנד.",
+    description_he: "ניגודי: חמישון תחתון על 2+ מתוך P/E, P/CF, P/B, תשואת דיבידנד.",
     school: "Contrarian Value",
     school_he: "ערך ניגודי",
     color: "#dc2626",
