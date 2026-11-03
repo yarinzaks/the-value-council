@@ -156,3 +156,47 @@ test("movements never repeat a date and kind", () => {
   const keys = movements(s).map((m) => `${m.date}-${m.kind}`);
   assert.equal(new Set(keys).size, keys.length, keys.join(", "));
 });
+
+test("a top-up is its own event, not silence and not a change of view", () => {
+  // ADD is the rebalance buying more of a name already held. It is a
+  // real trade — it moved cash and shares — so it belongs on the
+  // timeline, but it neither opens the position nor reconsiders it.
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-11-02", "ADD"),
+  ]);
+  const m = movements(s);
+  assert.equal(m.filter((x) => x.kind === "added").length, 1, JSON.stringify(m));
+  assert.equal(m.filter((x) => x.kind === "changed").length, 0);
+});
+
+test("a trim is its own event, and does not close the position", () => {
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-11-02", "TRIM"),
+  ]);
+  const m = movements(s);
+  assert.equal(m.filter((x) => x.kind === "trimmed").length, 1, JSON.stringify(m));
+  assert.equal(m.filter((x) => x.kind === "exited").length, 0, "a trim is not an exit");
+  assert.equal(m.filter((x) => x.kind === "changed").length, 0);
+});
+
+test("a trim does not reset the unbroken run", () => {
+  // The position was never closed, so the run continues.
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-09-04", "BUY"),
+    row("2026-11-02", "TRIM"),
+    row("2026-11-03", "BUY"),
+  ]);
+  assert.equal(s.daysHeldUnbroken, 3);
+});
+
+test("a buy after a trim is not a re-entry", () => {
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-11-02", "TRIM"),
+    row("2026-11-03", "BUY"),
+  ]);
+  assert.equal(movements(s).filter((x) => x.kind === "reopened").length, 0);
+});

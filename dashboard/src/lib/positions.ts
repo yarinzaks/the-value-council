@@ -101,6 +101,11 @@ export interface PositionStory {
 
 const BUY_KINDS = new Set(["BUY", "FILL", "ADD"]);
 
+//: What the rebalance writes when it resizes a position it already
+//: holds. Neither opens nor closes a line, and each one is a discrete
+//: trade rather than a verdict restated.
+const REBALANCE_KINDS = new Set(["ADD", "TRIM"]);
+
 function dayOf(timestamp: string): string {
   return timestamp.slice(0, 10);
 }
@@ -300,7 +305,7 @@ export function parseConditions(criteria: string[]): WatchCondition[] {
 /** One entry in the movements list — an event, not a daily heartbeat. */
 export interface Movement {
   date: string;
-  kind: "opened" | "reopened" | "exited" | "changed";
+  kind: "opened" | "reopened" | "exited" | "changed" | "added" | "trimmed";
   note: string | null;
 }
 
@@ -324,7 +329,12 @@ export function movements(story: PositionStory): Movement[] {
   let prev = rows[0].decision;
   let holding = BUY_KINDS.has(rows[0].decision);
   for (const r of rows.slice(1)) {
-    if (r.decision === prev) continue;
+    // A repeated verdict is one answer restated on many days and
+    // collapses to a single entry. A repeated execution is a second
+    // trade — the rebalance can top the same name up in March and
+    // again in May — and each one has to show.
+    const isExecution = REBALANCE_KINDS.has(r.decision);
+    if (r.decision === prev && !isExecution) continue;
     prev = r.decision;
     const isBuy = BUY_KINDS.has(r.decision);
     const isSell = r.decision === "SELL" || r.decision === "EXIT";
@@ -332,6 +342,12 @@ export function movements(story: PositionStory): Movement[] {
     if (isSell) {
       kind = "exited";
       holding = false;
+    } else if (r.decision === "TRIM") {
+      // Sold some, still holding. Not an exit, and emphatically not
+      // "changed its view", which is where it used to land.
+      kind = "trimmed";
+    } else if (r.decision === "ADD" && holding) {
+      kind = "added";
     } else if (isBuy && !holding) {
       kind = "reopened";
       holding = true;

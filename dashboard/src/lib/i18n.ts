@@ -221,6 +221,8 @@ const en: Dict = {
   pos_event_reopened: "Bought back in",
   pos_event_exited: "Sold out",
   pos_event_changed: "Changed its view",
+  pos_event_added: "Topped up to target weight",
+  pos_event_trimmed: "Trimmed back to target weight",
   pos_still_held: "Held since, unchanged, through {days} trading days.",
   // Shown against a movement dated to a day the exchange never opened.
   // Four 2026 holidays collected them before the runner knew to decline.
@@ -576,6 +578,8 @@ const he: Dict = {
   pos_event_reopened: "נקנתה מחדש",
   pos_event_exited: "נמכרה",
   pos_event_changed: "שינה את דעתו",
+  pos_event_added: "הוסיף כדי לחזור למשקל היעד",
+  pos_event_trimmed: "קיצץ כדי לחזור למשקל היעד",
   pos_still_held: "מוחזקת מאז ללא שינוי, לאורך {days} ימי מסחר.",
   market_was_closed: "השוק היה סגור",
   price_chart_title: "מחיר מאז הכניסה",
