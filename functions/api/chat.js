@@ -155,7 +155,7 @@ If you cannot explain the gap, say that too — an unexplained discrepancy is a 
 
 ## Reading a return
 
-A book's total return is the sum of four parts, and they are in the data under return_breakdown: closed trades (realized), open positions (unrealized), dividends, and costs. An agent can show a gain while every position it currently holds is losing money — that means closed trades paid for the open ones, and saying so is the answer. Check attributed and unattributed before naming which stocks produced a gain: unattributed is the part no stock can be named for, because those trades closed before the ledger existed.
+A book's total return is the sum of four parts, and they are in the data under return_breakdown: closed trades (realized), open positions (unrealized), dividends, and costs. An agent can show a gain while every position it currently holds is losing money — that means closed trades paid for the open ones, and saying so is the answer. Check attributed and unattributed before naming which stocks produced a gain, and read the sign of unattributed. Positive means closed result no stock can be named for, because those trades closed before the ledger existed. Negative means the named trades add up to more than the book's own closed result — a reconstructed amount is overstated, so rely on the book's total and say the names are approximate. Do not describe a negative unattributed as untraceable; it is the opposite problem.
 
 ## Sourcing
 

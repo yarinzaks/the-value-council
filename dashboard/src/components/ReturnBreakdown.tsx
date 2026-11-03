@@ -32,6 +32,10 @@ import {
   YAxis,
 } from "recharts";
 
+// Value import, and not a cycle: return-breakdown.ts takes the two
+// types from here with `import type`, which is erased.
+import { namedShare } from "@/lib/return-breakdown";
+
 export interface ReturnParts {
   initial_cash: number;
   realized: number;
@@ -41,7 +45,10 @@ export interface ReturnParts {
   nav: number;
   attributed_total: number;
   unattributed: number;
-  ledger_is_reconstructed: boolean;
+  /** Named trades whose amount was inferred from book snapshots. */
+  reconstructed_rows: number;
+  /** Named trades in all, so the note can say "47 of 49" and mean it. */
+  ledger_rows: number;
 }
 
 export interface Contributor {
@@ -140,8 +147,9 @@ export function ReturnBreakdown({
 }) {
   const steps = toSteps(parts, labels);
   const named = contributors.filter((c) => c.realized_usd !== 0);
-  const share =
-    parts.realized !== 0 ? parts.attributed_total / parts.realized : 0;
+  // null where the figure would not be a share of anything; see
+  // namedShare. Printed only when it is one.
+  const share = namedShare(parts);
 
   return (
     <div className="space-y-4">
@@ -191,9 +199,14 @@ export function ReturnBreakdown({
         <div>
           <div className="mb-2 flex items-baseline justify-between">
             <span className="text-xs font-medium">{labels.contributors}</span>
-            <span className="text-[11px] text-muted">
-              {labels.named_share.replace("{pct}", `${Math.round(share * 100)}%`)}
-            </span>
+            {share !== null && (
+              <span className="text-[11px] text-muted">
+                {labels.named_share.replace(
+                  "{pct}",
+                  `${Math.round(share * 100)}%`,
+                )}
+              </span>
+            )}
           </div>
           <ul className="space-y-1">
             {named.slice(0, 8).map((c) => (
@@ -215,18 +228,38 @@ export function ReturnBreakdown({
       )}
 
       {/* The remainder, said out loud. A breakdown that quietly dropped
-          it would look complete and be wrong by that amount. */}
-      {Math.abs(parts.unattributed) >= 1 && (
+          it would look complete and be wrong by that amount.
+
+          The two directions are different facts and used to share one
+          sentence. A positive remainder is closed result no stock can
+          be named for. A negative one is the opposite — the named
+          trades sum to more than the book's own closed figure — and
+          "cannot be traced to a stock" was simply false about it, as
+          was the "those trades closed before the ledger existed"
+          explanation that followed. */}
+      {parts.unattributed >= 1 && (
         <p className="rounded border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] leading-relaxed text-muted">
-          {labels.unattributed_note
-            .replace("{amount}", money(parts.unattributed, locale))
-            .replace("{pct}", `${Math.round((1 - share) * 100)}%`)}
+          {labels.unattributed_note.replace(
+            "{amount}",
+            money(parts.unattributed, locale),
+          )}
         </p>
       )}
 
-      {parts.ledger_is_reconstructed && (
+      {parts.unattributed <= -1 && (
+        <p className="rounded border border-amber-500/40 bg-amber-500/5 p-2 text-[11px] leading-relaxed text-muted">
+          {labels.over_attributed_note.replace(
+            "{amount}",
+            money(-parts.unattributed, locale),
+          )}
+        </p>
+      )}
+
+      {parts.reconstructed_rows > 0 && (
         <p className="text-[11px] leading-relaxed text-muted">
-          {labels.reconstructed_note}
+          {labels.reconstructed_note
+            .replace("{n}", String(parts.reconstructed_rows))
+            .replace("{total}", String(parts.ledger_rows))}
         </p>
       )}
     </div>

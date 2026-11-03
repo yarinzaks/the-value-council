@@ -329,8 +329,9 @@ const en: Dict = {
   rb_nav: "Now",
   rb_contributors: "Biggest closed trades",
   rb_named_share: "{pct} of closed gains named",
-  rb_unattributed_note: "{amount} ({pct}) of the closed-trade result cannot be traced to a stock. Those trades closed before the trade ledger existed, so only the total survives. This shrinks on its own as new trades are recorded.",
-  rb_reconstructed_note: "The named trades were reconstructed from daily book snapshots rather than recorded at execution, so their amounts are approximate. Every trade from here on is recorded exactly.",
+  rb_unattributed_note: "{amount} of the closed-trade result cannot be traced to a stock. Those trades closed before the trade ledger existed, so only the total survives. This shrinks on its own as new trades are recorded.",
+  rb_over_attributed_note: "The named trades add up to {amount} more than the book's own closed-trade result. The names are reconstructed from daily snapshots, so at least one amount is overstated — the book's total is the figure to rely on.",
+  rb_reconstructed_note: "{n} of the {total} named trades were reconstructed from daily book snapshots rather than recorded at execution, so their amounts are approximate. Every trade from here on is recorded exactly.",
 
   // ---- Glossary page ----
   glossary_title: "Glossary",
@@ -685,8 +686,9 @@ const he: Dict = {
   rb_nav: "היום",
   rb_contributors: "העסקאות הסגורות הגדולות",
   rb_named_share: "{pct} מהרווח הסגור מזוהה בשם",
-  rb_unattributed_note: "{amount} ({pct}) מתוצאת העסקאות הסגורות לא ניתנים לשיוך למניה. העסקאות האלה נסגרו לפני שיומן העסקאות היה קיים, ולכן רק הסכום הכולל שרד. הפער הזה מצטמצם מעצמו ככל שנרשמות עסקאות חדשות.",
-  rb_reconstructed_note: "העסקאות ששמן מופיע שוחזרו מתמונות יומיות של התיק ולא נרשמו ברגע הביצוע, ולכן הסכומים מקורבים. מכאן והלאה כל עסקה נרשמת במדויק.",
+  rb_unattributed_note: "{amount} מתוצאת העסקאות הסגורות לא ניתנים לשיוך למניה. העסקאות האלה נסגרו לפני שיומן העסקאות היה קיים, ולכן רק הסכום הכולל שרד. הפער הזה מצטמצם מעצמו ככל שנרשמות עסקאות חדשות.",
+  rb_over_attributed_note: "העסקאות ששמן מופיע מצטברות ל-{amount} יותר מתוצאת העסקאות הסגורות של התיק עצמו. השמות שוחזרו מתמונות יומיות, ולכן לפחות אחד הסכומים מוגזם — הסכום הכולל של התיק הוא המספר שעליו להסתמך.",
+  rb_reconstructed_note: "{n} מתוך {total} העסקאות ששמן מופיע שוחזרו מתמונות יומיות של התיק ולא נרשמו ברגע הביצוע, ולכן הסכומים מקורבים. מכאן והלאה כל עסקה נרשמת במדויק.",
 
   // ---- Glossary page ----
   glossary_title: "מילון מונחים",
