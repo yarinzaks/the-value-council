@@ -35,9 +35,33 @@ export interface CompareRow {
 }
 
 /** Percent change from the first value each series has in the window. */
+/** How long a close may stand in for days that have none.
+ *
+ *  A market shuts for weekends and holidays, so the last close is the
+ *  right value for a few days after it. It is not the right value for
+ *  two months. Without a bound, a holding whose feed stopped — eight
+ *  of them had, on the store this was written against — rebased to a
+ *  dead-flat 0.00%, which reads as "this share did not move" when the
+ *  truth is "nobody has published a price since August". Those are
+ *  opposite claims and the chart drew them the same.
+ *
+ *  Nine days covers the longest run of shut sessions a US exchange
+ *  produces (a Thursday holiday, the Friday after it, and the weekend
+ *  on either side) with room to spare, and is far short of the
+ *  gap a stopped feed opens.
+ */
+export const MAX_CARRY_DAYS = 9;
+
+function daysBetween(from: string, to: string): number {
+  return Math.round(
+    (Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86_400_000,
+  );
+}
+
 export function rebase(
   dates: readonly string[],
   points: readonly SeriesPoint[],
+  maxCarryDays: number = MAX_CARRY_DAYS,
 ): (number | null)[] {
   if (dates.length === 0) return [];
 
@@ -48,12 +72,20 @@ export function rebase(
   const out: (number | null)[] = [];
   let i = 0;
   let last: number | null = null;
+  let lastDate: string | null = null;
   let base: number | null = null;
 
   for (const date of dates) {
     while (i < sorted.length && sorted[i].d <= date) {
       last = sorted[i].c;
+      lastDate = sorted[i].d;
       i += 1;
+    }
+    // Past the carry limit the series has nothing to say about this
+    // day, and saying nothing is the honest answer.
+    if (lastDate !== null && daysBetween(lastDate, date) > maxCarryDays) {
+      out.push(null);
+      continue;
     }
     if (last === null || last === 0) {
       // Before this series starts — or a zero close, which cannot be
@@ -84,13 +116,14 @@ export function buildCompareRows(
   dates: readonly string[],
   series: Readonly<Record<string, readonly SeriesPoint[]>>,
   selected: readonly string[],
+  maxCarryDays: number = MAX_CARRY_DAYS,
 ): CompareRow[] {
   const rows: CompareRow[] = dates.map((date) => ({ date }));
 
   for (const key of selected) {
     const points = series[key];
     if (!points || points.length === 0) continue;
-    const values = rebase(dates, points);
+    const values = rebase(dates, points, maxCarryDays);
     // All-null means the series exists but has nothing inside the
     // window; drawing its key would put an empty entry in the legend.
     if (values.every((v) => v === null)) continue;
@@ -107,10 +140,11 @@ export function drawableKeys(
   dates: readonly string[],
   series: Readonly<Record<string, readonly SeriesPoint[]>>,
   selected: readonly string[],
+  maxCarryDays: number = MAX_CARRY_DAYS,
 ): string[] {
   return selected.filter((key) => {
     const points = series[key];
     if (!points || points.length === 0) return false;
-    return rebase(dates, points).some((v) => v !== null);
+    return rebase(dates, points, maxCarryDays).some((v) => v !== null);
   });
 }

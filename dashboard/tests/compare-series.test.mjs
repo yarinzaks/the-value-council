@@ -114,11 +114,14 @@ test("a selected series with no file is left out, not drawn flat", () => {
 });
 
 test("a series with points only outside the window is left out", () => {
+  // This test used to assert the opposite, on the reasoning that a
+  // close before the window is a valid base and the resulting flat
+  // line is "the truth about a name whose file stops". It is not: a
+  // flat line says the share did not move, and a stopped feed says
+  // nothing at all. The review that caught it found eight holdings
+  // drawn this way on the live store.
   const series = { OLD: [{ d: "2025-01-01", c: 10 }] };
-  // A close before the window is a valid base, so this one IS drawable
-  // — it carries forward as a flat line, which is the truth about a
-  // name whose file stops before the window.
-  assert.deepEqual(drawableKeys(DATES, series, ["OLD"]), ["OLD"]);
+  assert.deepEqual(drawableKeys(DATES, series, ["OLD"]), []);
 
   const future = { NEW: [{ d: "2027-01-01", c: 10 }] };
   assert.deepEqual(drawableKeys(DATES, future, ["NEW"]), []);
@@ -139,4 +142,45 @@ test("every row has the date, even with nothing selected", () => {
     { date: "2026-10-02" },
     { date: "2026-10-05" },
   ]);
+});
+
+test("a feed that stopped before the window does not draw a flat line", () => {
+  // The worst failure this chart can have: a dead feed and a share
+  // that did not move look identical. Carrying a close forward is
+  // right across a weekend and wrong across two months.
+  const out = rebase(DATES, [{ d: "2026-08-17", c: 56.87 }]);
+  assert.deepEqual(out, [null, null, null]);
+});
+
+test("a close is carried across a long weekend", () => {
+  // 10-01 is a Thursday here; a Friday close must still cover Monday.
+  const out = rebase(
+    ["2026-10-01", "2026-10-02", "2026-10-05"],
+    [{ d: "2026-10-01", c: 100 }],
+  );
+  assert.deepEqual(out, [0, 0, 0]);
+});
+
+test("a feed that dies mid-window stops rather than flatlining", () => {
+  const dates = ["2026-10-01", "2026-10-05", "2026-10-20", "2026-11-02"];
+  const out = rebase(dates, [
+    { d: "2026-10-01", c: 100 },
+    { d: "2026-10-05", c: 110 },
+  ]);
+  assert.deepEqual(out.slice(0, 2), [0, 10]);
+  assert.equal(out[2], null, "15 days past the last close is not a price");
+  assert.equal(out[3], null);
+});
+
+test("the staleness bound is adjustable", () => {
+  const dates = ["2026-10-01", "2026-10-20"];
+  assert.deepEqual(rebase(dates, [{ d: "2026-10-01", c: 100 }], 30), [0, 0]);
+  assert.deepEqual(rebase(dates, [{ d: "2026-10-01", c: 100 }], 7), [0, null]);
+});
+
+test("a wholly stale series is not drawable", () => {
+  const series = { DEAD: [{ d: "2026-08-17", c: 56.87 }] };
+  assert.deepEqual(drawableKeys(DATES, series, ["DEAD"]), []);
+  const rows = buildCompareRows(DATES, series, ["DEAD"]);
+  assert.ok(!("DEAD" in rows[0]));
 });
