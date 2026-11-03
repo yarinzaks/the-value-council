@@ -1,0 +1,24 @@
+Audit The Value Council end to end. Thirteen AI value-investor agents run paper portfolios daily; a Next.js dashboard and a Telegram bot report what they did. Find every place the system tells the user something untrue. Diagnose only, change nothing, cite file and line.
+
+SETUP
+Use .venv/bin/python with PYTHONPATH=$PWD. Dashboard tests: cd dashboard && npm test.
+There are TWO data trees, not one. core.paths resolves to ~/Library/Application Support/value-council on a Mac and to the repo's data/ in CI. They drift. Check BOTH and diff them; a finding true in one may be false in the other. This has already caused bugs.
+
+THE CENTRAL QUESTION
+Every trade must appear in three places written by different code: data/decisions/AGENT/DATE.json (the journal), data/trades/ (the ledger), and the Telegram message (built from result.trades in core/live/runner.py). Reconcile all three against the real ground truth, which is the committed git history of data/portfolios/AGENT.json, where a share count that moved is a trade that happened. Report every trade present in one store and absent from another, per agent, with counts. Recently fixed example: the _rebalance method traded without writing a journal row, hiding 284 October trades; it now writes ADD and TRIM. Verify that holds and look for the same shape elsewhere.
+
+CHECK, AT MINIMUM
+1. Money. NAV must equal cash plus invested, every snapshot, every agent. Realized plus unrealized plus dividends minus costs must reconcile to the NAV change (see decompose_return in core/live/trade_ledger.py). Report the residual per agent in dollars. Check cost_bps is actually charged. Cash earns no interest; confirm whether that is modelled or ignored.
+2. Decision vocabulary. VALID_DECISION_TYPES in core/backtest/decision_logger.py, versus what every writer emits, versus what dashboard/src/lib/positions.ts (BUY_KINDS, isSell) and core/live/notify.py (_ENTRY_KINDS, _EXIT_KINDS, _RECEIPT_KINDS) consume. Any value written and not handled, or handled and never written, is a silent gap. Enumerate all three sets and diff them.
+3. Holding discipline. DEFAULT_MIN_HOLDING_DAYS is 30 and is enforced in only one place. Find every path that disposes of shares and say whether it passes that check. Report any exit under 30 days. The flag flat_is_intentional is dead code; confirm and say what it cost.
+4. Dashboard loaders in dashboard/src/lib/data.ts. Confirm every per-day reader uses canonicalDayFiles, because file sync leaves duplicates named like "2026-10-30 2.json" that get double counted. Find every silent empty catch that drops a file and say what a reader loses when it fires.
+5. Strict JSON. No bare NaN or Infinity anywhere under data/, because JSON.parse rejects them and the dashboard then drops the whole day. Check every writer that calls json.dumps, not just the decision logger.
+6. Hebrew. data_bundled/hebrew.json is the single source for both core/live/hebrew_terms.py and dashboard/src/lib/translate-dynamic.ts. Walk the real journal through both and report anything still in English, any number or price altered or lost in translation, and any half-Hebrew half-English output. Note that a replacement needs three dollar signs before the digit, not two, to emit a dollar sign followed by a capture group.
+7. Tests that do not bite. Find assertions that would still pass against deliberately broken code. Name them.
+8. Secrets. Nothing in source, config, fixtures, logs or git history.
+
+ALSO LOOK WHERE I HAVE NOT POINTED YOU
+agents/, agents/council/, core/backtest/, .github/workflows/, functions/. Treat anything a user reads as a claim that must be true.
+
+REPORT
+Rank by whether it makes the system lie to the user, then by blast radius. Each finding: a one sentence claim, the file and line, the command or count that proves it, and a severity. Separate CONFIRMED, meaning you reproduced it, from SUSPECTED. Say what you could not check and why. Do not pad; a short list of real defects beats a long list of style notes.

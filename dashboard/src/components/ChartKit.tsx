@@ -55,6 +55,15 @@ export function useChartTheme(): ChartTheme {
   };
 }
 
+export {
+  contrast,
+  distinctCapacity,
+  readableOn,
+  seriesPalette,
+  seriesStyle,
+} from "@/lib/series-palette";
+
+
 /** Axis props every chart shares. Spread, don't retype. */
 export function axisProps(t: ChartTheme) {
   return {
