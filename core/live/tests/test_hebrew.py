@@ -364,3 +364,58 @@ class TestNothingComesBackHalfTranslated:
                 walk(row.get("memo"))
         assert seen > 0, "the memos produced no strings to check"
         assert hybrids == [], f"{len(hybrids)} half-translated: {hybrids[:3]}"
+
+
+class TestTheRebalancePathIsCovered:
+    """The three strings ``_log_rebalance`` writes, named one by one.
+
+    The live-journal test reads the last 200 day-files, which at the
+    time of writing is two agents out of thirteen and no rebalance row
+    at all — so a new template could ship with no Hebrew and nothing
+    would go red. These assert the strings the code emits rather than
+    the strings that happen to be on disk, which is the only form that
+    fails the day the template is added rather than the day a run
+    writes one.
+    """
+
+    # Written by core/live/runner.py::_log_rebalance. The band is
+    # formatted with ``{band:.0%}`` and the figures with ``:.4f`` and
+    # ``:.2f``, so these are the exact shapes, not paraphrases.
+    CRITERION = "drifted outside the 25% rebalance band"
+    TRIM = (
+        "Rebalance trim: 16.0000 shares at $300.00 "
+        "to restore the target weight"
+    )
+    ADD = (
+        "Rebalance add: 39.0000 shares at $100.00 "
+        "to restore the target weight"
+    )
+
+    @pytest.mark.parametrize("english", [CRITERION, TRIM, ADD])
+    def test_it_comes_back_in_hebrew(self, english: str) -> None:
+        from core.live.hebrew_terms import is_hybrid
+
+        out = translate(english)
+        assert out != english, f"no Hebrew for {english!r}"
+        assert not is_hybrid(out), out
+
+    @pytest.mark.parametrize(
+        ("english", "figures"),
+        [
+            (CRITERION, ["25%"]),
+            (TRIM, ["16.0000", "$300.00"]),
+            (ADD, ["39.0000", "$100.00"]),
+        ],
+    )
+    def test_every_figure_survives(self, english: str, figures: list[str]) -> None:
+        """A price that loses its dollar sign is a different price.
+
+        The replacement is rewritten for JavaScript on the dashboard
+        side, where a literal ``$`` in front of a backref collapses to
+        an escaped dollar and emits the text ``$2``. Capturing the sign
+        inside the group is what keeps one spelling right on both
+        sides, and this is the assertion that would catch it drifting.
+        """
+        out = translate(english)
+        for figure in figures:
+            assert figure in out, f"{figure!r} lost: {english!r} -> {out!r}"
