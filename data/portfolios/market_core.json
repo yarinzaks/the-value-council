@@ -1,11 +1,11 @@
 {
   "agent": "market_core",
-  "cash": 1762.55,
-  "invested": 7857.94,
-  "total_nav": 9620.49,
-  "cumulative_return_pct": -3.7951,
+  "cash": 660.73,
+  "invested": 9227.42,
+  "total_nav": 9888.15,
+  "cumulative_return_pct": -1.1185,
   "initial_cash": 10000.0,
-  "cumulative_costs": 12.6763,
+  "cumulative_costs": 20.9075,
   "cumulative_dividends": 13.5617,
   "last_dividend_date": "2026-10-30",
   "dividend_floor_date": "2026-08-11",
@@ -34,155 +34,83 @@
     "LLY": [
       "2026-08-14"
     ],
-    "MSFT": [
-      "2026-08-20"
-    ],
     "MU": [
       "2026-10-14"
     ],
-    "NVDA": [
-      "2026-09-10"
-    ],
     "ORCL": [
       "2026-10-09"
-    ],
-    "WMT": [
-      "2026-08-21"
-    ],
-    "XOM": [
-      "2026-08-17"
     ]
   },
   "positions": [
     {
-      "ticker": "NVDA",
-      "shares": 8.0,
-      "entry_price": 217.5286,
-      "entry_date": "2026-08-10",
-      "current_price": 206.69,
-      "pnl_usd": -86.71,
-      "pnl_pct": -4.98,
-      "weight_pct": 17.19,
-      "why_en": "market capitalisation $5,033bn, 14.8% of the book",
-      "why_he": "שווי שוק 5,033 מיליארד$, 14.8% מהתיק"
-    },
-    {
       "ticker": "AAPL",
-      "shares": 5.0,
-      "entry_price": 311.542,
+      "shares": 8.0,
+      "entry_price": 326.7663,
       "entry_date": "2026-08-10",
-      "current_price": 331.9,
-      "pnl_usd": 101.79,
-      "pnl_pct": 6.53,
-      "weight_pct": 17.25,
-      "why_en": "market capitalisation $4,839bn, 14.3% of the book",
-      "why_he": "שווי שוק 4,839 מיליארד$, 14.3% מהתיק"
+      "current_price": 352.14,
+      "pnl_usd": 202.99,
+      "pnl_pct": 7.77,
+      "weight_pct": 28.49,
+      "why_en": "market capitalisation $5,139bn, 24.2% of the book",
+      "why_he": "שווי שוק 5,139 מיליארד$, 24.2% מהתיק"
     },
     {
       "ticker": "GOOGL",
-      "shares": 4.0,
-      "entry_price": 338.4664,
+      "shares": 7.0,
+      "entry_price": 319.6751,
       "entry_date": "2026-08-10",
-      "current_price": 280.03,
-      "pnl_usd": -233.75,
-      "pnl_pct": -17.27,
-      "weight_pct": 11.64,
-      "why_en": "market capitalisation $3,401bn, 10.0% of the book",
-      "why_he": "שווי שוק 3,401 מיליארד$, 10.0% מהתיק"
-    },
-    {
-      "ticker": "MSFT",
-      "shares": 2.0,
-      "entry_price": 510.34,
-      "entry_date": "2026-08-10",
-      "current_price": 520.99,
-      "pnl_usd": 21.3,
-      "pnl_pct": 2.09,
-      "weight_pct": 10.83,
-      "why_en": "market capitalisation $3,807bn, 11.2% of the book",
-      "why_he": "שווי שוק 3,807 מיליארד$, 11.2% מהתיק"
+      "current_price": 294.62,
+      "pnl_usd": -175.39,
+      "pnl_pct": -7.84,
+      "weight_pct": 20.86,
+      "why_en": "market capitalisation $3,603bn, 17.0% of the book",
+      "why_he": "שווי שוק 3,603 מיליארד$, 17.0% מהתיק"
     },
     {
       "ticker": "AMZN",
-      "shares": 3.0,
-      "entry_price": 278.1401,
+      "shares": 6.0,
+      "entry_price": 274.6051,
       "entry_date": "2026-08-10",
-      "current_price": 250.69,
-      "pnl_usd": -82.35,
-      "pnl_pct": -9.87,
-      "weight_pct": 7.82,
-      "why_en": "market capitalisation $2,673bn, 7.9% of the book",
-      "why_he": "שווי שוק 2,673 מיליארד$, 7.9% מהתיק"
+      "current_price": 271.07,
+      "pnl_usd": -21.21,
+      "pnl_pct": -1.29,
+      "weight_pct": 16.45,
+      "why_en": "market capitalisation $2,931bn, 13.8% of the book",
+      "why_he": "שווי שוק 2,931 מיליארד$, 13.8% מהתיק"
     },
     {
       "ticker": "AVGO",
-      "shares": 1.0,
-      "entry_price": 430.1,
-      "entry_date": "2026-08-10",
-      "current_price": 332.13,
-      "pnl_usd": -97.97,
-      "pnl_pct": -22.78,
-      "weight_pct": 3.45,
-      "why_en": "market capitalisation $1,590bn, 4.7% of the book",
-      "why_he": "שווי שוק 1,590 מיליארד$, 4.7% מהתיק"
-    },
-    {
-      "ticker": "TSLA",
-      "shares": 1.0,
-      "entry_price": 330.995,
-      "entry_date": "2026-08-10",
-      "current_price": 398.5,
-      "pnl_usd": 67.5,
-      "pnl_pct": 20.39,
-      "weight_pct": 4.14,
-      "why_en": "market capitalisation $1,588bn, 4.7% of the book",
-      "why_he": "שווי שוק 1,588 מיליארד$, 4.7% מהתיק"
-    },
-    {
-      "ticker": "WMT",
       "shares": 2.0,
-      "entry_price": 111.54,
+      "entry_price": 381.5,
       "entry_date": "2026-08-10",
-      "current_price": 124.86,
-      "pnl_usd": 26.64,
-      "pnl_pct": 11.94,
-      "weight_pct": 2.6,
-      "why_en": "market capitalisation $994bn, 2.9% of the book",
-      "why_he": "שווי שוק 994 מיליארד$, 2.9% מהתיק"
-    },
-    {
-      "ticker": "XOM",
-      "shares": 1.0,
-      "entry_price": 157.84,
-      "entry_date": "2026-08-10",
-      "current_price": 177.46,
-      "pnl_usd": 19.62,
-      "pnl_pct": 12.43,
-      "weight_pct": 1.84,
-      "why_en": "market capitalisation $745bn, 2.2% of the book",
-      "why_he": "שווי שוק 745 מיליארד$, 2.2% מהתיק"
+      "current_price": 332.9,
+      "pnl_usd": -97.2,
+      "pnl_pct": -12.74,
+      "weight_pct": 6.73,
+      "why_en": "market capitalisation $1,589bn, 7.5% of the book",
+      "why_he": "שווי שוק 1,589 מיליארד$, 7.5% מהתיק"
     },
     {
       "ticker": "CSCO",
-      "shares": 1.0,
-      "entry_price": 123.74,
+      "shares": 2.0,
+      "entry_price": 113.9125,
       "entry_date": "2026-08-10",
-      "current_price": 102.97,
-      "pnl_usd": -20.77,
-      "pnl_pct": -16.79,
-      "weight_pct": 1.07,
-      "why_en": "market capitalisation $404bn, 1.2% of the book",
-      "why_he": "שווי שוק 404 מיליארד$, 1.2% מהתיק"
+      "current_price": 104.085,
+      "pnl_usd": -19.66,
+      "pnl_pct": -8.63,
+      "weight_pct": 2.11,
+      "why_en": "market capitalisation $410bn, 1.9% of the book",
+      "why_he": "שווי שוק 410 מיליארד$, 1.9% מהתיק"
     },
     {
       "ticker": "KO",
       "shares": 1.0,
       "entry_price": 90.81,
       "entry_date": "2026-10-14",
-      "current_price": 94.8,
-      "pnl_usd": 3.99,
-      "pnl_pct": 4.39,
-      "weight_pct": 0.99,
+      "current_price": 94.77,
+      "pnl_usd": 3.96,
+      "pnl_pct": 4.36,
+      "weight_pct": 0.96,
       "why_en": "market capitalisation $405bn, 1.2% of the book",
       "why_he": "שווי שוק 405 מיליארד$, 1.2% מהתיק"
     },
@@ -191,332 +119,404 @@
       "shares": 1.0,
       "entry_price": 122.92,
       "entry_date": "2026-11-02",
-      "current_price": 126.19,
-      "pnl_usd": 3.27,
-      "pnl_pct": 2.66,
-      "weight_pct": 1.31,
+      "current_price": 127.85,
+      "pnl_usd": 4.93,
+      "pnl_pct": 4.01,
+      "weight_pct": 1.29,
       "why_en": "market capitalisation $376bn, 1.1% of the book",
       "why_he": "שווי שוק 376 מיליארד$, 1.1% מהתיק"
     },
     {
       "ticker": "BAC",
-      "shares": 3.0,
-      "entry_price": 50.015,
+      "shares": 4.0,
+      "entry_price": 50.2637,
       "entry_date": "2026-11-02",
-      "current_price": 49.66,
-      "pnl_usd": -1.07,
-      "pnl_pct": -0.71,
-      "weight_pct": 1.55,
-      "why_en": "market capitalisation $356bn, 1.0% of the book",
-      "why_he": "שווי שוק 356 מיליארד$, 1.0% מהתיק"
+      "current_price": 51.01,
+      "pnl_usd": 2.98,
+      "pnl_pct": 1.48,
+      "weight_pct": 2.06,
+      "why_en": "market capitalisation $366bn, 1.7% of the book",
+      "why_he": "שווי שוק 366 מיליארד$, 1.7% מהתיק"
+    },
+    {
+      "ticker": "JPM",
+      "shares": 1.0,
+      "entry_price": 345.045,
+      "entry_date": "2026-11-04",
+      "current_price": 345.045,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 3.49,
+      "why_en": "market capitalisation $917bn, 4.3% of the book",
+      "why_he": "שווי שוק 917 מיליארד$, 4.3% מהתיק"
+    },
+    {
+      "ticker": "JNJ",
+      "shares": 1.0,
+      "entry_price": 269.1997,
+      "entry_date": "2026-11-04",
+      "current_price": 269.1997,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 2.72,
+      "why_en": "market capitalisation $648bn, 3.1% of the book",
+      "why_he": "שווי שוק 648 מיליארד$, 3.1% מהתיק"
+    },
+    {
+      "ticker": "ABBV",
+      "shares": 1.0,
+      "entry_price": 286.06,
+      "entry_date": "2026-11-04",
+      "current_price": 286.06,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 2.89,
+      "why_en": "market capitalisation $506bn, 2.4% of the book",
+      "why_he": "שווי שוק 506 מיליארד$, 2.4% מהתיק"
+    },
+    {
+      "ticker": "CVX",
+      "shares": 1.0,
+      "entry_price": 219.05,
+      "entry_date": "2026-11-04",
+      "current_price": 219.05,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 2.22,
+      "why_en": "market capitalisation $437bn, 2.1% of the book",
+      "why_he": "שווי שוק 437 מיליארד$, 2.1% מהתיק"
+    },
+    {
+      "ticker": "INTC",
+      "shares": 3.0,
+      "entry_price": 59.345,
+      "entry_date": "2026-11-04",
+      "current_price": 59.345,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 1.8,
+      "why_en": "market capitalisation $315bn, 1.5% of the book",
+      "why_he": "שווי שוק 315 מיליארד$, 1.5% מהתיק"
+    },
+    {
+      "ticker": "C",
+      "shares": 1.0,
+      "entry_price": 123.52,
+      "entry_date": "2026-11-04",
+      "current_price": 123.52,
+      "pnl_usd": 0.0,
+      "pnl_pct": 0.0,
+      "weight_pct": 1.25,
+      "why_en": "market capitalisation $216bn, 1.0% of the book",
+      "why_he": "שווי שוק 216 מיליארד$, 1.0% מהתיק"
     }
   ],
   "watchlist": [
     {
-      "ticker": "GE",
-      "identified_date": "2026-11-03",
+      "ticker": "DIS",
+      "identified_date": "2026-11-04",
       "current_rank": 26,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $333bn — ranked 26, just below the book",
-      "why_he": "שווי שוק 333 מיליארד$ — מקום 26, מעט מתחת לתיק"
+      "why_en": "market capitalisation $205bn — ranked 26, just below the book",
+      "why_he": "שווי שוק 205 מיליארד$ — מקום 26, מעט מתחת לתיק"
     },
     {
-      "ticker": "HD",
-      "identified_date": "2026-11-03",
+      "ticker": "ADI",
+      "identified_date": "2026-11-04",
       "current_rank": 27,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $332bn — ranked 27, just below the book",
-      "why_he": "שווי שוק 332 מיליארד$ — מקום 27, מעט מתחת לתיק"
+      "why_en": "market capitalisation $205bn — ranked 27, just below the book",
+      "why_he": "שווי שוק 205 מיליארד$ — מקום 27, מעט מתחת לתיק"
     },
     {
-      "ticker": "INTC",
-      "identified_date": "2026-11-03",
+      "ticker": "KLAC",
+      "identified_date": "2026-11-04",
       "current_rank": 28,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $330bn — ranked 28, just below the book",
-      "why_he": "שווי שוק 330 מיליארד$ — מקום 28, מעט מתחת לתיק"
+      "why_en": "market capitalisation $203bn — ranked 28, just below the book",
+      "why_he": "שווי שוק 203 מיליארד$ — מקום 28, מעט מתחת לתיק"
     },
     {
-      "ticker": "PM",
-      "identified_date": "2026-11-03",
+      "ticker": "ABT",
+      "identified_date": "2026-11-04",
       "current_rank": 29,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $322bn — ranked 29, just below the book",
-      "why_he": "שווי שוק 322 מיליארד$ — מקום 29, מעט מתחת לתיק"
+      "why_en": "market capitalisation $198bn — ranked 29, just below the book",
+      "why_he": "שווי שוק 198 מיליארד$ — מקום 29, מעט מתחת לתיק"
     },
     {
-      "ticker": "AMAT",
-      "identified_date": "2026-11-03",
+      "ticker": "CRM",
+      "identified_date": "2026-11-04",
       "current_rank": 30,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $305bn — ranked 30, just below the book",
-      "why_he": "שווי שוק 305 מיליארד$ — מקום 30, מעט מתחת לתיק"
+      "why_en": "market capitalisation $191bn — ranked 30, just below the book",
+      "why_he": "שווי שוק 191 מיליארד$ — מקום 30, מעט מתחת לתיק"
     },
     {
-      "ticker": "LRCX",
-      "identified_date": "2026-11-03",
+      "ticker": "BLK",
+      "identified_date": "2026-11-04",
       "current_rank": 31,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $291bn — ranked 31, just below the book",
-      "why_he": "שווי שוק 291 מיליארד$ — מקום 31, מעט מתחת לתיק"
+      "why_en": "market capitalisation $186bn — ranked 31, just below the book",
+      "why_he": "שווי שוק 186 מיליארד$ — מקום 31, מעט מתחת לתיק"
     },
     {
-      "ticker": "MS",
-      "identified_date": "2026-11-03",
+      "ticker": "DE",
+      "identified_date": "2026-11-04",
       "current_rank": 32,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $291bn — ranked 32, just below the book",
-      "why_he": "שווי שוק 291 מיליארד$ — מקום 32, מעט מתחת לתיק"
+      "why_en": "market capitalisation $178bn — ranked 32, just below the book",
+      "why_he": "שווי שוק 178 מיליארד$ — מקום 32, מעט מתחת לתיק"
     },
     {
-      "ticker": "TXN",
-      "identified_date": "2026-11-03",
+      "ticker": "COP",
+      "identified_date": "2026-11-04",
       "current_rank": 33,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $283bn — ranked 33, just below the book",
-      "why_he": "שווי שוק 283 מיליארד$ — מקום 33, מעט מתחת לתיק"
+      "why_en": "market capitalisation $168bn — ranked 33, just below the book",
+      "why_he": "שווי שוק 168 מיליארד$ — מקום 33, מעט מתחת לתיק"
     },
     {
-      "ticker": "RTX",
-      "identified_date": "2026-11-03",
+      "ticker": "ACN",
+      "identified_date": "2026-11-04",
       "current_rank": 34,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $275bn — ranked 34, just below the book",
-      "why_he": "שווי שוק 275 מיליארד$ — מקום 34, מעט מתחת לתיק"
+      "why_en": "market capitalisation $167bn — ranked 34, just below the book",
+      "why_he": "שווי שוק 167 מיליארד$ — מקום 34, מעט מתחת לתיק"
     },
     {
-      "ticker": "DELL",
-      "identified_date": "2026-11-03",
+      "ticker": "ISRG",
+      "identified_date": "2026-11-04",
       "current_rank": 35,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $266bn — ranked 35, just below the book",
-      "why_he": "שווי שוק 266 מיליארד$ — מקום 35, מעט מתחת לתיק"
+      "why_en": "market capitalisation $164bn — ranked 35, just below the book",
+      "why_he": "שווי שוק 164 מיליארד$ — מקום 35, מעט מתחת לתיק"
     },
     {
-      "ticker": "TMO",
-      "identified_date": "2026-11-03",
+      "ticker": "DHR",
+      "identified_date": "2026-11-04",
       "current_rank": 36,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $259bn — ranked 36, just below the book",
-      "why_he": "שווי שוק 259 מיליארד$ — מקום 36, מעט מתחת לתיק"
+      "why_en": "market capitalisation $162bn — ranked 36, just below the book",
+      "why_he": "שווי שוק 162 מיליארד$ — מקום 36, מעט מתחת לתיק"
     },
     {
-      "ticker": "WFC",
-      "identified_date": "2026-11-03",
+      "ticker": "CB",
+      "identified_date": "2026-11-04",
       "current_rank": 37,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $259bn — ranked 37, just below the book",
-      "why_he": "שווי שוק 259 מיליארד$ — מקום 37, מעט מתחת לתיק"
+      "why_en": "market capitalisation $144bn — ranked 37, just below the book",
+      "why_he": "שווי שוק 144 מיליארד$ — מקום 37, מעט מתחת לתיק"
     },
     {
-      "ticker": "NFLX",
-      "identified_date": "2026-11-03",
+      "ticker": "ETN",
+      "identified_date": "2026-11-04",
       "current_rank": 38,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $255bn — ranked 38, just below the book",
-      "why_he": "שווי שוק 255 מיליארד$ — מקום 38, מעט מתחת לתיק"
+      "why_en": "market capitalisation $141bn — ranked 38, just below the book",
+      "why_he": "שווי שוק 141 מיליארד$ — מקום 38, מעט מתחת לתיק"
     },
     {
-      "ticker": "CRWD",
-      "identified_date": "2026-11-03",
+      "ticker": "BA",
+      "identified_date": "2026-11-04",
       "current_rank": 39,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $253bn — ranked 39, just below the book",
-      "why_he": "שווי שוק 253 מיליארד$ — מקום 39, מעט מתחת לתיק"
+      "why_en": "market capitalisation $140bn — ranked 39, just below the book",
+      "why_he": "שווי שוק 140 מיליארד$ — מקום 39, מעט מתחת לתיק"
     },
     {
-      "ticker": "AMGN",
-      "identified_date": "2026-11-03",
+      "ticker": "BMY",
+      "identified_date": "2026-11-04",
       "current_rank": 40,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $251bn — ranked 40, just below the book",
-      "why_he": "שווי שוק 251 מיליארד$ — מקום 40, מעט מתחת לתיק"
+      "why_en": "market capitalisation $129bn — ranked 40, just below the book",
+      "why_he": "שווי שוק 129 מיליארד$ — מקום 40, מעט מתחת לתיק"
     },
     {
-      "ticker": "GEV",
-      "identified_date": "2026-11-03",
+      "ticker": "BKNG",
+      "identified_date": "2026-11-04",
       "current_rank": 41,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $240bn — ranked 41, just below the book",
-      "why_he": "שווי שוק 240 מיליארד$ — מקום 41, מעט מתחת לתיק"
+      "why_en": "market capitalisation $128bn — ranked 41, just below the book",
+      "why_he": "שווי שוק 128 מיליארד$ — מקום 41, מעט מתחת לתיק"
     },
     {
-      "ticker": "LIN",
-      "identified_date": "2026-11-03",
+      "ticker": "COF",
+      "identified_date": "2026-11-04",
       "current_rank": 42,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $238bn — ranked 42, just below the book",
-      "why_he": "שווי שוק 238 מיליארד$ — מקום 42, מעט מתחת לתיק"
+      "why_en": "market capitalisation $126bn — ranked 42, just below the book",
+      "why_he": "שווי שוק 126 מיליארד$ — מקום 42, מעט מתחת לתיק"
     },
     {
-      "ticker": "IBM",
-      "identified_date": "2026-11-03",
+      "ticker": "ADP",
+      "identified_date": "2026-11-04",
       "current_rank": 43,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $231bn — ranked 43, just below the book",
-      "why_he": "שווי שוק 231 מיליארד$ — מקום 43, מעט מתחת לתיק"
+      "why_en": "market capitalisation $119bn — ranked 43, just below the book",
+      "why_he": "שווי שוק 119 מיליארד$ — מקום 43, מעט מתחת לתיק"
     },
     {
-      "ticker": "AXP",
-      "identified_date": "2026-11-03",
+      "ticker": "HCA",
+      "identified_date": "2026-11-04",
       "current_rank": 44,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $220bn — ranked 44, just below the book",
-      "why_he": "שווי שוק 220 מיליארד$ — מקום 44, מעט מתחת לתיק"
+      "why_en": "market capitalisation $111bn — ranked 44, just below the book",
+      "why_he": "שווי שוק 111 מיליארד$ — מקום 44, מעט מתחת לתיק"
     },
     {
-      "ticker": "ANET",
-      "identified_date": "2026-11-03",
+      "ticker": "ENB",
+      "identified_date": "2026-11-04",
       "current_rank": 45,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $214bn — ranked 45, just below the book",
-      "why_he": "שווי שוק 214 מיליארד$ — מקום 45, מעט מתחת לתיק"
+      "why_en": "market capitalisation $106bn — ranked 45, just below the book",
+      "why_he": "שווי שוק 106 מיליארד$ — מקום 45, מעט מתחת לתיק"
     },
     {
-      "ticker": "C",
-      "identified_date": "2026-11-03",
+      "ticker": "GLW",
+      "identified_date": "2026-11-04",
       "current_rank": 46,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $214bn — ranked 46, just below the book",
-      "why_he": "שווי שוק 214 מיליארד$ — מקום 46, מעט מתחת לתיק"
+      "why_en": "market capitalisation $104bn — ranked 46, just below the book",
+      "why_he": "שווי שוק 104 מיליארד$ — מקום 46, מעט מתחת לתיק"
     },
     {
-      "ticker": "GILD",
-      "identified_date": "2026-11-03",
+      "ticker": "CVS",
+      "identified_date": "2026-11-04",
       "current_rank": 47,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $212bn — ranked 47, just below the book",
-      "why_he": "שווי שוק 212 מיליארד$ — מקום 47, מעט מתחת לתיק"
+      "why_en": "market capitalisation $104bn — ranked 47, just below the book",
+      "why_he": "שווי שוק 104 מיליארד$ — מקום 47, מעט מתחת לתיק"
     },
     {
-      "ticker": "ADI",
-      "identified_date": "2026-11-03",
+      "ticker": "ADBE",
+      "identified_date": "2026-11-04",
       "current_rank": 48,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $207bn — ranked 48, just below the book",
-      "why_he": "שווי שוק 207 מיליארד$ — מקום 48, מעט מתחת לתיק"
+      "why_en": "market capitalisation $100bn — ranked 48, just below the book",
+      "why_he": "שווי שוק 100 מיליארד$ — מקום 48, מעט מתחת לתיק"
     },
     {
-      "ticker": "KLAC",
-      "identified_date": "2026-11-03",
+      "ticker": "EQIX",
+      "identified_date": "2026-11-04",
       "current_rank": 49,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $204bn — ranked 49, just below the book",
-      "why_he": "שווי שוק 204 מיליארד$ — מקום 49, מעט מתחת לתיק"
+      "why_en": "market capitalisation $100bn — ranked 49, just below the book",
+      "why_he": "שווי שוק 100 מיליארד$ — מקום 49, מעט מתחת לתיק"
     },
     {
-      "ticker": "V",
-      "identified_date": "2026-11-03",
+      "ticker": "INTU",
+      "identified_date": "2026-11-04",
       "current_rank": 50,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $197bn — ranked 50, just below the book",
-      "why_he": "שווי שוק 197 מיליארד$ — מקום 50, מעט מתחת לתיק"
+      "why_en": "market capitalisation $100bn — ranked 50, just below the book",
+      "why_he": "שווי שוק 100 מיליארד$ — מקום 50, מעט מתחת לתיק"
     },
     {
-      "ticker": "DIS",
-      "identified_date": "2026-11-03",
+      "ticker": "DUK",
+      "identified_date": "2026-11-04",
       "current_rank": 51,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $195bn — ranked 51, just below the book",
-      "why_he": "שווי שוק 195 מיליארד$ — מקום 51, מעט מתחת לתיק"
+      "why_en": "market capitalisation $99bn — ranked 51, just below the book",
+      "why_he": "שווי שוק 99 מיליארד$ — מקום 51, מעט מתחת לתיק"
     },
     {
-      "ticker": "ABT",
-      "identified_date": "2026-11-03",
+      "ticker": "GD",
+      "identified_date": "2026-11-04",
       "current_rank": 52,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $193bn — ranked 52, just below the book",
-      "why_he": "שווי שוק 193 מיליארד$ — מקום 52, מעט מתחת לתיק"
+      "why_en": "market capitalisation $99bn — ranked 52, just below the book",
+      "why_he": "שווי שוק 99 מיליארד$ — מקום 52, מעט מתחת לתיק"
     },
     {
-      "ticker": "PEP",
-      "identified_date": "2026-11-03",
+      "ticker": "APH",
+      "identified_date": "2026-11-04",
       "current_rank": 53,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $188bn — ranked 53, just below the book",
-      "why_he": "שווי שוק 188 מיליארד$ — מקום 53, מעט מתחת לתיק"
+      "why_en": "market capitalisation $98bn — ranked 53, just below the book",
+      "why_he": "שווי שוק 98 מיליארד$ — מקום 53, מעט מתחת לתיק"
     },
     {
-      "ticker": "MCD",
-      "identified_date": "2026-11-03",
+      "ticker": "ICE",
+      "identified_date": "2026-11-04",
       "current_rank": 54,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $185bn — ranked 54, just below the book",
-      "why_he": "שווי שוק 185 מיליארד$ — מקום 54, מעט מתחת לתיק"
+      "why_en": "market capitalisation $96bn — ranked 54, just below the book",
+      "why_he": "שווי שוק 96 מיליארד$ — מקום 54, מעט מתחת לתיק"
     },
     {
-      "ticker": "UNP",
-      "identified_date": "2026-11-03",
+      "ticker": "FTNT",
+      "identified_date": "2026-11-04",
       "current_rank": 55,
       "entry_trigger": "market capitalisation enters the largest 25",
       "entry_price_target": null,
       "last_price": null,
-      "why_en": "market capitalisation $180bn — ranked 55, just below the book",
-      "why_he": "שווי שוק 180 מיליארד$ — מקום 55, מעט מתחת לתיק"
+      "why_en": "market capitalisation $95bn — ranked 55, just below the book",
+      "why_he": "שווי שוק 95 מיליארד$ — מקום 55, מעט מתחת לתיק"
     }
   ],
-  "last_updated": "2026-11-03T21:31:51+00:00",
-  "last_open_run": "2026-11-03T15:40:04+00:00",
+  "last_updated": "2026-11-04T15:35:08+00:00",
+  "last_open_run": "2026-11-04T15:35:08+00:00",
   "last_close_run": "2026-11-03T21:31:51+00:00",
-  "last_open_date": "2026-11-03",
+  "last_open_date": "2026-11-04",
   "last_close_date": "2026-11-03",
   "last_rebalance_date": ""
 }
