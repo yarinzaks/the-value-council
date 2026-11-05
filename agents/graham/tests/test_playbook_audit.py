@@ -13,11 +13,14 @@ from agents.graham.playbook_audit import (
     Snapshot,
     annual_values,
     audit,
+    build_thesis,
     dividend_streak,
     evaluate,
+    exit_triggers,
     extract_snapshot,
     fix_scale_errors,
     is_near_miss,
+    sell_target,
 )
 
 RATES = MarketRates(aaa_corporate_pct=6.0, treasury_20y_pct=5.0)
@@ -289,3 +292,117 @@ class TestExtractSnapshot:
         r = audit("X", _facts(drop="AssetsCurrent"), 10.0, INDUSTRY, RATES)
         assert r.status == "INSUFFICIENT_DATA"
         assert r.valuation is None
+
+
+class TestSellTarget:
+    def test_defensive_sells_at_graham_number(self) -> None:
+        assert sell_target("Defensive", 58.31, 40.0) == (58.31, "Graham Number")
+
+    def test_net_net_sells_at_ncav(self) -> None:
+        assert sell_target("Net-Net", 15.0, None) == (15.0, "NCAV")
+
+    def test_enterprising_sells_at_epv_not_the_buy_bound(self) -> None:
+        assert sell_target("Enterprising", 34.0, 40.0) == (40.0, "EPV")
+
+    def test_enterprising_without_epv_falls_back_to_buy_bound(self) -> None:
+        assert sell_target("Enterprising", 34.0, None)[0] == 34.0
+
+    def test_evaluate_reports_target_and_upside(self) -> None:
+        r = evaluate("OK", _snap(), 30.0, INDUSTRY, RATES)
+        assert r.valuation is not None
+        assert r.valuation.sell_target == pytest.approx(GN, abs=0.01)
+        assert r.valuation.upside_to_target == pytest.approx(GN / 30 - 1, abs=1e-3)
+
+    def test_enterprising_target_differs_from_buy_value(self) -> None:
+        r = evaluate("ENT", _snap(shares=10e6), 150.0, INDUSTRY, RATES)
+        assert r.valuation is not None
+        assert r.valuation.sell_target_method == "EPV"
+        assert r.valuation.sell_target == pytest.approx(r.metrics["epv"])
+        assert r.valuation.sell_target != r.valuation.intrinsic_value
+
+    def test_price_above_target_gives_negative_upside(self) -> None:
+        # A short dividend record fails Defensive, leaving Enterprising, whose
+        # target is EPV ≈ 355.6 here. Defensive itself cannot exceed its target:
+        # P/E ≤ 15 and P/B ≤ 1.5 already cap the price at the Graham Number.
+        snap = _snap(shares=10e6, dividends={2025: 20e6})
+        r = evaluate("HIGH", snap, 400.0, INDUSTRY, RATES)
+        assert r.valuation is not None
+        assert r.valuation.category == "Enterprising"
+        assert r.valuation.upside_to_target < 0
+        assert "already above" in r.thesis_en
+
+    def test_negative_tangible_book_does_not_qualify_as_enterprising(self) -> None:
+        # Intangibles exceed equity, so min(10 x EPS, 1.2 x NTA) is negative;
+        # the margin-of-safety formula would otherwise report a huge "safety".
+        r = evaluate("NEG", _snap(goodwill=5_000e6), 5.0, INDUSTRY, RATES)
+        assert "Enterprising" not in r.qualifying
+
+
+class TestExitTriggers:
+    def test_net_net_adds_the_two_year_rule(self) -> None:
+        en, he = exit_triggers("Net-Net", 15.0)
+        assert any("Two years" in t for t in en)
+        assert len(en) == len(he) == 3
+
+    def test_other_categories_have_no_time_rule(self) -> None:
+        en, he = exit_triggers("Defensive", 58.31)
+        assert not any("Two years" in t for t in en)
+        assert en[0] == "Price is at or above 58.31"
+        assert len(he) == 2
+
+
+class TestThesis:
+    def test_buy_thesis_states_the_figures_in_both_languages(self) -> None:
+        r = evaluate("OK", _snap(), 30.0, INDUSTRY, RATES)
+        assert r.status == "BUY"
+        assert "OK qualifies as Defensive" in r.thesis_en
+        assert "passes every quantitative gate" in r.thesis_en
+        assert "OK עומדת בקטגוריית Defensive" in r.thesis_he
+        assert r.valuation is not None
+        for text in (r.thesis_en, r.thesis_he):
+            assert f"{r.valuation.sell_target:.2f}" in text
+
+    def test_watch_thesis_gives_the_entry_price(self) -> None:
+        r = evaluate("OK", _snap(), 50.0, INDUSTRY, RATES)
+        assert r.status == "WATCH"
+        assert r.valuation is not None
+        assert f"below {r.valuation.max_entry_price:.2f}" in r.thesis_en
+
+    def test_rejected_thesis_names_the_anti_pattern(self) -> None:
+        r = evaluate("BIO", _snap(), 30.0, "Health Care/Biotechnology", RATES)
+        assert r.status == "REJECT_ANTI_PATTERN"
+        assert "#10 excluded sector" in r.thesis_en
+
+    def test_epv_below_price_is_flagged_for_defensive(self) -> None:
+        # EPS 5y avg ≈ 3.44 at 10% → EPV ≈ 34.4, below a price of 50.
+        r = evaluate("OK", _snap(), 50.0, INDUSTRY, RATES)
+        assert "Caution: earnings power value" in r.thesis_en
+        assert "זהירות" in r.thesis_he
+
+    def test_thesis_always_discloses_it_is_quantitative_only(self) -> None:
+        r = evaluate("OK", _snap(), 30.0, INDUSTRY, RATES)
+        assert "Quantitative only" in r.thesis_en
+        assert "כמותי בלבד" in r.thesis_he
+
+    def test_infinite_ratios_render_as_not_available(self) -> None:
+        r = evaluate("OK", _snap(), 30.0, INDUSTRY, RATES)
+        assert r.valuation is not None
+        en, _ = build_thesis(
+            ticker="X",
+            price=9.0,
+            valuation=r.valuation,
+            status="WATCH",
+            pe3=math.inf,
+            pb=1.0,
+            current_ratio=2.0,
+            dividend_years=0,
+            epv=None,
+            anti_patterns=(),
+        )
+        assert "P/E n/a" in en
+
+    def test_no_category_has_no_thesis(self) -> None:
+        r = evaluate("NONE", _snap(current_liabilities=3_000e6), 500.0, INDUSTRY, RATES)
+        assert r.valuation is None
+        assert r.thesis_en == ""
+        assert r.exit_triggers_en == ()

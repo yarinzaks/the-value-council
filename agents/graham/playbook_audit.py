@@ -25,6 +25,11 @@ What it applies (playbook section in brackets)
 * Intrinsic value per category and the 33% margin of safety [12.1 steps 6-7].
 * The AAA-yield cut to the Graham Number coefficient [11.6] and the
   Treasury-driven EPV hurdle [4.4].
+* A sell target per category and the sell triggers [7.1].
+
+Each qualifying company also gets a thesis in English and Hebrew. It is
+assembled from the figures above, not from a model: it restates the
+arithmetic and predicts nothing, in keeping with playbook 3.2.
 
 Known limits, stated rather than hidden
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -168,6 +173,10 @@ class Valuation:
     method: str
     margin_of_safety: float
     max_entry_price: float
+    sell_target: float
+    sell_target_method: str
+    # Negative when the price is already above the sell target.
+    upside_to_target: float
 
 
 @dataclass(frozen=True)
@@ -184,6 +193,10 @@ class AuditResult:
     qualifying: tuple[Category, ...] = ()
     valuation: Valuation | None = None
     note: str = ""
+    thesis_en: str = ""
+    thesis_he: str = ""
+    exit_triggers_en: tuple[str, ...] = ()
+    exit_triggers_he: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -419,6 +432,102 @@ def _finite(x: float) -> float | None:
     return round(x, 4) if math.isfinite(x) else None
 
 
+def sell_target(category: Category, intrinsic_value: float, epv: float | None) -> tuple[float, str]:
+    """Price at which playbook 7.1 trigger 1 says to sell, and how it was set.
+
+    Defensive sells at the Graham Number and Net-Net at full NCAV, both of
+    which are already its intrinsic value. Enterprising sells at EPV, which
+    can differ from the lower bound it was bought against; without an EPV
+    that bound is the only figure left.
+    """
+    if category == "Enterprising" and epv is not None:
+        return epv, "EPV"
+    return intrinsic_value, {
+        "Defensive": "Graham Number",
+        "Enterprising": "buy-side intrinsic value (no EPV)",
+        "Net-Net": "NCAV",
+    }[category]
+
+
+def exit_triggers(category: Category, target: float) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Playbook 7.1 sell triggers as (English, Hebrew). Trigger 4 needs a portfolio."""
+    english = [
+        f"Price is at or above {target:.2f}",
+        "Current ratio falls below 1.5, the dividend is cut, or earnings turn negative",
+    ]
+    hebrew = [
+        f"המחיר ב-{target:.2f} ומעלה",
+        "היחס השוטף יורד מתחת ל-1.5, הדיבידנד נחתך או שהחברה עוברת להפסד",
+    ]
+    if category == "Net-Net":
+        english.append("Two years pass without reaching the target")
+        hebrew.append("עברו שנתיים בלי שהמחיר הגיע ליעד")
+    return tuple(english), tuple(hebrew)
+
+
+def _ratio(x: float, digits: int = 2) -> str:
+    return f"{x:.{digits}f}" if math.isfinite(x) else "n/a"
+
+
+def build_thesis(
+    *,
+    ticker: str,
+    price: float,
+    valuation: Valuation,
+    status: Status,
+    pe3: float,
+    pb: float,
+    current_ratio: float,
+    dividend_years: int,
+    epv: float | None,
+    anti_patterns: tuple[str, ...],
+) -> tuple[str, str]:
+    """A (English, Hebrew) thesis stating only what the figures show."""
+    v = valuation
+    figures = (
+        f"P/E {_ratio(pe3)}, P/B {_ratio(pb)}, current ratio {_ratio(current_ratio)}, "
+        f"{dividend_years}y dividend streak"
+    )
+    figures_he = (
+        f"P/E {_ratio(pe3)}, ‏P/B {_ratio(pb)}, יחס שוטף {_ratio(current_ratio)}, "
+        f"רצף דיבידנדים של {dividend_years} שנים"
+    )
+    en = [
+        f"{ticker} qualifies as {v.category} ({figures}).",
+        f"At {price:.2f} against a value of {v.intrinsic_value:.2f} ({v.method}), "
+        f"the margin of safety is {v.margin_of_safety:.1%}; 33% is required.",
+    ]
+    he = [
+        f"{ticker} עומדת בקטגוריית {v.category} ({figures_he}).",
+        f"במחיר {price:.2f} מול שווי של {v.intrinsic_value:.2f} ({v.method}), "
+        f"מרווח הביטחון הוא {v.margin_of_safety:.1%}, והנדרש הוא 33%.",
+    ]
+    if v.upside_to_target > 0:
+        en.append(f"Sell target {v.sell_target:.2f} ({v.upside_to_target:+.1%}).")
+        he.append(f"יעד מכירה {v.sell_target:.2f} ({v.upside_to_target:+.1%}).")
+    else:
+        en.append(f"The price is already above the sell target of {v.sell_target:.2f}.")
+        he.append(f"המחיר כבר מעל יעד המכירה של {v.sell_target:.2f}.")
+
+    if status == "BUY":
+        en.append("It passes every quantitative gate.")
+        he.append("היא עוברת את כל הבדיקות הכמותיות.")
+    elif status == "WATCH":
+        en.append(f"Not a purchase at this price; it becomes one below {v.max_entry_price:.2f}.")
+        he.append(f"לא קנייה במחיר הזה; היא הופכת לקנייה מתחת ל-{v.max_entry_price:.2f}.")
+    else:
+        rejected = "; ".join(anti_patterns)
+        en.append(f"Rejected regardless of price: {rejected}.")
+        he.append(f"נפסלת בכל מחיר: {rejected}.")
+
+    if v.sell_target_method != "EPV" and epv is not None and epv < price:
+        en.append(f"Caution: earnings power value of {epv:.2f} is below the price.")
+        he.append(f"זהירות: ה-EPV של {epv:.2f} נמוך מהמחיר.")
+    en.append("Quantitative only: filings, 13F and insider activity were not reviewed.")
+    he.append("ניתוח כמותי בלבד: דוחות, 13F ופעילות פנימיים לא נבדקו.")
+    return " ".join(en), " ".join(he)
+
+
 def evaluate(
     ticker: str, snap: Snapshot, price: float, industry: str, rates: MarketRates
 ) -> AuditResult:
@@ -533,9 +642,11 @@ def evaluate(
     if not defensive and graham_number:
         candidates.append(("Defensive", graham_number, "Graham Number"))
     if not enterprising and ttm_eps is not None and ttm_eps > 0:
-        candidates.append(
-            ("Enterprising", min(10 * ttm_eps, 1.2 * tbvps), "min(10x TTM EPS, 1.2x NTA)")
-        )
+        enterprising_value = min(10 * ttm_eps, 1.2 * tbvps)
+        # Negative tangible book has no value to buy under or sell at, and
+        # would read as a huge margin of safety in the formula below.
+        if enterprising_value > 0:
+            candidates.append(("Enterprising", enterprising_value, "min(10x TTM EPS, 1.2x NTA)"))
     if not net_net:
         candidates.append(("Net-Net", ncav_ps, "NCAV"))
 
@@ -544,12 +655,16 @@ def evaluate(
     if candidates:
         category, value, method = candidates[0]
         mos = (value - price) / value
+        target, target_method = sell_target(category, value, epv)
         valuation = Valuation(
             category=category,
             intrinsic_value=round(value, 2),
             method=method,
             margin_of_safety=round(mos, 4),
             max_entry_price=round(value * (1 - MIN_MARGIN_OF_SAFETY), 2),
+            sell_target=round(target, 2),
+            sell_target_method=target_method,
+            upside_to_target=round((target - price) / price, 4),
         )
         if anti:
             status = "REJECT_ANTI_PATTERN"
@@ -559,6 +674,24 @@ def evaluate(
             status = "WATCH"
     else:
         status = "REJECT_ANTI_PATTERN" if anti else "REJECT_NO_CATEGORY"
+
+    thesis_en = thesis_he = ""
+    triggers_en: tuple[str, ...] = ()
+    triggers_he: tuple[str, ...] = ()
+    if valuation is not None:
+        thesis_en, thesis_he = build_thesis(
+            ticker=ticker,
+            price=price,
+            valuation=valuation,
+            status=status,
+            pe3=pe3,
+            pb=pb,
+            current_ratio=current_ratio,
+            dividend_years=streak,
+            epv=epv,
+            anti_patterns=tuple(anti),
+        )
+        triggers_en, triggers_he = exit_triggers(valuation.category, valuation.sell_target)
 
     metrics: dict[str, float | int | str | None] = {
         "market_cap_usd": round(mcap),
@@ -593,6 +726,10 @@ def evaluate(
         anti_patterns=tuple(anti),
         qualifying=tuple(c[0] for c in candidates),
         valuation=valuation,
+        thesis_en=thesis_en,
+        thesis_he=thesis_he,
+        exit_triggers_en=triggers_en,
+        exit_triggers_he=triggers_he,
     )
 
 
@@ -624,13 +761,16 @@ __all__ = [
     "Valuation",
     "annual_values",
     "audit",
+    "build_thesis",
     "diluted_shares",
     "dividend_streak",
     "evaluate",
+    "exit_triggers",
     "extract_snapshot",
     "fix_scale_errors",
     "instant_at",
     "is_near_miss",
     "latest_instant",
+    "sell_target",
     "ttm_net_income",
 ]
