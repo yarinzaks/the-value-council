@@ -40,6 +40,7 @@ from core.backtest.strategy_runner import (
 )
 from core.data.edgar_cache import EdgarCache
 from core.llm.concurrency import analyze_all
+from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
@@ -218,7 +219,7 @@ class SethKlarman(Strategy):
         # Stage 4 (live only): LLM downside analyzer.
         memos: list[KlarmanMemo] = []
         if self.downside_analyzer is not None and top:
-            top, memos = self._llm_filter(top, as_of)
+            top, memos = self._llm_filter(top, as_of, held=held)
         self.last_memos = memos
 
         if not top:
@@ -282,6 +283,8 @@ class SethKlarman(Strategy):
         self,
         top: list[KlarmanScore],
         as_of: date,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> tuple[list[KlarmanScore], list[KlarmanMemo]]:
         kept: list[KlarmanScore] = []
         memos: list[KlarmanMemo] = []
@@ -304,7 +307,11 @@ class SethKlarman(Strategy):
             }
             return analyzer.analyze(
                 stock_data=stock_data,
-                portfolio_state={"as_of": as_of.isoformat()},
+                # The book, which the five prompts all promise the model
+                # and none of them used to send. See core.llm.held_context.
+                portfolio_state=portfolio_state_for(
+                    s.ticker, as_of, held
+                ),
             )
 
         for s, outcome in analyze_all(top, ask):

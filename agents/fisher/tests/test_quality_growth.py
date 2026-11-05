@@ -12,6 +12,7 @@ from agents.fisher.quality_growth import (
     PhilipFisher,
 )
 from agents.fisher.scuttlebutt import FisherMemo
+from core.backtest.strategy_runner import HeldPosition
 from core.data.edgar_cache import EdgarCache
 
 from .conftest import make_pit
@@ -248,3 +249,91 @@ class TestSelectionHistory:
         assert "QUALITY" in rec["selected_tickers"]
         assert rec["tier_a_count"] == 1
         assert rec["tier_b_count"] == 0
+
+
+class TestTheAnalystIsToldWhatTheBookHolds:
+    """The plumbing, end to end, without calling the model.
+
+    Every memo on disk says WATCH or REJECT, and 78 of the 82 matching
+    a live holding were written after the purchase while the book held
+    the shares — "so I wait and observe and do not force a purchase",
+    on 111 shares. The prompt promised the model the portfolio and the
+    call site sent `{"as_of": ...}`.
+    """
+
+    def _universe(self) -> tuple[dict[str, float], dict[str, object]]:
+        f = make_pit(
+            "QUALITY",
+            revenue=5_000_000_000,
+            operating_income=1_000_000_000,
+            shares=200_000_000,
+            eps_diluted=4.0,
+        )
+        return {"QUALITY": 80.0}, {"QUALITY": f}
+
+    def _run(
+        self,
+        cache: EdgarCache,
+        held: dict[str, HeldPosition] | None,
+    ) -> MagicMock:
+        prices, fins = self._universe()
+        memo = FisherMemo.model_validate({**SAMPLE_MEMO_JSON, "ticker": "QUALITY"})
+        analyzer = MagicMock()
+        analyzer.analyze.return_value = memo
+        PhilipFisher(
+            edgar_cache=cache,
+            scuttlebutt_analyzer=analyzer,
+        ).select(
+            as_of=date(2024, 6, 30),
+            universe=["QUALITY"],
+            prices=_StaticPriceLookup(prices),  # type: ignore[arg-type]
+            fundamentals=_StaticFundamentalsLookup(fins),  # type: ignore[arg-type]
+            held=held,
+        )
+        analyzer.analyze.assert_called_once()
+        return analyzer
+
+    def test_a_held_name_reaches_the_analyst_as_held(
+        self, fisher_quality_cache: EdgarCache
+    ) -> None:
+        held = {
+            "QUALITY": HeldPosition(
+                ticker="QUALITY",
+                shares=111.0,
+                entry_price=64.0,
+                entry_date=date(2024, 4, 1),
+                current_price=80.0,
+            )
+        }
+        analyzer = self._run(fisher_quality_cache, held)
+        state = analyzer.analyze.call_args.kwargs["portfolio_state"]
+        assert state["position"]["held"] is True
+        assert state["position"]["shares"] == 111.0
+        assert state["position"]["entry_date"] == "2024-04-01"
+        assert state["position"]["days_held"] == 90
+        assert state["position"]["unrealised_return_pct"] == pytest.approx(25.0)
+        assert state["names_held"] == 1
+
+    def test_a_name_not_held_reaches_the_analyst_as_not_held(
+        self, fisher_quality_cache: EdgarCache
+    ) -> None:
+        analyzer = self._run(fisher_quality_cache, {})
+        state = analyzer.analyze.call_args.kwargs["portfolio_state"]
+        assert state["position"] == {"known": True, "held": False}
+
+    def test_no_book_is_passed_through_as_unknown(
+        self, fisher_quality_cache: EdgarCache
+    ) -> None:
+        """A backtest sweep calls select() without a book. Telling the
+        model "you hold none" there would be an invented fact."""
+        analyzer = self._run(fisher_quality_cache, None)
+        state = analyzer.analyze.call_args.kwargs["portfolio_state"]
+        assert state["position"] == {"known": False}
+
+    def test_the_date_still_travels(
+        self, fisher_quality_cache: EdgarCache
+    ) -> None:
+        analyzer = self._run(fisher_quality_cache, None)
+        assert analyzer.analyze.call_args.kwargs["portfolio_state"]["as_of"] == (
+            "2024-06-30"
+        )

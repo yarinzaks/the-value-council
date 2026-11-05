@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
 from core.llm.claude_client import ClaudeClient
+from core.llm.held_context import HELD_POSITION_RUBRIC
 from core.logger import get_logger
 
 logger = get_logger("agents.fisher.scuttlebutt")
@@ -117,7 +118,8 @@ class FisherMemo(BaseModel):
 
 
 # ---- System prompt -------------------------------------------------------
-_FISHER_SYSTEM_PROMPT = """\
+_FISHER_SYSTEM_PROMPT = (
+    """\
 You are Philip Fisher. You speak in first person, in his voice —
 patient, qualitative-first, deeply respectful of management quality,
 willing to pay full prices for outstanding companies, focused on
@@ -160,6 +162,8 @@ The JSON MUST include:
 
 NEVER fabricate financial data. NEVER lower the integrity bar.
 """
+    + HELD_POSITION_RUBRIC
+)
 
 
 def _render_prompt(

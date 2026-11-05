@@ -36,6 +36,7 @@ from core.backtest.strategy_runner import (
 )
 from core.data.edgar_cache import EdgarCache
 from core.llm.concurrency import analyze_all
+from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
@@ -194,7 +195,7 @@ class HowardMarks(Strategy):
         # Stage 4 (live only): LLM second-level analyzer.
         memos: list[MarksMemo] = []
         if self.second_level_analyzer is not None and top:
-            top, memos = self._llm_filter(top, as_of, temperature)
+            top, memos = self._llm_filter(top, as_of, temperature, held=held)
         self.last_memos = memos
 
         if not top:
@@ -263,6 +264,8 @@ class HowardMarks(Strategy):
         top: list[MarksScore],
         as_of: date,
         temperature: TemperatureAssessment,
+        *,
+        held: Mapping[str, HeldPosition] | None = None,
     ) -> tuple[list[MarksScore], list[MarksMemo]]:
         """Ask the LLM for second-level analysis. Drop REJECT/SELL."""
         kept: list[MarksScore] = []
@@ -292,10 +295,12 @@ class HowardMarks(Strategy):
             }
             return analyzer.analyze(
                 stock_data=stock_data,
-                portfolio_state={
-                    "as_of": as_of.isoformat(),
-                    "posture": temperature.posture,
-                },
+                # The book, which the five prompts all promise the model
+                # and none of them used to send. The posture rides along
+                # as it always did. See core.llm.held_context.
+                portfolio_state=portfolio_state_for(
+                    s.ticker, as_of, held, posture=temperature.posture
+                ),
             )
 
         for s, outcome in analyze_all(top, ask):
