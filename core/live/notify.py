@@ -51,7 +51,7 @@ from typing import Any, Protocol
 
 from core.live.hebrew_industry import industry_he
 from core.live.hebrew_terms import is_hybrid, translate
-from core.live.rtl import ltr, rtl_line
+from core.live.rtl import isolate_runs, ltr, rtl_line
 from core.logger import get_logger
 from core.text import titlecase
 from core.watchlist import diff_watchlist
@@ -277,6 +277,24 @@ def shape_complaints(config: TelegramConfig) -> list[str]:
 _HEBREW = re.compile(r"[\u0590-\u05ff]")
 
 
+#: The levels a row's own exit rule can name as the price that closes
+#: the position. Where the rule names one, calling the figure a sell
+#: target is the row's claim; where it does not, the figure is a
+#: valuation the screen recorded and nothing more.
+#:
+#: 305 of the 341 messages that print the figure carry a rule naming no
+#: price at all — "P/E or P/B revert above thresholds; OR fundamentals
+#: deteriorate" — and were labelling it "sell target" with a "possible
+#: gain" beneath, which promises a sale the agent never undertook.
+_PRICE_TRIGGER_PHRASES = ("graham number", "ncav", "p/ncav")
+
+
+def _rule_names_the_level(decision: Any) -> bool:
+    """Whether the row's own exit rule names a price as the exit."""
+    rule = str(getattr(decision, "exit_trigger", "") or "").lower()
+    return any(phrase in rule for phrase in _PRICE_TRIGGER_PHRASES)
+
+
 def _exit_rule(decision: Any) -> str | None:
     """What the row says ends the position, in Hebrew.
 
@@ -331,7 +349,13 @@ def _exit_rule(decision: Any) -> str | None:
     # comes back "not hybrid" and wholly English. Both are refused.
     if not _HEBREW.search(hebrew) or is_hybrid(hebrew):
         return None
-    return hebrew
+    # `isolate_runs`, not `ltr`: this is a Hebrew sentence with Latin
+    # fragments in it, and wrapping the whole line would lay the Hebrew
+    # out left to right. It was the one field value passed to `_field`
+    # with no isolate at all, so the bidi algorithm resolved "1.0×" to
+    # "×1.0" and "~50%" to "50%~" — the sign is neutral and took its
+    # direction from the Hebrew around it instead of from its number.
+    return isolate_runs(hebrew)
 
 #: The name of the level each sleeve sells at.
 _TARGET_LABEL_BY_MODE: Mapping[str, str] = {
@@ -658,10 +682,20 @@ def format_action(
         if target is not None:
             target = float(target)
             label = _TARGET_LABEL_BY_MODE.get(mode, "יעד")
-            upside = ((target / price) - 1.0) * 100.0 if price else None
-            lines.append(_field("יעד מכירה", f"{_money(target)} ({label})"))
-            if upside is not None:
-                lines.append(_field("רווח אפשרי", ltr(f"{upside:+.1f}%")))
+            gap = ((target / price) - 1.0) * 100.0 if price else None
+            # "Sell target" is a promise, and only the row that names
+            # the level as its exit makes it. For the rest the figure is
+            # what the screen values the share at, and the percentage is
+            # the distance to it rather than a gain the agent undertook
+            # to take.
+            if _rule_names_the_level(decision):
+                lines.append(_field("יעד מכירה", f"{_money(target)} ({label})"))
+                if gap is not None:
+                    lines.append(_field("רווח אפשרי", ltr(f"{gap:+.1f}%")))
+            else:
+                lines.append(_field("שווי לפי המסך", f"{_money(target)} ({label})"))
+                if gap is not None:
+                    lines.append(_field("פער למחיר", ltr(f"{gap:+.1f}%")))
         if rule is not None:
             lines.append(_field("כלל היציאה", rule))
 

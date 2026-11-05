@@ -566,8 +566,54 @@ def test_a_row_with_no_rule_states_none():
         FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
         {"SEB": a_defensive_decision(target=7936.58)},
     )
-    assert "יעד מכירה" in text
+    # The level still shows. It is not called a sell target, because
+    # this row's rule names no price — see the test below.
+    assert "שווי לפי המסך" in text
     assert "כלל היציאה" not in text
+
+
+def test_a_level_is_called_a_sell_target_only_where_the_rule_says_so():
+    """305 of the 341 messages that print the figure called it "sell
+    target" with a "possible gain" beneath, above a rule reading "P/E or
+    P/B revert above thresholds; OR fundamentals deteriorate" — which
+    names no price and undertakes no sale at that level. 36 rows do name
+    it, and those keep the label.
+    """
+    priced = rendered(
+        FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
+        {"SEB": a_defensive_decision(target=7936.58, exit_trigger=GRAHAM_NUMBER_RULE)},
+    )
+    assert "יעד מכירה" in priced
+    assert "רווח אפשרי" in priced
+    assert "שווי לפי המסך" not in priced
+
+    unpriced = rendered(
+        FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
+        {"SEB": a_defensive_decision(target=7936.58, exit_trigger=DEFENSIVE_RULE)},
+    )
+    assert "שווי לפי המסך" in unpriced
+    assert "פער למחיר" in unpriced
+    assert "יעד מכירה" not in unpriced
+    assert "רווח אפשרי" not in unpriced
+
+
+def test_the_net_net_level_keeps_its_sell_target_label():
+    """All 26 NET_NET rows name P/NCAV as the exit, so for them the
+    figure is a sell target and always was."""
+    text = rendered(
+        FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB", price=50.0)]),
+        {
+            "SEB": FakeDecision(
+                ticker="SEB",
+                criteria_met=["P/NCAV=0.50 (≤ 0.67)"],
+                criteria_values={"mode": "NET_NET"},
+                target_price=100.0,
+                exit_trigger="P/NCAV reverts toward 1.0× OR ~50% gain",
+            )
+        },
+    )
+    assert "יעד מכירה" in text
+    assert "NCAV למניה" in text
 
 
 def test_a_rule_the_table_cannot_render_is_withheld_rather_than_half_translated():
@@ -1633,7 +1679,10 @@ class TestAReasonMustMatchTheTradeItExplains:
 
         assert "מה זיהה:" in text
         assert "P/E 11.23 < 15" in text
-        assert "יעד מכירה: $43.68" in text
+        # The level, whatever it is called. This row's rule names no
+        # price, so it is the screen's valuation rather than a sell
+        # target; the subject of this test is that the figure is there.
+        assert "שווי לפי המסך: $43.68" in text
 
     def test_a_row_of_an_unknown_kind_explains_nothing(self):
         """A kind this module has not been taught is not assumed to be
@@ -2083,11 +2132,17 @@ class TestTheMessageReadsRightToLeft:
             assert text[start - 1] == LRI, f"{figure} is not isolated"
             assert text[start + len(figure)] == PDI, f"{figure} is not closed"
 
-    def test_the_upside_percentage_is_isolated(self) -> None:
-        """It ends an RTL line, which is exactly where a sign drifts."""
+    def test_the_percentage_beside_the_level_is_isolated(self) -> None:
+        """It ends an RTL line, which is exactly where a sign drifts.
+
+        The label is "פער למחיר" on this fixture rather than "רווח
+        אפשרי": its rule names no price, so the figure is a valuation
+        and the percentage is the distance to it. The isolate is the
+        same concern either way.
+        """
         text = self.a_full_message()
 
-        assert f"רווח אפשרי: {LRI}+85.3%{PDI}" in text
+        assert f"פער למחיר: {LRI}+85.3%{PDI}" in text
 
     def test_every_line_hangs_from_the_right(self) -> None:
         """A line opening with a Latin name or a digit would otherwise
@@ -2146,3 +2201,101 @@ class TestTheMessageReadsRightToLeft:
 
         assert text.startswith(RLM)
         assert "ההרצה נכשלה" in strip_marks(text)
+
+
+# ------------------------- the exit rule's left-to-right runs
+#
+# Every other value `_field` receives is isolated — the actor, the
+# ticker, the company, the price, the upside. The exit rule was the one
+# that was not, and it is the only one that is a Hebrew *sentence* with
+# Latin fragments inside it rather than a single Latin object. So the
+# bidi algorithm resolved "1.0×" to "×1.0" and "~50%" to "50%~": the
+# sign is a neutral character and took its direction from the Hebrew
+# around it instead of from the number it belongs to.
+#
+# `ltr` would be the wrong tool — it would lay the whole Hebrew line out
+# left to right. `isolate_runs` wraps the runs and leaves the sentence
+# alone.
+
+
+class TestTheExitRuleIsLaidOut:
+    """The eight strings the six quantitative strategies actually write."""
+
+    EIGHT = (
+        "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+        "P/NCAV reverts toward 1.0× OR ~50% gain",
+        (
+            "price reaches the Graham Number; OR P/E or P/B revert above "
+            "thresholds; OR fundamentals deteriorate"
+        ),
+        "metrics revert toward median (composite rank >= 0.5) OR ~50% gain",
+        "annual rotation OR rank slips out of top-N",
+        (
+            "P/E rises toward market average OR earnings miss two quarters "
+            "OR dividend yield collapses"
+        ),
+        "P/B reverts toward 1.0× book OR ~50% gain",
+        (
+            "cycle peak signals OR thesis break OR fundamental "
+            "balance-sheet deterioration"
+        ),
+    )
+
+    def test_every_rule_keeps_its_words_through_the_isolates(self) -> None:
+        from core.live.notify import _exit_rule
+        from core.live.rtl import strip_marks
+
+        for raw in self.EIGHT:
+            rule = _exit_rule(FakeDecision(exit_trigger=raw))
+            assert rule is not None, raw
+            bare = strip_marks(rule)
+            # The isolates are invisible formatting and must add nothing
+            # a reader would see.
+            assert "⁦" not in bare
+            assert "⁩" not in bare
+            assert bare.strip() == bare
+
+    def test_a_sign_travels_inside_its_own_number(self) -> None:
+        """"~50%" and ">= 0.5" are each one object, not a sign beside a run.
+
+        Left outside, the sign is a neutral next to an isolate and flips
+        anyway, which is the bug in a subtler form.
+        """
+        from core.live.rtl import LRI, PDI, isolate_runs
+
+        assert f"{LRI}~50%{PDI}" in isolate_runs("או ~50% רווח")
+        assert f"{LRI}>= 0.5{PDI}" in isolate_runs("(דירוג משולב >= 0.5)")
+        assert f"{LRI}1.0×{PDI}" in isolate_runs("חוזר לכיוון 1.0× ההון")
+
+    def test_an_isolate_does_not_swallow_the_space_before_it(self) -> None:
+        from core.live.rtl import LRI, PDI, isolate_runs
+
+        out = isolate_runs("P/E או P/B חוזרים")
+        assert f"{LRI}P/E{PDI} או {LRI}P/B{PDI} חוזרים" == out
+
+    def test_a_wholly_hebrew_rule_is_left_untouched(self) -> None:
+        from core.live.rtl import isolate_runs
+
+        hebrew = "סימני שיא מחזור או שבירת התזה או הרעה יסודית במאזן"
+        assert isolate_runs(hebrew) == hebrew
+
+    def test_the_rule_reaches_the_real_message_isolated(self) -> None:
+        """Through `format_result`, not `rendered`, which strips the
+        marks on purpose — the readability every other test wants is
+        exactly what would hide this."""
+        from core.live.rtl import LRI
+
+        text = format_result(
+            FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
+            as_of=AS_OF,
+            decisions={
+                "SEB": a_defensive_decision(
+                    exit_trigger="P/B reverts toward 1.0× book OR ~50% gain"
+                )
+            },
+            names=NAMES,
+            industry=industries,
+        )
+        line = next(li for li in text.split("\n") if "כלל היציאה" in li)
+        # P/B, 1.0× and ~50% — three runs, three isolates.
+        assert line.count(LRI) >= 3, line

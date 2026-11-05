@@ -116,7 +116,14 @@ export function ActionLog({
                     that day's market close — by +27.8% to +514.5%. */}
                 {action.valueTarget !== null && (
                   <span className="text-xs text-council-600 dark:text-muted tabular">
-                    {t("action_value_target")} {price(action.valueTarget)}
+                    {/* money(), not price(). A fill can land at a
+                        fraction of a cent and `price` exists to show
+                        it; a valuation cannot. Every one of the 56
+                        cards rendered today carries a raw float — LZ
+                        is 8.114058044735991 — and four decimals of a
+                        DCF output read as a tick rather than as an
+                        estimate. */}
+                    {t("action_value_target")} {money(action.valueTarget)}
                   </span>
                 )}
                 {action.realized !== null && (

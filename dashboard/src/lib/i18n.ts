@@ -45,7 +45,7 @@ const en: Dict = {
   action_trim: "Trimmed",
   action_watch: "Watching",
   action_unwatch: "Dropped",
-  action_value_target: "value target",
+  action_value_target: "intrinsic value",
   action_gain: "gain",
   action_loss: "loss",
 
@@ -409,7 +409,7 @@ const he: Dict = {
   action_trim: "קיצץ",
   action_watch: "נכנס למעקב",
   action_unwatch: "יצא מהמעקב",
-  action_value_target: "יעד שווי",
+  action_value_target: "שווי פנימי",
   action_gain: "רווח",
   action_loss: "הפסד",
 

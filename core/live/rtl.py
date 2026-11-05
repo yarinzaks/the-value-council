@@ -35,6 +35,8 @@ we have today.
 
 from __future__ import annotations
 
+import re
+
 #: Isolate a left-to-right run inside right-to-left text.
 LRI = "⁦"
 #: Close the innermost isolate.
@@ -70,6 +72,48 @@ def rtl_line(text: str) -> str:
     return f"{RLM}{text}"
 
 
+#: One left-to-right run inside Hebrew prose: a run anchored on a Latin
+#: letter or a digit, together with the neutral characters that belong
+#: to it — a slash in ``P/E``, a decimal point, a comparison operator
+#: and its number in ``>= 0.5``, a multiplication sign in ``1.0×``, a
+#: tilde in ``~50%``.
+#:
+#: Anchored rather than greedy: the class alone would match a lone
+#: semicolon or a space between two Hebrew words and wrap nothing in an
+#: isolate, and `(`/`)` are deliberately left out so a parenthesis stays
+#: with the Hebrew that opened it.
+_LTR_RUN = re.compile(
+    # A sign that belongs to the number after it has to be inside the
+    # isolate with it, or it is a neutral next to one and flips anyway:
+    # "~50%" and ">= 0.5" are each one object, not a sign beside a run.
+    r"(?:(?:[~$]|[<>]=?|≥|≤) ?)?"
+    r"[A-Za-z0-9]"           # anchored on something strongly LTR
+    r"(?:[A-Za-z0-9/.,%×~+$=<>-])*"
+    r"[A-Za-z0-9%×]"         # ending on one, or on a sign that hangs off it
+    r"|[A-Za-z0-9]"          # or a single character: the N in top-N
+)
+
+
+def isolate_runs(text: str) -> str:
+    """``text`` with every left-to-right run wrapped in an isolate.
+
+    For a Hebrew *sentence* that contains Latin fragments, where
+    :func:`ltr` is wrong because the sentence as a whole runs right to
+    left. "P/B חוזר לכיוון 1.0× או ~50% רווח" is one such: the bidi
+    algorithm resolves ``1.0×`` to ``×1.0`` and ``~50%`` to ``50%~``,
+    because the sign is a neutral character taking its direction from
+    the Hebrew around it rather than from the number it belongs to.
+
+    Idempotent in effect on text already isolated character by
+    character, but not meant to be applied twice: a run already inside
+    an isolate is matched again and wrapped again, which is harmless to
+    the layout and noise in the string.
+    """
+    if not text:
+        return text
+    return _LTR_RUN.sub(lambda m: f"{LRI}{m.group(0)}{PDI}", text)
+
+
 def strip_marks(text: str) -> str:
     """``text`` without any of this module's characters.
 
@@ -83,4 +127,4 @@ def strip_marks(text: str) -> str:
     return text
 
 
-__all__ = ["LRI", "PDI", "RLM", "ltr", "rtl_line", "strip_marks"]
+__all__ = ["LRI", "PDI", "RLM", "isolate_runs", "ltr", "rtl_line", "strip_marks"]
