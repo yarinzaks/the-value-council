@@ -276,7 +276,8 @@ def _print(final: list[AuditResult], source: str, screened: int, n_errors: int) 
         print("No company qualifies for any category. Hold cash (playbook 6.2).")
         return
     print(
-        f"\n{'ticker':<7}{'status':<7}{'category':<14}{'price':>10}{'value':>10}{'MoS':>8}{'max entry':>11}"
+        f"\n{'ticker':<7}{'status':<7}{'category':<14}{'price':>10}{'value':>10}{'MoS':>8}"
+        f"{'max entry':>11}{'sell at':>10}{'upside':>9}"
     )
     for r in shown:
         v = r.valuation
@@ -284,7 +285,11 @@ def _print(final: list[AuditResult], source: str, screened: int, n_errors: int) 
         print(
             f"{r.ticker:<7}{r.status:<7}{v.category:<14}{r.price:>10.2f}"
             f"{v.intrinsic_value:>10.2f}{v.margin_of_safety:>8.1%}{v.max_entry_price:>11.2f}"
+            f"{v.sell_target:>10.2f}{v.upside_to_target:>9.1%}"
         )
+    for r in shown:
+        print(f"\n{r.ticker}\n{r.thesis_he}")
+        print("יציאה: " + " | ".join(r.exit_triggers_he))
 
 
 def main(argv: list[str] | None = None) -> None:
