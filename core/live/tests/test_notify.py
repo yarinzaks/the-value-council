@@ -404,7 +404,7 @@ def industries(ticker: str) -> str | None:
     }.get(ticker.upper())
 
 
-def a_defensive_decision(ticker="SEB", target=7936.58):
+def a_defensive_decision(ticker="SEB", target=7936.58, exit_trigger=None):
     return FakeDecision(
         ticker=ticker,
         criteria_met=[
@@ -414,6 +414,7 @@ def a_defensive_decision(ticker="SEB", target=7936.58):
         ],
         criteria_values={"mode": "DEFENSIVE", "graham_number": target},
         target_price=target,
+        exit_trigger=exit_trigger,
     )
 
 
@@ -491,27 +492,127 @@ def test_a_buy_states_the_sell_target_and_the_upside():
     assert "+105.0%" in text
 
 
-def test_the_plan_names_the_rule_for_the_sleeve():
+DEFENSIVE_RULE = "P/E or P/B revert above thresholds; OR fundamentals deteriorate"
+"""What 1,318 of Graham's 1,342 Defensive BUY rows say, verbatim."""
+
+GRAHAM_NUMBER_RULE = (
+    "price reaches the Graham Number; OR P/E or P/B revert above "
+    "thresholds; OR fundamentals deteriorate"
+)
+"""What the other 24 say. Only these name a price trigger."""
+
+
+def test_the_plan_states_the_rule_the_row_recorded():
     text = rendered(
         FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
-        {"SEB": a_defensive_decision()},
+        {"SEB": a_defensive_decision(exit_trigger=DEFENSIVE_RULE)},
     )
-    assert "מוכר כשהמחיר מגיע למספר גרהם" in text
+    assert "כלל היציאה" in text
+    assert "חוזרים מעל הרף" in text
+    assert "היסודות מתדרדרים" in text
 
 
-def test_a_net_net_buy_gets_its_own_rule_and_label():
+def test_the_plan_does_not_promise_a_price_trigger_the_row_never_named():
+    """The over-claim this replaced.
+
+    The rule was a per-sleeve constant reading "sells when the price
+    reaches the Graham Number", printed on all 1,342 Defensive buys.
+    Only 24 of those rows name a price trigger. The runner sells a
+    position when it drops out of the day's target list, and of 87 real
+    Graham sales whose Graham Number is on record, 22 executed below
+    it — as far as 56% below for NRDS and FRSH.
+    """
+    text = rendered(
+        FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
+        {"SEB": a_defensive_decision(target=7936.58, exit_trigger=DEFENSIVE_RULE)},
+    )
+    # The level is still named, because the row recorded it.
+    assert "מספר גרהם" in text
+    # The claim about what triggers the sale is not.
+    assert "מוכר כשהמחיר מגיע למספר גרהם" not in text
+
+
+def test_a_row_that_does_name_the_price_trigger_keeps_it():
+    text = rendered(
+        FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
+        {"SEB": a_defensive_decision(exit_trigger=GRAHAM_NUMBER_RULE)},
+    )
+    assert "המחיר מגיע למספר גרהם" in text
+
+
+def test_a_buy_with_no_resolvable_target_still_says_when_it_sells():
+    """The plan block required a target, so it printed nothing at all
+    for a buy whose level could not be resolved — although the row
+    carried the rule."""
+    text = rendered(
+        FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
+        {
+            "SEB": FakeDecision(
+                ticker="SEB",
+                criteria_met=["current ratio=2.10 (≥ 2.0)"],
+                criteria_values={},
+                target_price=None,
+                exit_trigger=DEFENSIVE_RULE,
+            )
+        },
+    )
+    assert "התוכנית" in text
+    assert "כלל היציאה" in text
+    assert "יעד מכירה" not in text
+
+
+def test_a_row_with_no_rule_states_none():
+    text = rendered(
+        FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB")]),
+        {"SEB": a_defensive_decision(target=7936.58)},
+    )
+    assert "יעד מכירה" in text
+    assert "כלל היציאה" not in text
+
+
+def test_a_rule_the_table_cannot_render_is_withheld_rather_than_half_translated():
+    """The four strategies with an analyst layer write a sentence per
+    company — 283 distinct strings — and none of them has a Telegram
+    leg. If one ever does, a half-Hebrew rule is worse than none."""
+    from core.live.notify import _exit_rule
+
+    assert _exit_rule(FakeDecision(exit_trigger=DEFENSIVE_RULE)) is not None
+    assert (
+        _exit_rule(
+            FakeDecision(
+                exit_trigger=(
+                    "Evidence of brand pricing power eroding, such as "
+                    "sustained markdowns or loss of premium positioning"
+                )
+            )
+        )
+        is None
+    )
+    assert _exit_rule(FakeDecision(exit_trigger=None)) is None
+    assert _exit_rule(FakeDecision(exit_trigger="   ")) is None
+    assert _exit_rule(None) is None
+
+
+def test_a_net_net_buy_labels_its_level_and_quotes_its_own_rule():
+    """The label still comes from the recorded mode — that is what the
+    level is called. The rule comes from the row, which for all 26
+    NET_NET rows says "P/NCAV reverts toward 1.0x OR ~50% gain" and
+    says nothing about the "two years without progress" the constant
+    used to add."""
     decision = FakeDecision(
         ticker="SEB",
         criteria_met=["P/NCAV=0.50 (≤ 0.67)"],
         criteria_values={"mode": "NET_NET"},
         target_price=100.0,
+        exit_trigger="P/NCAV reverts toward 1.0× OR ~50% gain",
     )
     text = rendered(
         FakeResult(agent="benjamin_graham", trades=[a_buy(ticker="SEB", price=50.0)]),
         {"SEB": decision},
     )
     assert "NCAV למניה" in text
-    assert "NCAV המלא" in text
+    assert "כלל היציאה" in text
+    assert "שנתיים" not in text
 
 
 def test_a_sell_does_not_label_the_exit_reason_as_what_it_spotted():
@@ -1118,21 +1219,22 @@ def test_a_level_recorded_as_something_other_than_a_number_is_ignored():
     assert "התוכנית" not in text
 
 
-def test_the_three_mode_mappings_describe_the_same_sleeves():
+def test_the_two_mode_mappings_describe_the_same_sleeves():
     """The drift guard.
 
-    Three mappings keyed on the recorded mode — the label, the value's
-    key, and the exit rule. A sleeve present in one and missing from
-    another renders half a plan, and the halves are written far enough
-    apart in the file to make that easy to do.
-    """
-    from core.live.notify import (
-        _PLAN_BY_MODE,
-        _TARGET_KEY_BY_MODE,
-        _TARGET_LABEL_BY_MODE,
-    )
+    Two mappings keyed on the recorded mode — what the level is called
+    and where the row records it. A sleeve present in one and missing
+    from the other names a price without a name, or looks for a value
+    it will not label. They are written far enough apart in the file to
+    make that easy to do.
 
-    assert set(_PLAN_BY_MODE) == set(_TARGET_LABEL_BY_MODE) == set(_TARGET_KEY_BY_MODE)
+    There were three. The exit rule was the third, written against the
+    playbook per sleeve; it is read off the row now, so a new sleeve
+    needs no entry for it and cannot drift from one.
+    """
+    from core.live.notify import _TARGET_KEY_BY_MODE, _TARGET_LABEL_BY_MODE
+
+    assert set(_TARGET_LABEL_BY_MODE) == set(_TARGET_KEY_BY_MODE)
 
 
 # ------------------------- a level recorded under the wrong name
