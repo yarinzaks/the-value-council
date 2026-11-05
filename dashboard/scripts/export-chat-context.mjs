@@ -15,6 +15,19 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
+// The five analyst-layer memo dialects, read by the same code the
+// position page reads them with. Duplicating that here is how the two
+// would come to disagree — the reason this script reads the tree the
+// pages were built from rather than restating it.
+//
+// This works because node strips the types on import (default since
+// 23.6; CI is on 24) and because position-plan.ts takes `BrainMemo`
+// and `Locale` with `import type`, which is erased — a bare `node`
+// has no "@/..." resolver, so a VALUE import added there would break
+// this script and the static build with it. tests/chat-context-plan
+// runs this file end to end for exactly that reason.
+import { planFromMemo } from "../src/lib/position-plan.ts";
+
 const DATA_DIR = process.env.VALUE_COUNCIL_DATA_DIR;
 const OUT = process.argv[2];
 
@@ -54,6 +67,89 @@ function listJson(dir) {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/** Every memo the analyst layer wrote, newest first per (agent, ticker).
+ *
+ *  Asked why a name is held and when it would be sold, the assistant
+ *  could answer neither: the position map carried eight numbers and the
+ *  system prompt's own inventory of the data never mentioned a plan.
+ *  82 of the 240 held positions have a memo, each with a thesis the
+ *  agent wrote in Hebrew itself, and nothing read them.
+ */
+function loadMemos() {
+  const root = join(DATA_DIR, "memos");
+  if (!existsSync(root)) return new Map();
+  const newest = new Map();
+  let agents = [];
+  try {
+    agents = readdirSync(root, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  } catch {
+    return newest;
+  }
+  for (const agent of agents) {
+    for (const f of listJson(join(root, agent))) {
+      const rows = readJson(join(root, agent, f));
+      if (!Array.isArray(rows)) continue;
+      for (const r of rows) {
+        if (!r?.ticker || !r?.memo) continue;
+        const key = `${agent}/${r.ticker}`;
+        const prev = newest.get(key);
+        if (!prev || (r.timestamp ?? "") > (prev.timestamp ?? "")) {
+          newest.set(key, r);
+        }
+      }
+    }
+  }
+  return newest;
+}
+
+const MEMOS = loadMemos();
+
+/** The plan for one name: the agent's own, in both languages where it
+ *  wrote both. Null where neither the journal nor a memo holds one. */
+function planFor(agent, ticker, journalRow) {
+  const memo = MEMOS.get(`${agent}/${ticker}`);
+  const fromMemo = memo ? planFromMemo(memo.memo, "en") : null;
+  const hebrew = memo ? planFromMemo(memo.memo, "he") : null;
+  const exitTrigger = journalRow?.exit_trigger ?? null;
+  const target = journalRow?.target_price ?? null;
+  if (!fromMemo && exitTrigger === null && target === null) return null;
+  const plan = {};
+  // The journal's rule, which every quantitative strategy records and
+  // the dashboard shows on the position page.
+  if (exitTrigger !== null) plan.exit_rule = exitTrigger;
+  // The agent's recorded valuation. It is a per-share level the agent
+  // thinks the business is worth, NOT a price it is waiting to pay —
+  // the action log called it that and was wrong by 128% to 173% on 79
+  // of 147 cards.
+  if (target !== null) plan.value_target_usd_per_share = target;
+  if (fromMemo) {
+    if (fromMemo.thesis) plan.thesis_en = fromMemo.thesis;
+    if (hebrew?.thesis && hebrew.thesis !== fromMemo.thesis) {
+      plan.thesis_he = hebrew.thesis;
+    }
+    if (fromMemo.horizon) {
+      plan.means_to_hold =
+        fromMemo.horizon.kind === "range"
+          ? `${fromMemo.horizon.range} years`
+          : fromMemo.horizon.kind === "years"
+            ? `${fromMemo.horizon.years} years`
+            : `${fromMemo.horizon.months} months`;
+    }
+    if (fromMemo.intrinsicValue !== null) {
+      plan.intrinsic_value_usd_per_share = round2(fromMemo.intrinsicValue);
+    }
+    if (fromMemo.marginOfSafetyPct !== null) {
+      plan.margin_of_safety_pct = round2(fromMemo.marginOfSafetyPct);
+    }
+    if (fromMemo.exitTriggers.length > 0) {
+      plan.memo_exit_triggers = fromMemo.exitTriggers;
+    }
+  }
+  return plan;
+}
+
 const portfolios = [];
 const portfolioDir = join(DATA_DIR, "portfolios");
 
@@ -62,17 +158,41 @@ for (const file of listJson(portfolioDir)) {
   if (!book) continue;
   const agent = book.agent ?? file.replace(/\.json$/, "");
 
-  // Positions, trimmed to what a reader would see on the agent's card.
-  const positions = (book.positions ?? []).map((p) => ({
-    ticker: p.ticker,
-    shares: p.shares,
-    entry_price: p.entry_price,
-    entry_date: p.entry_date,
-    current_price: p.current_price,
-    pnl_pct: p.pnl_pct,
-    weight_pct: p.weight_pct,
-    why: p.why_en,
-  }));
+  // The newest BUY row per ticker, over the WHOLE journal rather than
+  // the recent tail below: a name bought in May and still held has no
+  // row in the last fourteen days, and its plan is in that May row.
+  // This is why only 88 of the 240 holdings had any decision row in
+  // the context at all.
+  const allDecisionsDir = join(DATA_DIR, "decisions", agent);
+  const newestBuy = new Map();
+  for (const f of listJson(allDecisionsDir)) {
+    const rows = readJson(join(allDecisionsDir, f));
+    if (!Array.isArray(rows)) continue;
+    for (const d of rows) {
+      if (d?.decision !== "BUY" || !d.ticker) continue;
+      const prev = newestBuy.get(d.ticker);
+      if (!prev || (d.timestamp ?? "") > (prev.timestamp ?? "")) {
+        newestBuy.set(d.ticker, d);
+      }
+    }
+  }
+
+  // Positions, trimmed to what a reader would see on the agent's card —
+  // plus the plan, which the card now shows and this map used to drop.
+  const positions = (book.positions ?? []).map((p) => {
+    const plan = planFor(agent, p.ticker, newestBuy.get(p.ticker));
+    return {
+      ticker: p.ticker,
+      shares: p.shares,
+      entry_price: p.entry_price,
+      entry_date: p.entry_date,
+      current_price: p.current_price,
+      pnl_pct: p.pnl_pct,
+      weight_pct: p.weight_pct,
+      why: p.why_en,
+      ...(plan ? { plan } : {}),
+    };
+  });
 
   const snapshotDir = join(DATA_DIR, "snapshots", agent);
   const snapshots = listJson(snapshotDir)
@@ -159,6 +279,12 @@ for (const file of listJson(portfolioDir)) {
       date: (d.timestamp ?? "").slice(0, 10),
       entry_price: d.entry_price,
       rationale: d.rationale,
+      // Thirteen fields on the row, five kept, and the two the reader
+      // asks about were among the eight dropped.
+      ...(d.target_price != null
+        ? { value_target_usd_per_share: d.target_price }
+        : {}),
+      ...(d.exit_trigger ? { exit_rule: d.exit_trigger } : {}),
     }))
     .slice(-DECISIONS_PER_AGENT);
 
@@ -189,6 +315,14 @@ for (const file of listJson(portfolioDir)) {
     watchlist: (book.watchlist ?? []).map((w) => ({
       ticker: w.ticker,
       why: w.why_en,
+      // What would make it buy, and the price it is waiting for. Every
+      // live watchlist entry carries the trigger and this map dropped
+      // it, so the assistant could say a name was being watched and not
+      // why or for what.
+      ...(w.entry_trigger ? { entry_trigger: w.entry_trigger } : {}),
+      ...(w.entry_price_target != null
+        ? { entry_price_target: w.entry_price_target }
+        : {}),
     })),
     snapshots,
     decisions,
