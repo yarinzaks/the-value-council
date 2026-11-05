@@ -112,8 +112,8 @@ export function ActionLog({
                 )}
                 {/* A valuation, labelled as one. This used to print
                     "waiting for $X" off the same number, which on 79 of
-                    the 147 watch cards named a price 128%-173% above
-                    that day's market close. */}
+                    the 81 checkable watch cards named a price above
+                    that day's market close — by +27.8% to +514.5%. */}
                 {action.valueTarget !== null && (
                   <span className="text-xs text-council-600 dark:text-muted tabular">
                     {t("action_value_target")} {price(action.valueTarget)}

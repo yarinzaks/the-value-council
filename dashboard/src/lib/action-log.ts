@@ -64,11 +64,13 @@ export interface AgentAction {
   price: number | null;
   /** The agent's intrinsic-value target for the name, as
    *  `decision_logger.py` documents the field it comes from. It is a
-   *  valuation, NOT a price the agent is waiting to pay: on 79 of the
-   *  147 watch cards in the book it sits 128% to 173% above the market
-   *  close of that day, and the card read "waiting for $67.40" about a
-   *  name trading at $24.97. Null where the agent logged none, which
-   *  is nine of the thirteen books. */
+   *  valuation, NOT a price the agent is waiting to pay. Of the 147
+   *  watch cards the log renders with a number, 81 can be checked
+   *  against that day's close and 79 stand above it — by +27.8% to
+   *  +514.5%, median +105%; the other 66 tickers have no price history
+   *  to check. The card read "waiting for $67.40" about a name trading
+   *  at $24.97. Null where the agent logged none, which is nine of the
+   *  thirteen books. */
   valueTarget: number | null;
   /** Realised P&L on a sale, in dollars. Null elsewhere — a buy
    *  realises nothing, and printing 0.00 reads as a break-even trade. */

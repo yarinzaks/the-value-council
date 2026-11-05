@@ -110,10 +110,11 @@ test("the watch carries the agent's value target, and its reason", () => {
   // This test used to read "the price it is waiting for" and assert
   // that `target_price` landed in `price`, which the component printed
   // as "waiting for $42". The field is documented in
-  // decision_logger.py as an intrinsic-value target, and on 79 of the
-  // 147 watch cards in the book it stood 128%-173% ABOVE that day's
-  // market close — Klarman's FITBI card said "waiting for $67.40"
-  // about a name trading at $24.97. A valuation is not a bid.
+  // decision_logger.py as an intrinsic-value target, and of the 147
+  // watch cards the log renders with a number, 81 can be checked
+  // against that day's close and 79 stand ABOVE it — by +27.8% to
+  // +514.5%, median +105%. Klarman's FITBI card said "waiting for
+  // $67.40" about a name trading at $24.97. A valuation is not a bid.
   const log = buildActionLog([], [
     decision("2026-09-01T00:00:00+00:00", "UVV", "WATCH", {
       target_price: 42,

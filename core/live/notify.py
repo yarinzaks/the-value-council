@@ -298,12 +298,24 @@ def _exit_rule(decision: Any) -> str | None:
     "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
     which is also what the runner implements — a position is sold when
     it drops out of the day's target list (``runner.py`` line 1081),
-    not when a level is touched. Of 87 real Graham sales whose Graham
-    Number is on record, 22 executed *below* it, as far as 56% below
-    for NRDS and FRSH; the stated rule cannot account for those and the
-    row's own words can. The NET_NET constant likewise added "exits
-    after two years without progress, or if fundamentals deteriorate",
-    which appears in none of the 26 rows.
+    not when a level is touched. The NET_NET constant likewise added
+    "exits after two years without progress, or if fundamentals
+    deteriorate", which appears in none of the 26 rows.
+
+    Two figures cited for this when it was written do not survive
+    checking and are recorded here rather than quietly dropped. "22 of
+    87 real sales executed below the Graham Number" compared the sale
+    price against a ``graham_number`` value that is the ``pe * pb``
+    composite on 86 of those 87 rows — the very value
+    ``_FALLBACK_WITNESS_BY_MODE`` below exists to refuse — so the
+    comparison was against a dimensionless product, not a price. And
+    "1,013 messages gain a rule" counted journal rows: a message is
+    sent per executed trade, and Graham's ledger holds 89 trades, all
+    of them sales. No buy message has ever been sent, so the number of
+    existing messages this changes is zero. What does reproduce, and
+    is the whole reason for the change, is that 1,318 of the 1,342
+    Defensive rows name no price trigger while the constant told the
+    reader they did.
 
     Returns ``None`` where the row carried no rule, and where the
     translation comes back part English — a half-Hebrew sentence is
