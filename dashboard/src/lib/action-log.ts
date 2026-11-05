@@ -60,8 +60,16 @@ export interface AgentAction {
   ticker: string;
   /** Whole shares for an execution; null for a watchlist event. */
   shares: number | null;
-  /** Fill price, or the price being waited for. Null when neither. */
+  /** Fill price. Null for a watchlist event, which fills nothing. */
   price: number | null;
+  /** The agent's intrinsic-value target for the name, as
+   *  `decision_logger.py` documents the field it comes from. It is a
+   *  valuation, NOT a price the agent is waiting to pay: on 79 of the
+   *  147 watch cards in the book it sits 128% to 173% above the market
+   *  close of that day, and the card read "waiting for $67.40" about a
+   *  name trading at $24.97. Null where the agent logged none, which
+   *  is nine of the thirteen books. */
+  valueTarget: number | null;
   /** Realised P&L on a sale, in dollars. Null elsewhere — a buy
    *  realises nothing, and printing 0.00 reads as a break-even trade. */
   realized: number | null;
@@ -138,6 +146,7 @@ export function buildActionLog(
       ticker,
       shares: row.shares,
       price: row.price,
+      valueTarget: null,
       realized: side === "BUY" ? null : (row.realized_pnl_usd ?? null),
       why: "",
     });
@@ -163,7 +172,8 @@ export function buildActionLog(
         kind: "watch",
         ticker,
         shares: null,
-        price: row.target_price ?? null,
+        price: null,
+        valueTarget: row.target_price ?? null,
         realized: null,
         // The journal's rationale, as written. It is English, and the
         // component runs it through translateRationale — the same path
@@ -178,6 +188,7 @@ export function buildActionLog(
         ticker,
         shares: null,
         price: null,
+        valueTarget: null,
         realized: null,
         why: "",
       });

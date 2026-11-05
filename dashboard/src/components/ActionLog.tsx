@@ -110,9 +110,13 @@ export function ActionLog({
                     {shares(action.shares)} × {price(action.price)}
                   </span>
                 )}
-                {action.shares === null && action.price !== null && (
+                {/* A valuation, labelled as one. This used to print
+                    "waiting for $X" off the same number, which on 79 of
+                    the 147 watch cards named a price 128%-173% above
+                    that day's market close. */}
+                {action.valueTarget !== null && (
                   <span className="text-xs text-council-600 dark:text-muted tabular">
-                    {t("action_waiting_for")} {price(action.price)}
+                    {t("action_value_target")} {price(action.valueTarget)}
                   </span>
                 )}
                 {action.realized !== null && (
