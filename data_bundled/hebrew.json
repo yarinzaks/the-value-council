@@ -194,6 +194,14 @@
     [
       "\\bRebalance add: ([\\d.]+) shares at (\\$[\\d,.]+) to restore the target weight",
       "איזון מחדש — קניית \\1 מניות ב-\\2 להחזרת המשקל ליעד"
+    ],
+    [
+      "\\b(\\d+)-point score drops below ([\\d.]+)",
+      "הציון בן \\1 הנקודות יורד מתחת ל-\\2"
+    ],
+    [
+      "\\bearnings growth decelerates below ([\\d.]+)%",
+      "צמיחת הרווח מואטת מתחת ל-\\1%"
     ]
   ],
   "industry_by_code": {

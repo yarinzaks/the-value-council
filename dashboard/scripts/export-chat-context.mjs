@@ -54,6 +54,29 @@ function listJson(dir) {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/** An exit rule that denies the position exists.
+ *
+ *  The analyst layer was run on names the book already holds and wrote
+ *  as though it held none — fixed upstream in core/llm/held_context.py,
+ *  but every row on disk predates that. 30 of the 201 holdings that
+ *  carry a rule carry one of these: peter_lynch/URBN holds 4 shares and
+ *  its newest BUY row says "Not applicable until a position is taken".
+ *
+ *  Handing that to the assistant as the sell plan for a held name would
+ *  have it tell the reader their position is not open. Withheld, and
+ *  reported as no rule recorded, which is the honest answer.
+ */
+const DENIES_THE_POSITION =
+  /not applicable|until a position|if bought|no position|do not initiate|stay on watch/i;
+
+/** The rule the strategy recorded for a name, or null. */
+function exitRuleFor(row, { held }) {
+  const rule = row?.exit_trigger;
+  if (!rule) return null;
+  if (held && DENIES_THE_POSITION.test(rule)) return null;
+  return rule;
+}
+
 const portfolios = [];
 const portfolioDir = join(DATA_DIR, "portfolios");
 
@@ -62,17 +85,47 @@ for (const file of listJson(portfolioDir)) {
   if (!book) continue;
   const agent = book.agent ?? file.replace(/\.json$/, "");
 
-  // Positions, trimmed to what a reader would see on the agent's card.
-  const positions = (book.positions ?? []).map((p) => ({
-    ticker: p.ticker,
-    shares: p.shares,
-    entry_price: p.entry_price,
-    entry_date: p.entry_date,
-    current_price: p.current_price,
-    pnl_pct: p.pnl_pct,
-    weight_pct: p.weight_pct,
-    why: p.why_en,
-  }));
+  // The newest BUY row per ticker, over the WHOLE journal rather than
+  // the recent tail below: a name bought in May and still held has no
+  // row in the last fourteen days, and its plan is in that May row.
+  // Only 88 of the 240 holdings have any decision row in the context.
+  const allDecisionsDir = join(DATA_DIR, "decisions", agent);
+  const newestBuy = new Map();
+  for (const f of listJson(allDecisionsDir)) {
+    const rows = readJson(join(allDecisionsDir, f));
+    if (!Array.isArray(rows)) continue;
+    for (const d of rows) {
+      if (d?.decision !== "BUY" || !d.ticker) continue;
+      const prev = newestBuy.get(d.ticker);
+      if (!prev || (d.timestamp ?? "") > (prev.timestamp ?? "")) {
+        newestBuy.set(d.ticker, d);
+      }
+    }
+  }
+
+  // Positions, trimmed to what a reader would see on the agent's card —
+  // plus what the strategy recorded about ending the position, which
+  // this map used to drop and the assistant was asked about.
+  const positions = (book.positions ?? []).map((p) => {
+    const row = newestBuy.get(p.ticker);
+    const rule = exitRuleFor(row, { held: true });
+    // The agent's own valuation of the share. NOT a price it is waiting
+    // to pay — the action log called it that and named $67.40 on a
+    // stock trading at $24.97.
+    const value = row?.target_price ?? null;
+    return {
+      ticker: p.ticker,
+      shares: p.shares,
+      entry_price: p.entry_price,
+      entry_date: p.entry_date,
+      current_price: p.current_price,
+      pnl_pct: p.pnl_pct,
+      weight_pct: p.weight_pct,
+      why: p.why_en,
+      ...(rule ? { exit_rule: rule } : {}),
+      ...(value != null ? { intrinsic_value_usd_per_share: value } : {}),
+    };
+  });
 
   const snapshotDir = join(DATA_DIR, "snapshots", agent);
   const snapshots = listJson(snapshotDir)
@@ -159,6 +212,14 @@ for (const file of listJson(portfolioDir)) {
       date: (d.timestamp ?? "").slice(0, 10),
       entry_price: d.entry_price,
       rationale: d.rationale,
+      // Thirteen fields on the row, five kept, and the two the reader
+      // asks about were among the eight dropped. Not filtered here: a
+      // decision row is a dated record of what was said that day, and
+      // "not applicable until a position is taken" was true of a WATCH.
+      ...(d.target_price != null
+        ? { intrinsic_value_usd_per_share: d.target_price }
+        : {}),
+      ...(d.exit_trigger ? { exit_rule: d.exit_trigger } : {}),
     }))
     .slice(-DECISIONS_PER_AGENT);
 
@@ -189,6 +250,14 @@ for (const file of listJson(portfolioDir)) {
     watchlist: (book.watchlist ?? []).map((w) => ({
       ticker: w.ticker,
       why: w.why_en,
+      // What would make it buy, and the price it waits for. Every live
+      // watchlist entry carries the trigger and this map dropped it, so
+      // the assistant could say a name was watched and not why or for
+      // what. This IS an entry price, unlike the field above.
+      ...(w.entry_trigger ? { entry_trigger: w.entry_trigger } : {}),
+      ...(w.entry_price_target != null
+        ? { entry_price_target: w.entry_price_target }
+        : {}),
     })),
     snapshots,
     decisions,

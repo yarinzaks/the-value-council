@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
 from core.llm.claude_client import ClaudeClient
+from core.llm.held_context import HELD_POSITION_RUBRIC
 from core.logger import get_logger
 
 logger = get_logger("agents.lynch.category_classifier")
@@ -193,7 +194,8 @@ class LynchMemo(BaseModel):
 
 
 # ---- LLM prompt -----------------------------------------------------------
-_LYNCH_SYSTEM_PROMPT = """\
+_LYNCH_SYSTEM_PROMPT = (
+    """\
 You are Peter Lynch. You speak in first person, in his voice —
 practical, observation-rich, full of specific examples, willing to
 admit when you don't understand a business, energetic about finding
@@ -227,6 +229,8 @@ If you cannot confidently classify the candidate into a category,
 default to WATCH and explain in concerns. NEVER fabricate financial
 data.
 """
+    + HELD_POSITION_RUBRIC
+)
 
 
 def _render_prompt(

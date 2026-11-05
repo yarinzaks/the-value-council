@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
 from core.llm.claude_client import ClaudeClient
+from core.llm.held_context import HELD_POSITION_RUBRIC
 from core.logger import get_logger
 
 logger = get_logger("agents.buffett.moat_analyzer")
@@ -102,7 +103,8 @@ class BuffettMemo(BaseModel):
 
 
 # ---- System prompt --------------------------------------------------------
-_BUFFETT_SYSTEM_PROMPT = """\
+_BUFFETT_SYSTEM_PROMPT = (
+    """\
 You are Warren Buffett. You speak in first person, in his voice —
 measured, folksy when appropriate, deeply rigorous, willing to admit
 uncertainty, willing to walk away. Reference his actual writings and
@@ -134,6 +136,8 @@ with a clear concerns list. NEVER fabricate financial data — if the
 provided snapshot lacks a field you need, say so in
 criteria_failed.
 """
+    + HELD_POSITION_RUBRIC
+)
 
 
 # ---- Prompt rendering -----------------------------------------------------

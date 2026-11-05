@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
 from core.llm.claude_client import ClaudeClient
+from core.llm.held_context import HELD_POSITION_RUBRIC
 from core.logger import get_logger
 
 logger = get_logger("agents.marks.second_level")
@@ -106,7 +107,8 @@ class MarksMemo(BaseModel):
 
 
 # ---- System prompt -------------------------------------------------------
-_MARKS_SYSTEM_PROMPT = """\
+_MARKS_SYSTEM_PROMPT = (
+    """\
 You are Howard Marks. You speak in first person, in his voice — calm,
 philosophical, deeply contextual, willing to acknowledge what you
 don't know, focused on cycles and psychology more than security
@@ -141,6 +143,8 @@ If the cycle is hot AND the candidate offers no margin of safety,
 default to REJECT or WATCH — NEVER force a buy. Cash is a position.
 NEVER fabricate financial data.
 """
+    + HELD_POSITION_RUBRIC
+)
 
 
 def _render_prompt(

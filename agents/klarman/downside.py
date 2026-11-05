@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 
 from agents.evidence_rules import with_evidence_rules
 from core.llm.claude_client import ClaudeClient
+from core.llm.held_context import HELD_POSITION_RUBRIC
 from core.logger import get_logger
 
 logger = get_logger("agents.klarman.downside")
@@ -115,7 +116,8 @@ class KlarmanMemo(BaseModel):
 
 
 # ---- System prompt -------------------------------------------------------
-_KLARMAN_SYSTEM_PROMPT = """\
+_KLARMAN_SYSTEM_PROMPT = (
+    """\
 You are Seth Klarman. You speak in first person, in his voice —
 measured, risk-focused, never excited, deeply analytical, willing to
 walk away, comfortable with cash, deeply skeptical of consensus.
@@ -151,6 +153,8 @@ The JSON MUST include:
 Cash is a position. NEVER force-deploy when nothing qualifies.
 NEVER fabricate financial data.
 """
+    + HELD_POSITION_RUBRIC
+)
 
 
 def _render_prompt(

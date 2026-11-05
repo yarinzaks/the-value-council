@@ -106,15 +106,61 @@ test("a rejection of a name never watched is not an event", () => {
   assert.deepEqual(log, []);
 });
 
-test("the watch carries the price it is waiting for, and its reason", () => {
+test("the watch carries the agent's value target, and its reason", () => {
+  // This test used to read "the price it is waiting for" and assert
+  // that `target_price` landed in `price`, which the component printed
+  // as "waiting for $42". The field is documented in
+  // decision_logger.py as an intrinsic-value target, and of the 147
+  // watch cards the log renders with a number, 81 can be checked
+  // against that day's close and 79 stand ABOVE it — by +27.8% to
+  // +514.5%, median +105%. Klarman's FITBI card said "waiting for
+  // $67.40" about a name trading at $24.97. A valuation is not a bid.
   const log = buildActionLog([], [
     decision("2026-09-01T00:00:00+00:00", "UVV", "WATCH", {
       target_price: 42,
       rationale: "P/B 1.42 above the 1.20 Graham requires",
     }),
   ]);
-  assert.equal(log[0].price, 42);
+  assert.equal(log[0].valueTarget, 42);
   assert.match(log[0].why, /Graham requires/);
+});
+
+test("a watch fills nothing, so it carries no fill price", () => {
+  const log = buildActionLog([], [
+    decision("2026-09-01T00:00:00+00:00", "UVV", "WATCH", {
+      target_price: 42,
+    }),
+  ]);
+  assert.equal(log[0].price, null);
+  assert.equal(log[0].shares, null);
+});
+
+test("an execution carries a fill price and claims no valuation", () => {
+  const log = buildActionLog(
+    [trade("2026-08-20", "HOG", "BUY", 61, 25.95)],
+    [],
+  );
+  assert.equal(log[0].price, 25.95);
+  assert.equal(log[0].valueTarget, null);
+});
+
+test("a watch the agent logged no valuation for claims none", () => {
+  // Nine of the thirteen books never write target_price.
+  const log = buildActionLog([], [
+    decision("2026-09-01T00:00:00+00:00", "UVV", "WATCH", {}),
+  ]);
+  assert.equal(log[0].valueTarget, null);
+  assert.equal(log[0].price, null);
+});
+
+test("leaving the watchlist claims neither a price nor a valuation", () => {
+  const log = buildActionLog([], [
+    decision("2026-09-01T00:00:00+00:00", "UVV", "WATCH", {}),
+    decision("2026-09-08T00:00:00+00:00", "UVV", "REJECT", {}),
+  ]);
+  const un = log.find((a) => a.kind === "unwatch");
+  assert.equal(un.price, null);
+  assert.equal(un.valueTarget, null);
 });
 
 test("the whole arc of one name reads in order", () => {

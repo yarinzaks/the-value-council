@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -439,3 +440,79 @@ class TestTheRebalancePathIsCovered:
         out = translate(english)
         for figure in figures:
             assert figure in out, f"{figure!r} lost: {english!r} -> {out!r}"
+
+
+class TestTheAnalystRulesThatReachHebrew:
+    """Four of the analyst layer's 283 free-text exit rules translate.
+
+    The other 279 come back English and the guard in ``notify._exit_rule``
+    withholds them, which is right — a half-Hebrew rule is worse than
+    none. These four get through, and two of them used to get through
+    broken:
+
+      "15-point score drops below 11" produced "15-נקודות יורד מתחת
+      ל- 11". The substring entry replaced "point score drops below"
+      and left the 15 stranded outside, so the sentence lost its
+      subject — the *score* is what drops — and the ל- prefix was
+      left with a space before its number.
+    """
+
+    FOUR: ClassVar[dict[str, tuple[str, ...]]] = {
+        "15-point score drops below 11; integrity question; "
+        "R&D / culture decline": (
+            "הציון בן 15 הנקודות יורד מתחת ל-11",
+        ),
+        "PEG > 1.5 OR earnings growth decelerates below 15% OR "
+        "thesis-specific story break": (
+            "צמיחת הרווח מואטת מתחת ל-15%",
+        ),
+        "moat erosion OR management failure OR extreme overvaluation "
+        "> 1.5x intrinsic": (
+            "שחיקת החומה העסקית",
+            "כישלון הנהלה",
+        ),
+        "scaling out as price approaches intrinsic value; thesis break "
+        "OR balance-sheet deterioration": (
+            "יציאה הדרגתית",
+            "שבירת התזה",
+        ),
+    }
+
+    def test_each_one_says_what_the_english_says(self) -> None:
+        from core.live.hebrew_terms import translate
+
+        for english, expected in self.FOUR.items():
+            hebrew = translate(english)
+            for fragment in expected:
+                assert fragment in hebrew, f"{english!r} -> {hebrew!r}"
+
+    def test_the_score_keeps_its_subject(self) -> None:
+        """The sentence this test exists for."""
+        from core.live.hebrew_terms import translate
+
+        hebrew = translate("15-point score drops below 11")
+        assert "הציון" in hebrew
+        assert hebrew.startswith("הציון")
+        # The stranded number, and the space the prefix cannot take.
+        assert "15-נקודות" not in hebrew
+        assert "ל- " not in hebrew
+
+    def test_the_prefix_never_keeps_a_space_before_its_number(self) -> None:
+        from core.live.hebrew_terms import translate
+
+        for english in self.FOUR:
+            assert "ל- " not in translate(english)
+
+    def test_the_four_survive_the_notifier_guard(self) -> None:
+        """They are the only four of the 283 that do, and the guard has
+        to keep letting exactly these through."""
+        from dataclasses import dataclass
+
+        from core.live.notify import _exit_rule
+
+        @dataclass
+        class Row:
+            exit_trigger: str
+
+        for english in self.FOUR:
+            assert _exit_rule(Row(exit_trigger=english)) is not None, english

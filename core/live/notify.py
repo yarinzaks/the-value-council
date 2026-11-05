@@ -50,8 +50,8 @@ from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
 from core.live.hebrew_industry import industry_he
-from core.live.hebrew_terms import translate
-from core.live.rtl import ltr, rtl_line
+from core.live.hebrew_terms import is_hybrid, translate
+from core.live.rtl import isolate_runs, ltr, rtl_line
 from core.logger import get_logger
 from core.text import titlecase
 from core.watchlist import diff_watchlist
@@ -272,20 +272,90 @@ def shape_complaints(config: TelegramConfig) -> list[str]:
     return complaints
 
 
-#: What ends the trade, per sleeve, from the playbook's §7.1 rather than
-#: from the decision log's English prose. Translating that prose would be
-#: guesswork; the mode is a recorded enum, so the Hebrew is written once
-#: against the rule it describes.
-_PLAN_BY_MODE: Mapping[str, str] = {
-    "DEFENSIVE": (
-        "מוכר כשהמחיר מגיע למספר גרהם. "
-        "יוצא גם אם P/E או P/B חוזרים מעל הרף, או שהיסודות מתדרדרים."
-    ),
-    "NET_NET": (
-        "מוכר כשהמחיר מגיע ל-NCAV המלא — רווח של כ-50% מקניית ⅔. "
-        "יוצא גם אחרי שנתיים בלי התקדמות, או אם היסודות מתדרדרים."
-    ),
-}
+#: Any Hebrew letter. The output of the phrase table has to contain
+#: one, or the table did not reach the sentence.
+_HEBREW = re.compile(r"[\u0590-\u05ff]")
+
+
+#: The levels a row's own exit rule can name as the price that closes
+#: the position. Where the rule names one, calling the figure a sell
+#: target is the row's claim; where it does not, the figure is a
+#: valuation the screen recorded and nothing more.
+#:
+#: 305 of the 341 messages that print the figure carry a rule naming no
+#: price at all — "P/E or P/B revert above thresholds; OR fundamentals
+#: deteriorate" — and were labelling it "sell target" with a "possible
+#: gain" beneath, which promises a sale the agent never undertook.
+_PRICE_TRIGGER_PHRASES = ("graham number", "ncav", "p/ncav")
+
+
+def _rule_names_the_level(decision: Any) -> bool:
+    """Whether the row's own exit rule names a price as the exit."""
+    rule = str(getattr(decision, "exit_trigger", "") or "").lower()
+    return any(phrase in rule for phrase in _PRICE_TRIGGER_PHRASES)
+
+
+def _exit_rule(decision: Any) -> str | None:
+    """What the row says ends the position, in Hebrew.
+
+    This was a per-sleeve constant keyed on ``mode``, written against
+    the playbook rather than against the row, on the stated grounds
+    that translating the journal's English prose would be guesswork.
+    For this channel it is not guesswork, and the constant over-claimed.
+
+    The prose is templated, not free. Across every BUY and WATCH row in
+    the live tree the six quantitative strategies use eight distinct
+    strings between them for 30,874 rows — Graham's own 1,368 rows use
+    three — and the shared phrase table already renders all eight. The
+    four strategies that do write a sentence per company are the ones
+    with an analyst layer, and none of them has a Telegram leg.
+
+    What the constant got wrong: it told the reader "sells when the
+    price reaches the Graham Number" on all 1,342 Defensive buys, and
+    only 24 of those rows name a price trigger. The other 1,318 say
+    "P/E or P/B revert above thresholds; OR fundamentals deteriorate",
+    which is also what the runner implements — a position is sold when
+    it drops out of the day's target list (``runner.py`` line 1081),
+    not when a level is touched. The NET_NET constant likewise added
+    "exits after two years without progress, or if fundamentals
+    deteriorate", which appears in none of the 26 rows.
+
+    Two figures cited for this when it was written do not survive
+    checking and are recorded here rather than quietly dropped. "22 of
+    87 real sales executed below the Graham Number" compared the sale
+    price against a ``graham_number`` value that is the ``pe * pb``
+    composite on 86 of those 87 rows — the very value
+    ``_FALLBACK_WITNESS_BY_MODE`` below exists to refuse — so the
+    comparison was against a dimensionless product, not a price. And
+    "1,013 messages gain a rule" counted journal rows: a message is
+    sent per executed trade, and Graham's ledger holds 89 trades, all
+    of them sales. No buy message has ever been sent, so the number of
+    existing messages this changes is zero. What does reproduce, and
+    is the whole reason for the change, is that 1,318 of the 1,342
+    Defensive rows name no price trigger while the constant told the
+    reader they did.
+
+    Returns ``None`` where the row carried no rule, and where the
+    translation comes back part English — a half-Hebrew sentence is
+    worse than the Hebrew summary the reader already has above it.
+    """
+    raw = str(getattr(decision, "exit_trigger", "") or "").strip()
+    if not raw:
+        return None
+    hebrew = translate(raw)
+    # Two ways the table can fail to produce a Hebrew sentence, and
+    # `is_hybrid` only catches one of them: it asks whether Hebrew and
+    # English are mixed, so a string the table did not touch at all
+    # comes back "not hybrid" and wholly English. Both are refused.
+    if not _HEBREW.search(hebrew) or is_hybrid(hebrew):
+        return None
+    # `isolate_runs`, not `ltr`: this is a Hebrew sentence with Latin
+    # fragments in it, and wrapping the whole line would lay the Hebrew
+    # out left to right. It was the one field value passed to `_field`
+    # with no isolate at all, so the bidi algorithm resolved "1.0×" to
+    # "×1.0" and "~50%" to "50%~" — the sign is neutral and took its
+    # direction from the Hebrew around it instead of from its number.
+    return isolate_runs(hebrew)
 
 #: The name of the level each sleeve sells at.
 _TARGET_LABEL_BY_MODE: Mapping[str, str] = {
@@ -603,16 +673,30 @@ def format_action(
             heading = "מה זיהה" if side == "BUY" else "למה יצא"
             lines += ["", rtl_line(f"{heading}:")] + [_bullet(str(c)) for c in shown]
 
-    if side == "BUY" and target is not None:
-        target = float(target)
-        label = _TARGET_LABEL_BY_MODE.get(mode, "יעד")
-        upside = ((target / price) - 1.0) * 100.0 if price else None
+    # The plan, which used to require a sell target to appear at all —
+    # so a buy whose level could not be resolved said nothing about when
+    # the position ends, although its row carried the rule.
+    rule = _exit_rule(decision) if side == "BUY" else None
+    if side == "BUY" and (target is not None or rule is not None):
         lines += ["", rtl_line("התוכנית")]
-        lines.append(_field("יעד מכירה", f"{_money(target)} ({label})"))
-        if upside is not None:
-            lines.append(_field("רווח אפשרי", ltr(f"{upside:+.1f}%")))
-        rule = _PLAN_BY_MODE.get(mode)
-        if rule:
+        if target is not None:
+            target = float(target)
+            label = _TARGET_LABEL_BY_MODE.get(mode, "יעד")
+            gap = ((target / price) - 1.0) * 100.0 if price else None
+            # "Sell target" is a promise, and only the row that names
+            # the level as its exit makes it. For the rest the figure is
+            # what the screen values the share at, and the percentage is
+            # the distance to it rather than a gain the agent undertook
+            # to take.
+            if _rule_names_the_level(decision):
+                lines.append(_field("יעד מכירה", f"{_money(target)} ({label})"))
+                if gap is not None:
+                    lines.append(_field("רווח אפשרי", ltr(f"{gap:+.1f}%")))
+            else:
+                lines.append(_field("שווי לפי המסך", f"{_money(target)} ({label})"))
+                if gap is not None:
+                    lines.append(_field("פער למחיר", ltr(f"{gap:+.1f}%")))
+        if rule is not None:
             lines.append(_field("כלל היציאה", rule))
 
     return "\n".join(lines)
