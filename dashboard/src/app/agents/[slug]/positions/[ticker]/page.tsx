@@ -15,13 +15,11 @@ import {
 } from "@/components/Cards";
 import { Term } from "@/components/Term";
 import {
-  loadBrainMemos,
   loadCompanyNames,
   loadJournal,
   loadLivePortfolio,
   loadPriceSeries,
 } from "@/lib/data";
-import { planFor } from "@/lib/position-plan";
 import { PositionPriceChart } from "@/components/PositionPriceChart";
 import { AGENTS, metaLocalized } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
@@ -115,17 +113,12 @@ export default async function PositionDetailPage({
   const meta = metaLocalized(slug, locale);
   if (!meta) return notFound();
 
-  const [portfolio, names, decisionsAll, priceSeries, memos] =
-    await Promise.all([
-      loadLivePortfolio(slug),
-      loadCompanyNames(),
-      loadJournal({ agent: slug, decisions: ["BUY"], limit: 5000 }),
-      loadPriceSeries(ticker),
-      // The agent's own memo for this name, where the analyst layer
-      // reached it. It holds the thesis, the horizon and the valuation
-      // that nothing on this page could state before.
-      loadBrainMemos(),
-    ]);
+  const [portfolio, names, decisionsAll, priceSeries] = await Promise.all([
+    loadLivePortfolio(slug),
+    loadCompanyNames(),
+    loadJournal({ agent: slug, decisions: ["BUY"], limit: 5000 }),
+    loadPriceSeries(ticker),
+  ]);
   const position = portfolio?.positions.find((p) => p.ticker === ticker);
   if (!position) {
     return (
@@ -150,7 +143,6 @@ export default async function PositionDetailPage({
   const latestBuy = decisions[0]; // already sorted newest-first
   const value = position.shares * position.current_price;
   const companyName = names[ticker] ?? "";
-  const plan = planFor(memos, slug, ticker, locale);
   // Through the table even though `why_he` is the agent's Hebrew field:
   // several builders interpolate an English label into it, and the
   // positions already on the books carry that English until the next
@@ -261,100 +253,6 @@ export default async function PositionDetailPage({
           </ul>
         )}
       </Card>
-
-      {/* What the agent means to do with the name. Read off its own
-          memo, including the Hebrew thesis it wrote itself — until now
-          the only thesis any surface showed was the English one, run
-          through a phrase table that cannot translate a sentence
-          written fresh for each company. */}
-      {plan && (
-        <Card className="mb-6">
-          <h3 className="text-sm font-semibold mb-3">{t("plan_heading")}</h3>
-
-          {plan.thesis && (
-            <p className="text-sm leading-relaxed text-council-700 dark:text-council-300 mb-4">
-              {plan.thesis}
-            </p>
-          )}
-
-          {(plan.horizon || plan.intrinsicValue !== null) && (
-            <div className="grid grid-cols-2 gap-3 text-sm mb-1">
-              {plan.horizon && (
-                <div>
-                  <div className="text-xs text-muted uppercase tracking-wider">
-                    {t("plan_horizon")}
-                  </div>
-                  <div className="tabular">
-                    {plan.horizon.kind === "range"
-                      ? t("plan_years_range").replace(
-                          "{range}",
-                          plan.horizon.range,
-                        )
-                      : plan.horizon.kind === "years"
-                        ? t("plan_years").replace(
-                            "{n}",
-                            String(plan.horizon.years),
-                          )
-                        : t("plan_months").replace(
-                            "{n}",
-                            String(plan.horizon.months),
-                          )}
-                  </div>
-                </div>
-              )}
-              {plan.intrinsicValue !== null && (
-                <div>
-                  <div className="text-xs text-muted uppercase tracking-wider">
-                    {t("plan_intrinsic_value")}
-                  </div>
-                  <div className="tabular">
-                    ${plan.intrinsicValue.toFixed(2)}
-                    {plan.marginOfSafetyPct !== null && (
-                      <span className="text-xs text-muted">
-                        {" "}
-                        {t("plan_margin_of_safety").replace(
-                          "{pct}",
-                          `${plan.marginOfSafetyPct.toFixed(1)}%`,
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {plan.exitTriggers.length > 0 && (
-            <div className="mt-4">
-              <div className="text-xs text-muted uppercase tracking-wider mb-1">
-                {t("plan_exit_triggers")}
-                {/* Said out loud rather than left for the reader to
-                    notice: the trigger lists are English-only in all
-                    five memo models, and each one is written fresh per
-                    company, so there is nothing to translate them
-                    with. */}
-                {!plan.exitTriggersAreNative && (
-                  <span className="normal-case tracking-normal">
-                    {" "}
-                    {t("plan_triggers_untranslated")}
-                  </span>
-                )}
-              </div>
-              <ul className="space-y-1">
-                {plan.exitTriggers.map((x, i) => (
-                  <li
-                    key={i}
-                    className="text-sm text-council-700 dark:text-council-300 flex items-start gap-2"
-                  >
-                    <span className="text-muted mt-0.5">•</span>
-                    <span>{decorate(translateExitTrigger(x, locale))}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Card>
-      )}
 
       {latestBuy?.exit_trigger && (
         <Card className="mb-6">
