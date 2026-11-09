@@ -155,6 +155,21 @@ test("English is returned untouched when the locale is English", () => {
   }
 });
 
+test("the scaling-out ladder reads in Hebrew", () => {
+  // agents/marks/cycle_value.py has written "trim at {p:.2f}", joined by
+  // "; ", since the strategy was built — but only when a memo carries
+  // trim_at_price_levels, and none did until 2026-11-06. A format string
+  // the table had never covered sat in the code for months and then
+  // arrived on a page in English, which is exactly what the journal walk
+  // below exists to catch.
+  const real = "trim at 95.00; trim at 110.00"; // howard_marks/2026-11-06
+  const he = translateExitTrigger(real, "he");
+  assert.equal(he, "מכירה חלקית ב-95.00; מכירה חלקית ב-110.00");
+  assert.ok(!stillEnglish(he), he);
+  // And the prices are untouched.
+  assert.deepEqual(he.match(/[\d,.]+/g), ["95.00", "110.00"]);
+});
+
 test("the ratio abbreviations are left in Latin", () => {
   for (const input of ["P/E=11.23 (≤ 15.0)", "D/E=0.94 (≤ 1.0)", "ROE=18.2%"]) {
     const he = translateCriterion(input, "he");

@@ -516,3 +516,57 @@ class TestTheAnalystRulesThatReachHebrew:
 
         for english in self.FOUR:
             assert _exit_rule(Row(exit_trigger=english)) is not None, english
+
+
+class TestTheScalingOutPlanReadsInHebrew:
+    """``trim at 95.00; trim at 110.00`` — Marks' price ladder.
+
+    ``agents/marks/cycle_value.py`` has written this since the strategy
+    was built, from ``memo.scaling_out_plan.trim_at_price_levels``, and
+    the branch is only reached when a memo carries levels. No memo did
+    until 2026-11-06, so a format string the table had never covered sat
+    in the code for months and then arrived on a page in English.
+
+    It is a template, not prose: one clause, a fixed format, identical
+    every run. The table has to render it.
+    """
+
+    #: The real string, from data/decisions/howard_marks/2026-11-06.json.
+    REAL = "trim at 95.00; trim at 110.00"
+
+    def test_both_levels_come_back_in_hebrew(self) -> None:
+        from core.live.hebrew_terms import translate
+
+        hebrew = translate(self.REAL)
+        assert hebrew.count("מכירה חלקית") == 2, hebrew
+        assert "trim" not in hebrew, hebrew
+
+    def test_every_price_survives(self) -> None:
+        import re
+
+        from core.live.hebrew_terms import translate
+
+        hebrew = translate(self.REAL)
+        assert re.findall(r"[\d,.]+", hebrew) == ["95.00", "110.00"], hebrew
+
+    def test_one_level_reads_too(self) -> None:
+        """A single-element ladder joins to no semicolon."""
+        from core.live.hebrew_terms import translate
+
+        assert translate("trim at 4.21") == "מכירה חלקית ב-4.21"
+
+    def test_it_survives_the_notifier_guard(self) -> None:
+        """The guard withholds anything half-Hebrew. This is whole, so a
+        Telegram sell message must now name the ladder rather than fall
+        back to silence."""
+        from dataclasses import dataclass
+
+        from core.live.notify import _exit_rule
+
+        @dataclass
+        class Row:
+            exit_trigger: str
+
+        rule = _exit_rule(Row(exit_trigger=self.REAL))
+        assert rule is not None
+        assert "מכירה חלקית" in rule
