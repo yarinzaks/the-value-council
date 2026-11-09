@@ -1,0 +1,350 @@
+{
+ "all_clear": false,
+ "at": "2026-11-06T15:48:17+00:00",
+ "breaches": [],
+ "circuit_breaker": false,
+ "drawdown_from_peak": -0.023127529999999896,
+ "filings_flagged": [
+  {
+   "accession": "0001001614-26-000061",
+   "code": "1.01",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "entry into a material agreement",
+   "severity": "investigate",
+   "ticker": "REPX"
+  },
+  {
+   "accession": "0000832988-26-000240",
+   "code": "5.02",
+   "filed": "2026-11-05",
+   "form": "8-K",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "SIG"
+  },
+  {
+   "accession": "0001193125-26-449720",
+   "code": "2.02",
+   "filed": "2026-11-05",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "PRDO"
+  },
+  {
+   "accession": "0001628280-26-070297",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "NATR"
+  },
+  {
+   "accession": "0001628280-26-070276",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "SD"
+  },
+  {
+   "accession": "0001653477-26-000061",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "NGVT"
+  },
+  {
+   "accession": "0001001614-26-000061",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "REPX"
+  },
+  {
+   "accession": "0001104659-26-122377",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "HRMY"
+  },
+  {
+   "accession": "0001104659-26-120673",
+   "code": "5.02",
+   "filed": "2026-10-30",
+   "form": "8-K/A",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "HRMY"
+  },
+  {
+   "accession": "0000099780-26-000135",
+   "code": "2.02",
+   "filed": "2026-10-29",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "TRN"
+  },
+  {
+   "accession": "0001193125-26-437037",
+   "code": "2.02",
+   "filed": "2026-10-29",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "UPBD"
+  },
+  {
+   "accession": "0000933034-26-000009",
+   "code": "2.02",
+   "filed": "2026-10-29",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "STRT"
+  },
+  {
+   "accession": "0001050797-26-000148",
+   "code": "2.02",
+   "filed": "2026-10-29",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "COLM"
+  },
+  {
+   "accession": "0001193125-26-437812",
+   "code": "5.02",
+   "filed": "2026-10-29",
+   "form": "8-K",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "KSS"
+  }
+ ],
+ "forced_exits_proposed": [],
+ "kill_criteria": [],
+ "limits": [
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UPBD",
+   "note": "",
+   "observed": 0.028286189700893093,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:ASO",
+   "note": "",
+   "observed": 0.027528670144630035,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:KSS",
+   "note": "",
+   "observed": 0.024230389049657627,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:LRN",
+   "note": "",
+   "observed": 0.022633455931049016,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:GCO",
+   "note": "",
+   "observed": 0.022301785206414917,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UTMD",
+   "note": "",
+   "observed": 0.021767426816726648,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PLAB",
+   "note": "",
+   "observed": 0.02173466921429365,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:TRN",
+   "note": "",
+   "observed": 0.02154017094984773,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:COLM",
+   "note": "",
+   "observed": 0.021229997401810287,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SD",
+   "note": "",
+   "observed": 0.02082564574677798,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:HRMY",
+   "note": "",
+   "observed": 0.02005379473945048,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PRDO",
+   "note": "",
+   "observed": 0.0195458778769761,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NGVT",
+   "note": "",
+   "observed": 0.01916129338766195,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:STRT",
+   "note": "",
+   "observed": 0.01843229341901712,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:RMR",
+   "note": "",
+   "observed": 0.017791472821421614,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:REPX",
+   "note": "",
+   "observed": 0.016722756042045078,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NATR",
+   "note": "",
+   "observed": 0.01499069781340035,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:MHO",
+   "note": "",
+   "observed": 0.013562159244798864,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:POWL",
+   "note": "",
+   "observed": 0.013416285546464422,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIG",
+   "note": "",
+   "observed": 0.01247245712636369,
+   "state": "pass"
+  },
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "39.8% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.3982274881797006,
+   "state": "unknown"
+  },
+  {
+   "cap": 0.2,
+   "forces_action": false,
+   "limit": "illiquid_aggregate",
+   "note": "",
+   "observed": 0.09380753661734371,
+   "state": "pass"
+  },
+  {
+   "cap": 0.05,
+   "forces_action": false,
+   "limit": "cash_floor",
+   "note": "",
+   "observed": 0.6017725118202993,
+   "state": "pass"
+  },
+  {
+   "cap": 1.0,
+   "forces_action": false,
+   "limit": "leverage",
+   "note": "",
+   "observed": 0.39822748817970066,
+   "state": "pass"
+  },
+  {
+   "cap": -0.25,
+   "forces_action": false,
+   "limit": "drawdown_circuit_breaker",
+   "note": "",
+   "observed": -0.023127529999999896,
+   "state": "pass"
+  }
+ ],
+ "run": "heartbeat",
+ "unknown_limits": [
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "39.8% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.3982274881797006,
+   "state": "unknown"
+  }
+ ]
+}
