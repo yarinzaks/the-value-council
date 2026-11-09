@@ -1,0 +1,305 @@
+{
+ "all_clear": false,
+ "at": "2026-11-09T15:50:16+00:00",
+ "breaches": [],
+ "circuit_breaker": false,
+ "drawdown_from_peak": -0.016498749999999895,
+ "filings_flagged": [
+  {
+   "accession": "0001001614-26-000061",
+   "code": "1.01",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "entry into a material agreement",
+   "severity": "investigate",
+   "ticker": "REPX"
+  },
+  {
+   "accession": "0000832988-26-000240",
+   "code": "5.02",
+   "filed": "2026-11-05",
+   "form": "8-K",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "SIG"
+  },
+  {
+   "accession": "0001193125-26-449720",
+   "code": "2.02",
+   "filed": "2026-11-05",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "PRDO"
+  },
+  {
+   "accession": "0001628280-26-070297",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "NATR"
+  },
+  {
+   "accession": "0001628280-26-070276",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "SD"
+  },
+  {
+   "accession": "0001653477-26-000061",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "NGVT"
+  },
+  {
+   "accession": "0001001614-26-000061",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "REPX"
+  },
+  {
+   "accession": "0001104659-26-122377",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "HRMY"
+  },
+  {
+   "accession": "0001104659-26-120673",
+   "code": "5.02",
+   "filed": "2026-10-30",
+   "form": "8-K/A",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "HRMY"
+  }
+ ],
+ "forced_exits_proposed": [],
+ "kill_criteria": [],
+ "limits": [
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:ASO",
+   "note": "",
+   "observed": 0.02851445282860596,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UPBD",
+   "note": "",
+   "observed": 0.027055379949949224,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:KSS",
+   "note": "",
+   "observed": 0.02492116812256212,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:LRN",
+   "note": "",
+   "observed": 0.023649181940541508,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PLAB",
+   "note": "",
+   "observed": 0.02329636083329838,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:GCO",
+   "note": "",
+   "observed": 0.022328390533311475,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:UTMD",
+   "note": "",
+   "observed": 0.021982178466982118,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:COLM",
+   "note": "",
+   "observed": 0.021773231096554272,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:TRN",
+   "note": "",
+   "observed": 0.0209892971666279,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SD",
+   "note": "",
+   "observed": 0.020156558011492104,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:HRMY",
+   "note": "",
+   "observed": 0.020126054745736213,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:STRT",
+   "note": "",
+   "observed": 0.0193543221221122,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:PRDO",
+   "note": "",
+   "observed": 0.01930958399900356,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NGVT",
+   "note": "",
+   "observed": 0.018794587195491617,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:RMR",
+   "note": "",
+   "observed": 0.01763241277019221,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:REPX",
+   "note": "",
+   "observed": 0.016740192246832424,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:NATR",
+   "note": "",
+   "observed": 0.015601403658612532,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:POWL",
+   "note": "",
+   "observed": 0.014432365998518049,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:MHO",
+   "note": "",
+   "observed": 0.013644110772609592,
+   "state": "pass"
+  },
+  {
+   "cap": 0.35,
+   "forces_action": false,
+   "limit": "trim_above_35pct:SIG",
+   "note": "",
+   "observed": 0.011982191176676186,
+   "state": "pass"
+  },
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "40.2% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.4022834236357097,
+   "state": "unknown"
+  },
+  {
+   "cap": 0.2,
+   "forces_action": false,
+   "limit": "illiquid_aggregate",
+   "note": "",
+   "observed": 0.09472687502939116,
+   "state": "pass"
+  },
+  {
+   "cap": 0.05,
+   "forces_action": false,
+   "limit": "cash_floor",
+   "note": "",
+   "observed": 0.5977165763642903,
+   "state": "pass"
+  },
+  {
+   "cap": 1.0,
+   "forces_action": false,
+   "limit": "leverage",
+   "note": "",
+   "observed": 0.4022834236357096,
+   "state": "pass"
+  },
+  {
+   "cap": -0.25,
+   "forces_action": false,
+   "limit": "drawdown_circuit_breaker",
+   "note": "",
+   "observed": -0.016498749999999895,
+   "state": "pass"
+  }
+ ],
+ "run": "heartbeat",
+ "unknown_limits": [
+  {
+   "cap": 0.45,
+   "forces_action": false,
+   "limit": "correlated_cluster:unlabelled",
+   "note": "40.2% of the book carries no cluster label and cannot be checked against the 45% cap",
+   "observed": 0.4022834236357097,
+   "state": "unknown"
+  }
+ ]
+}
