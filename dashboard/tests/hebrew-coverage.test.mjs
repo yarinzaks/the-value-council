@@ -44,7 +44,7 @@ const BUNDLE = JSON.parse(
  *  `nan` is here because the notifier drops a criterion carrying one and
  *  this site may still render it — see core/live/notify.py. */
 const KEEP =
-  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|Net-Net|SPAC|REIT|nan/g;
+  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|Net-Net|SPAC|REIT|XBRL|nan/g;
 
 function stillEnglish(text) {
   return /[A-Za-z]{3,}/.test(text.replace(KEEP, ""));
@@ -155,6 +155,21 @@ test("English is returned untouched when the locale is English", () => {
   }
 });
 
+test("the scaling-out ladder reads in Hebrew", () => {
+  // agents/marks/cycle_value.py has written "trim at {p:.2f}", joined by
+  // "; ", since the strategy was built — but only when a memo carries
+  // trim_at_price_levels, and none did until 2026-11-06. A format string
+  // the table had never covered sat in the code for months and then
+  // arrived on a page in English, which is exactly what the journal walk
+  // below exists to catch.
+  const real = "trim at 95.00; trim at 110.00"; // howard_marks/2026-11-06
+  const he = translateExitTrigger(real, "he");
+  assert.equal(he, "מכירה חלקית ב-95.00; מכירה חלקית ב-110.00");
+  assert.ok(!stillEnglish(he), he);
+  // And the prices are untouched.
+  assert.deepEqual(he.match(/[\d,.]+/g), ["95.00", "110.00"]);
+});
+
 test("the ratio abbreviations are left in Latin", () => {
   for (const input of ["P/E=11.23 (≤ 15.0)", "D/E=0.94 (≤ 1.0)", "ROE=18.2%"]) {
     const he = translateCriterion(input, "he");
@@ -251,7 +266,18 @@ test("every criterion in the live journal comes back in Hebrew", () => {
  */
 function isAnalystProse(text) {
   if (/\b(I|me|my|Let|we|our)\b/.test(text)) return true;
-  return text.includes(";") && text.length > 150;
+  // A comma joins clauses as a semicolon does, and the analyst uses
+  // both. Lynch wrote "Not applicable since no position is taken.
+  // Revisit only if PEG on verified three-year growth falls to 1.0 or
+  // below, with earnings consistency, free cash flow, margins and
+  // insider data confirmed from the filing" — 200 characters, no
+  // semicolon, and this called it a strategy template.
+  //
+  // 150 characters stays the line because no template comes near it:
+  // the longest of the eight the quantitative strategies write is
+  // Graham's 99-character "price reaches the Graham Number; OR P/E or
+  // P/B revert above thresholds; OR fundamentals deteriorate".
+  return /[;,]/.test(text) && text.length > 150;
 }
 
 test("nothing templated is left in English", () => {

@@ -26,6 +26,7 @@
 set -euo pipefail
 
 DASHBOARD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$DASHBOARD_DIR/.." && pwd)"
 cd "$DASHBOARD_DIR"
 
 # Default to the repo's own data tree, which is what CI has. A developer
@@ -83,6 +84,30 @@ done
 # questions about a dashboard it cannot read would make things up.
 echo "=== chat context ==="
 node "$DASHBOARD_DIR/scripts/export-chat-context.mjs" "$SITE_DIR/chat-context.json"
+
+# The doctrines themselves, so the assistant can apply one to a company
+# the agents have never looked at. Asked to judge a stock by Buffett's
+# rules it had no idea what they are: the playbooks are in the repo and
+# nothing published them. One file per agent, fetched by /api/chat only
+# when a question names that agent — 9,000 tokens is worth paying for
+# the question that asked for it and not for every other question.
+echo "=== playbooks ==="
+mkdir -p "$SITE_DIR/playbooks"
+published=""
+for book in "$REPO_DIR"/agents/*/playbook.md; do
+  slug="$(basename "$(dirname "$book")")"
+  cp "$book" "$SITE_DIR/playbooks/$slug.md"
+  published="$published $slug"
+done
+# A manifest, so the edge function asks only for a file that is there
+# rather than treating a 404 as an answer.
+node -e '
+  const fs = require("fs");
+  const dir = process.argv[1];
+  const slugs = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3)).sort();
+  fs.writeFileSync(dir + "/index.json", JSON.stringify(slugs));
+  console.log("  " + slugs.length + " playbooks: " + slugs.join(", "));
+' "$SITE_DIR/playbooks"
 
 # Hebrew is the default: this dashboard has one reader and that is the
 # language they use. Cloudflare Pages reads this file; other static

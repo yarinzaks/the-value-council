@@ -136,7 +136,29 @@
     "expands above": "מתרחב מעל",
     "Sell if ": "מכור אם ",
     "Dividend yield ": "תשואת דיבידנד ",
-    ", so PEGY equals PEG": ", ולכן PEGY שווה ל-PEG"
+    ", so PEGY equals PEG": ", ולכן PEGY שווה ל-PEG",
+    "#1 no 10 years of positive earnings": "‎#1 אין 10 שנים של רווח חיובי",
+    "#2 never paid a dividend": "‎#2 מעולם לא חילקה דיבידנד",
+    "#3 market cap < $50M": "‎#3 שווי שוק נמוך מ-50 מיליון דולר",
+    "#6 intangibles > 50% of equity": "‎#6 נכסים לא-מוחשיים מעל 50% מההון",
+    "#8 debt exceeds book value": "‎#8 החוב גבוה מההון העצמי",
+    "#10 excluded sector": "‎#10 סקטור מוחרג",
+    "not 10 years of positive earnings": "אין 10 שנים של רווח חיובי",
+    "no current assets (unclassified balance sheet)": "אין נכסים שוטפים (מאזן לא מסווג)",
+    "price >= 1.2x NTA and P/E >= 10": "המחיר מ-1.2x הנכסים המוחשיים נטו ומעלה, ו-P/E מ-10 ומעלה",
+    "P/B > 1.5 and P/E x P/B > 22.5": "P/B מעל 1.5 ו-P/E כפול P/B מעל 22.5",
+    "long-term debt > working capital": "חוב לזמן ארוך גבוה מההון החוזר",
+    "debt > 110% of net current assets": "החוב מעל 110% מהנכסים השוטפים נטו",
+    "loss in the last 5 years": "הפסד באחת מחמש השנים האחרונות",
+    "earnings below 4 years ago": "הרווח נמוך מזה שלפני ארבע שנים",
+    "P/E (3y avg) > 15": "P/E (ממוצע 3 שנים) מעל 15",
+    "price > 2/3 NCAV": "המחיר מעל ⅔ מה-NCAV",
+    "no current dividend": "אין דיבידנד שוטף",
+    "no annual net income": "אין רווח נקי שנתי",
+    "TTM EPS <= 0": "EPS ל-12 החודשים האחרונים אינו חיובי",
+    "current ratio < 1.5": "יחס שוטף נמוך מ-1.5",
+    "current ratio < 2": "יחס שוטף נמוך מ-2",
+    "no XBRL facts": "אין נתוני XBRL"
   },
   "patterns": [
     [
@@ -202,6 +224,22 @@
     [
       "\\bearnings growth decelerates below ([\\d.]+)%",
       "צמיחת הרווח מואטת מתחת ל-\\1%"
+    ],
+    [
+      "\\bdividend streak (\\d+)y",
+      "רצף דיבידנד של \\1 שנים"
+    ],
+    [
+      "\\b(\\d+)y dividend streak",
+      "רצף דיבידנד של \\1 שנים"
+    ],
+    [
+      "\\b10y earnings growth (.+?) < 33%",
+      "צמיחת רווח ל-10 שנים \\1 — פחות מ-33%"
+    ],
+    [
+      "\\btrim at ([\\d,.]+)",
+      "מכירה חלקית ב-\\1"
     ]
   ],
   "industry_by_code": {

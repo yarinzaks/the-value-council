@@ -68,7 +68,7 @@ PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
 #: investor reads in Latin script, and the units beside them.
 _LATIN_BY_CONVENTION = re.compile(
     r"P/E|P/B|P/CF|P/NCAV|D/E|TR/PE|EV/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY"
-    r"|NCAV|CAGR|DCF|EBIT|BVPS|REIT|SPAC|NAV|CEO|USD|nan|CR|bps"
+    r"|NCAV|CAGR|DCF|EBIT|BVPS|REIT|SPAC|NAV|CEO|USD|XBRL|nan|CR|bps"
 )
 
 _HEBREW = re.compile(r"[\u0590-\u05ff]")

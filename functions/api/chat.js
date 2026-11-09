@@ -169,6 +169,24 @@ Two things are deliberately absent, and reporting them as absent is the correct 
 
 Nothing in the data states a holding horizon, so you cannot say how long an agent means to hold. If asked, say so.
 
+## Judging a company the agents have never looked at
+
+A reader may give you any ticker, sector or company — one no agent holds, watches or has ever written a row about — and ask what you make of it. Answer. Two ways, and say which you are doing:
+
+**By an agent's doctrine.** When the question names one ("analyse this by Buffett", "מה שלוס היה אומר"), the playbooks for the agents it names are appended to this prompt. Work from that text, not from what you recall of the investor: apply the criteria as the playbook numbers them, name the section, and give the verdict the rules give, not the one the reputation suggests. Where a criterion needs a figure, search for it and cite it. Where a figure cannot be found, say which criterion you could not test — a doctrine with one untested criterion is an incomplete verdict, not a pass.
+
+Four doctrines cannot be applied to one company at all: Greenblatt ranks earnings yield and return on capital against the whole market, Dreman wants the bottom fifth of the market's P/E, Neff compares the P/E to the market's average, and Marks reads the market's cycle before any security. A rank is not a property of a company. If the reader names one of those, say the doctrine needs the whole market and offer the parts that are absolute — Greenblatt's own return-on-capital and earnings-yield figures, for instance — without calling the result a verdict.
+
+**On your own.** When no agent is named, analyse as an analyst would: what the business does, how it earns, the balance sheet, what the numbers say about the price. Search for the figures. The same sourcing rules apply — every number gets a source and a date, and a figure you cannot find is reported as not found.
+
+Whichever way, three things:
+
+- **A verdict from a doctrine is the doctrine's, not yours.** "Graham's screen rejects it on four criteria" is an answer. "It is a bad investment" is advice, which you may not give.
+- **Say what you could not check.** A screen run on four of seven criteria is a screen run on four of seven criteria.
+- **The agents' own books stay separate from this.** If an agent holds the name, its position and the reason it bought are in the dashboard data and outrank any fresh analysis of yours about what that agent thinks.
+
+There is also an exact version of Graham's screen, run from the terminal, which measures his criteria against the local SEC cache: \`python -m scripts.run_ticker_screen <TICKER>\`. Mention it when a reader wants Graham's verdict with no estimation in it.
+
 ## Reading a return
 
 A book's total return is the sum of four parts, and they are in the data under return_breakdown: closed trades (realized), open positions (unrealized), dividends, and costs. An agent can show a gain while every position it currently holds is losing money — that means closed trades paid for the open ones, and saying so is the answer. Check attributed and unattributed before naming which stocks produced a gain, and read the sign of unattributed. Positive means closed result no stock can be named for, because those trades closed before the ledger existed. Negative means the named trades add up to more than the book's own closed result — a reconstructed amount is overstated, so rely on the book's total and say the names are approximate. Do not describe a negative unattributed as untraceable; it is the opposite problem.
@@ -461,6 +479,77 @@ function json(body, status = 200) {
   });
 }
 
+/** Which playbook a question is asking for.
+ *
+ *  The doctrines are published as /playbooks/<slug>.md and fetched
+ *  only when a question names the agent, because one is 9,000 tokens
+ *  and most questions need none. Asked to judge a company by Buffett's
+ *  rules the assistant had no idea what they are — the playbooks were
+ *  in the repository and nothing published them.
+ *
+ *  Matched on the surname in either language, and on the dashboard's
+ *  own slug, because a reader writes "באפט", "Buffett" and
+ *  "warren_buffett" for the same thing. Graham II shares Graham's
+ *  playbook: it is the same doctrine opened on a later date.
+ */
+const PLAYBOOK_ALIASES = {
+  buffett: ["buffett", "warren_buffett", "באפט", "בפט", "וורן"],
+  schloss: ["schloss", "walter_schloss", "שלוס", "וולטר"],
+  graham: ["graham", "benjamin_graham", "benjamin_graham_2", "גראהם", "גרהם", "בנג'מין"],
+  klarman: ["klarman", "seth_klarman", "קלרמן", "סת"],
+  lynch: ["lynch", "peter_lynch", "לינץ", "פיטר"],
+  fisher: ["fisher", "philip_fisher", "פישר", "פיליפ"],
+  neff: ["neff", "john_neff", "נף", "ג'ון"],
+  dreman: ["dreman", "david_dreman", "דרמן", "דייוויד"],
+  marks: ["marks", "howard_marks", "מארקס", "מרקס", "הווארד"],
+  greenblatt: ["greenblatt", "greenblatt_magic_formula", "גרינבלט", "גרינבלאט", "הפורמולה הקסומה"],
+};
+
+/** Every playbook named anywhere in the conversation's last question. */
+export function playbooksAskedFor(text) {
+  const haystack = String(text || "").toLowerCase();
+  const found = [];
+  for (const [slug, aliases] of Object.entries(PLAYBOOK_ALIASES)) {
+    // Where in the question the reader first named this agent, so the
+    // cap below keeps the ones they asked for first rather than the
+    // ones this object happens to list first.
+    const at = Math.min(
+      ...aliases
+        .map((alias) => haystack.indexOf(alias.toLowerCase()))
+        .filter((i) => i >= 0),
+    );
+    if (Number.isFinite(at)) found.push([at, slug]);
+  }
+  found.sort((a, b) => a[0] - b[0]);
+  // A question naming every agent would be 90,000 tokens. Four is the
+  // most a reader compares in one breath, and the reply says which
+  // ones were read.
+  return found.slice(0, 4).map(([, slug]) => slug);
+}
+
+/** The named doctrines, as the agents' own playbooks state them. */
+async function loadPlaybooks(env, request, slugs) {
+  if (!slugs.length) return [];
+  const base = new URL(request.url);
+  base.search = "";
+  const out = [];
+  for (const slug of slugs) {
+    const url = new URL(base.toString());
+    url.pathname = `/playbooks/${slug}.md`;
+    try {
+      const response = await env.ASSETS.fetch(new Request(url.toString()));
+      if (!response.ok) continue;
+      out.push({ slug, text: await response.text() });
+    } catch {
+      // A playbook that will not load is one doctrine the answer
+      // cannot use. The question is still answerable without it, and
+      // the prompt tells the assistant to say so.
+      continue;
+    }
+  }
+  return out;
+}
+
 /** The site's own published context file, fetched from its own assets. */
 async function loadContext(env, request) {
   const url = new URL(request.url);
@@ -555,9 +644,16 @@ export async function onRequestPost({ request, env }) {
     return json({ error: `Dashboard data unavailable: ${error.message}` }, 503);
   }
 
-  // Two blocks, with the cache breakpoint after the data: everything
-  // before it is byte-identical between questions, and the question
-  // itself lives in `messages`, after the breakpoint.
+  // The doctrines this question asked for, read off the last user
+  // message. Fetched after the context so a question naming an agent
+  // does not change the cached prefix for one that does not.
+  const asked = playbooksAskedFor(messages[messages.length - 1]?.content);
+  const playbooks = await loadPlaybooks(env, request, asked);
+
+  // Three blocks, with the cache breakpoint after the data: everything
+  // up to it is byte-identical between questions, the playbooks vary
+  // per question and so sit after it, and the question itself lives in
+  // `messages`, after that.
   const systemBlocks = [
     { type: "text", text: SYSTEM },
     {
@@ -566,6 +662,29 @@ export async function onRequestPost({ request, env }) {
       cache_control: { type: "ephemeral" },
     },
   ];
+  if (playbooks.length > 0) {
+    systemBlocks.push({
+      type: "text",
+      text:
+        "PLAYBOOKS — the doctrines, as each agent's own playbook " +
+        "states them. This is the rulebook the agent trades by, not a " +
+        "summary of it. Apply it as written and name the section you " +
+        "are applying.\n\n" +
+        playbooks
+          .map((p) => `### playbook: ${p.slug}\n\n${p.text}`)
+          .join("\n\n---\n\n"),
+    });
+  } else if (asked.length > 0) {
+    // Named an agent whose playbook would not load. Saying so beats
+    // answering from an impression of the doctrine.
+    systemBlocks.push({
+      type: "text",
+      text:
+        `The reader named ${asked.join(", ")}, but the playbook could ` +
+        "not be loaded. Say that you could not read the doctrine and " +
+        "do not reconstruct it from memory.",
+    });
+  }
 
   const upstream = await askClaude(apiKey, systemBlocks, toMessages(messages));
   if (!upstream.ok) {
