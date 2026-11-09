@@ -55,7 +55,7 @@ const SHARED_PATTERNS: readonly [RegExp, string][] = (
 /** Latin that belongs in a Hebrew sentence: the abbreviations an Israeli
  *  investor reads in Latin script, and the units beside them. */
 const LATIN_BY_CONVENTION =
-  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|REIT|SPAC|NAV|CEO|USD|nan|CR|bps/g;
+  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|REIT|SPAC|NAV|CEO|USD|XBRL|nan|CR|bps/g;
 
 /**
  * Whether a string came out half Hebrew and half English sentence.

@@ -44,7 +44,7 @@ const BUNDLE = JSON.parse(
  *  `nan` is here because the notifier drops a criterion carrying one and
  *  this site may still render it — see core/live/notify.py. */
 const KEEP =
-  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|Net-Net|SPAC|REIT|nan/g;
+  /P\/E|P\/B|P\/CF|P\/NCAV|D\/E|TR\/PE|EV\/EBIT|ROE|ROC|EPS|FCF|PEGY|PEG|MoS|OE|EY|NCAV|CAGR|DCF|EBIT|BVPS|Net-Net|SPAC|REIT|XBRL|nan/g;
 
 function stillEnglish(text) {
   return /[A-Za-z]{3,}/.test(text.replace(KEEP, ""));
@@ -251,7 +251,18 @@ test("every criterion in the live journal comes back in Hebrew", () => {
  */
 function isAnalystProse(text) {
   if (/\b(I|me|my|Let|we|our)\b/.test(text)) return true;
-  return text.includes(";") && text.length > 150;
+  // A comma joins clauses as a semicolon does, and the analyst uses
+  // both. Lynch wrote "Not applicable since no position is taken.
+  // Revisit only if PEG on verified three-year growth falls to 1.0 or
+  // below, with earnings consistency, free cash flow, margins and
+  // insider data confirmed from the filing" — 200 characters, no
+  // semicolon, and this called it a strategy template.
+  //
+  // 150 characters stays the line because no template comes near it:
+  // the longest of the eight the quantitative strategies write is
+  // Graham's 99-character "price reaches the Graham Number; OR P/E or
+  // P/B revert above thresholds; OR fundamentals deteriorate".
+  return /[;,]/.test(text) && text.length > 150;
 }
 
 test("nothing templated is left in English", () => {
