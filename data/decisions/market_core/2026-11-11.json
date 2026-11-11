@@ -1,0 +1,527 @@
+[
+  {
+    "ticker": "AAPL",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 5143892618152.0,
+      "weight_pct": 15.128
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 353.9656066894531,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $5,144bn, 15.1% of the book"
+  },
+  {
+    "ticker": "NVDA",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 4170505073547.0,
+      "weight_pct": 12.265
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 173.0500030517578,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $4,171bn, 12.3% of the book"
+  },
+  {
+    "ticker": "MSFT",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 3907477827747.0,
+      "weight_pct": 11.492
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 526.1749877929688,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $3,907bn, 11.5% of the book"
+  },
+  {
+    "ticker": "GOOGL",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 3573558299927.0,
+      "weight_pct": 10.51
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 290.67498779296875,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $3,574bn, 10.5% of the book"
+  },
+  {
+    "ticker": "AMZN",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 2903003254211.0,
+      "weight_pct": 8.537
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 268.4700012207031,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $2,903bn, 8.5% of the book"
+  },
+  {
+    "ticker": "AVGO",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 1684661733139.0,
+      "weight_pct": 4.954
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 352.9100036621094,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $1,685bn, 5.0% of the book"
+  },
+  {
+    "ticker": "TSLA",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 1548651064806.0,
+      "weight_pct": 4.554
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 392.1084899902344,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $1,549bn, 4.6% of the book"
+  },
+  {
+    "ticker": "LLY",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 1335569066584.0,
+      "weight_pct": 3.928
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 1418.7698974609375,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $1,336bn, 3.9% of the book"
+  },
+  {
+    "ticker": "WMT",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 985847324855.0,
+      "weight_pct": 2.899
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 124.26000213623047,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $986bn, 2.9% of the book"
+  },
+  {
+    "ticker": "JPM",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 910329697296.0,
+      "weight_pct": 2.677
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 342.7950134277344,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $910bn, 2.7% of the book"
+  },
+  {
+    "ticker": "MU",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 904095400713.0,
+      "weight_pct": 2.659
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 799.0780029296875,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $904bn, 2.7% of the book"
+  },
+  {
+    "ticker": "AMD",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 873766124815.0,
+      "weight_pct": 2.57
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 535.2401123046875,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $874bn, 2.6% of the book"
+  },
+  {
+    "ticker": "XOM",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 692807777133.0,
+      "weight_pct": 2.037
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 166.27000427246094,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $693bn, 2.0% of the book"
+  },
+  {
+    "ticker": "JNJ",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 666824943682.0,
+      "weight_pct": 1.961
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 277.0,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $667bn, 2.0% of the book"
+  },
+  {
+    "ticker": "ONC",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 602835771229.0,
+      "weight_pct": 1.773
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 417.9800109863281,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $603bn, 1.8% of the book"
+  },
+  {
+    "ticker": "ABBV",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 515097000148.0,
+      "weight_pct": 1.515
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 291.489990234375,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $515bn, 1.5% of the book"
+  },
+  {
+    "ticker": "COST",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 476926480500.0,
+      "weight_pct": 1.403
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 1075.0,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $477bn, 1.4% of the book"
+  },
+  {
+    "ticker": "CVX",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 423400862392.0,
+      "weight_pct": 1.245
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 212.19000244140625,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $423bn, 1.2% of the book"
+  },
+  {
+    "ticker": "KO",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 413471513229.0,
+      "weight_pct": 1.216
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 96.13999938964844,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $413bn, 1.2% of the book"
+  },
+  {
+    "ticker": "PLTR",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 412337359858.0,
+      "weight_pct": 1.213
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 171.60009765625,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $412bn, 1.2% of the book"
+  },
+  {
+    "ticker": "CSCO",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 397531041624.0,
+      "weight_pct": 1.169
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 100.83000183105469,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $398bn, 1.2% of the book"
+  },
+  {
+    "ticker": "ORCL",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 379811480806.0,
+      "weight_pct": 1.117
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 125.61000061035156,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $380bn, 1.1% of the book"
+  },
+  {
+    "ticker": "BAC",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 364073083199.0,
+      "weight_pct": 1.071
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 50.72999954223633,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $364bn, 1.1% of the book"
+  },
+  {
+    "ticker": "MRK",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 359734827077.0,
+      "weight_pct": 1.058
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 145.80859375,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $360bn, 1.1% of the book"
+  },
+  {
+    "ticker": "UNH",
+    "decision": "BUY",
+    "agent": "market_core",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "largest_by_capitalisation",
+      "liquid"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "market_cap_usd": 356867884415.0,
+      "weight_pct": 1.05
+    },
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 398.2799987792969,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "market capitalisation $357bn, 1.0% of the book"
+  }
+]

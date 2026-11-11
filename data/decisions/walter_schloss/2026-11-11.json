@@ -1,0 +1,184 @@
+[
+  {
+    "ticker": "BUR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.346 (< 0.75)",
+      "D/E=0.87 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.3462,
+      "debt_to_equity": 0.8692,
+      "book_value_per_share": 11.183419961421203,
+      "market_cap": 801164649.188118,
+      "net_income": 62572000.0,
+      "price": 3.6600000858306885
+    },
+    "market_conditions": {},
+    "confidence": 0.6537752995943313,
+    "entry_price": 3.6600000858306885,
+    "target_price": 11.183419961421203,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.346, D/E 0.87, BVPS 11.18"
+  },
+  {
+    "ticker": "BHF",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.378 (< 0.75)",
+      "D/E=0.47 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.3778,
+      "debt_to_equity": 0.4662,
+      "book_value_per_share": 118.35457965334035,
+      "market_cap": 2556701013.9363937,
+      "net_income": 433000000.0,
+      "price": 44.709999084472656
+    },
+    "market_conditions": {},
+    "confidence": 0.6222368478226369,
+    "entry_price": 44.709999084472656,
+    "target_price": 118.35457965334035,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.378, D/E 0.47, BVPS 118.35"
+  },
+  {
+    "ticker": "GNW",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.391 (< 0.75)",
+      "D/E=0.17 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.3909,
+      "debt_to_equity": 0.1729,
+      "book_value_per_share": 22.57417601413202,
+      "market_cap": 3343145280.375,
+      "net_income": 223000000.0,
+      "price": 8.625
+    },
+    "market_conditions": {},
+    "confidence": 0.6091260048667135,
+    "entry_price": 8.625,
+    "target_price": 22.57417601413202,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.391, D/E 0.17, BVPS 22.57"
+  },
+  {
+    "ticker": "AGO",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.581 (< 0.75)",
+      "D/E=0.30 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.5811,
+      "debt_to_equity": 0.3009,
+      "book_value_per_share": 125.98787744331774,
+      "market_cap": 3290699337.338173,
+      "net_income": 503000000.0,
+      "price": 73.20999908447266
+    },
+    "market_conditions": {},
+    "confidence": 0.41891235434607577,
+    "entry_price": 73.20999908447266,
+    "target_price": 125.98787744331774,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.581, D/E 0.30, BVPS 125.99"
+  },
+  {
+    "ticker": "FOR",
+    "decision": "BUY",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "P/B=0.661 (< 0.75)",
+      "D/E=0.45 (\u2264 1.0)",
+      "positive trailing net income"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "pb_ratio": 0.6612,
+      "debt_to_equity": 0.454,
+      "book_value_per_share": 34.77237957843461,
+      "market_cap": 1168859338.593172,
+      "net_income": 167900000.0,
+      "price": 22.989999771118164
+    },
+    "market_conditions": {},
+    "confidence": 0.3388430688425974,
+    "entry_price": 22.989999771118164,
+    "target_price": 34.77237957843461,
+    "exit_trigger": "P/B reverts toward 1.0\u00d7 book OR ~50% gain",
+    "rationale": "Schloss deep-value: P/B 0.661, D/E 0.45, BVPS 34.77"
+  },
+  {
+    "ticker": "GNW",
+    "decision": "FILL",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "rank #3",
+      "live paper-trade"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 8.625,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "P/B 0.39, D/E 0.17. Trades below tangible book \u2014 Schloss deep-value bargain."
+  },
+  {
+    "ticker": "BUR",
+    "decision": "TRIM",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "drifted outside the 25% rebalance band"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 3.6600000858306885,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Rebalance trim: 141.0000 shares at $3.66 to restore the target weight"
+  },
+  {
+    "ticker": "GNW",
+    "decision": "ADD",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-11T00:00:00+00:00",
+    "criteria_met": [
+      "drifted outside the 25% rebalance band"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 8.625,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Rebalance add: 59.0000 shares at $8.62 to restore the target weight"
+  }
+]
