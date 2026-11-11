@@ -1,0 +1,118 @@
+{
+ "at": "2026-11-11T19:04:08+00:00",
+ "cash_weight": 0.6102714157702287,
+ "filings_flagged": [
+  {
+   "accession": "0001001614-26-000061",
+   "code": "1.01",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "entry into a material agreement",
+   "severity": "investigate",
+   "ticker": "REPX"
+  },
+  {
+   "accession": "0000832988-26-000240",
+   "code": "5.02",
+   "filed": "2026-11-05",
+   "form": "8-K",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "SIG"
+  },
+  {
+   "accession": "0001193125-26-449720",
+   "code": "2.02",
+   "filed": "2026-11-05",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "PRDO"
+  },
+  {
+   "accession": "0001628280-26-070276",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "SD"
+  },
+  {
+   "accession": "0001653477-26-000061",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "NGVT"
+  },
+  {
+   "accession": "0001001614-26-000061",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "REPX"
+  },
+  {
+   "accession": "0001104659-26-122377",
+   "code": "2.02",
+   "filed": "2026-11-04",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "HRMY"
+  }
+ ],
+ "grounds_triggered": [],
+ "nav": 9889.698,
+ "open_theses": 0,
+ "positions": 19,
+ "punch_card": {
+  "remaining": 20,
+  "used": 0
+ },
+ "queued_for_reading": [],
+ "regime": {
+  "as_of": "2026-11-11",
+  "risk_on_count": 0,
+  "signals": [
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "BAMLH0A0HYM2",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "T10Y3M",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "SP500",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "VIXCLS",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   }
+  ],
+  "unknown_count": 4
+ },
+ "run": "close"
+}
