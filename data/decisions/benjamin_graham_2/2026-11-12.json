@@ -1,0 +1,19 @@
+[
+  {
+    "ticker": "UVV",
+    "decision": "ADD",
+    "agent": "benjamin_graham_2",
+    "timestamp": "2026-11-12T00:00:00+00:00",
+    "criteria_met": [
+      "drifted outside the 25% rebalance band"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {},
+    "confidence": 0.0,
+    "entry_price": 37.70140075683594,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Rebalance add: 13.0000 shares at $37.70 to restore the target weight"
+  }
+]
