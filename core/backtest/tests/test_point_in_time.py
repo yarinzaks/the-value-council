@@ -370,6 +370,129 @@ class TestFilingListFollowsTheParquet:
         }
 
 
+#: MSFT as the audit found it (FUND-9): the shared sqlite held only a
+#: synthetic ``FMP-MSFT-FY-2025-06-30`` row, while the parquet carried
+#: the real 10-K and two later 10-Qs. Accessions and filing dates are
+#: MSFT's own, read from the parquet; the values are its net income.
+_MSFT_10K_FY2025 = XbrlFact(
+    concept="NetIncomeLoss",
+    namespace="us-gaap",
+    unit="USD",
+    value=101_832_000_000.0,
+    period_start=date(2024, 7, 1),
+    period_end=date(2025, 6, 30),
+    filed=date(2025, 7, 30),
+    form="10-K",
+    fiscal_year=2025,
+    fiscal_period="FY",
+    accession_number="0000950170-25-100235",
+)
+_MSFT_10Q_Q2_FY2026 = XbrlFact(
+    concept="NetIncomeLoss",
+    namespace="us-gaap",
+    unit="USD",
+    value=38_458_000_000.0,
+    period_start=date(2025, 10, 1),
+    period_end=date(2025, 12, 31),
+    filed=date(2026, 1, 28),
+    form="10-Q",
+    fiscal_year=2026,
+    fiscal_period="Q2",
+    accession_number="0001193125-26-027207",
+)
+_MSFT_FMP_ROW = FilingMetadata(
+    ticker="MSFT",
+    cik="0000789019",
+    form_type="10-K",
+    filing_date=date(2025, 7, 30),
+    period_of_report=date(2025, 6, 30),
+    accession_number="FMP-MSFT-FY-2025-06-30",
+)
+#: A net income no real MSFT filing reports, so a payload served from
+#: the synthetic row cannot pass for one parsed from the parquet.
+_FMP_SENTINEL_NET_INCOME = 1.0
+
+
+class TestStaleSqliteFilingList:
+    """Audit FUND-9: a stale sqlite filing list must not hide the parquet.
+
+    ``list_filings`` used to return the sqlite's list whenever it held
+    one. For ten holdings that list was five synthetic ``FMP-<T>-FY``
+    10-K rows and no 10-Q, so the live run read MSFT's fiscal 2025 10-K
+    when the parquet it had extracted already held the 10-Q filed
+    2026-01-28, two quarters newer.
+    """
+
+    def _seed_stale_sqlite(self, fc_dir: Path, sqlite: Path) -> None:
+        """Write what an earlier FMP-backed run left in the shared file."""
+        seeding = _parquet_loader(fc_dir, sqlite)
+        seeding._store_filings([_MSFT_FMP_ROW])
+        seeding._store_financials(
+            _MSFT_FMP_ROW.accession_number,
+            {"net_income": _FMP_SENTINEL_NET_INCOME, "revenue": 1.0},
+        )
+
+    def test_stale_sqlite_filing_list_is_refreshed_from_parquet(
+        self, tmp_path: Path
+    ) -> None:
+        fc_dir, sqlite = tmp_path / "fundamentals_cache", tmp_path / "edgar.sqlite"
+        EdgarCache(cache_dir=fc_dir).save_facts(
+            "MSFT", [_MSFT_10K_FY2025, _MSFT_10Q_Q2_FY2026]
+        )
+        self._seed_stale_sqlite(fc_dir, sqlite)
+
+        result = _parquet_loader(fc_dir, sqlite).get_financials(
+            "MSFT", date(2026, 2, 2)
+        )
+
+        assert result is not None
+        assert result.source_filing.form_type == "10-Q"
+        assert result.source_filing.filing_date == date(2026, 1, 28)
+        assert result.source_filing.accession_number == "0001193125-26-027207"
+        assert result.net_income != _FMP_SENTINEL_NET_INCOME
+
+    def test_synthetic_row_is_never_listed_beside_the_parquet(
+        self, tmp_path: Path
+    ) -> None:
+        """Edge: the synthetic row shares its date with the real 10-K.
+
+        Between 2025-07-30 and the first 10-Q the only eligible filings
+        are the FMP row and the real 10-K, filed the same day; ``max``
+        would pick whichever came first, so the row must not be listed.
+        """
+        fc_dir, sqlite = tmp_path / "fundamentals_cache", tmp_path / "edgar.sqlite"
+        EdgarCache(cache_dir=fc_dir).save_facts(
+            "MSFT", [_MSFT_10K_FY2025, _MSFT_10Q_Q2_FY2026]
+        )
+        self._seed_stale_sqlite(fc_dir, sqlite)
+        loader = _parquet_loader(fc_dir, sqlite)
+
+        listed = {f.accession_number for f in loader.list_filings("MSFT")}
+        before_q = loader.latest_filing_before("MSFT", date(2025, 8, 15))
+
+        assert listed == {"0000950170-25-100235", "0001193125-26-027207"}
+        assert before_q is not None
+        assert before_q.accession_number == "0000950170-25-100235"
+
+    def test_stale_sqlite_does_not_shadow_a_10q_on_a_second_call(
+        self, tmp_path: Path
+    ) -> None:
+        """Failure mode: the parquet answer was stored; a later call in
+        the same loader must not fall back to the sqlite's FMP row."""
+        fc_dir, sqlite = tmp_path / "fundamentals_cache", tmp_path / "edgar.sqlite"
+        EdgarCache(cache_dir=fc_dir).save_facts(
+            "MSFT", [_MSFT_10K_FY2025, _MSFT_10Q_Q2_FY2026]
+        )
+        self._seed_stale_sqlite(fc_dir, sqlite)
+        loader = _parquet_loader(fc_dir, sqlite)
+
+        loader.list_filings("MSFT")
+        second = loader.latest_filing_before("MSFT", date(2026, 2, 2))
+
+        assert second is not None
+        assert second.accession_number == "0001193125-26-027207"
+
+
 class TestLatestFilingBefore:
     def test_returns_none_when_no_eligible_filings(
         self, loader: PointInTimeLoader
