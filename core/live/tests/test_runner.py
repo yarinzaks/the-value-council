@@ -793,7 +793,12 @@ class TestRebalanceBand:
     name that doubled became twice its intended weight."""
 
     def _drifted(
-        self, runner: DailyRunner, *, entry: float, now: float
+        self,
+        runner: DailyRunner,
+        *,
+        entry: float,
+        now: float,
+        entry_date: str = "2026-07-01",
     ) -> DailyRunner:
         p = LivePortfolio(agent="stub_agent")
         p.positions.append(
@@ -801,7 +806,7 @@ class TestRebalanceBand:
                 ticker="DRIFT",
                 shares=50.0,
                 entry_price=entry,
-                entry_date="2026-07-01",
+                entry_date=entry_date,
                 current_price=now,
                 why_en="",
                 why_he="",
@@ -881,6 +886,95 @@ class TestRebalanceBand:
         assert result.portfolio.positions[0].weight_pct == pytest.approx(
             50.0, abs=1.0
         )
+
+
+class TestTheHoldingFloorCoversTheTrim:
+    """Audit ENG-5: the 30-day floor guarded the exit path only.
+
+    ``_rebalance`` built trims from drift alone, so market_core cut BAC
+    at 7 days (4 -> 3 shares) and seth_klarman cut TTD at 11 days
+    (54 -> 42) — the same young-position selling the floor exists to
+    stop, arriving through the other door.
+    """
+
+    _band = TestRebalanceBand()
+
+    def _drifted(
+        self, runner: DailyRunner, *, entry: float, now: float, entry_date: str
+    ) -> DailyRunner:
+        return self._band._drifted(
+            runner, entry=entry, now=now, entry_date=entry_date
+        )
+
+    def _run(self, runner: DailyRunner, price: float) -> AgentRunResult:
+        result: AgentRunResult = self._band._run(runner, price)
+        return result
+
+    def test_a_7_day_old_overweight_position_is_not_trimmed(
+        self, runner: DailyRunner
+    ) -> None:
+        # +50% drift, which a seasoned line trims by 16 shares.
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-29")
+
+        result = self._run(runner, 300.0)
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.positions[0].shares == 50.0
+
+    def test_a_29_day_old_position_is_still_inside_the_floor(
+        self, runner: DailyRunner
+    ) -> None:
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-07")
+
+        result = self._run(runner, 300.0)
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+
+    def test_a_position_exactly_30_days_old_is_trimmed(
+        self, runner: DailyRunner
+    ) -> None:
+        # The exit path holds below the floor and sells at it; the trim
+        # path agrees, so one boundary governs every sale.
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-06")
+
+        result = self._run(runner, 300.0)
+
+        sells = [t for t in result.trades if t.side == "SELL"]
+        assert len(sells) == 1 and sells[0].ticker == "DRIFT"
+
+    def test_an_unreadable_entry_date_does_not_block_the_trim(
+        self, runner: DailyRunner
+    ) -> None:
+        # pos_age_days returns None for "cannot tell", and the exit path
+        # treats that as no floor. The trim path must not differ.
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="not-a-date")
+
+        result = self._run(runner, 300.0)
+
+        assert len([t for t in result.trades if t.side == "SELL"]) == 1
+
+    def test_a_young_underweight_position_is_still_topped_up(
+        self, runner: DailyRunner
+    ) -> None:
+        # The floor stops selling. Buying more of a 7-day-old name sells
+        # nothing, so the add path is unchanged.
+        self._drifted(runner, entry=100.0, now=20.0, entry_date="2026-07-29")
+
+        result = self._run(runner, 20.0)
+
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert len(buys) == 1 and buys[0].ticker == "DRIFT"
+
+    def test_a_runner_with_a_shorter_floor_trims_sooner(
+        self, runner: DailyRunner
+    ) -> None:
+        # The trim reads the runner's floor, not a second constant.
+        runner.min_holding_days = 5
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-29")
+
+        result = self._run(runner, 300.0)
+
+        assert len([t for t in result.trades if t.side == "SELL"]) == 1
 
 
 class TestTheBrokerCommission:

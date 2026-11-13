@@ -140,7 +140,8 @@ MAX_REBALANCE_COMMISSION_FRACTION: float = 0.01
 #: was expressed once and then abandoned to price drift.
 DEFAULT_REBALANCE_BAND: float = 0.25
 
-#: Days a position is held before a rotation may sell it.
+#: Days a position is held before a rotation or a rebalance trim may
+#: sell any of it.
 #:
 #: Not a doctrine — a floor under one. Every investor here holds for
 #: years; none of them sells because a name slipped a rank overnight.
@@ -1778,6 +1779,9 @@ class DailyRunner:
         ``band`` is the doctrine's (see :func:`band_for`). ``None`` never
         trims: an overweight name is left to run, and an underweight one
         is still topped up at the runner's band (audit SF-X3).
+
+        A position younger than ``min_holding_days`` is never trimmed;
+        it may still be added to (audit ENG-5).
         """
         if not targets:
             return []
@@ -1817,6 +1821,18 @@ class DailyRunner:
                 if delta < price:
                     # Less than one share of drift. Trimming would need a
                     # fraction, and leaving it is what a real book does.
+                    continue
+                # A trim is a sale, and the holding floor governs every
+                # sale, not only the exit (audit ENG-5: BAC trimmed at 7
+                # days, TTD at 11). Same rule as the exit path: below the
+                # floor hold, an unreadable entry date imposes no floor.
+                age = pos_age_days(pos, as_of)
+                if age is not None and age < self.min_holding_days:
+                    logger.info(
+                        f"{as_of}: {agent} leaving {target.ticker} over "
+                        f"target — held {age}d, floor is "
+                        f"{self.min_holding_days}d"
+                    )
                     continue
                 trims.append((target.ticker, price, delta / price))
             else:
