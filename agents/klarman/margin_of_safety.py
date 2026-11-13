@@ -40,11 +40,13 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict
 from core.llm.concurrency import analyze_all
 from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
+from . import exits as klarman_exits
 from .downside import DownsideAnalyzer, KlarmanMemo
 from .filters import (
     DEFAULT_MAX_DE,
@@ -165,6 +167,11 @@ class SethKlarman(Strategy):
         self.decision_logger = decision_logger
         self.selection_history: list[KlarmanSelection] = []
         self.last_memos: list[KlarmanMemo] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.klarman.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -177,6 +184,17 @@ class SethKlarman(Strategy):
     ) -> dict[str, float]:
         logger.info(
             f"{as_of}: starting Klarman MoS scan over {len(universe)} candidates"
+        )
+        # First, so it is published even when nothing qualifies today —
+        # an empty screen is when a held name's verdict matters most.
+        self.last_exit_decisions = klarman_exits.verdicts(
+            held,
+            prices,
+            fundamentals,
+            cache=self.edgar_cache,
+            market_cap=lambda t, fin, price: self._market_cap(t, as_of, fin, price),
+            as_of=as_of,
+            max_de=self.max_de,
         )
 
         triples: list[
