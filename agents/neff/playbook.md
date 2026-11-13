@@ -339,6 +339,8 @@ For the agent (relevant context, not actionable rule): this represents the **dee
 ## 7. Exit Rules
 
 > **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Neff's verdict (`agents/neff/exits.py`) is computed for every held name against the market the day's screen measured (the universe median P/E and Total-Return/PE of every name past the quality gates — the same market P/E the entry's hard gate rejects at). In order: trigger 3, at any price, sells when revenue in the latest 10-K is below the 10-K a year before; trigger 1 sells at or past 100% of the market P/E; trigger 2 sells when Total-Return/PE is below 1× the market's (unmeasurable growth or yield is unknown, never a breach); from 80% to 100% of the market P/E the verdict is a keep whose reason names the trim zone (the trim itself is not executed — a verdict is keep or sell). Anything else is kept, on or off the day's list. A price decline is never a sell, and §6.2's 2-4 years is an expectation each keep reports ("held N days of an expected 2-4 years"), never a trigger. No verdict when the fundamentals, the price, a positive P/E or the day's market P/E is missing and no deterioration fired. Not computed: the trim, trigger 3's quarterly-earnings and industry-ROE tests (no quarterly EPS or industry ROE history in the cache), trigger 4 (weighs a candidate against a holding), and §6.3's adds.
 
 Neff's exit rules are **the most criterion-driven** in the Council. He sold when the framework no longer applied.
 
