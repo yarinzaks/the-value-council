@@ -278,3 +278,235 @@ class TestSplitDetectorSanity:
         # must not need it once a fresh weighted average is on file.
         mcap = market_cap_at(cache, "AOS", date(2026, 3, 2), 70.0, 1.0)
         assert mcap == pytest.approx(70.0 * 141_029_845.0)
+
+
+_CSSO = "CommonStockSharesOutstanding"
+
+
+class TestNewestFilingAcrossConcepts:
+    """The newest count is the newest *filing's*, weighted average included.
+
+    Review of item 08 (audit FUND-5): a multi-class filer's cover and
+    balance-sheet concepts carry one class, and once its 10-K stops
+    tagging them the only fresh count is the basic weighted average,
+    which covers every class. Taking the cover series alone swapped
+    MIR's all-class 229,959,000 for its one-class 18,750,000 and turned
+    a $4.2bn company into $0.34bn, under every $500M floor. Rows are
+    MIR's own facts from the local EDGAR cache, trimmed.
+    """
+
+    def test_mir_weighted_average_newer_than_the_one_class_count_wins(
+        self, cache: EdgarCache
+    ) -> None:
+        cache.save_facts(
+            "MIR",
+            [
+                _fact(_CSSO, date(2025, 10, 29), None, date(2025, 9, 30), 18_750_000.0),
+                _fact(
+                    _WAB, date(2025, 10, 29), date(2025, 7, 1), date(2025, 9, 30),
+                    224_583_000.0,
+                ),
+                _fact(
+                    _WAB, date(2026, 2, 19), date(2025, 1, 1), date(2025, 12, 31),
+                    229_959_000.0,
+                ),
+            ],
+        )
+        mcap = market_cap_at(cache, "MIR", date(2026, 10, 30), 18.37, 229_959_000.0)
+        assert mcap == pytest.approx(18.37 * 229_959_000.0)
+        assert mcap is not None and mcap > 5e8
+
+    def test_a_newer_weighted_average_is_restated_for_a_later_split(
+        self, cache: EdgarCache
+    ) -> None:
+        # The 10-K carries no cover count; a 2-for-1 shows up at the next
+        # 10-Q's cover. A date between the two must read the 10-K's
+        # weighted average in today's (post-split) units.
+        cache.save_facts(
+            "TWO",
+            [
+                _fact(_DEI, date(2025, 5, 1), None, date(2025, 4, 25), 10_000_000.0),
+                _fact(
+                    _WAB, date(2025, 8, 1), date(2025, 1, 1), date(2025, 6, 30),
+                    10_100_000.0,
+                ),
+                _fact(_DEI, date(2026, 2, 1), None, date(2026, 1, 25), 20_400_000.0),
+            ],
+        )
+        mcap = market_cap_at(cache, "TWO", date(2025, 10, 1), 50.0, 10_100_000.0)
+        assert mcap == pytest.approx(50.0 * 20_200_000.0)
+
+    def test_in_the_same_filing_the_cover_count_beats_the_average(
+        self, cache: EdgarCache
+    ) -> None:
+        # BMNR's April 2026 10-Q: issuance during the quarter leaves the
+        # average below the count on the cover, which is the fresher one.
+        cache.save_facts(
+            "BMNR",
+            [
+                _fact(_DEI, date(2026, 4, 14), None, date(2026, 4, 10), 537_628_819.0),
+                _fact(
+                    _WAB, date(2026, 4, 14), date(2026, 1, 1), date(2026, 2, 28),
+                    454_620_613.0,
+                ),
+            ],
+        )
+        mcap = market_cap_at(cache, "BMNR", date(2026, 11, 13), 30.0, None)
+        assert mcap == pytest.approx(30.0 * 537_628_819.0)
+
+    def test_a_stale_weighted_average_is_not_preferred_over_the_filed_count(
+        self, cache: EdgarCache
+    ) -> None:
+        cache.save_facts(
+            "OLDW",
+            [
+                _fact(
+                    _WAB, date(2018, 3, 1), date(2017, 1, 1), date(2017, 12, 31),
+                    3_000_000.0,
+                ),
+            ],
+        )
+        mcap = market_cap_at(cache, "OLDW", date(2026, 10, 30), 10.0, 7_000_000.0)
+        assert mcap == pytest.approx(10.0 * 7_000_000.0)
+
+
+def _filed_fact(
+    concept: str,
+    filed: date,
+    end: date,
+    value: float,
+    *,
+    form: str,
+    unit: str = "shares",
+) -> XbrlFact:
+    return XbrlFact(
+        concept=concept,
+        namespace="dei" if concept.startswith("Entity") else "us-gaap",
+        unit=unit,
+        value=value,
+        period_start=None,
+        period_end=end,
+        filed=filed,
+        form=form,
+        fiscal_year=end.year,
+        fiscal_period=None,
+        accession_number=f"acc-{form}-{filed.isoformat()}",
+    )
+
+
+class TestSameEvidenceAsTheLoader:
+    """The helper reads the facts the point-in-time loader reads.
+
+    The loader takes ``shares_outstanding`` only from 10-K and 10-Q
+    filings, in ``shares``, from a period ending within
+    ``MAX_FACT_AGE_DAYS``. The helper's series took every form and
+    judged age by filing date, so an amendment or a registration
+    statement reprinting an old count was read as the newest one. Rows
+    are EONR's and VLGEA's own facts from the local EDGAR cache.
+    """
+
+    def test_an_amendment_reprinting_an_old_count_is_not_the_newest(
+        self, cache: EdgarCache
+    ) -> None:
+        cache.save_facts(
+            "EONR",
+            [
+                _filed_fact(
+                    _DEI, date(2025, 11, 17), date(2025, 11, 12), 49_968_344.0,
+                    form="10-Q",
+                ),
+                # A 10-K/A filed in April 2026 carrying the 2024 year-end count.
+                _filed_fact(
+                    _CSSO, date(2026, 4, 27), date(2024, 12, 31), 10_323_205.0,
+                    form="10-K/A",
+                ),
+            ],
+        )
+        mcap = market_cap_at(cache, "EONR", date(2026, 10, 30), 0.306, 49_968_344.0)
+        assert mcap == pytest.approx(0.306 * 49_968_344.0)
+
+    def test_a_fresh_filing_of_a_stale_period_is_not_a_current_count(
+        self, cache: EdgarCache
+    ) -> None:
+        # VLGEA's FY2025 10-K carries only the prior year-end's count
+        # (one class of two). Its period is 825 days before as_of.
+        cache.save_facts(
+            "VLGEA",
+            [
+                _filed_fact(
+                    _CSSO, date(2025, 10, 9), date(2024, 7, 27), 4_204_000.0,
+                    form="10-K",
+                ),
+            ],
+        )
+        assert market_cap_at(cache, "VLGEA", date(2026, 10, 30), 42.77, None) is None
+        assert market_cap_at(
+            cache, "VLGEA", date(2026, 10, 30), 42.77, 14_500_000.0
+        ) == pytest.approx(42.77 * 14_500_000.0)
+
+    def test_a_count_in_the_wrong_unit_is_ignored(self, cache: EdgarCache) -> None:
+        cache.save_facts(
+            "UNIT",
+            [
+                _filed_fact(
+                    _DEI, date(2026, 2, 1), date(2026, 1, 25), 8_000_000.0,
+                    form="10-K",
+                ),
+                _filed_fact(
+                    _DEI, date(2026, 5, 1), date(2026, 4, 25), 8_000.0,
+                    form="10-Q", unit="pure",
+                ),
+            ],
+        )
+        mcap = market_cap_at(cache, "UNIT", date(2026, 6, 1), 10.0, None)
+        assert mcap == pytest.approx(10.0 * 8_000_000.0)
+
+
+class TestWeightedAverageUnits:
+    """A weighted average is restated by real splits, not by unit repairs.
+
+    VRNO's 2023 and 2024 10-Ks each reprint a 100,000-share balance-sheet
+    count from 2020. The pair of jumps around that row brings it into
+    its neighbours' units, and it must not multiply the weighted average
+    the company filed in between by 3,632 (a $4.1trn VRNO on 2025-06-02).
+    Rows are VRNO's own facts from the local EDGAR cache, trimmed.
+    """
+
+    def test_vrno_weighted_average_is_not_multiplied_by_a_unit_repair(
+        self, cache: EdgarCache
+    ) -> None:
+        def wa(filed: date, start: date, end: date, value: float, form: str) -> XbrlFact:
+            return XbrlFact(
+                concept=_WAB,
+                namespace="us-gaap",
+                unit="shares",
+                value=value,
+                period_start=start,
+                period_end=end,
+                filed=filed,
+                form=form,
+                fiscal_year=end.year,
+                fiscal_period=None,
+                accession_number=f"acc-{form}-{filed.isoformat()}",
+            )
+
+        fy22 = (date(2022, 1, 1), date(2022, 12, 31))
+        fy23 = (date(2023, 1, 1), date(2023, 12, 31))
+        fy24 = (date(2024, 1, 1), date(2024, 12, 31))
+        cache.save_facts(
+            "VRNO",
+            [
+                _filed_fact(_DEI, date(2023, 3, 30), date(2023, 3, 28), 341_774_865.0, form="10-K"),
+                _filed_fact(_CSSO, date(2023, 3, 30), date(2020, 12, 14), 100_000.0, form="10-K"),
+                wa(date(2023, 3, 30), *fy22, 331_409_315.0, "10-K"),
+                _filed_fact(_CSSO, date(2024, 3, 15), date(2020, 12, 14), 100_000.0, form="10-K"),
+                wa(date(2024, 3, 15), *fy22, 331_409_315.0, "10-K"),
+                wa(date(2024, 3, 15), *fy23, 342_774_236.0, "10-K"),
+                wa(date(2025, 2, 27), *fy24, 349_584_820.0, "10-K"),
+                wa(date(2025, 5, 8), date(2025, 1, 1), date(2025, 3, 31), 359_145_607.0, "10-Q"),
+                _filed_fact(_DEI, date(2026, 3, 12), date(2026, 3, 10), 363_245_512.0, form="10-K"),
+                wa(date(2026, 3, 12), *fy24, 349_584_820.0, "10-K"),
+            ],
+        )
+        mcap = market_cap_at(cache, "VRNO", date(2025, 6, 2), 3.15, 359_145_607.0)
+        assert mcap == pytest.approx(3.15 * 359_145_607.0)

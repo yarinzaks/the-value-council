@@ -335,8 +335,11 @@ def share_count_by_filing(facts: pd.DataFrame) -> pd.Series:
     Their level differs from a cover count by days of buybacks, far
     inside the split threshold, so the junction is not read as a split.
     """
-    cover = _cover_series(facts)
-    weighted = _weighted_average_series(facts)
+    return _joined(_cover_series(facts), _weighted_average_series(facts))
+
+
+def _joined(cover: pd.Series, weighted: pd.Series) -> pd.Series:
+    """:func:`share_count_by_filing` from its two already-read series."""
     if weighted.empty:
         return cover
     if cover.empty:
@@ -428,6 +431,67 @@ def _reverted(events: list[SplitEvent], i: int) -> bool:
     return False
 
 
+def _kept_splits(
+    facts: pd.DataFrame, shares: pd.Series
+) -> tuple[list[SplitEvent], list[SplitEvent]]:
+    """``(kept, standing)`` jumps in ``shares``.
+
+    ``kept`` are the jumps the filer's restated comparatives allow, plus
+    the pairs that bracket a run of rows filed in the wrong unit
+    (:func:`_reverted`). ``standing`` are the kept jumps that are splits
+    on their own evidence. The bracketing pairs rescale the cover
+    series' own mis-unit rows and nothing else, so a count from another
+    concept is restated by ``standing`` only.
+    """
+    candidates = detect_splits(shares)
+    kept: list[SplitEvent] = []
+    standing: list[SplitEvent] = []
+    for i, event in enumerate(candidates):
+        if not _contradicted(facts, event):
+            kept.append(event)
+            standing.append(event)
+            continue
+        if _reverted(candidates, i):
+            kept.append(event)
+            continue
+        logger.debug(
+            f"{event.ratio:g}x @ {event.observed_at} rejected: the filer's "
+            f"reprinted comparatives did not move"
+        )
+    return kept, standing
+
+
+def split_adjusted_counts(facts: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    """Share count and basic weighted average by filing date, both restated.
+
+    The first series is :func:`split_adjusted_share_count`. The second
+    is each filing's own current-period basic weighted average restated
+    by the splits that stand on their own evidence, so the two are in
+    the same units and a caller can take whichever was filed later. The
+    weighted average is the one count a multi-class filer tags for every
+    class together (review of audit FUND-5: MIR's balance-sheet count is
+    one class, 18.75M of about 230M, and its 10-K tags no cover count at
+    all).
+
+    The weighted average is not restated by a pair of jumps bracketing
+    a run of cover rows in the wrong unit: that pair corrects those rows
+    only. VRNO's 2024 10-K reprinted a 100,000-share count from 2020;
+    the pair around it is right for that row and would multiply the
+    weighted averages filed in between by 3,632. Both series are empty
+    when no usable count is on file.
+    """
+    raw_weighted = _weighted_average_series(facts)
+    shares = _normalize(_joined(_cover_series(facts), raw_weighted))
+    if shares.empty:
+        return shares, pd.Series(dtype="float64")
+    kept, standing = _kept_splits(facts, shares)
+    weighted = _normalize(raw_weighted)
+    return (
+        shares * cumulative_factors(shares, kept),
+        weighted * cumulative_factors(weighted, standing),
+    )
+
+
 def split_adjusted_share_count(facts: pd.DataFrame) -> pd.Series:
     """A ticker's share count by filing date, in the adjusted price's units.
 
@@ -439,16 +503,7 @@ def split_adjusted_share_count(facts: pd.DataFrame) -> pd.Series:
     shares = _normalize(share_count_by_filing(facts))
     if shares.empty:
         return shares
-    candidates = detect_splits(shares)
-    kept: list[SplitEvent] = []
-    for i, event in enumerate(candidates):
-        if not _contradicted(facts, event) or _reverted(candidates, i):
-            kept.append(event)
-            continue
-        logger.debug(
-            f"{event.ratio:g}x @ {event.observed_at} rejected: the filer's "
-            f"reprinted comparatives did not move"
-        )
+    kept, _standing = _kept_splits(facts, shares)
     return shares * cumulative_factors(shares, kept)
 
 
@@ -464,5 +519,6 @@ __all__ = [
     "cumulative_factors",
     "detect_splits",
     "share_count_by_filing",
+    "split_adjusted_counts",
     "split_adjusted_share_count",
 ]

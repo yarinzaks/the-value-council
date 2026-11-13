@@ -20,6 +20,7 @@ from core.research.splits import (
     cumulative_factors,
     detect_splits,
     share_count_by_filing,
+    split_adjusted_counts,
     split_adjusted_share_count,
 )
 
@@ -378,3 +379,41 @@ class TestFilerRestatement:
 
     def test_an_empty_frame_has_no_counts(self) -> None:
         assert split_adjusted_share_count(pd.DataFrame()).empty
+
+
+class TestSplitAdjustedCounts:
+    """The weighted averages beside the share count (review of FUND-5)."""
+
+    def test_nvda_weighted_average_is_restated_by_the_real_split(self) -> None:
+        cover, weighted = split_adjusted_counts(_facts(NVDA_FACTS))
+        assert cover.equals(split_adjusted_share_count(_facts(NVDA_FACTS)))
+        # The July 2023 quarter as filed then, in post-split units.
+        assert weighted.loc[date(2023, 8, 28)] == pytest.approx(24_730_000_000.0)
+        assert weighted.loc[date(2024, 8, 28)] == pytest.approx(24_578_000_000.0)
+
+    def test_a_unit_repair_pair_does_not_rescale_the_weighted_average(
+        self,
+    ) -> None:
+        # RMD's thousands-tagged cover rows: the pair around them rescales
+        # those rows, while the weighted averages were in shares all along.
+        rows: list[Fact] = [
+            (DEI, "2021-04-29", None, "2021-04-20", 145_400_000.0),
+            (DEI, "2021-08-17", None, "2021-08-10", 145_681.0),
+            (DEI, "2021-10-29", None, "2021-10-20", 145_723_142.0),
+            (WAB, "2021-04-29", "2020-01-01", "2020-03-31", 144_900_000.0),
+            (WAB, "2021-08-17", "2020-01-01", "2020-03-31", 144_900_000.0),
+            (WAB, "2021-08-17", "2021-04-01", "2021-06-30", 145_500_000.0),
+            (WAB, "2021-10-29", "2020-01-01", "2020-03-31", 144_900_000.0),
+        ]
+        cover, weighted = split_adjusted_counts(_facts(rows))
+        assert cover.loc[date(2021, 8, 17)] == pytest.approx(145_723_142.0, rel=1e-3)
+        assert weighted.loc[date(2021, 8, 17)] == pytest.approx(145_500_000.0)
+
+    def test_an_empty_frame_has_no_counts_of_either_kind(self) -> None:
+        cover, weighted = split_adjusted_counts(pd.DataFrame())
+        assert cover.empty and weighted.empty
+
+    def test_a_filer_with_only_cover_counts_has_no_weighted_average(self) -> None:
+        cover, weighted = split_adjusted_counts(_facts(RYN_FACTS[:3]))
+        assert len(cover) == 3
+        assert weighted.empty
