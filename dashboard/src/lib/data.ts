@@ -385,6 +385,11 @@ export interface LedgerRow {
   price: number;
   realized_pnl_usd: number;
   source?: string;
+  /** On a SELL written since 2026-11-13: when the line it closed was
+   *  opened, and at what average cost. Absent on a BUY and on older
+   *  rows, where the entry is unknown rather than same-day. */
+  entry_date?: string;
+  entry_price?: number;
 }
 
 /** Every executed trade for one agent, oldest first.
