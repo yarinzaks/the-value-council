@@ -82,6 +82,7 @@ def floor_one(portfolio: LivePortfolio) -> tuple[float, list[tuple[str, float, f
     freed = 0.0
     changes: list[tuple[str, float, float, float]] = []
     kept: list[Position] = []
+    closing: list[Position] = []
 
     for pos in portfolio.positions:
         whole = float(math.floor(pos.shares))
@@ -103,18 +104,32 @@ def floor_one(portfolio: LivePortfolio) -> tuple[float, list[tuple[str, float, f
         freed += cash
         changes.append((pos.ticker, pos.shares, whole, cash))
         if whole <= 0:
-            continue  # the lot was never a share; it closes
+            # The lot was never a share; it closes. Kept in the list for
+            # now and closed below through `sell()`, so the close drops
+            # the line's dividend and split records the way every other
+            # close does (audit item 23 / CE-3b: removing it from the
+            # list by hand left 13 stale keys in the committed books).
+            kept.append(pos)
+            closing.append(pos)
+            continue
         pos.shares = whole
         kept.append(pos)
 
     portfolio.positions = kept
+    floored = sum(c for _, _, after, c in changes if after > 0)
     # Not rounded to the cent. A fraction of a share is not a whole
     # number of cents — 0.007184 of Lam Research at $239.11 is
     # $1.71757 — and rounding it moved three books' cumulative return
     # in the fourth decimal place. The point of this migration is that
     # it restates nothing, so the cent stays where the arithmetic puts
     # it.
-    portfolio.cash += freed
+    portfolio.cash += floored
+    for pos in closing:
+        # No commission and no cost: there is no counterparty, and
+        # charging one would take real money out of the book for a
+        # trade nobody made. `sell()` credits shares x mark to cash,
+        # which is the same value the fraction is counted at above.
+        portfolio.sell(pos.ticker, price=pos.current_price, commission=0.0, cost_bps=0.0)
     return freed, changes
 
 

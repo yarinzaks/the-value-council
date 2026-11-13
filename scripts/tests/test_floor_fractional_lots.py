@@ -167,3 +167,43 @@ class TestAnEmptyBookIsNotAnError:
         assert freed == 0.0
         assert changes == []
         assert book.cash == 10_000.0
+
+
+class TestAClosedLotTakesItsHistoryWithIt:
+    """Audit CE-3b. The flooring closed sub-share lots by dropping them
+    from the list, which skipped what `sell()` does on a close — pop the
+    line's `paid_dividends` and `applied_splits`. Seven orphan keys and
+    six stale ones were left in the committed books."""
+
+    def test_paid_dividends_keys_subset_of_positions_after_floor(self) -> None:
+        book = _book([_pos("SEB", 0.4, 4_283.0), _pos("KEEP", 5.25, 10.0)])
+        book.paid_dividends = {"SEB": ["2026-08-14"], "KEEP": ["2026-09-01"]}
+        book.applied_splits = {"SEB": ["2026-07-01"]}
+
+        floor_one(book)
+
+        held = {p.ticker.upper() for p in book.positions}
+        assert set(book.paid_dividends) <= held
+        assert set(book.applied_splits) <= held
+        assert book.paid_dividends == {"KEEP": ["2026-09-01"]}
+
+    def test_a_kept_lot_keeps_its_history(self) -> None:
+        book = _book([_pos("KEEP", 5.25, 10.0)])
+        book.paid_dividends = {"KEEP": ["2026-09-01"]}
+
+        floor_one(book)
+
+        assert book.paid_dividends == {"KEEP": ["2026-09-01"]}
+
+    def test_the_close_charges_nothing_and_is_valued_at_the_mark(self) -> None:
+        book = _book([_pos("SEB", 0.4, 4_283.0, entry=4_000.0)], cash=100.0)
+
+        freed, changes = floor_one(book)
+
+        assert book.positions == []
+        assert freed == pytest.approx(0.4 * 4_283.0)
+        assert book.cash == pytest.approx(100.0 + 0.4 * 4_283.0)
+        assert book.cumulative_costs == 0.0
+        [(ticker, before, after, cash)] = changes
+        assert (ticker, before, after) == ("SEB", 0.4, 0.0)
+        assert cash == pytest.approx(0.4 * 4_283.0)

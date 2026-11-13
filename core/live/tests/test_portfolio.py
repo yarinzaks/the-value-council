@@ -927,3 +927,99 @@ class TestApplySplit:
 
         loaded.sell("NVDA", price=60.0)
         assert loaded.applied_splits == {}
+
+
+# ---------------------------------------------------------------------------
+# Pruning settled-event records the book can no longer use (audit CE-3b)
+# ---------------------------------------------------------------------------
+class TestPruneEventHistory:
+    """`paid_dividends` and `applied_splits` are meant to stay the size of
+    the book. A line closed without `sell()` left its keys behind — 13
+    of them across four committed books — and this is what removes
+    them."""
+
+    @staticmethod
+    def _book(*lines: tuple[str, str]) -> LivePortfolio:
+        p = LivePortfolio(agent="t", cash=1_000.0)
+        p.positions = [
+            Position(
+                ticker=t, shares=5.0, entry_price=10.0, entry_date=d,
+                current_price=10.0,
+            )
+            for t, d in lines
+        ]
+        return p
+
+    def test_a_key_for_a_name_not_held_is_removed(self) -> None:
+        p = self._book(("KEEP", "2026-05-06"))
+        p.paid_dividends = {"KEEP": ["2026-06-15"], "SEB": ["2026-08-14"]}
+        p.applied_splits = {"GONE": ["2026-07-01"]}
+
+        removed = p.prune_event_history()
+
+        assert p.paid_dividends == {"KEEP": ["2026-06-15"]}
+        assert p.applied_splits == {}
+        assert removed == {
+            "paid_dividends": {"SEB": ["2026-08-14"]},
+            "applied_splits": {"GONE": ["2026-07-01"]},
+        }
+
+    def test_an_ex_date_before_the_current_entry_is_removed(self) -> None:
+        """REPX paid 2026-10-28 on a lot the flooring closed, and the
+        name was bought back 2026-11-04. Settlement never looks before
+        the entry date, so the old date is dead weight."""
+        p = self._book(("REPX", "2026-11-04"))
+        p.paid_dividends = {"REPX": ["2026-10-28"]}
+
+        removed = p.prune_event_history()
+
+        assert p.paid_dividends == {}
+        assert removed["paid_dividends"] == {"REPX": ["2026-10-28"]}
+
+    def test_an_ex_date_on_or_after_the_entry_is_kept(self) -> None:
+        """Removing one of these would let settlement pay it a second
+        time: it is the record that makes re-scanning safe."""
+        p = self._book(("MRK", "2026-06-15T13:30:00+00:00"))
+        p.paid_dividends = {"MRK": ["2026-06-15", "2026-09-15"]}
+        p.applied_splits = {"MRK": ["2026-07-01"]}
+
+        removed = p.prune_event_history()
+
+        assert p.paid_dividends == {"MRK": ["2026-06-15", "2026-09-15"]}
+        assert p.applied_splits == {"MRK": ["2026-07-01"]}
+        assert removed == {"paid_dividends": {}, "applied_splits": {}}
+
+    def test_a_lower_case_ticker_on_the_line_still_counts_as_held(self) -> None:
+        # The maps are keyed upper-case; a line is not always.
+        p = self._book(("brk.b", "2026-05-06"))
+        p.paid_dividends = {"BRK.B": ["2026-06-15"]}
+
+        p.prune_event_history()
+
+        assert p.paid_dividends == {"BRK.B": ["2026-06-15"]}
+
+    def test_a_line_with_no_entry_date_keeps_every_date(self) -> None:
+        # No date to compare with is no evidence a payment is stale.
+        p = self._book(("OLD", ""))
+        p.paid_dividends = {"OLD": ["2026-06-15"]}
+
+        p.prune_event_history()
+
+        assert p.paid_dividends == {"OLD": ["2026-06-15"]}
+
+    def test_cash_and_nav_do_not_move(self) -> None:
+        p = self._book(("KEEP", "2026-11-04"))
+        p.paid_dividends = {"KEEP": ["2026-10-01"], "SEB": ["2026-08-14"]}
+        p.mark_to_market({})
+        before = (p.cash, p.total_nav, p.cumulative_dividends)
+
+        p.prune_event_history()
+
+        assert (p.cash, p.total_nav, p.cumulative_dividends) == before
+
+    def test_an_empty_book_is_not_an_error(self) -> None:
+        p = LivePortfolio(agent="t")
+
+        assert p.prune_event_history() == {
+            "paid_dividends": {}, "applied_splits": {},
+        }

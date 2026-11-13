@@ -442,6 +442,58 @@ class LivePortfolio:
 
         return True
 
+    def prune_event_history(self) -> dict[str, dict[str, list[str]]]:
+        """Drop settled-event records the book can no longer consult.
+
+        Audit item 23 / CE-3b. :meth:`sell` and :meth:`apply_split` pop
+        a closed line's :attr:`paid_dividends` and :attr:`applied_splits`;
+        a line removed any other way (the 2026-10-31 whole-share
+        flooring did) leaves them behind. Two kinds are removed:
+
+        - a key for a name the book does not hold;
+        - an ex-date strictly before the held line's ``entry_date``, left
+          by an earlier holding of the same name. Settlement scans from
+          ``max(entry_date, floor)``, so such a date is never looked up
+          again and removing it cannot cause a second payment.
+
+        Dates on or after the entry date are kept — they are what stops
+        a re-scan paying twice. A line with no entry date keeps every
+        date. Cash, NAV and every cumulative figure are untouched.
+
+        Returns what was removed, per map, as ``{ticker: [ex_dates]}``.
+        """
+        entry_by_ticker: dict[str, str] = {}
+        for p in self.positions:
+            key = p.ticker.upper()
+            start = p.entry_date[:10]
+            # Two lines in one name is a repair case (see `consolidate`);
+            # the earlier start is the one that keeps more history.
+            prior = entry_by_ticker.get(key)
+            entry_by_ticker[key] = start if prior is None else min(prior, start)
+
+        removed: dict[str, dict[str, list[str]]] = {}
+        for name, record in (
+            ("paid_dividends", self.paid_dividends),
+            ("applied_splits", self.applied_splits),
+        ):
+            dropped: dict[str, list[str]] = {}
+            for ticker in list(record):
+                if ticker not in entry_by_ticker:
+                    dropped[ticker] = sorted(record.pop(ticker))
+                    continue
+                start = entry_by_ticker[ticker]
+                stale = sorted(d for d in record[ticker] if start and d < start)
+                if not stale:
+                    continue
+                dropped[ticker] = stale
+                kept = [d for d in record[ticker] if not (start and d < start)]
+                if kept:
+                    record[ticker] = kept
+                else:
+                    del record[ticker]
+            removed[name] = dropped
+        return removed
+
     def credit_dividend(
         self, ticker: str, *, amount_per_share: float, ex_date: str
     ) -> float:
