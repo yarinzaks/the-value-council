@@ -65,6 +65,18 @@ const en: Dict = {
   // Live performance ranking (new section)
   ranking_title: "Live performance ranking",
   ranking_subtitle: "Sorted by total return since seed",
+  ranking_window_from: "from",
+  ranking_window_to: "to",
+  ranking_period_1W: "1W",
+  ranking_period_1M: "1M",
+  ranking_period_3M: "3M",
+  ranking_period_FIX: "Since fix",
+  ranking_period_ALL: "ALL",
+  ranking_fix_note:
+    "Since 2026-08-08, the first session under the 30-day holding floor. Before it a name that slipped one rank for a day was sold and bought back, so earlier returns are not the doctrines' own.",
+  ranking_clipped: "from first day",
+  col_window_pnl: "P&L in window",
+  col_window_pct: "Return in window",
   col_rank: "Rank",
   col_medal: " ",
   // Live portfolios table
@@ -429,6 +441,18 @@ const he: Dict = {
   // Live performance ranking
   ranking_title: "דירוג ביצועים חי",
   ranking_subtitle: "ממוין לפי תשואה כוללת מהשקעה ראשונית",
+  ranking_window_from: "מ-",
+  ranking_window_to: "עד",
+  ranking_period_1W: "שבוע",
+  ranking_period_1M: "חודש",
+  ranking_period_3M: "3 חודשים",
+  ranking_period_FIX: "מאז התיקון",
+  ranking_period_ALL: "הכל",
+  ranking_fix_note:
+    "מ-2026-08-08, יום המסחר הראשון עם רצפת ההחזקה של 30 יום. לפני כן מניה שירדה דרגה אחת ליום נמכרה ונקנתה בחזרה, ולכן תשואות קודמות אינן של הדוקטרינות עצמן.",
+  ranking_clipped: "מהיום הראשון",
+  col_window_pnl: "רווח/הפסד בחלון",
+  col_window_pct: "תשואה בחלון",
   col_rank: "דירוג",
   col_medal: " ",
   // Live portfolios table
