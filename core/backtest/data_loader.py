@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterable, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -114,9 +114,17 @@ NO_DATA_TTL_DAYS = 7
 #: 2026-01-02, a 2:1 split applied to 2026 only, and 86 of 5,186 cached
 #: tickers jumped more than 60% across that one year boundary.
 #:
-#: The fix measures the ratio between fetched and cached bars on the
-#: dates they share and applies it to every cached bar the fetch did
-#: not replace. These constants govern that measurement.
+#: The fix widens every fetch through the cache's newest bar, so nothing
+#: newer than a fetch is ever left behind, measures the ratio between
+#: fetched and cached bars on the oldest dates they share, and applies
+#: it to every older cached bar. These constants govern that measurement.
+#:
+#: What it does not do is repair a cache that already mixes bases inside
+#: its history (APH: 2025 at 134.67, 2026 at 69.50). The daily fetches
+#: share bars only with the recent, already-consistent end of such a
+#: cache, measure a factor of 1 and leave the older break where it is;
+#: only a refetch that reaches back across the break — in practice the
+#: ticker's full cached span with ``force_refresh=True`` — heals it.
 #:
 #: Calendar days of cached history a fetch is widened to include when it
 #: would otherwise share too few bars with the cache to measure a basis.
@@ -515,7 +523,17 @@ class PriceDataLoader:
             ).fetchall()
         return [(_to_date(r[0]), float(r[1])) for r in rows]
 
-    def _write_cache(self, ticker: str, df: pd.DataFrame) -> int:
+    def _write_cache(
+        self,
+        ticker: str,
+        df: pd.DataFrame,
+        conn: sqlite3.Connection | None = None,
+    ) -> int:
+        """Insert or replace ``df``'s bars.
+
+        ``conn`` lets :meth:`get_history` write in the same transaction
+        as :meth:`_restate_basis`; without it the write commits on its own.
+        """
         if df.empty:
             return 0
         ticker = ticker.upper()
@@ -536,8 +554,11 @@ class PriceDataLoader:
                     fetched_at,
                 )
             )
-        with self._connect() as conn:
-            conn.executemany(
+        scope: AbstractContextManager[sqlite3.Connection] = (
+            self._connect() if conn is None else nullcontext(conn)
+        )
+        with scope as c:
+            c.executemany(
                 """
                 INSERT OR REPLACE INTO prices
                     (ticker, trade_date, open, high, low, close, adj_close, volume,
@@ -569,28 +590,33 @@ class PriceDataLoader:
     ) -> tuple[date, date]:
         """The window to fetch so it shares enough bars with the cache.
 
+        The window always runs through the cache's newest bar. Bars newer
+        than a fetch could only be put on its basis by a factor measured
+        at the fetch's far edge, and that is wrong whenever the cache
+        already mixes bases: a forced refetch of APH's 2025 measured ×0.5
+        against bars cached before the split and halved 2026, which had
+        been cached after it. Refetching them costs a longer download in
+        the same single request; the daily paths already end at or after
+        the newest bar, so for them nothing changes.
+
         A fetch that shares no bars with the cache cannot tell whether
         the vendor's basis has moved since the cache was written — the
-        old calendar-year fetch was exactly that. The requested window
-        is kept when it already overlaps by :data:`MIN_BASIS_OVERLAP`
-        bars; otherwise it is stretched :data:`BASIS_ANCHOR_DAYS` into
-        the near edge of the cache; failing that (the request sits in a
-        hole, or the cache is tiny) the whole cached span is refetched,
-        which restates it outright.
+        old calendar-year fetch was exactly that. So the start is kept
+        when the window already overlaps by :data:`MIN_BASIS_OVERLAP`
+        bars, moved :data:`BASIS_ANCHOR_DAYS` before the newest bar when
+        not, and moved to the cache's oldest bar as a last resort (a
+        cache of fewer bars than that, or a window inside a hole that
+        reaches to the end of the cache), which refetches it outright.
         """
         if cached_range is None:
             return start, end
         cmin, cmax = cached_range
+        end = max(end, cmax)
         anchor = timedelta(days=BASIS_ANCHOR_DAYS)
-        candidates = [(start, end)]
-        if end >= cmax:
-            candidates.append((min(start, cmax - anchor), end))
-        if start <= cmin:
-            candidates.append((start, max(end, cmin + anchor)))
-        for s, e in candidates:
-            if self._cached_count(ticker, s, e) >= MIN_BASIS_OVERLAP:
-                return s, e
-        return min(start, cmin), max(end, cmax)
+        for s in (start, min(start, cmax - anchor)):
+            if self._cached_count(ticker, s, end) >= MIN_BASIS_OVERLAP:
+                return s, end
+        return min(start, cmin), end
 
     @staticmethod
     def _consensus(ratios: list[float]) -> float | None:
@@ -612,21 +638,29 @@ class PriceDataLoader:
             return None
         return float(np.mean(agree))
 
-    def _restate_basis(self, ticker: str, fetched: pd.DataFrame) -> None:
-        """Put the cached bars the fetch will not replace on its basis.
+    def _restate_basis(
+        self, ticker: str, fetched: pd.DataFrame, conn: sqlite3.Connection
+    ) -> None:
+        """Put the cached bars older than the fetch on its basis.
 
         Ratios of fetched to cached values on the dates both hold give
         the factor; ``close`` and ``adj_close`` are measured separately
         because a split moves both while a new ex-date moves only the
         adjusted series. Bars older than the fetch take the factor seen
         on its oldest shared bars — every adjustment event inside the
-        window is later than them — and bars newer than the fetch take
-        the factor from its newest shared bars. A close factor also
+        window is later than them. Bars newer than the fetch are never
+        rescaled: :meth:`_basis_window` runs every fetch through the
+        newest cached bar, so the only ones left are bars the vendor did
+        not return, and a factor from the far edge of the window would
+        be wrong for them on a cache that mixes bases. A close factor also
         rescales open/high/low, divides volume (so close × volume, the
         dollars traded, is unchanged) and rescales cash dividends, which
         the vendor reports split-adjusted. With no agreed factor nothing
         is restated: a vendor disagreeing bar by bar is not a split, and
         guessing would corrupt history that is at least self-consistent.
+
+        Runs in the caller's ``conn`` so the restatement commits or rolls
+        back together with the write of the fetched bars.
         """
         if (
             fetched.empty
@@ -658,10 +692,10 @@ class PriceDataLoader:
             new, how="inner", rsuffix="_new"
         )
 
-        def edge_factor(column: str, oldest: bool) -> float:
+        def edge_factor(column: str) -> float:
             pair = shared[[column, f"{column}_new"]].dropna()
             pair = pair[(pair[column] > 0) & (pair[f"{column}_new"] > 0)]
-            pair = pair.head(MIN_BASIS_OVERLAP) if oldest else pair.tail(MIN_BASIS_OVERLAP)
+            pair = pair.head(MIN_BASIS_OVERLAP)
             ratios = (pair[f"{column}_new"] / pair[column]).tolist()
             factor = self._consensus(ratios)
             if factor is None:
@@ -669,47 +703,53 @@ class PriceDataLoader:
                     logger.warning(
                         f"{ticker}: no agreed {column} factor between the "
                         f"cache and the fetch ({[round(r, 6) for r in ratios]}) "
-                        f"— the bars outside {first}..{last} are left as they are"
+                        f"— the bars before {first} are left as they are"
                     )
                 return 1.0
             return factor if abs(factor - 1.0) > BASIS_RTOL else 1.0
 
-        with self._connect() as conn:
-            for oldest, op, edge in ((True, "<", first), (False, ">", last)):
-                outside = conn.execute(
-                    f"SELECT COUNT(*) FROM prices WHERE ticker = ? AND trade_date {op} ?",
-                    (ticker, edge.isoformat()),
-                ).fetchone()[0]
-                if not outside:
-                    continue
-                f_close = edge_factor("close", oldest)
-                f_adj = edge_factor("adj_close", oldest)
-                if f_close == 1.0 and f_adj == 1.0:
-                    continue
-                logger.info(
-                    f"{ticker}: restating {outside} cached bars "
-                    f"{'before' if oldest else 'after'} {edge} onto the vendor's "
-                    f"current basis (close ×{f_close:.6g}, adj_close ×{f_adj:.6g})"
-                )
-                conn.execute(
-                    f"""
-                    UPDATE prices SET
-                        open = open * ?, high = high * ?, low = low * ?,
-                        close = close * ?, adj_close = adj_close * ?,
-                        volume = CAST(ROUND(volume / ?) AS INTEGER)
-                    WHERE ticker = ? AND trade_date {op} ?
-                    """,
-                    (
-                        f_close, f_close, f_close, f_close, f_adj, f_close,
-                        ticker, edge.isoformat(),
-                    ),
-                )
-                if f_close != 1.0:
-                    conn.execute(
-                        f"UPDATE dividends SET amount = amount * ? "
-                        f"WHERE ticker = ? AND ex_date {op} ?",
-                        (f_close, ticker, edge.isoformat()),
-                    )
+        newer = conn.execute(
+            "SELECT COUNT(*) FROM prices WHERE ticker = ? AND trade_date > ?",
+            (ticker, last.isoformat()),
+        ).fetchone()[0]
+        if newer:
+            logger.warning(
+                f"{ticker}: the vendor returned nothing after {last}; {newer} "
+                f"newer cached bars are kept as they are"
+            )
+        older = conn.execute(
+            "SELECT COUNT(*) FROM prices WHERE ticker = ? AND trade_date < ?",
+            (ticker, first.isoformat()),
+        ).fetchone()[0]
+        if not older:
+            return
+        f_close = edge_factor("close")
+        f_adj = edge_factor("adj_close")
+        if f_close == 1.0 and f_adj == 1.0:
+            return
+        logger.info(
+            f"{ticker}: restating {older} cached bars before {first} onto the "
+            f"vendor's current basis (close ×{f_close:.6g}, adj_close ×{f_adj:.6g})"
+        )
+        conn.execute(
+            """
+            UPDATE prices SET
+                open = open * ?, high = high * ?, low = low * ?,
+                close = close * ?, adj_close = adj_close * ?,
+                volume = CAST(ROUND(volume / ?) AS INTEGER)
+            WHERE ticker = ? AND trade_date < ?
+            """,
+            (
+                f_close, f_close, f_close, f_close, f_adj, f_close,
+                ticker, first.isoformat(),
+            ),
+        )
+        if f_close != 1.0:
+            conn.execute(
+                "UPDATE dividends SET amount = amount * ? "
+                "WHERE ticker = ? AND ex_date < ?",
+                (f_close, ticker, first.isoformat()),
+            )
 
     # ------------------------------------------------------------------
     # Public API
@@ -726,11 +766,13 @@ class PriceDataLoader:
 
         Cached results are returned when available; missing ranges are
         fetched from yfinance and added to the cache. A fetch is widened
-        to share bars with the cache, and every cached bar it does not
-        replace is rescaled onto its basis when the shared bars show a
-        consistent factor (a split or a dividend re-adjustment), so one
-        ticker's cache never mixes adjustment bases — see
-        :data:`BASIS_ANCHOR_DAYS` and :meth:`_restate_basis`.
+        to share bars with the cache and to run through its newest bar,
+        and every older cached bar is rescaled onto the fetch's basis
+        when the oldest shared bars show a consistent factor (a split or
+        a dividend re-adjustment), so a fetch never introduces a second
+        adjustment basis — see :data:`BASIS_ANCHOR_DAYS` and
+        :meth:`_restate_basis`. A cache that already mixes bases is
+        healed only by a fetch that reaches back across the break.
 
         Args:
             ticker: Symbol (e.g., "AAPL"). Case-insensitive.
@@ -778,8 +820,11 @@ class PriceDataLoader:
         df = self._fetch_yfinance(ticker, fetch_start, fetch_end)
         if not df.empty:
             # Before the write: the comparison needs the old cached rows.
-            self._restate_basis(ticker, df)
-            n = self._write_cache(ticker, df)
+            # One transaction, so a failed write cannot leave the older
+            # bars rescaled next to bars still on the old basis.
+            with self._connect() as conn:
+                self._restate_basis(ticker, df, conn)
+                n = self._write_cache(ticker, df, conn)
             d = self._write_dividends(ticker, df)
             sp = self._write_splits(ticker, df)
             logger.debug(
@@ -1083,10 +1128,11 @@ class PriceDataLoader:
            boundaries).
         2. On true cache miss, fetch the entire calendar year so
            subsequent daily lookups in the same year are free.
-           ``get_history`` stretches that year back (or forward) into
-           the cached history and restates the rest of the ticker onto
-           the fetch's basis, so a split between two fetches no longer
-           leaves the years on different bases (audit PD-05).
+           ``get_history`` stretches that year back into the cached
+           history when it would not otherwise overlap it, runs it
+           through the newest cached bar, and restates the older bars
+           onto the fetch's basis, so a split between two fetches no
+           longer leaves the years on different bases (audit PD-05).
 
         Args:
             force_refresh: Re-fetch ``as_of``'s bar even when the cache

@@ -1054,11 +1054,14 @@ class TestOneAdjustmentBasisPerTicker:
         assert self._row(loader, "2025-12-01")["adj_close"] == pytest.approx(99.0)
         assert self._row(loader, "2025-12-30")["adj_close"] == pytest.approx(100.0)
 
-    def test_fetching_earlier_history_restates_the_newer_cache(
+    def test_fetching_earlier_history_refetches_the_newer_cache(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         # 2026 was cached before the split; a backtest now asks for 2025.
-        # The newer bars must move to the vendor's current basis too.
+        # The newer bars must move to the vendor's current basis too, and
+        # they are refetched rather than rescaled: a factor measured at
+        # one edge of a window says nothing about bars beyond its other
+        # edge when the cache mixes bases.
         loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
         self._seed_old_basis(
             loader, self._days("2026-01-02", "2026-03-31"), close=140.0, adj=140.0
@@ -1071,12 +1074,104 @@ class TestOneAdjustmentBasisPerTicker:
 
         loader.get_history("SPL", date(2025, 12, 1), date(2025, 12, 31))
 
-        # Widened only far enough to share bars with the cache's start,
-        # so March is outside the fetch and must be restated, not refetched.
-        assert date(2026, 1, 2) < calls[0][1] < date(2026, 3, 1)
+        assert calls == [(date(2025, 12, 1), date(2026, 3, 31))]
         bar = self._row(loader, "2026-03-31")
         assert bar["close"] == pytest.approx(70.0)
         assert bar["volume"] == 2000
+
+    def _seed_mixed_cache(self, loader: PriceDataLoader) -> None:
+        # The real APH shape: 2025 cached before its 2:1 split at 140,
+        # 2026 cached after it at 70. The vendor serves all of it at 70.
+        self._seed_old_basis(
+            loader,
+            self._days("2025-06-02", "2025-06-06") + self._days("2025-12-01", "2025-12-31"),
+            close=140.0,
+            adj=140.0,
+        )
+        self._seed_old_basis(
+            loader, self._days("2026-01-02", "2026-03-31"), close=70.0, adj=70.0
+        )
+
+    def test_a_mid_span_refetch_leaves_the_newest_bars_on_their_basis(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Review of PD-05: a forced refetch of 2025 measured ×0.5 on its
+        # newest shared bars and applied it to 2026, which was already on
+        # the current basis, so get_price_on read half the real price.
+        # backfill_price_gap.py and get_price_on's stale-hole path both
+        # make exactly this kind of mid-span forced fetch.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_mixed_cache(loader)
+        monkeypatch.setattr(self, "TODAY", date(2026, 4, 15))
+        fetch, calls = self._vendor(
+            pre_close=70.0, pre_adj=70.0, post_close=70.0, cutover=date(2027, 1, 1)
+        )
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        loader.get_history(
+            "SPL", date(2025, 12, 1), date(2025, 12, 31), force_refresh=True
+        )
+
+        assert loader.get_price_on("SPL", date(2026, 3, 31)) == pytest.approx(70.0)
+        assert calls[0][1] == date(2026, 3, 31)
+        for day in ("2025-06-04", "2025-12-31", "2026-01-02", "2026-03-31"):
+            assert self._row(loader, day)["adj_close"] == pytest.approx(70.0), day
+
+    def test_a_partial_repair_is_not_undone_by_the_next_year_fetch(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Review of PD-05: after the mid-span refetch, the next 2026
+        # year fetch measured ×2 and pushed every older bar back up —
+        # the cache flipped between two wrong states on alternate runs.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_mixed_cache(loader)
+        monkeypatch.setattr(self, "TODAY", date(2026, 4, 15))
+        fetch, _ = self._vendor(
+            pre_close=70.0, pre_adj=70.0, post_close=70.0, cutover=date(2027, 1, 1)
+        )
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        loader.get_history(
+            "SPL", date(2025, 12, 1), date(2025, 12, 31), force_refresh=True
+        )
+        loader.get_history(
+            "SPL", date(2026, 1, 1), date(2026, 12, 31), force_refresh=True
+        )
+
+        for day in ("2025-06-04", "2025-12-31", "2026-01-02", "2026-03-31"):
+            assert self._row(loader, day)["adj_close"] == pytest.approx(70.0), day
+
+    def test_a_failed_write_rolls_the_restatement_back(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Review of PD-05: the restatement and the write of the fetched
+        # bars ran in separate connections, so a failed write left the
+        # older bars rescaled next to unreplaced bars on the old basis.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader,
+            self._days("2025-06-02", "2025-06-06") + self._days("2025-12-01", "2025-12-31"),
+            close=140.0,
+            adj=140.0,
+        )
+        fetch, _ = self._vendor(pre_close=70.0, pre_adj=70.0, post_close=71.0)
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+        real_write = loader._write_cache
+
+        def failing_write(
+            ticker: str, df: pd.DataFrame, *args: sqlite3.Connection | None
+        ) -> int:
+            real_write(ticker, df, *args)
+            raise sqlite3.OperationalError("disk I/O error")
+
+        monkeypatch.setattr(loader, "_write_cache", failing_write)
+
+        with pytest.raises(sqlite3.OperationalError):
+            loader.get_history("SPL", date(2026, 1, 1), date(2026, 1, 9))
+
+        for day in ("2025-06-04", "2025-12-31"):
+            assert self._row(loader, day)["close"] == pytest.approx(140.0), day
+        assert loader.cached_range("SPL") == (date(2025, 6, 2), date(2025, 12, 31))
 
     def test_an_inconsistent_ratio_restates_nothing(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
