@@ -163,6 +163,16 @@ def council_published_dir() -> Path:
     return data_root() / "council" / "published"
 
 
+def doctrine_exits_dir() -> Path:
+    """Each doctrine's keep-or-sell verdict on its held names, per day.
+
+    Beside ``decisions_dir`` rather than inside it: in shadow a doctrine
+    can call a sale the engine did not make, and a SELL row in the
+    dashboard's journal would read as one (audit SF-X1).
+    """
+    return data_root() / "doctrine_exits"
+
+
 def ensure_dirs() -> None:
     """Create all known subdirectories. Idempotent — safe to call from
     any entry point."""
@@ -172,6 +182,7 @@ def ensure_dirs() -> None:
         fundamentals_cache_dir(),
         portfolios_dir(),
         decisions_dir(),
+        doctrine_exits_dir(),
         memos_dir(),
         backtest_decisions_dir(),
         backtest_results_dir(),
@@ -189,6 +200,7 @@ __all__ = [
     "cron_logs_dir",
     "data_root",
     "decisions_dir",
+    "doctrine_exits_dir",
     "edgar_filings_db",
     "ensure_dirs",
     "fundamentals_cache_dir",

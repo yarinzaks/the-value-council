@@ -26,6 +26,12 @@ from core.backtest.strategy_runner import (
     PriceLookup,
     Strategy,
 )
+from core.live.doctrine_exits import (
+    ExitMode,
+    ExitVerdict,
+    exit_mode_for,
+    parse_exit_mode,
+)
 from core.live.why_translator import (
     buffett_why,
     dreman_watch_why,
@@ -102,6 +108,12 @@ class ScanResult:
     #: Setting this says the emptiness is the decision. Silence still
     #: means hold everything.
     flat_is_intentional: bool = False
+    #: The doctrine's own keep-or-sell verdict on held names, each with
+    #: its reason (audit SF-X1). Empty means the doctrine expressed no
+    #: exit opinion — not that it wants to keep everything. Whether the
+    #: runner acts on these or only journals them is the adapter's
+    #: ``exit_mode``.
+    exit_verdicts: list[ExitVerdict] = field(default_factory=list)
 
 
 class AgentAdapter:
@@ -129,10 +141,22 @@ class AgentAdapter:
     #: wearing the clothes of a bug fix.
     honours_run_types: bool = False
 
-    def __init__(self, strategy: Strategy, *, watchlist_size: int = DEFAULT_WATCHLIST_SIZE):
+    def __init__(
+        self,
+        strategy: Strategy,
+        *,
+        watchlist_size: int = DEFAULT_WATCHLIST_SIZE,
+        exit_mode: str | None = None,
+    ):
         self.strategy = strategy
         self.watchlist_size = watchlist_size
         self.entry_trigger: str = "rank enters top portfolio"
+        #: Whether this agent's doctrine exits only watch ("shadow", the
+        #: default for every agent) or govern its held names
+        #: ("enforce"). See :mod:`core.live.doctrine_exits`.
+        self.exit_mode: ExitMode = (
+            exit_mode_for(self.name) if exit_mode is None else parse_exit_mode(exit_mode)
+        )
 
     def run_scan(
         self,
@@ -158,7 +182,36 @@ class AgentAdapter:
             watchlist=watchlist,
             universe_size=len(universe),
             forced_exits=forced,
+            exit_verdicts=self._exit_verdicts(),
         )
+
+    def _exit_verdicts(self) -> list[ExitVerdict]:
+        """The strategy's keep-or-sell verdicts from the ``select`` just run.
+
+        Read off ``last_exit_decisions``; an absent attribute means the
+        doctrine has no exit opinion yet. An entry that is not an
+        :class:`ExitVerdict` is a bug in the strategy. In shadow it is
+        dropped and logged at ERROR — shadow only journals, and a
+        journaling bug must not cost the agent its trading day — while
+        an enforcing agent stops, because there the verdict trades.
+        """
+        raw = list(getattr(self.strategy, "last_exit_decisions", []) or [])
+        return self._checked_verdicts(raw)
+
+    def _checked_verdicts(self, raw: list[object]) -> list[ExitVerdict]:
+        verdicts: list[ExitVerdict] = []
+        for item in raw:
+            if isinstance(item, ExitVerdict):
+                verdicts.append(item)
+                continue
+            message = (
+                f"{self.name}: malformed exit verdict {item!r} "
+                f"(expected ExitVerdict, got {type(item).__name__})"
+            )
+            if self.exit_mode == "enforce":
+                raise TypeError(message)
+            logger.error(f"{message} — dropped; exits are in shadow")
+        return verdicts
 
     # -- subclass hooks -------------------------------------------------
     def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
@@ -512,6 +565,28 @@ class LynchLive(AgentAdapter):
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
         self.entry_trigger = "PEG drops into category buy zone"
+
+    def _exit_verdicts(self) -> list[ExitVerdict]:
+        """Lynch's held-name decisions, which ``select`` already computes.
+
+        :func:`agents.lynch.exits.retained` reasons about every held
+        name and the strategy stores the result as ``last_exits`` —
+        which nothing read (audit SF-X1). Same content, the shared
+        vocabulary: ``retained`` is the inverse of ``sell``.
+        """
+        raw: list[object] = []
+        for decision in getattr(self.strategy, "last_exits", []) or []:
+            try:
+                raw.append(
+                    ExitVerdict(
+                        decision.ticker,
+                        sell=not decision.retained,
+                        reason=decision.reason,
+                    )
+                )
+            except (AttributeError, TypeError, ValueError):
+                raw.append(decision)
+        return self._checked_verdicts(raw)
 
     def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
         return _hybrid_collect_targets(self.strategy, weights, lynch_why)

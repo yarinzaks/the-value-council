@@ -89,6 +89,7 @@ from core.live.agent_adapter import (
     ScanResult,
     SchlossLive,
 )
+from core.live.doctrine_exits import DEFAULT_EXIT_MODE, ExitVerdict
 from core.live.fundamentals_freshness import FundamentalsFreshness, assess_freshness
 from core.live.notify import notify_run
 from core.live.portfolio import (
@@ -112,7 +113,7 @@ from core.llm.mode import LLMMode
 from core.llm.wiring import build_analyst_layer
 from core.logger import get_logger
 from core.market_calendar import closes_early, why_closed
-from core.paths import council_published_dir, trade_ledger_dir
+from core.paths import council_published_dir, doctrine_exits_dir, trade_ledger_dir
 
 logger = get_logger("core.live.runner")
 
@@ -693,6 +694,11 @@ class DailyRunner:
             silently running nothing — a filter that quietly matches
             no-one looks exactly like a clean run that traded nothing,
             which is also the normal outcome on a quiet day.
+        exit_verdict_logger: Where each doctrine's keep-or-sell verdict
+            on its held names is journaled beside what the engine did
+            (default ``<data root>/doctrine_exits``). Separate from the
+            decision journal on purpose: a shadow SELL there would read
+            as a sale to the dashboard and the notifier.
     """
 
     def __init__(
@@ -715,6 +721,7 @@ class DailyRunner:
         decision_logger: DecisionLogger | None = None,
         only_agents: Sequence[str] | None = None,
         llm_mode: LLMMode = LLMMode.OFF,
+        exit_verdict_logger: DecisionLogger | None = None,
     ) -> None:
         if market not in ("US", "TASE"):
             raise ValueError(
@@ -723,6 +730,9 @@ class DailyRunner:
         self.market = market
         self.cache = cache or EdgarCache()
         self.decision_logger = decision_logger or DecisionLogger()
+        self.exit_verdict_logger = exit_verdict_logger or DecisionLogger(
+            doctrine_exits_dir()
+        )
         # Before the adapters: Schloss's distressed-price condition
         # needs this loader, and the builder takes it as an argument.
         self.price_loader = price_loader or PriceDataLoader()
@@ -1119,6 +1129,32 @@ class DailyRunner:
                 )
             scan.targets = [t for t in scan.targets if t.ticker in held_now]
 
+        # ---- DOCTRINE EXITS: the strategy's own keep-or-sell ----------
+        # Audit SF-X1: no playbook's exit rule ever ran. The strategy may
+        # now say, per held name, keep or sell and why. In shadow — every
+        # agent's default — that verdict is journaled beside what the
+        # engine does and changes nothing below: `doctrine_keeps` and
+        # `doctrine_sells` stay empty, so the sell loop, the buys and the
+        # rebalance see exactly the scan they saw before.
+        exit_mode = getattr(adapter, "exit_mode", DEFAULT_EXIT_MODE)
+        held_at_open = {p.ticker.upper(): p for p in portfolio.positions}
+        verdicts = self._held_verdicts(
+            adapter.name, scan.exit_verdicts, held_at_open, as_of
+        )
+        # Whether the scan produced a target list at all, read before an
+        # enforced sell can take its own target out of it. Removing the
+        # doctrine's sells must not turn a real scan into the no-trade
+        # signal the empty-list guard below protects.
+        had_targets = bool(scan.targets)
+        listed_tickers = {t.ticker for t in scan.targets}
+        doctrine_keeps: set[str] = set()
+        doctrine_sells: set[str] = set()
+        if exit_mode == "enforce":
+            doctrine_keeps = {t for t, v in verdicts.items() if not v.sell}
+            doctrine_sells = {t for t, v in verdicts.items() if v.sell}
+            # A name the doctrine sells is not bought back the same day.
+            scan.targets = [t for t in scan.targets if t.ticker not in doctrine_sells]
+
         target_tickers = {t.ticker for t in scan.targets}
         trades: list[TradeRecord] = []
 
@@ -1143,13 +1179,26 @@ class DailyRunner:
         # wants no equities at all, which produces the same empty list a
         # failed scan does. The flag is how the two are told apart.
         going_flat = scan.flat_is_intentional
-        if scan.targets or forced_exits or going_flat:
+        if had_targets or forced_exits or going_flat:
             for pos in list(portfolio.positions):
                 # Forced first: a name can be both a current target and
                 # under a terminal filing, and the filing wins.
                 if pos.ticker in target_tickers and pos.ticker not in forced_exits:
                     continue
-                if not scan.targets and not going_flat and pos.ticker not in forced_exits:
+                if not had_targets and not going_flat and pos.ticker not in forced_exits:
+                    continue
+                # Enforced doctrine keep: the name left the list but its
+                # own exit rule has not fired. A terminal filing and an
+                # intentional flat still outrank it.
+                if (
+                    pos.ticker in doctrine_keeps
+                    and pos.ticker not in forced_exits
+                    and not going_flat
+                ):
+                    logger.info(
+                        f"{as_of}: {adapter.name} keeping {pos.ticker} — "
+                        f"doctrine: {verdicts[pos.ticker].reason}"
+                    )
                     continue
                 # A name can leave the target list for a day because a
                 # price moved and it slipped a rank, then come straight
@@ -1213,9 +1262,28 @@ class DailyRunner:
                         commission=self.commission,
                     )
                     trades.append(trade)
-                    self._log_sell(adapter.name, pos, price, as_of)
+                    self._log_sell(
+                        adapter.name,
+                        pos,
+                        price,
+                        as_of,
+                        verdict=verdicts.get(pos.ticker),
+                        exit_mode=exit_mode,
+                        left_list=pos.ticker not in listed_tickers,
+                    )
                 except LivePortfolioError as exc:
                     logger.warning(f"{as_of}: sell of {pos.ticker} failed: {exc}")
+
+        # Every verdict on a held name, beside what the engine did with
+        # it. In shadow this is the whole effect of the doctrine's exits.
+        self._journal_exit_verdicts(
+            adapter.name,
+            exit_mode,
+            verdicts,
+            held_at_open,
+            sold={t.ticker for t in trades if t.side == "SELL"},
+            as_of=as_of,
+        )
 
         # ---- BUYs: targets we don't yet hold --------------------------
         nav_after_sells = portfolio.total_nav
@@ -1847,21 +1915,125 @@ class DailyRunner:
         except Exception as exc:
             logger.debug(f"decision log BUY {target.ticker} failed: {exc}")
 
-    def _log_sell(
-        self, agent: str, pos: Position, price: float, as_of: date
+    def _held_verdicts(
+        self,
+        agent: str,
+        verdicts: list[ExitVerdict],
+        held: dict[str, Position],
+        as_of: date,
+    ) -> dict[str, ExitVerdict]:
+        """The verdicts that are about a name the book holds, by ticker.
+
+        A verdict on anything else has no position to keep or sell and
+        is dropped with a warning rather than journaled as if it did.
+        """
+        out: dict[str, ExitVerdict] = {}
+        for verdict in verdicts:
+            ticker = verdict.ticker.upper()
+            if ticker not in held:
+                logger.warning(
+                    f"{as_of}: {agent} gave an exit verdict on {ticker}, "
+                    f"which the book does not hold — ignored"
+                )
+                continue
+            out[ticker] = verdict
+        return out
+
+    def _journal_exit_verdicts(
+        self,
+        agent: str,
+        exit_mode: str,
+        verdicts: dict[str, ExitVerdict],
+        held: dict[str, Position],
+        *,
+        sold: set[str],
+        as_of: date,
     ) -> None:
+        """Write each doctrine verdict beside the engine's action.
+
+        One row per held name the doctrine spoke about: SELL or HOLD
+        for the doctrine's call, its reason, the mode, and whether the
+        engine sold or kept the name. Reading the shadow weeks back is
+        a filter on ``engine_action`` against ``decision``.
+
+        Never fatal. The trades already happened; a lost journal costs
+        the comparison, not money, and is said at WARNING.
+        """
+        for ticker, verdict in sorted(verdicts.items()):
+            pos = held[ticker]
+            action = "sold" if ticker in sold else "kept"
+            try:
+                self.exit_verdict_logger.log(
+                    make_decision(
+                        ticker=ticker,
+                        decision="SELL" if verdict.sell else "HOLD",
+                        agent=agent,
+                        timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
+                        criteria_met=[verdict.reason],
+                        market_conditions={
+                            "exit_mode": exit_mode,
+                            "engine_action": action,
+                        },
+                        entry_price=pos.entry_price,
+                        exit_trigger=verdict.reason if verdict.sell else None,
+                        rationale=(
+                            f"Doctrine said {'sell' if verdict.sell else 'keep'} "
+                            f"({verdict.reason}); the engine {action} it "
+                            f"[{exit_mode}]"
+                        ),
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"{as_of}: doctrine exit journal for {agent} {ticker} "
+                    f"failed: {exc}"
+                )
+
+    def _log_sell(
+        self,
+        agent: str,
+        pos: Position,
+        price: float,
+        as_of: date,
+        *,
+        verdict: ExitVerdict | None = None,
+        exit_mode: str = DEFAULT_EXIT_MODE,
+        left_list: bool = True,
+    ) -> None:
+        # The reason this row gives. With no doctrine verdict it is the
+        # one it always was. When the doctrine called the sale, its rule
+        # comes first and becomes the row's exit_trigger (audit SF-X1:
+        # 823 of 823 exits had none); the list exit is kept beside it
+        # only if the name did leave the list. A doctrine that wanted to
+        # keep the name is recorded too, so a shadow sale it opposed is
+        # visible on the row that made it.
+        criteria = ["left today's target list"]
+        trigger: str | None = None
+        conditions: dict[str, str] = {}
+        if verdict is not None:
+            conditions = {
+                "doctrine_exit_mode": exit_mode,
+                "doctrine_verdict": "sell" if verdict.sell else "keep",
+                "doctrine_reason": verdict.reason,
+            }
+            if verdict.sell:
+                trigger = verdict.reason
+                criteria = [verdict.reason] + (
+                    ["left today's target list"] if left_list else []
+                )
         try:
             self.decision_logger.log(
                 make_decision(
                     ticker=pos.ticker,
-                    # EXIT, not SELL — this is the executed disposal, and
-                    # the trigger is a real one: the name left today's
-                    # target list. Recording it as "SELL" made a
-                    # mechanical rotation look like a doctrine decision.
+                    # EXIT, not SELL — this is the executed disposal.
+                    # Recording it as "SELL" made a mechanical rotation
+                    # look like a doctrine decision.
                     decision="EXIT",
                     agent=agent,
                     timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
-                    criteria_met=["left today's target list"],
+                    criteria_met=criteria,
+                    market_conditions=conditions,
+                    exit_trigger=trigger,
                     rationale=(
                         f"Closed live position: entry ${pos.entry_price:.2f}, "
                         f"exit ${price:.2f} ({(price/pos.entry_price - 1)*100:+.2f}%)"

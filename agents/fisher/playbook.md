@@ -380,6 +380,8 @@ Position trimming or selling is restricted to **specific fundamental triggers** 
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+
 Fisher's exit framework is the most restrictive in the Council. The default is **never sell**.
 
 ### 7.1 The three legitimate sell triggers — and only these

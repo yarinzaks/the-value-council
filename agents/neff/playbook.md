@@ -338,6 +338,8 @@ For the agent (relevant context, not actionable rule): this represents the **dee
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+
 Neff's exit rules are **the most criterion-driven** in the Council. He sold when the framework no longer applied.
 
 ### 7.1 The four legitimate sell triggers

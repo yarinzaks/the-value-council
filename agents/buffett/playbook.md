@@ -276,6 +276,8 @@ Buffett holds substantial cash when opportunities are scarce. Berkshire's cash h
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+
 Buffett's exit framework is the **opposite** of Graham's. Where Graham sold at fair value, Buffett's "favorite holding period is forever."
 
 ### 7.1 The four legitimate sell triggers

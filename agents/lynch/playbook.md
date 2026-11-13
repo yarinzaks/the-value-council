@@ -338,6 +338,8 @@ The agent stays at 90%+ invested when 30+ qualifying candidates exist. Cash posi
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+
 Lynch's exit framework is **category-specific** — different rules for each of the six categories:
 
 ### 7.1 Universal sell triggers (apply to all categories)
