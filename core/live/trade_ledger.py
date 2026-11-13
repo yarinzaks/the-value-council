@@ -79,6 +79,12 @@ class LedgerEntry:
     #: The wall-clock date the row was written, when that is not the
     #: session it describes. Absent on an ordinary same-day run.
     recorded_on: str | None = None
+    #: On a SELL: when the position it closed was opened, and at what
+    #: average cost. Absent on a BUY, and on rows written before the
+    #: field existed — a reader must treat a missing entry as unknown,
+    #: not as "bought the same day".
+    entry_date: str | None = None
+    entry_price: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -93,6 +99,12 @@ class LedgerEntry:
             "realized_pnl_usd": round(self.realized_pnl_usd, 2),
             "source": self.source,
             **({"recorded_on": self.recorded_on} if self.recorded_on else {}),
+            **({"entry_date": self.entry_date} if self.entry_date else {}),
+            **(
+                {"entry_price": round(self.entry_price, 4)}
+                if self.entry_price is not None
+                else {}
+            ),
         }
 
     @classmethod
@@ -110,6 +122,12 @@ class LedgerEntry:
             source=str(data.get("source", "executed")),
             recorded_on=(
                 str(data["recorded_on"]) if data.get("recorded_on") else None
+            ),
+            entry_date=str(data["entry_date"]) if data.get("entry_date") else None,
+            entry_price=(
+                float(data["entry_price"])
+                if data.get("entry_price") is not None
+                else None
             ),
         )
 
@@ -149,6 +167,8 @@ def record_day(
             realized_pnl_usd=t.realized_pnl_usd,
             source="caught-up" if late else "executed",
             recorded_on=recorded_on.isoformat() if late else None,
+            entry_date=t.entry_date,
+            entry_price=t.entry_price,
         )
         for t in trades
     ]

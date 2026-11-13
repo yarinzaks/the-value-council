@@ -283,6 +283,8 @@ class LivePortfolio:
             gross_value=gross,
             cost_paid=cost,
             realized_pnl_usd=(price - pos.entry_price) * sold,
+            entry_date=pos.entry_date,
+            entry_price=pos.entry_price,
         )
 
     def consolidate(self, ticker: str) -> bool:
@@ -663,6 +665,13 @@ class TradeRecord:
     gross_value: float
     cost_paid: float
     realized_pnl_usd: float
+    #: What a sale closed: the position's entry date and average cost.
+    #: Only a SELL carries them. Without them a sale is a price and a
+    #: profit with no beginning — the ledger could say what a name made
+    #: and never how long it was held or what it was bought for, so no
+    #: page could draw the position from entry to exit.
+    entry_date: str | None = None
+    entry_price: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
