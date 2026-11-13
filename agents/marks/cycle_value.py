@@ -36,11 +36,13 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict
 from core.llm.concurrency import analyze_all
 from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
+from . import exits as marks_exits
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
@@ -116,6 +118,11 @@ class HowardMarks(Strategy):
         self.selection_history: list[MarksSelection] = []
         self.last_temperature: TemperatureAssessment | None = None
         self.last_memos: list[MarksMemo] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.marks.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -169,6 +176,20 @@ class HowardMarks(Strategy):
         temperature = assess_market_temperature(measurable, as_of=as_of)
         self.last_temperature = temperature
         profile = profile_for(temperature.posture)
+
+        # Before any return, so it is published even when nothing
+        # qualifies today — when a held name's verdict matters most.
+        # Judged against the cycle just measured; an empty measurable
+        # universe defaults to Neutral without reading anything, which
+        # is no posture to value a name against.
+        self.last_exit_decisions = marks_exits.verdicts(
+            held,
+            prices,
+            fundamentals,
+            temperature.posture if temperature.signals.universe_size else None,
+            as_of=as_of,
+            max_de=self.max_de,
+        )
 
         # Stage 2: quality gates, now that the posture is known.
         survivors = apply_quality_gates(
