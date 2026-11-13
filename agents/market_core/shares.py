@@ -35,7 +35,7 @@ import pandas as pd
 from core.data.edgar_cache import EdgarCache
 from core.data.fundamentals_fetcher import MAX_FACT_AGE_DAYS
 from core.logger import get_logger
-from core.research.splits import adjusted_shares
+from core.research.splits import COVER_CONCEPTS, split_adjusted_share_count
 
 logger = get_logger("agents.market_core.shares")
 
@@ -43,11 +43,10 @@ logger = get_logger("agents.market_core.shares")
 #: cover-page fact is preferred because it is dated at the filing rather
 #: than at a period end — a 10-K restates the same concept for every
 #: year in its comparative columns, so taking the largest reaches years
-#: into the past and reads a count that was stale when filed.
-SHARE_CONCEPTS: tuple[str, ...] = (
-    "EntityCommonStockSharesOutstanding",
-    "CommonStockSharesOutstanding",
-)
+#: into the past and reads a count that was stale when filed. Owned by
+#: :mod:`core.research.splits`, which also falls back to the weighted
+#: average when this series goes dark (audit FUND-8).
+SHARE_CONCEPTS: tuple[str, ...] = COVER_CONCEPTS
 
 
 def split_adjusted_shares(cache: EdgarCache, ticker: str) -> pd.Series:
@@ -64,16 +63,9 @@ def split_adjusted_shares(cache: EdgarCache, ticker: str) -> pd.Series:
         return pd.Series(dtype="float64")
     if facts is None or len(facts) == 0:
         return pd.Series(dtype="float64")
-
-    rows = facts[facts["concept"].isin(SHARE_CONCEPTS)]
-    if len(rows) == 0:
-        return pd.Series(dtype="float64")
-
-    preference = {name: i for i, name in enumerate(SHARE_CONCEPTS)}
-    ordered = rows.assign(_rank=rows["concept"].map(preference)).sort_values(
-        ["filed", "_rank", "period_end"], ascending=[True, False, True]
-    )
-    return adjusted_shares(ordered.groupby("filed")["value"].last())
+    # Sanity floor, weighted-average fallback and the filer's-restatement
+    # check on every detected split (audit FUND-8) live there.
+    return split_adjusted_share_count(facts)
 
 
 def _newest_known(

@@ -183,3 +183,98 @@ class TestUnusableInputs:
         self, cache: EdgarCache, shares: float | None
     ) -> None:
         assert market_cap_at(cache, "NONE", date(2024, 6, 5), 10.0, shares) is None
+
+
+def _fact(
+    concept: str, filed: date, start: date | None, end: date, value: float
+) -> XbrlFact:
+    return XbrlFact(
+        concept=concept,
+        namespace="dei" if concept.startswith("Entity") else "us-gaap",
+        unit="shares",
+        value=value,
+        period_start=start,
+        period_end=end,
+        filed=filed,
+        form="10-Q",
+        fiscal_year=end.year,
+        fiscal_period=None,
+        accession_number=f"acc-{filed.isoformat()}",
+    )
+
+
+_WAB = "WeightedAverageNumberOfSharesOutstandingBasic"
+_DEI = "EntityCommonStockSharesOutstanding"
+
+
+class TestSplitDetectorSanity:
+    """Audit FUND-8, seen through the helper the screens call.
+
+    Rows are FOXA's, RYN's and AOS's own facts from the local EDGAR
+    cache, trimmed to the filings that decide each case.
+    """
+
+    def test_foxa_cover_count_of_one_is_not_a_market_cap(
+        self, cache: EdgarCache
+    ) -> None:
+        cache.save_facts(
+            "FOXA",
+            [
+                _fact(_DEI, date(2019, 3, 18), None, date(2019, 3, 18), 1.0),
+                _fact(
+                    _WAB, date(2019, 5, 10), date(2019, 1, 1), date(2019, 3, 31),
+                    621_000_000.0,
+                ),
+            ],
+        )
+        # Between the two filings the only count on file was "1"; the
+        # loader's count is what is left.
+        assert market_cap_at(
+            cache, "FOXA", date(2019, 4, 1), 40.0, 620_000_000.0
+        ) == pytest.approx(40.0 * 620_000_000.0)
+        assert market_cap_at(
+            cache, "FOXA", date(2019, 6, 1), 40.0, None
+        ) == pytest.approx(40.0 * 621_000_000.0)
+
+    def test_ryn_merger_issuance_does_not_double_the_old_count(
+        self, cache: EdgarCache
+    ) -> None:
+        cache.save_facts(
+            "RYN",
+            [
+                _fact(_DEI, date(2025, 11, 7), None, date(2025, 10, 31), 153_899_831.0),
+                _fact(_DEI, date(2026, 2, 23), None, date(2026, 2, 13), 302_298_328.0),
+                _fact(
+                    _WAB, date(2025, 2, 21), date(2024, 1, 1), date(2024, 12, 31),
+                    148_839_858.0,
+                ),
+                _fact(
+                    _WAB, date(2026, 2, 23), date(2024, 1, 1), date(2024, 12, 31),
+                    148_839_858.0,
+                ),
+            ],
+        )
+        mcap = market_cap_at(cache, "RYN", date(2025, 12, 1), 22.0, None)
+        assert mcap == pytest.approx(22.0 * 153_899_831.0)
+
+    def test_aos_newest_count_comes_from_weighted_average(
+        self, cache: EdgarCache
+    ) -> None:
+        cache.save_facts(
+            "AOS",
+            [
+                _fact(_DEI, date(2015, 8, 10), None, date(2015, 8, 5), 75_732_188.0),
+                _fact(
+                    _WAB, date(2025, 10, 28), date(2025, 7, 1), date(2025, 9, 30),
+                    139_953_331.0,
+                ),
+                _fact(
+                    _WAB, date(2026, 2, 10), date(2025, 1, 1), date(2025, 12, 31),
+                    141_029_845.0,
+                ),
+            ],
+        )
+        # The loader's figure is deliberately wrong here: the helper
+        # must not need it once a fresh weighted average is on file.
+        mcap = market_cap_at(cache, "AOS", date(2026, 3, 2), 70.0, 1.0)
+        assert mcap == pytest.approx(70.0 * 141_029_845.0)
