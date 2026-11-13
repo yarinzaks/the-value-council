@@ -602,3 +602,176 @@ class TestTheCommittedBaseline:
 
         assert not report.ok
         assert any(u.startswith("broken.json") for u in report.unreadable)
+
+
+# ---------------------------------------------------------------------------
+# A split moves shares with no order, so no ledger day (audit item 22)
+# ---------------------------------------------------------------------------
+def _split_row(
+    ticker: str, before: float, after: float, *, ex_date: str = "2026-08-05",
+    ratio: float = 2.0, agent: str = "graham",
+) -> dict[str, Any]:
+    """A SPLIT journal row as ``DailyRunner._log_split`` writes it."""
+    return {
+        "ticker": ticker,
+        "decision": "SPLIT",
+        "agent": agent,
+        "timestamp": "2026-08-05T00:00:00+00:00",
+        "market_conditions": {
+            "corporate_action": "split",
+            "ex_date": ex_date,
+            "ratio": ratio,
+            "shares_before": before,
+            "shares_after": after,
+        },
+    }
+
+
+def _journal_day(
+    journal: Path, agent: str, rows: list[dict[str, Any]], day: str = "2026-08-05"
+) -> Path:
+    folder = journal / agent
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{day}.json"
+    path.write_text(json.dumps(rows))
+    return path
+
+
+class TestASplitIsNotAnUnledgeredMove:
+    """A split restates a holding's share count without placing an
+    order, so the runner writes no ledger day for it — by design, cash
+    in lieu is not a trade. Before this, the gate read the restated
+    count as shares moved off the record and failed the run, so on a
+    split day with no trade the whole run's state was never committed,
+    and the next run re-applied the split to the uncommitted book."""
+
+    def _check(self, tmp_path: Path, after: dict[str, float],
+               before: dict[str, float]) -> Any:
+        books = tmp_path / "portfolios"
+        books.mkdir(exist_ok=True)
+        _book(books, "graham", after)
+        return check_portfolios(
+            books, mode="open", as_of=AS_OF,
+            previous=_committed({"graham.json": before}),
+            ledger_dir=tmp_path / "trades",
+            journal_dir=tmp_path / "decisions",
+        )
+
+    def test_a_journaled_split_explains_the_change(self, tmp_path: Path) -> None:
+        _journal_day(tmp_path / "decisions", "graham", [_split_row("NVDA", 10, 20)])
+
+        report = self._check(tmp_path, {"NVDA": 20, "KO": 5}, {"NVDA": 10, "KO": 5})
+
+        assert report.ok
+        assert report.unledgered == []
+        assert report.split_adjusted == ["graham (NVDA 10→20)"]
+        text = format_report(report, mode="open", as_of=AS_OF)
+        assert "::error::" not in text
+        assert "::notice::" in text
+
+    def test_without_the_journal_row_it_still_fails(self, tmp_path: Path) -> None:
+        report = self._check(tmp_path, {"NVDA": 20}, {"NVDA": 10})
+
+        assert not report.ok
+        assert report.unledgered == ["graham (NVDA 10→20)"]
+
+    def test_a_row_that_does_not_match_the_counts_explains_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        # The journal says 10 became 20; the book went to 30.
+        _journal_day(tmp_path / "decisions", "graham", [_split_row("NVDA", 10, 20)])
+
+        report = self._check(tmp_path, {"NVDA": 30}, {"NVDA": 10})
+
+        assert report.unledgered == ["graham (NVDA 10→30)"]
+
+    def test_a_split_does_not_cover_another_names_trade(
+        self, tmp_path: Path
+    ) -> None:
+        _journal_day(tmp_path / "decisions", "graham", [_split_row("NVDA", 10, 20)])
+
+        report = self._check(
+            tmp_path, {"NVDA": 20, "KO": 3}, {"NVDA": 10, "KO": 5}
+        )
+
+        assert not report.ok
+        assert report.unledgered == ["graham (KO 5→3)"]
+
+    def test_a_reverse_split_that_closed_the_line_is_explained(
+        self, tmp_path: Path
+    ) -> None:
+        # 5 shares through 1-for-10 is half a share: all of it paid in cash.
+        _journal_day(
+            tmp_path / "decisions", "graham",
+            [_split_row("TINY", 5, 0, ratio=0.1)],
+        )
+
+        report = self._check(tmp_path, {"KO": 5}, {"KO": 5, "TINY": 5})
+
+        assert report.ok
+        assert report.split_adjusted == ["graham (-TINY)"]
+
+    def test_two_splits_in_one_run_are_chained(self, tmp_path: Path) -> None:
+        # A stale row from an earlier attempt (shares_before 7) is ignored.
+        _journal_day(
+            tmp_path / "decisions", "graham",
+            [
+                _split_row("NVDA", 30, 60, ex_date="2026-08-05"),
+                _split_row("NVDA", 7, 14, ex_date="2026-08-04"),
+                _split_row("NVDA", 10, 30, ex_date="2026-08-04", ratio=3.0),
+            ],
+        )
+
+        report = self._check(tmp_path, {"NVDA": 60}, {"NVDA": 10})
+
+        assert report.ok
+
+    def test_a_corrupt_journal_day_is_unreadable_not_an_excuse(
+        self, tmp_path: Path
+    ) -> None:
+        folder = tmp_path / "decisions" / "graham"
+        folder.mkdir(parents=True)
+        (folder / "2026-08-05.json").write_text("{not json")
+
+        report = self._check(tmp_path, {"NVDA": 20}, {"NVDA": 10})
+
+        assert not report.ok
+        assert report.unledgered == ["graham (NVDA 10→20)"]
+        assert any("journal" in u for u in report.unreadable)
+
+    def test_the_journal_needs_the_baseline(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError):
+            check_portfolios(
+                tmp_path, mode="open", as_of=AS_OF,
+                journal_dir=tmp_path / "decisions",
+            )
+
+    def test_main_passes_a_split_only_run(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # The workflow passes no journal flag: the gate must find the
+        # journal at the data root, where the runner wrote it.
+        books = tmp_path / "repo" / "data" / "portfolios"
+        books.mkdir(parents=True)
+        _git(tmp_path / "repo", "init", "-q")
+        _book(books, "graham", {"NVDA": 10})
+        _git(tmp_path / "repo", "add", "data/portfolios/graham.json")
+        _git(tmp_path / "repo", "commit", "-q", "-m", "pre-run books")
+        _book(books, "graham", {"NVDA": 20})
+        root = tmp_path / "root"
+        _journal_day(root / "decisions", "graham", [_split_row("NVDA", 10, 20)])
+        monkeypatch.setattr("core.paths.DATA_ROOT", root)
+        db = _prices_db(tmp_path / "prices.sqlite", {"NVDA": "2026-08-05"})
+
+        code = main(
+            [
+                "--mode", "open", "--as-of", "2026-08-05",
+                "--portfolios", str(books), "--prices-db", str(db),
+                "--trades", str(tmp_path / "trades"), "--baseline-ref", "HEAD",
+            ]
+        )
+
+        out = capsys.readouterr().out
+        assert code == 0, out
+        assert "graham (NVDA 10→20)" in out

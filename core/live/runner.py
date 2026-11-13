@@ -29,7 +29,7 @@ import math
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, timedelta
 from fractions import Fraction
 from pathlib import Path
 
@@ -1886,7 +1886,8 @@ class DailyRunner:
 
         The floor is stamped on the first run that sees positions, at
         the book's last mark (the later of its last open and close
-        dates), and never moved. Splits before it are ones the book
+        dates, but no later than the day before ``as_of``, so today's
+        own ex-date is never below it), and never moved. Splits before it are ones the book
         already priced through; restating them would rewrite history,
         which is not a daily run's call. Splits after it are applied
         even if the cache learns of them late, because the record of
@@ -1912,7 +1913,14 @@ class DailyRunner:
                 for d in (portfolio.last_open_date, portfolio.last_close_date)
                 if d
             ]
-            portfolio.split_floor_date = max(marks) if marks else as_of.isoformat()
+            # Never today: the lower bound is exclusive, so a floor of
+            # as_of would drop today's ex-date for good on a book an
+            # earlier run already marked today (the close mark of the
+            # deploy day, after an open run of the old code).
+            day_before = (as_of - timedelta(days=1)).isoformat()
+            portfolio.split_floor_date = (
+                min(max(marks), day_before) if marks else day_before
+            )
         floor = portfolio.split_floor_date[:10]
 
         applied: list[SplitRecord] = []

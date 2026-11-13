@@ -1800,6 +1800,57 @@ class TestSplitsAdjustTheBook:
         assert result.portfolio.split_floor_date == "2026-08-04"
         assert result.portfolio.positions[0].shares == 10.0
 
+    def test_a_book_already_marked_today_still_takes_todays_split(
+        self, runner: DailyRunner
+    ) -> None:
+        # Deploy day: the open run (old code) marked the book today, and
+        # the close mark is the first run to stamp the floor. A floor of
+        # today would exclude today's ex-date for good.
+        self._held(runner, last_close="2026-08-04")
+        book = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)
+        book.last_open_date = AS_OF.isoformat()
+        book.save(directory=runner.portfolio_dir)
+        runner.price_loader = _StubPriceLoaderWithSplits(  # type: ignore[assignment]
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        assert results[0].portfolio.split_floor_date == "2026-08-04"
+        assert results[0].portfolio.positions[0].shares == 20.0
+
+    def test_a_split_only_day_passes_the_run_gate(
+        self, runner: DailyRunner, tmp_path: Path
+    ) -> None:
+        # The workflow's verify step fails a book whose holdings moved
+        # with no ledger day; a split places no order and writes none.
+        # Its SPLIT journal row is what puts the change on record.
+        from scripts.verify_run_state import check_portfolios
+
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+        assert result.trades == []
+
+        report = check_portfolios(
+            runner.portfolio_dir,
+            mode="open",
+            as_of=AS_OF,
+            previous=lambda path: {"NVDA": 10.0},
+            ledger_dir=tmp_path / "trades",
+            journal_dir=tmp_path / "decisions",
+        )
+
+        # Freshness is not asserted: the runner stamps the wall clock,
+        # not AS_OF. What matters here is the ledger check.
+        assert report.unledgered == []
+        assert report.unreadable == []
+        assert report.split_adjusted == ["stub_agent (NVDA 10→20)"]
+
     def test_a_split_learned_a_day_late_is_still_applied(
         self, runner: DailyRunner
     ) -> None:

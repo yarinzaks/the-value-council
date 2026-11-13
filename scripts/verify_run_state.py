@@ -43,6 +43,17 @@ is the state before this run — and fails the run when a book's holdings
 moved but no ledger file for the day exists. A day without trades writes
 no ledger file by design, so unchanged holdings need none.
 
+A stock split is the one share change with no order behind it: the
+runner restates the holding's count and journals a ``SPLIT`` row, but
+writes no ledger day, because cash in lieu is not a trade (audit item
+22). Without the baseline it needs nothing; with it, a change that the
+day's ``SPLIT`` rows account for exactly — shares before to shares
+after, chained through every split of that name — is reported as a
+notice, not an error. Any other change in the same book still needs
+its ledger day. Before this, a split on a day the holder placed no
+order failed the gate, so the run's state was never committed and the
+next run split the uncommitted book again.
+
 Usage::
 
     python -m scripts.verify_run_state --mode open
@@ -64,7 +75,7 @@ from pathlib import Path
 
 from core.live.portfolio import unpriced_since_for
 from core.market_calendar import why_closed
-from core.paths import portfolios_dir, prices_db, trade_ledger_dir
+from core.paths import decisions_dir, portfolios_dir, prices_db, trade_ledger_dir
 
 #: Newest cached bar for a ticker, or ``None`` when the cache has none.
 LastBar = Callable[[str], date | None]
@@ -104,6 +115,9 @@ class VerifyReport:
     #: ``agent (changes)`` for every book whose holdings moved with no
     #: ledger file for the day.
     unledgered: list[str] = field(default_factory=list)
+    #: ``agent (changes)`` for every book whose only unledgered moves
+    #: are accounted for by the day's journaled splits.
+    split_adjusted: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -199,6 +213,69 @@ def git_baseline_reader(directory: Path, ref: str) -> PreviousShares | None:
     return previous
 
 
+#: A journaled split, as the gate reads it: ex-date, shares before, after.
+_SplitRow = tuple[str, float, float]
+
+
+def _journaled_splits(path: Path) -> dict[str, list[_SplitRow]]:
+    """Ticker → the ``SPLIT`` rows in one agent's journal day file.
+
+    ``{}`` when the day has no journal file. Raises ``ValueError``/
+    ``TypeError``/``KeyError`` on a malformed file or ``SPLIT`` row,
+    which the caller reports as unreadable rather than as no split.
+    """
+    if not path.is_file():
+        return {}
+    rows = json.loads(path.read_text())
+    if not isinstance(rows, list):
+        raise TypeError(f"{path.name} is {type(rows).__name__}, not a list")
+    splits: dict[str, list[_SplitRow]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or row.get("decision") != "SPLIT":
+            continue
+        conditions = row["market_conditions"]
+        splits.setdefault(str(row["ticker"]).upper(), []).append(
+            (
+                str(conditions["ex_date"]),
+                round(float(conditions["shares_before"]), _SHARE_DECIMALS),
+                round(float(conditions["shares_after"]), _SHARE_DECIMALS),
+            )
+        )
+    return splits
+
+
+def _explained_by_splits(
+    before: dict[str, float],
+    after: dict[str, float],
+    splits: dict[str, list[_SplitRow]],
+) -> set[str]:
+    """Tickers whose move from *before* to *after* the splits account for.
+
+    Walks each name's rows oldest ex-date first, taking a row only when
+    its ``shares_before`` is the count reached so far, so two splits in
+    one run chain and a row left by an earlier attempt that day is
+    passed over. A line the split closed (a reverse split leaving less
+    than one share) is absent from *after* and counts as zero.
+    """
+    explained: set[str] = set()
+    for ticker, rows in splits.items():
+        start = before.get(ticker)
+        if start is None:
+            continue
+        end = after.get(ticker, 0.0)
+        reached = start
+        for _ex_date, shares_before, shares_after in sorted(rows):
+            if shares_before == reached:
+                reached = shares_after
+        if start != end and reached == end:
+            explained.add(ticker)
+    return explained
+
+
+def _only(holdings: dict[str, float], tickers: set[str]) -> dict[str, float]:
+    return {t: s for t, s in holdings.items() if t in tickers}
+
+
 def _describe(before: dict[str, float], after: dict[str, float]) -> str:
     """``+NEW, -GONE, KEPT 54→42`` — what moved, sorted by ticker."""
     parts: list[str] = []
@@ -235,6 +312,7 @@ def check_portfolios(
     last_bar: LastBar | None = None,
     previous: PreviousShares | None = None,
     ledger_dir: Path | None = None,
+    journal_dir: Path | None = None,
 ) -> VerifyReport:
     """Assert every portfolio in *directory* was written by today's run.
 
@@ -243,14 +321,18 @@ def check_portfolios(
 
     With *previous* and *ledger_dir*, also assert that every book whose
     holdings differ from *previous* has a ledger file for *as_of*;
-    without them that check is not run.
+    without them that check is not run. With *journal_dir* as well, a
+    change the day's journaled ``SPLIT`` rows account for exactly needs
+    no ledger file and is reported in ``split_adjusted``.
 
     Raises ``KeyError`` for an unknown *mode* rather than guessing which
     timestamp to read, and ``ValueError`` when only one of *previous*
-    and *ledger_dir* is given.
+    and *ledger_dir* is given, or *journal_dir* without them.
     """
     if (previous is None) != (ledger_dir is None):
         raise ValueError("previous and ledger_dir are given together or not at all")
+    if journal_dir is not None and previous is None:
+        raise ValueError("journal_dir needs previous and ledger_dir")
     field_name = STAMP_FIELD[mode]
     expected = as_of.isoformat()
 
@@ -260,6 +342,7 @@ def check_portfolios(
     unflagged: list[str] = []
     flagged: list[str] = []
     unledgered: list[str] = []
+    split_adjusted: list[str] = []
 
     for path in sorted(directory.glob("*.json")):
         before: dict[str, float] = {}
@@ -295,7 +378,28 @@ def check_portfolios(
             and before != after
             and not (ledger_dir / agent / f"{expected}.json").is_file()
         ):
-            unledgered.append(f"{agent} ({_describe(before, after)})")
+            moved = {
+                t for t in before.keys() | after.keys()
+                if before.get(t) != after.get(t)
+            }
+            split: set[str] = set()
+            if journal_dir is not None:
+                journal = journal_dir / agent / f"{expected}.json"
+                try:
+                    split = _explained_by_splits(
+                        before, after, _journaled_splits(journal)
+                    )
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    unreadable.append(f"{agent} journal {journal.name}: {exc}")
+            if split:
+                split_adjusted.append(
+                    f"{agent} ({_describe(_only(before, split), _only(after, split))})"
+                )
+            rest = moved - split
+            if rest:
+                unledgered.append(
+                    f"{agent} ({_describe(_only(before, rest), _only(after, rest))})"
+                )
 
         if last_bar is None:
             continue
@@ -320,6 +424,7 @@ def check_portfolios(
         unflagged=unflagged,
         flagged=flagged,
         unledgered=unledgered,
+        split_adjusted=split_adjusted,
     )
 
 
@@ -360,6 +465,12 @@ def format_report(report: VerifyReport, *, mode: str, as_of: date) -> str:
             f"::error::holdings moved with no ledger day — {entry}. The "
             f"run changed shares but wrote no trades file for {as_of}, "
             f"so what it executed, and at what price, is not on record."
+        )
+
+    for entry in report.split_adjusted:
+        lines.append(
+            f"::notice::holdings restated for a stock split — {entry}. No "
+            f"order was placed; the day's SPLIT journal rows account for it."
         )
 
     for entry in report.flagged:
@@ -403,6 +514,13 @@ def main(argv: list[str] | None = None) -> int:
         help="trade ledger directory; defaults to the resolved data root's",
     )
     parser.add_argument(
+        "--decisions",
+        type=Path,
+        default=None,
+        help="decision journal directory, read for the day's SPLIT rows; "
+        "defaults to the resolved data root's",
+    )
+    parser.add_argument(
         "--baseline-ref",
         default=None,
         help="git ref holding the books as they stood before this run "
@@ -439,6 +557,7 @@ def main(argv: list[str] | None = None) -> int:
 
     previous: PreviousShares | None = None
     ledger_dir: Path | None = None
+    journal_dir: Path | None = None
     if args.baseline_ref is not None:
         previous = git_baseline_reader(directory, args.baseline_ref)
         # Asked to compare and unable to is not the same as nothing
@@ -451,6 +570,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         ledger_dir = args.trades or trade_ledger_dir()
+        journal_dir = args.decisions or decisions_dir()
     else:
         print("ledger check not run: no --baseline-ref given")
 
@@ -461,6 +581,7 @@ def main(argv: list[str] | None = None) -> int:
         last_bar=last_bar_reader(db),
         previous=previous,
         ledger_dir=ledger_dir,
+        journal_dir=journal_dir,
     )
     print(format_report(report, mode=args.mode, as_of=as_of))
     return 0 if report.ok else 1
