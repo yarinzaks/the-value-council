@@ -498,6 +498,16 @@ class GrahamSecondCohortLive(GrahamLive):
 
     name = "benjamin_graham_2"
 
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        # The strategy journals its intent rows under ``strategy.name``,
+        # a class attribute BenjaminGraham fixes at "benjamin_graham" for
+        # both cohorts, so this book's BUY/WATCH rows landed in the first
+        # Graham's folder (audit SF-X7). Name this instance after the
+        # book it serves. An instance attribute: the class, and the
+        # first cohort's strategy, keep their name.
+        strategy.name = self.name
+
 
 # --------------------------------------------------------------------------
 # Dreman
