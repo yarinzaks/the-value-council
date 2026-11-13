@@ -1446,6 +1446,7 @@ class DailyRunner:
                         pos,
                         price,
                         as_of,
+                        shares=trade.shares,
                         verdict=verdicts.get(pos.ticker),
                         exit_mode=exit_mode,
                         left_list=pos.ticker not in listed_tickers,
@@ -2374,10 +2375,16 @@ class DailyRunner:
         price: float,
         as_of: date,
         *,
+        shares: float,
         verdict: ExitVerdict | None = None,
         exit_mode: str = DEFAULT_EXIT_MODE,
         left_list: bool = True,
     ) -> None:
+        # ``shares`` is the fill's, not the position's: the row records
+        # what left the book, as ``_log_rebalance`` does (audit RK-05:
+        # ADD and TRIM named their shares and EXIT never did). Appended
+        # after the percentage so the "entry $X, exit $Y" prefix that
+        # the backfill and the dashboard read is unchanged.
         # The reason this row gives. With no doctrine verdict it is the
         # one it always was. When the doctrine called the sale, its rule
         # comes first and becomes the row's exit_trigger (audit SF-X1:
@@ -2414,13 +2421,23 @@ class DailyRunner:
                     exit_trigger=trigger,
                     rationale=(
                         f"Closed live position: entry ${pos.entry_price:.2f}, "
-                        f"exit ${price:.2f} ({(price/pos.entry_price - 1)*100:+.2f}%)"
+                        f"exit ${price:.2f} ({(price/pos.entry_price - 1)*100:+.2f}%), "
+                        f"sold {_shares_label(shares)} shares"
                     ),
                     entry_price=pos.entry_price,
                 )
             )
         except Exception as exc:
             self._journal_failed(agent, as_of, f"EXIT {pos.ticker}", exc)
+
+
+def _shares_label(shares: float) -> str:
+    """``10.0`` -> ``"10"``; a legacy fractional line keeps its fraction.
+
+    Six places, the precision the book and the ledger store shares at,
+    with trailing zeros dropped so a whole-share sale reads as one.
+    """
+    return f"{shares:.6f}".rstrip("0").rstrip(".")
 
 
 def _split_label(ratio: float) -> str:

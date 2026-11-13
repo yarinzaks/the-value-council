@@ -450,6 +450,40 @@ class TestExecutionLabels:
         assert exits[0]["ticker"] == "GONE"
         assert "left today's target list" in exits[0]["criteria_met"]
 
+    def _exit_rationale(self, runner: DailyRunner, shares: float) -> str:
+        _seed_holding(
+            runner, "stub_agent", "GONE", entry_price=50.0, current_price=55.0,
+            shares=shares,
+        )
+        runner.price_loader = _StubPriceLoader({"GONE": 55.0, "NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+        runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW", "GONE"],
+            {"NEW": 20.0, "GONE": 55.0},
+            {"NEW": None, "GONE": None},
+        )
+        exits = [r for r in self._records(runner) if r["decision"] == "EXIT"]
+        assert len(exits) == 1
+        return str(exits[0]["rationale"])
+
+    def test_an_exit_says_how_many_shares_it_sold(
+        self, runner: DailyRunner
+    ) -> None:
+        """Audit RK-05: ADD and TRIM rows name their shares, EXIT did not,
+        so the journal could not say how large a sale was."""
+        assert self._exit_rationale(runner, 10.0) == (
+            "Closed live position: entry $50.00, exit $55.00 (+10.00%), "
+            "sold 10 shares"
+        )
+
+    def test_a_legacy_fractional_line_reports_what_left_the_book(
+        self, runner: DailyRunner
+    ) -> None:
+        # A full exit sells the line entire, fraction and all.
+        assert self._exit_rationale(runner, 10.5).endswith(", sold 10.5 shares")
+
 
 # ---------------------------------------------------------------------------
 # Position sizing

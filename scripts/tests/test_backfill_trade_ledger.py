@@ -118,6 +118,17 @@ def _run(monkeypatch: pytest.MonkeyPatch, books: dict[str, dict[str, Any]],
 class TestExitPrice:
     """CE-1b: the exit is the price the sale got, when anything wrote it down."""
 
+    def test_the_exit_price_is_read_from_a_row_that_names_its_shares(
+        self
+    ) -> None:
+        # RK-05 appended the share count to the EXIT rationale; the
+        # price this script reads from it must not move.
+        row = ("Closed live position: entry $22.88, exit $22.70 (-0.79%), "
+               "sold 60 shares")
+        match = bf._EXIT.search(row)
+        assert match is not None
+        assert match.group(1) == "22.70"
+
     def test_reconstructed_exit_uses_journal_price_when_available(
         self, monkeypatch: pytest.MonkeyPatch, _empty_repo_cwd: Path
     ) -> None:

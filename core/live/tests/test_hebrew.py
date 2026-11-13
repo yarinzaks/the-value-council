@@ -442,6 +442,37 @@ class TestTheRebalancePathIsCovered:
             assert figure in out, f"{figure!r} lost: {english!r} -> {out!r}"
 
 
+class TestTheExitRowIsCovered:
+    """The EXIT rationale ``_log_sell`` writes, with its share count.
+
+    The count was appended for audit RK-05. The old shape is still in
+    the journal by the thousand, so both must come back whole.
+    """
+
+    OLD = "Closed live position: entry $50.00, exit $55.00 (+10.00%)"
+    NEW = OLD + ", sold 10 shares"
+    FRACTIONAL = OLD + ", sold 28.025835 shares"
+
+    @pytest.mark.parametrize(
+        ("english", "figures"),
+        [
+            (OLD, ["$50.00", "$55.00", "+10.00%"]),
+            (NEW, ["$50.00", "$55.00", "+10.00%", "10 מניות"]),
+            (FRACTIONAL, ["28.025835 מניות"]),
+        ],
+    )
+    def test_it_comes_back_in_hebrew_with_every_figure(
+        self, english: str, figures: list[str]
+    ) -> None:
+        from core.live.hebrew_terms import is_hybrid
+
+        out = translate(english)
+        assert out != english, f"no Hebrew for {english!r}"
+        assert not is_hybrid(out), out
+        for figure in figures:
+            assert figure in out, f"{figure!r} lost: {english!r} -> {out!r}"
+
+
 class TestTheAnalystRulesThatReachHebrew:
     """Four of the analyst layer's 283 free-text exit rules translate.
 
