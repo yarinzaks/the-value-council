@@ -609,6 +609,185 @@ class TestWholeShareSizing:
         assert [t.ticker for t in kept] == ["A"]
 
 
+class TestCashPosture:
+    """A doctrine that deploys less than the whole book means the rest
+    as cash.
+
+    Audit SF-X2: Klarman's list sums to 92% and his book ran at 99.96%
+    invested ($4.83 of cash); Marks at Neutral sums to 80% and his ran
+    at 0.08%. The whole-share residue pass pooled every dollar of cash,
+    and the rebalance ADD spent whatever was left.
+    """
+
+    @staticmethod
+    def _awkward_prices(n: int) -> dict[str, float | None]:
+        # The same deliberately awkward ladder the whole-share tests
+        # use: no price divides a slot, so the residue pass has work.
+        return {f"T{i:02d}": 37.0 + i * 11.3 for i in range(n)}
+
+    def _open(
+        self, runner: DailyRunner, n: int, deployed: float
+    ) -> AgentRunResult:
+        prices = self._awkward_prices(n)
+        targets = [
+            _target(t, weight=deployed / n, rank=i + 1)
+            for i, t in enumerate(sorted(prices))
+        ]
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        return runner._run_one(
+            _StubAdapter("stub_agent", targets),  # type: ignore[arg-type]
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+
+    def test_klarman_92_percent_deployment_leaves_8_percent_cash(
+        self, runner: DailyRunner
+    ) -> None:
+        from agents.klarman.margin_of_safety import _deployment_for
+
+        decision = _deployment_for(20)
+        assert decision.deployed_fraction == pytest.approx(0.92)
+        result = self._open(
+            runner, decision.portfolio_size, decision.deployed_fraction
+        )
+
+        p = result.portfolio
+        assert len(p.positions) == decision.portfolio_size
+        cash_pct = p.cash / p.total_nav * 100.0
+        # The doctrine's 8% is a floor the sizing may not dig into. The
+        # whole-share residue may leave a little more, never less.
+        assert cash_pct >= 8.0, f"{cash_pct:.2f}% cash against an 8% posture"
+        assert cash_pct < 12.0, f"{cash_pct:.2f}% cash — sizing left too much idle"
+
+    def test_marks_neutral_posture_holds_20_percent(
+        self, runner: DailyRunner
+    ) -> None:
+        from agents.marks.temperature import profile_for
+
+        neutral = profile_for("Neutral")
+        assert neutral.deployed_fraction == pytest.approx(0.80)
+        result = self._open(
+            runner, neutral.portfolio_size, neutral.deployed_fraction
+        )
+
+        p = result.portfolio
+        cash_pct = p.cash / p.total_nav * 100.0
+        assert cash_pct >= 20.0, f"{cash_pct:.2f}% cash against a 20% posture"
+        assert cash_pct < 24.0, f"{cash_pct:.2f}% cash — sizing left too much idle"
+
+    def test_a_rebalance_add_does_not_spend_the_posture_cash(
+        self, runner: DailyRunner
+    ) -> None:
+        """The second way the 8% went: an ADD that spent every dollar.
+
+        Two names at 46% each of a $10,000 book want $4,600 apiece. A
+        sits at $5,500 (+19.6%, inside the band) and B at $3,200 (-30.4%,
+        outside it), so the book is 87% invested. B's shortfall is
+        $1,400, but the doctrine's 92% leaves room for only $500 more.
+        """
+        p = LivePortfolio(agent="stub_agent", cash=1_300.0)
+        p.last_rebalance_date = "2026-08-03"
+        for ticker, shares, price in (("A", 55.0, 100.0), ("B", 32.0, 100.0)):
+            p.positions.append(
+                Position(
+                    ticker=ticker,
+                    shares=shares,
+                    entry_price=price,
+                    entry_date="2026-07-01",
+                    current_price=price,
+                )
+            )
+        p.save(directory=runner.portfolio_dir)
+        prices: dict[str, float | None] = {"A": 100.0, "B": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target("A", weight=0.46), _target("B", weight=0.46, rank=2)],
+            ),
+            AS_OF,
+            ["A", "B"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        adds = [t for t in result.trades if t.side == "BUY"]
+        # Still topped up — the posture limits the ADD, it does not
+        # forbid it — but by four shares, not twelve.
+        assert len(adds) == 1 and adds[0].ticker == "B"
+        assert adds[0].shares == pytest.approx(4.0)
+        book = result.portfolio
+        assert book.cash / book.total_nav * 100.0 >= 8.0
+
+    def test_a_held_name_outside_the_list_counts_against_the_posture(
+        self, runner: DailyRunner
+    ) -> None:
+        """Capital the floor keeps in a name is capital already invested.
+
+        OLD left the list four days after it was bought and the 30-day
+        floor holds it: $2,000 of a $10,000 book. The new list is one
+        name at 50%. The doctrine's half in cash is honoured only if
+        NEW gets $3,000, not $5,000.
+        """
+        p = LivePortfolio(agent="stub_agent", cash=8_000.0)
+        p.last_rebalance_date = "2026-08-03"
+        p.positions.append(
+            Position(
+                ticker="OLD",
+                shares=20.0,
+                entry_price=100.0,
+                entry_date="2026-08-01",
+                current_price=100.0,
+            )
+        )
+        p.save(directory=runner.portfolio_dir)
+        prices: dict[str, float | None] = {"OLD": 100.0, "NEW": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", [_target("NEW", weight=0.5)]),  # type: ignore[arg-type]
+            AS_OF,
+            ["OLD", "NEW"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        book = result.portfolio
+        assert book.has("OLD")
+        new = book.positions[book._index_of("NEW")]  # type: ignore[index]
+        assert new.shares == pytest.approx(29.0)
+        assert book.cash / book.total_nav * 100.0 >= 50.0
+
+    def test_a_fully_deployed_doctrine_may_spend_all_its_cash(self) -> None:
+        """Weights that sum to the whole book leave the cash uncapped."""
+        from core.live.runner import deployable_cash
+
+        targets = [_target(t, weight=1 / 3) for t in ("A", "B", "C")]
+        assert deployable_cash(
+            targets, nav=10_000.0, invested=4_000.0, cash=6_000.0
+        ) == pytest.approx(6_000.0)
+
+    def test_a_book_already_past_its_posture_deploys_nothing(self) -> None:
+        """Over the posture is not a reason to sell; it is a reason not
+        to buy. The cap floors at zero rather than going negative."""
+        from core.live.runner import deployable_cash
+
+        targets = [_target("A", weight=0.5)]
+        assert deployable_cash(
+            targets, nav=10_000.0, invested=7_000.0, cash=3_000.0
+        ) == pytest.approx(0.0)
+
+    def test_an_empty_list_deploys_nothing(self) -> None:
+        from core.live.runner import deployable_cash
+
+        assert deployable_cash(
+            [], nav=10_000.0, invested=0.0, cash=10_000.0
+        ) == pytest.approx(0.0)
+
+
 class TestRebalanceBand:
     """Positions were sized once at entry and never touched again, so a
     name that doubled became twice its intended weight."""
@@ -2178,9 +2357,11 @@ class TestTheQuarterlyRebalanceTradesACooledOffList:
         assert result.error is None
         buys = [t for t in result.trades if t.side == "BUY"]
         assert [t.ticker for t in buys] == ["BOTH"]
-        # $10,000 at the published 25% is $2,500, which buys 50 shares
-        # at $50 — not the 100 that today's 50% weight would have.
-        assert buys[0].shares == 50.0
+        # $10,000 at the published 25% is $2,500 — about 50 shares at
+        # $50, not the 100 that today's 50% weight would have. Exactly
+        # 49: the list leaves 75% in cash, and the 50th share plus the
+        # $2.50 commission would take the book past that (audit SF-X2).
+        assert buys[0].shares == 49.0
 
     def test_the_rebalance_is_stamped_so_it_happens_once(
         self, runner: DailyRunner

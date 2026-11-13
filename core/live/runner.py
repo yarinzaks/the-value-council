@@ -256,6 +256,44 @@ def commission_dominates(trade_value: float, *, commission: float) -> bool:
     return commission > trade_value * MAX_REBALANCE_COMMISSION_FRACTION
 
 
+#: Weights within this of 1.0 are a fully deployed list. Equal weights of
+#: 1/27 sum to 0.9999999999999998, and reading that as a posture would
+#: cap the cash a hair under itself and could cost the last share.
+_FULLY_DEPLOYED_TOLERANCE: float = 1e-9
+
+
+def deployable_cash(
+    targets: Sequence[LiveTarget],
+    *,
+    nav: float,
+    invested: float,
+    cash: float,
+) -> float:
+    """The cash the book may spend today without breaking its posture.
+
+    A doctrine's weights say how much of the book belongs in stocks.
+    Klarman's list sums to 92% and Marks's, at Neutral, to 80%; the rest
+    is cash on purpose — "cash is a position". The invested total those
+    weights describe is ``nav × Σ weights``, and the book may spend up
+    to that, less what it already holds. Every holding counts, on the
+    list or not: a name the holding floor keeps is capital already in
+    stocks.
+
+    A list that sums to the whole book (within float error) leaves the
+    cash uncapped. One that sums to more — never meant, but not this
+    function's to correct — is likewise capped only by the cash. A
+    book already past its posture deploys nothing; that is a reason not
+    to buy, not a reason to sell. An empty list deploys nothing.
+    """
+    posture = sum(t.weight for t in targets if t.weight > 0)
+    available = max(0.0, cash)
+    if posture <= 0:
+        return 0.0
+    if posture >= 1.0 - _FULLY_DEPLOYED_TOLERANCE:
+        return available
+    return max(0.0, min(available, nav * posture - invested))
+
+
 def plan_whole_share_buys(
     targets: Sequence[LiveTarget],
     prices: dict[str, float | None],
@@ -1304,12 +1342,19 @@ class DailyRunner:
         )
         # Then decide the share count for every new name together, so
         # the remainder one slot cannot round up becomes a share in the
-        # slot that needs it most.
+        # slot that needs it most — out of the cash the doctrine means
+        # to deploy, not all of it (audit SF-X2: a 92% list ran the
+        # book to 99.96% invested).
         plan = plan_whole_share_buys(
             [t for t in scan.targets if not portfolio.has(t.ticker)],
             prices,
             nav_after_sells,
-            portfolio.cash,
+            deployable_cash(
+                scan.targets,
+                nav=nav_after_sells,
+                invested=portfolio.invested,
+                cash=portfolio.cash,
+            ),
             cost_bps=self.cost_bps,
             commission=self.commission,
             band=self.rebalance_band,
@@ -1695,8 +1740,16 @@ class DailyRunner:
         for ticker, price, dollars in adds:
             # The shortfall in position value plus the order's fee, so
             # the commission does not come out of the shares that close
-            # the gap.
-            spend = min(dollars + self.commission, portfolio.cash * 0.99)
+            # the gap — but never past the doctrine's posture. Read per
+            # add, after the trims and any earlier add, so the room is
+            # what is left now (audit SF-X2).
+            room = deployable_cash(
+                targets,
+                nav=portfolio.total_nav,
+                invested=portfolio.invested,
+                cash=portfolio.cash,
+            )
+            spend = min(dollars + self.commission, portfolio.cash * 0.99, room)
             # buy() floors the same way; this is the stock it would get.
             add_shares = math.floor(
                 max(spend - self.commission, 0.0) / (price * (1.0 + self.cost_bps))
