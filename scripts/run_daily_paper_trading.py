@@ -144,6 +144,13 @@ def print_report(results: list[AgentRunResult]) -> None:
             f"trades today: {len(r.trades)}  "
             f"universe: {r.universe_size}"
         )
+        if r.journal_failures:
+            # The trades stand; the decision journal is missing their
+            # rows. Said here so it is not only in the log (audit RK-04).
+            print(
+                f"  WARNING: {r.journal_failures} journal row(s) NOT written "
+                f"— the trades stand, the decision journal lacks them"
+            )
 
         buys = [t for t in r.trades if t.side == "BUY"]
         sells = [t for t in r.trades if t.side == "SELL"]

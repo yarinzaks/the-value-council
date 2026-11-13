@@ -3632,3 +3632,173 @@ class TestTheDoctrineOwnsTheBandAndTheCap:
         for bad in (0.0, 150.0):
             with pytest.raises(ValueError, match="max_position_pct"):
                 max_weight_for(_DoctrineAdapter("a", [], max_position_pct=bad))
+
+
+# ---------------------------------------------------------------------------
+# Journal write failures (audit RK-04)
+# ---------------------------------------------------------------------------
+class _BrokenJournal(DecisionLogger):
+    """A decision log whose every write fails, as a full disk would."""
+
+    def log(self, decision):  # type: ignore[no-untyped-def]
+        raise OSError("No space left on device")
+
+
+@pytest.fixture
+def warnings_seen() -> Iterator[list[str]]:
+    """Every WARNING-or-worse message logged while the test runs.
+
+    The project logs through loguru, which pytest's caplog never sees.
+    """
+    from loguru import logger as loguru_logger
+
+    seen: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: seen.append(m.record["message"]), level="WARNING"
+    )
+    try:
+        yield seen
+    finally:
+        loguru_logger.remove(sink_id)
+
+
+class TestJournalFailuresAreCounted:
+    """A trade whose journal row could not be written is said and counted.
+
+    The FILL, EXIT and rebalance rows were written under
+    ``except Exception: logger.debug`` — below every level the daily job
+    prints — so a journal that lost rows looked exactly like one that
+    had none to write. 103 book changes reached the repo with no journal
+    row (audit RK-04). The trade itself must still stand: the book is
+    the record of money, the journal the record of reasons.
+    """
+
+    def test_journal_write_failure_is_counted_not_swallowed(
+        self, runner: DailyRunner, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW"],
+            {"NEW": 20.0},
+            {"NEW": None},
+        )
+
+        assert result.portfolio.has("NEW")  # the trade stands
+        assert result.journal_failures == 1
+        assert any(
+            "NEW" in m and "journal" in m and "No space left" in m
+            for m in warnings_seen
+        ), warnings_seen
+
+    def test_a_lost_exit_row_is_counted(
+        self, runner: DailyRunner, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "GONE", entry_price=50.0, current_price=55.0
+        )
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"GONE": 55.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("KEEP")])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["KEEP", "GONE"],
+            {"KEEP": None, "GONE": 55.0},
+            {"KEEP": None, "GONE": None},
+        )
+
+        assert not result.portfolio.has("GONE")
+        assert result.journal_failures == 1
+        assert any("EXIT GONE" in m for m in warnings_seen), warnings_seen
+
+    def test_a_lost_rebalance_row_is_counted(
+        self, runner: DailyRunner, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        # The TestRebalanceBand trim: 50 x $300 against $5,000 cash.
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFT", shares=50.0, entry_price=100.0,
+                entry_date="2026-07-01", current_price=300.0,
+                why_en="", why_he="",
+            )
+        )
+        p.cash = 5_000.0
+        p.save(directory=runner.portfolio_dir)
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"DRIFT": 300.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("DRIFT", weight=0.5)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DRIFT"],
+            {"DRIFT": 300.0},
+            {"DRIFT": None},
+        )
+
+        assert [t.side for t in result.trades] == ["SELL"]
+        assert result.journal_failures == 1
+        assert any("TRIM DRIFT" in m for m in warnings_seen), warnings_seen
+
+    def test_a_healthy_journal_counts_nothing(self, runner: DailyRunner) -> None:
+        runner.price_loader = _StubPriceLoader({"NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW"],
+            {"NEW": 20.0},
+            {"NEW": None},
+        )
+
+        assert result.trades
+        assert result.journal_failures == 0
+
+    def test_the_count_is_per_agent_not_per_runner(
+        self, runner: DailyRunner, tmp_path: Path
+    ) -> None:
+        # One runner serves every agent in turn; the second agent must
+        # not report the first one's lost rows as its own.
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"NEW": 20.0})  # type: ignore[assignment]
+        first = runner._run_one(
+            _StubAdapter("agent_a", [_target("NEW", weight=0.5)]),  # type: ignore[arg-type]
+            AS_OF, ["NEW"], {"NEW": 20.0}, {"NEW": None},
+        )
+        runner.decision_logger = DecisionLogger(root=tmp_path / "ok")
+        second = runner._run_one(
+            _StubAdapter("agent_b", [_target("NEW", weight=0.5)]),  # type: ignore[arg-type]
+            AS_OF, ["NEW"], {"NEW": 20.0}, {"NEW": None},
+        )
+
+        assert first.journal_failures == 1
+        assert second.journal_failures == 0
+
+    def test_the_daily_report_prints_the_count(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from scripts.run_daily_paper_trading import print_report
+
+        lost = AgentRunResult(
+            agent="stub_agent",
+            portfolio=LivePortfolio(agent="stub_agent", cash=10_000),
+            journal_failures=2,
+        )
+        clean = AgentRunResult(
+            agent="other_agent",
+            portfolio=LivePortfolio(agent="other_agent", cash=10_000),
+        )
+
+        print_report([lost, clean])
+
+        out = capsys.readouterr().out
+        assert "2 journal row(s) NOT written" in out
+        assert out.count("NOT written") == 1

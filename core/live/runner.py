@@ -529,6 +529,11 @@ class AgentRunResult:
     #: True when this agent had already completed ``as_of`` and the run
     #: was a no-op. Distinguishes "nothing to do" from "traded nothing".
     skipped: bool = False
+    #: Journal rows this run tried to write and could not (audit RK-04).
+    #: The trades stand either way; a non-zero count says the decision
+    #: journal — the only store the dashboard reads — is missing rows
+    #: for them, which until now was logged at DEBUG and seen by no one.
+    journal_failures: int = 0
 
 
 def build_default_adapters(
@@ -906,6 +911,9 @@ class DailyRunner:
             self.pit_loader = PointInTimeLoader(adapter=adapter)
         else:
             self.pit_loader = pit_loader
+        # Journal rows lost in the current run, per agent. Reset at the
+        # start of each agent's pass and reported on its result.
+        self._journal_failures: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     def _tase_placeholder(
@@ -1176,6 +1184,7 @@ class DailyRunner:
         run_type: RunType | None = None,
         freshness: FundamentalsFreshness | None = None,
     ) -> AgentRunResult:
+        self._journal_failures[adapter.name] = 0
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
             directory=self.portfolio_dir,
@@ -1634,6 +1643,7 @@ class DailyRunner:
             previous_watchlist=previous_watchlist,
             trades=trades,
             universe_size=scan.universe_size,
+            journal_failures=self._journal_failures.get(adapter.name, 0),
         )
 
     # ------------------------------------------------------------------
@@ -2136,7 +2146,26 @@ class DailyRunner:
                 )
             )
         except Exception as exc:
-            logger.debug(f"decision log {decision} {fill.ticker} failed: {exc}")
+            self._journal_failed(agent, as_of, f"{decision} {fill.ticker}", exc)
+
+    def _journal_failed(
+        self, agent: str, as_of: date, row: str, exc: Exception
+    ) -> None:
+        """Say, and count, a journal row that could not be written.
+
+        Never fatal: the trade it describes already happened and the
+        book already holds it, so raising here would lose the book to
+        save the journal. But it was logged at DEBUG, below everything
+        the daily job prints, and 103 book changes reached the repo
+        with no journal row and nothing anywhere saying so (audit
+        RK-04). WARNING puts it in the run log; the count puts it on
+        the agent's result and the daily report.
+        """
+        self._journal_failures[agent] = self._journal_failures.get(agent, 0) + 1
+        logger.warning(
+            f"{as_of}: journal row {row} for {agent} NOT written: {exc}. "
+            f"The trade stands; the decision journal is missing it."
+        )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -2262,7 +2291,7 @@ class DailyRunner:
                 )
             )
         except Exception as exc:
-            logger.debug(f"decision log BUY {target.ticker} failed: {exc}")
+            self._journal_failed(agent, as_of, f"FILL {target.ticker}", exc)
 
     def _held_verdicts(
         self,
@@ -2391,7 +2420,7 @@ class DailyRunner:
                 )
             )
         except Exception as exc:
-            logger.debug(f"decision log SELL {pos.ticker} failed: {exc}")
+            self._journal_failed(agent, as_of, f"EXIT {pos.ticker}", exc)
 
 
 def _split_label(ratio: float) -> str:
