@@ -795,6 +795,11 @@ class PabraiLive(AgentAdapter):
     #: This is the agent Part 7 was written for.
     honours_run_types = True
 
+    #: §6's table trims only by E5, E6 and E9, and none of them is a
+    #: drift band; "Nothing else sells". The runner's 25% band cut SIG
+    #: and REPX on 2026-10-30 with no row in the journal (audit item 19).
+    rebalance_band = None
+
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
         self.entry_trigger = (

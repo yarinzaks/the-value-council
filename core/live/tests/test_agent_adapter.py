@@ -192,6 +192,14 @@ class TestDoctrineSizingDeclarations:
 
         assert SchlossLive.max_position_pct == 5.0
 
+    def test_the_council_never_trims_to_rebalance(self) -> None:
+        # COUNCIL_SELECTION §6: trims are E5, E6 and E9 only, none of
+        # them a drift band; "Nothing else sells" (audit item 19).
+        from core.live.agent_adapter import PabraiLive
+
+        assert PabraiLive.rebalance_band is None
+        assert PabraiLive.max_position_pct is None
+
     def test_every_other_adapter_keeps_the_runner_band_and_no_cap(self) -> None:
         from core.live.agent_adapter import (
             RUNNER_BAND,
@@ -201,7 +209,6 @@ class TestDoctrineSizingDeclarations:
             MarketCoreLive,
             MarksLive,
             NeffLive,
-            PabraiLive,
         )
 
         for cls in (
@@ -213,7 +220,6 @@ class TestDoctrineSizingDeclarations:
             KlarmanLive,
             FisherLive,
             MarketCoreLive,
-            PabraiLive,
         ):
             assert cls.rebalance_band == RUNNER_BAND, cls.__name__
             assert cls.max_position_pct is None, cls.__name__

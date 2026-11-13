@@ -710,6 +710,7 @@ def build_default_adapters(
                 # thousand names, found a hundred and eleven candidates,
                 # and bought none of them.
                 drawdown_reader=lambda: drawdown_from_peak("mohnish_pabrai"),
+                decision_logger=decision_logger,
             )
         ),
     ]
@@ -1235,15 +1236,28 @@ class DailyRunner:
         # machine". So every Council scan writes its would-be list, and
         # a rebalance run trades from whatever was written before today
         # rather than from the rank computed a second ago.
+        #
+        # §6 also makes E8 -- "left the rank" -- a quarterly rule: "Nothing
+        # else sells." So between rebalances a held name is kept unless
+        # the doctrine forced it out, and the rebalance itself sells by
+        # E8 only when it trades a cooled-off list (audit item 19: YELP,
+        # ZUMZ, CRTO, HOG, CLMB and NATR were sold mid-quarter on a
+        # daily re-rank). None for the eleven, who are not bound.
+        held_between_rebalances: set[str] | None = None
         if getattr(adapter, "honours_run_types", False):
             self._publish_would_be_list(adapter, scan, as_of)
+            rebalanced = False
             if is_rebalance_run(
                 as_of,
                 previous_run=_parse_date(portfolio.last_open_date),
                 last_rebalance=_parse_date(portfolio.last_rebalance_date),
             ):
-                scan = self._rebalance_from_published(adapter, scan, portfolio, as_of)
+                scan, rebalanced = self._rebalance_from_published(
+                    adapter, scan, portfolio, as_of
+                )
                 portfolio.last_rebalance_date = as_of.isoformat()
+            if not rebalanced:
+                held_between_rebalances = {p.ticker for p in portfolio.positions}
         if getattr(adapter, "honours_run_types", False) and not permissions_for(
             run_type
         ).may_open:
@@ -1326,6 +1340,20 @@ class DailyRunner:
                     logger.info(
                         f"{as_of}: {adapter.name} keeping {pos.ticker} — "
                         f"doctrine: {verdicts[pos.ticker].reason}"
+                    )
+                    continue
+                # Between rebalances only a forced exit sells (§6). The
+                # name may have slipped in today's rank, but that is
+                # E8's question and E8 is asked once a quarter.
+                if (
+                    held_between_rebalances is not None
+                    and pos.ticker in held_between_rebalances
+                    and pos.ticker not in forced_exits
+                    and not going_flat
+                ):
+                    logger.info(
+                        f"{as_of}: {adapter.name} keeping {pos.ticker} — "
+                        "between rebalances only a forced exit sells"
                     )
                     continue
                 # A name can leave the target list for a day because a
@@ -1627,12 +1655,15 @@ class DailyRunner:
         scan: ScanResult,
         portfolio: LivePortfolio,
         as_of: date,
-    ) -> ScanResult:
+    ) -> tuple[ScanResult, bool]:
         """Swap today's rank for the one published on an earlier run.
 
         With nothing published in time the book is held rather than
         traded: the fallback of "rank now, execute now" is the exact
         breach §7 forbids, and it would arrive looking like resilience.
+
+        Returns the scan and whether a published list was traded. Only
+        then does E8 sell anything; a skipped rebalance holds every name.
         """
         published = executable_list(self.published_dir, as_of=as_of)
         if published is None:
@@ -1642,7 +1673,7 @@ class DailyRunner:
             )
             held = {p.ticker for p in portfolio.positions}
             scan.targets = [t for t in scan.targets if t.ticker in held]
-            return scan
+            return scan, False
 
         logger.info(
             f"{as_of}: {adapter.name} rebalancing from the list published "
@@ -1680,7 +1711,7 @@ class DailyRunner:
                 )
             )
         scan.targets = rebalanced
-        return scan
+        return scan, True
 
     def _settle_dividends(self, portfolio: LivePortfolio, as_of: date) -> float:
         """Credit cash for every unpaid dividend on the current holdings.
