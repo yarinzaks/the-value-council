@@ -821,6 +821,158 @@ class TestCashPosture:
             [], nav=10_000.0, invested=0.0, cash=10_000.0
         ) == pytest.approx(0.0)
 
+    @staticmethod
+    def _held(
+        runner: DailyRunner, cash: float, lines: list[tuple[str, float, float]]
+    ) -> None:
+        """Save a book holding ``(ticker, shares, mark)`` lines, all past
+        the holding floor."""
+        p = LivePortfolio(agent="stub_agent", cash=cash)
+        p.last_rebalance_date = "2026-08-03"
+        for ticker, shares, mark in lines:
+            p.positions.append(
+                Position(
+                    ticker=ticker,
+                    shares=shares,
+                    entry_price=mark,
+                    entry_date="2026-07-01",
+                    current_price=mark,
+                )
+            )
+        p.save(directory=runner.portfolio_dir)
+
+    def test_a_held_name_without_a_quote_keeps_its_place_in_the_posture(
+        self, runner: DailyRunner
+    ) -> None:
+        """Review of SF-X2: a held list name with no quote today left Σw
+        but stayed in ``invested`` at its last mark, so its slot was
+        counted twice and an equal-weight book could buy nothing.
+
+        Twenty names at 5%. T00..T18 are held at their $500 slot, T00
+        with no quote today; T19 is new at $50 and the book has $500.
+        The list sums to the whole book, so T19 gets its nine shares.
+        """
+        self._held(
+            runner, 500.0, [(f"T{i:02d}", 10.0, 50.0) for i in range(19)]
+        )
+        prices: dict[str, float | None] = {f"T{i:02d}": 50.0 for i in range(20)}
+        prices["T00"] = None
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target(f"T{i:02d}", weight=0.05, rank=i + 1) for i in range(20)],
+            ),
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        book = result.portfolio
+        assert book.has("T19")
+        new = book.positions[book._index_of("T19")]  # type: ignore[index]
+        assert new.shares == pytest.approx(9.0)
+
+    def test_an_unquoted_holding_does_not_starve_a_partial_posture(
+        self, runner: DailyRunner
+    ) -> None:
+        """The same gap on a 92% list. A ($4,600, 46%) has no quote; B
+        is new at $100. Room is $9,200 − $4,600 = $4,600, so B gets 45
+        shares ($4,500 + fees) and cash stays at or above 8%."""
+        self._held(runner, 5_400.0, [("A", 46.0, 100.0)])
+        prices: dict[str, float | None] = {"A": None, "B": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target("A", weight=0.46), _target("B", weight=0.46, rank=2)],
+            ),
+            AS_OF,
+            ["A", "B"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        book = result.portfolio
+        assert book.has("B")
+        b = book.positions[book._index_of("B")]  # type: ignore[index]
+        assert b.shares == pytest.approx(45.0)
+        assert book.cash / book.total_nav * 100.0 >= 8.0
+
+    def test_an_unquoted_holding_does_not_block_a_rebalance_add(
+        self, runner: DailyRunner
+    ) -> None:
+        """The zeroed room also blocked the day's ADDs. A ($4,600) has no
+        quote; B sits at $3,200 against a $4,600 slot (−30%). Room is
+        $9,200 − $7,800 = $1,400: thirteen shares after the fee."""
+        self._held(runner, 2_200.0, [("A", 46.0, 100.0), ("B", 32.0, 100.0)])
+        prices: dict[str, float | None] = {"A": None, "B": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target("A", weight=0.46), _target("B", weight=0.46, rank=2)],
+            ),
+            AS_OF,
+            ["A", "B"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        adds = [t for t in result.trades if t.side == "BUY"]
+        assert len(adds) == 1 and adds[0].ticker == "B"
+        assert adds[0].shares == pytest.approx(13.0)
+        book = result.portfolio
+        assert book.cash / book.total_nav * 100.0 >= 8.0
+
+    def test_only_an_unquoted_holding_returns_to_the_posture(self) -> None:
+        """An unquoted name not held keeps its slot in cash, as before;
+        an unquoted held one is added back, at the per-name cap."""
+        from core.live.runner import posture_targets
+
+        listed = [
+            _target("HELD", weight=0.3),
+            _target("NEW", weight=0.3, rank=2),
+            _target("OK", weight=0.3, rank=3),
+        ]
+        prices: dict[str, float | None] = {"HELD": None, "NEW": None, "OK": 10.0}
+        reachable = reachable_targets(
+            listed, prices, nav=10_000.0, held=frozenset({"HELD"}), max_weight=0.25
+        )
+        assert [t.ticker for t in reachable] == ["OK"]
+
+        posture = posture_targets(
+            listed, reachable, prices, frozenset({"HELD"}), max_weight=0.25
+        )
+        assert {t.ticker: t.weight for t in posture} == pytest.approx(
+            {"OK": 0.25, "HELD": 0.25}
+        )
+
+    def test_a_non_finite_input_deploys_nothing(self) -> None:
+        """NaN fails every comparison, so ``min(cash, nan)`` was the
+        whole cash: a broken mark would have lifted the cap entirely."""
+        from core.live.runner import deployable_cash
+
+        targets = [_target("A", weight=0.5)]
+        for nav, invested in (
+            (float("nan"), 0.0),
+            (10_000.0, float("nan")),
+            (float("inf"), 0.0),
+        ):
+            assert deployable_cash(
+                targets, nav=nav, invested=invested, cash=3_000.0
+            ) == pytest.approx(0.0)
+        assert deployable_cash(
+            [_target("A", weight=float("inf"))],
+            nav=10_000.0,
+            invested=0.0,
+            cash=3_000.0,
+        ) == pytest.approx(0.0)
+
 
 class TestRebalanceBand:
     """Positions were sized once at entry and never touched again, so a

@@ -364,14 +364,59 @@ def deployable_cash(
     function's to correct — is likewise capped only by the cash. A
     book already past its posture deploys nothing; that is a reason not
     to buy, not a reason to sell. An empty list deploys nothing.
+
+    A non-finite weight, NAV or invested total deploys nothing too. NaN
+    fails every comparison, so without the check ``min(cash, nan)``
+    returned the whole cash and a broken mark lifted the cap entirely.
     """
     posture = sum(t.weight for t in targets if t.weight > 0)
     available = max(0.0, cash)
+    if not (math.isfinite(posture) and math.isfinite(nav) and math.isfinite(invested)):
+        logger.warning(
+            f"posture not computable (weights {posture}, nav {nav}, "
+            f"invested {invested}) — deploying no cash"
+        )
+        return 0.0
     if posture <= 0:
         return 0.0
     if posture >= 1.0 - _FULLY_DEPLOYED_TOLERANCE:
         return available
     return max(0.0, min(available, nav * posture - invested))
+
+
+def posture_targets(
+    listed: Sequence[LiveTarget],
+    reachable: Sequence[LiveTarget],
+    prices: dict[str, float | None],
+    held: frozenset[str],
+    *,
+    max_weight: float | None = None,
+) -> list[LiveTarget]:
+    """The list :func:`deployable_cash` should read the posture from.
+
+    :func:`reachable_targets` drops a name with no quote today and does
+    not hand its weight to the others. For a name not held that is
+    right: its slot stays cash until it can be priced. For a held name
+    it is not: the position is still in ``invested`` at its last mark,
+    so dropping its weight from Σw counts its slot twice — once as
+    capital already in stocks, once as posture that no longer exists —
+    and an equal-weight book could buy nothing on a day one holding
+    went unquoted (review of audit SF-X2).
+
+    So the posture is ``reachable`` plus every held name of ``listed``
+    that it dropped for want of a price, at the same per-name cap.
+    Held names are never dropped for reach, so a missing price is the
+    only way one leaves.
+    """
+    kept = {t.ticker for t in reachable}
+    unquoted_held = [
+        t
+        for t in listed
+        if t.ticker in held
+        and t.ticker not in kept
+        and not (prices.get(t.ticker) or 0.0) > 0.0
+    ]
+    return list(reachable) + _capped(unquoted_held, max_weight)
 
 
 def plan_whole_share_buys(
@@ -1483,12 +1528,19 @@ class DailyRunner:
         # would be permanent.
         band = band_for(adapter, default=self.rebalance_band)
         max_weight = max_weight_for(adapter)
+        held_after_sells = frozenset(pos.ticker for pos in portfolio.positions)
+        listed = scan.targets
         scan.targets = reachable_targets(
             scan.targets,
             prices,
             nav_after_sells,
-            held=frozenset(pos.ticker for pos in portfolio.positions),
+            held=held_after_sells,
             max_weight=max_weight,
+        )
+        # A held name with no quote today is off the sizing list but
+        # still in ``invested``; the posture keeps its weight.
+        posture = posture_targets(
+            listed, scan.targets, prices, held_after_sells, max_weight=max_weight
         )
         # Then decide the share count for every new name together, so
         # the remainder one slot cannot round up becomes a share in the
@@ -1500,7 +1552,7 @@ class DailyRunner:
             prices,
             nav_after_sells,
             deployable_cash(
-                scan.targets,
+                posture,
                 nav=nav_after_sells,
                 invested=portfolio.invested,
                 cash=portfolio.cash,
@@ -1565,7 +1617,13 @@ class DailyRunner:
         # ---- REBALANCE: pull drifted holdings back toward target ------
         trades.extend(
             self._rebalance(
-                portfolio, scan.targets, prices, as_of, adapter.name, band=band
+                portfolio,
+                scan.targets,
+                prices,
+                as_of,
+                adapter.name,
+                band=band,
+                posture=posture,
             )
         )
 
@@ -1942,6 +2000,7 @@ class DailyRunner:
         agent: str,
         *,
         band: float | None,
+        posture: Sequence[LiveTarget] | None = None,
     ) -> list[TradeRecord]:
         """Pull holdings that drifted outside the band back to target.
 
@@ -1962,6 +2021,9 @@ class DailyRunner:
 
         A position younger than ``min_holding_days`` is never trimmed;
         it may still be added to (audit ENG-5).
+
+        ``posture`` is the list the ADD cap reads its Σ weights from (see
+        :func:`posture_targets`); ``None`` reads it from ``targets``.
         """
         if not targets:
             return []
@@ -2051,7 +2113,7 @@ class DailyRunner:
             # add, after the trims and any earlier add, so the room is
             # what is left now (audit SF-X2).
             room = deployable_cash(
-                targets,
+                targets if posture is None else posture,
                 nav=portfolio.total_nav,
                 invested=portfolio.invested,
                 cash=portfolio.cash,
