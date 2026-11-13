@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
+from agents.marks import cycle_value
 from agents.marks.cycle_value import HowardMarks
 from agents.marks.second_level import MarksMemo
+from agents.marks.temperature import (
+    TemperatureAssessment,
+    TemperatureSignals,
+    posture_for_score,
+)
+from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.data.edgar_cache import EdgarCache
 
 from .conftest import make_pit
@@ -384,3 +392,147 @@ class TestTemperatureReadsTheMarketNotTheSurvivors:
         )
 
         assert not any(t.startswith("SICK") for t in out)
+
+
+# ---- Posture persistence across sessions (audit item 21) -----------------
+def _measured(score: float, as_of: date) -> TemperatureAssessment:
+    """A fixed reading with one measurable name, so it counts as a market."""
+    return TemperatureAssessment(
+        as_of=as_of,
+        score=score,
+        posture=posture_for_score(score),
+        signals=TemperatureSignals(
+            universe_size=1,
+            median_pe=15.0,
+            frac_negative_ni=0.2,
+            median_de=0.5,
+            frac_high_de=0.2,
+            median_yield_pct=2.0,
+        ),
+        votes={},
+    )
+
+
+def _journal_posture(
+    log: DecisionLogger, day: date, score: float, posture: str
+) -> None:
+    log.log(
+        make_decision(
+            ticker="ANY",
+            decision="BUY",
+            agent="howard_marks",
+            timestamp=f"{day.isoformat()}T00:00:00+00:00",
+            criteria_values={"posture": posture, "temperature_score": score},
+        )
+    )
+
+
+def _select_on(s: HowardMarks, day: date) -> None:
+    s.select(
+        as_of=day,
+        universe=[],
+        prices=_StaticPriceLookup({}),  # type: ignore[arg-type]
+        fundamentals=_StaticFundamentalsLookup({}),  # type: ignore[arg-type]
+    )
+
+
+class TestPosturePersistsAcrossSessions:
+    """The live agent is a fresh process every day, so the posture it
+    held is read back from its own journal; a backtest keeps one
+    instance and reads its own ``selection_history``."""
+
+    def test_live_agent_holds_its_journaled_posture_through_a_one_day_dip(
+        self,
+        empty_cache: EdgarCache,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        log = DecisionLogger(root=tmp_path / "decisions")
+        for d in (date(2026, 11, 9), date(2026, 11, 10), date(2026, 11, 11)):
+            _journal_posture(log, d, -2.0, "Cool")
+        # A runner row for the same agent carries no posture: ignored.
+        log.log(
+            make_decision(
+                ticker="XYZ",
+                decision="EXIT",
+                agent="howard_marks",
+                timestamp="2026-11-11T21:00:00+00:00",
+            )
+        )
+        monkeypatch.setattr(
+            cycle_value,
+            "assess_market_temperature",
+            lambda measurable, *, as_of: _measured(-1.0, as_of),
+        )
+        s = HowardMarks(
+            edgar_cache=empty_cache,
+            decision_logger=log,
+            posture_from_journal=True,
+        )
+
+        _select_on(s, date(2026, 11, 12))
+
+        assert s.last_temperature is not None
+        assert s.last_temperature.posture == "Cool"
+        assert s.last_temperature.measured_posture == "Neutral"
+        assert s.last_temperature.score == -1.0
+        assert s.selection_history[-1].posture == "Cool"
+
+    def test_backtest_instance_uses_its_own_history(
+        self, empty_cache: EdgarCache, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        scores = iter([-2.0, -2.0, -2.0, -1.0])
+        monkeypatch.setattr(
+            cycle_value,
+            "assess_market_temperature",
+            lambda measurable, *, as_of: _measured(next(scores), as_of),
+        )
+        s = HowardMarks(edgar_cache=empty_cache)
+
+        for day in (1, 2, 3, 4):
+            _select_on(s, date(2024, 7, day))
+
+        assert [h.posture for h in s.selection_history] == ["Cool"] * 4
+
+    def test_journal_mode_without_a_logger_is_refused(
+        self, empty_cache: EdgarCache
+    ) -> None:
+        with pytest.raises(ValueError, match="decision_logger"):
+            HowardMarks(edgar_cache=empty_cache, posture_from_journal=True)
+
+    def test_an_empty_market_is_not_settled_against_history(
+        self, empty_cache: EdgarCache, tmp_path: Path
+    ) -> None:
+        # No measurable name: the Neutral default is no reading, and
+        # the exit verdicts already refuse to judge against it.
+        log = DecisionLogger(root=tmp_path / "decisions")
+        for d in (date(2026, 11, 9), date(2026, 11, 10), date(2026, 11, 11)):
+            _journal_posture(log, d, -2.0, "Cool")
+        s = HowardMarks(
+            edgar_cache=empty_cache,
+            decision_logger=log,
+            posture_from_journal=True,
+        )
+
+        _select_on(s, date(2026, 11, 12))
+
+        assert s.last_temperature is not None
+        assert s.last_temperature.posture == "Neutral"
+
+    def test_the_live_roster_reads_posture_from_the_journal(
+        self, empty_cache: EdgarCache, tmp_path: Path
+    ) -> None:
+        from core.backtest.data_loader import PriceDataLoader
+        from core.live.runner import build_default_adapters
+
+        log = DecisionLogger(root=tmp_path / "decisions")
+        adapters = build_default_adapters(
+            decision_logger=log,
+            edgar_cache=empty_cache,
+            price_loader=PriceDataLoader(cache_path=tmp_path / "prices.db"),
+        )
+
+        (marks,) = [a for a in adapters if a.name == "howard_marks"]
+        assert isinstance(marks.strategy, HowardMarks)
+        assert marks.strategy.posture_from_journal is True
+        assert marks.strategy.decision_logger is log

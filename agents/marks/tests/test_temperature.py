@@ -8,6 +8,7 @@ import pytest
 
 from agents.marks.temperature import (
     PostureProfile,
+    PostureReading,
     _de,
     _vote_de,
     _vote_high_de_frac,
@@ -15,7 +16,9 @@ from agents.marks.temperature import (
     _vote_pe,
     _vote_yield,
     assess_market_temperature,
+    posture_for_score,
     profile_for,
+    settle_posture,
 )
 
 from .conftest import make_pit
@@ -291,3 +294,120 @@ class TestUntaggedDebtIsNotZeroLeverage:
                        total_equity=1_000_000_000.0)
 
         assert _de(fin) == pytest.approx(0.5)
+
+
+# ---- Posture persistence (audit item 21) ----------------------------------
+def _readings(*rows: tuple[date, float, str]) -> list[PostureReading]:
+    return [PostureReading(as_of=d, score=s, posture=p) for d, s, p in rows]  # type: ignore[arg-type]
+
+
+class TestPosturePersistence:
+    """A measured posture is adopted only once it has held for
+    ``POSTURE_PERSISTENCE_SESSIONS`` sessions, today included.
+
+    The composite is a sum of five integer votes and the Cool/Neutral
+    edge sits at -1.5, so one signal moving one notch flips the posture.
+    From 2026-08-05 to 2026-11-13 the live score alternated between -1
+    and -2 and the posture flipped Cool<->Neutral 8 times, each flip
+    resizing the book between 22 names at 90% and 18 at 80%.
+    """
+
+    def test_posture_does_not_flip_on_one_day_score_change(self) -> None:
+        # Cool for three sessions at -2, then a single -1 reading.
+        history = _readings(
+            (date(2026, 11, 9), -2.0, "Cool"),
+            (date(2026, 11, 10), -2.0, "Cool"),
+            (date(2026, 11, 11), -2.0, "Cool"),
+        )
+
+        assert settle_posture("Neutral", date(2026, 11, 12), history) == "Cool"
+
+    def test_a_posture_that_persists_is_adopted(self) -> None:
+        history = _readings(
+            (date(2026, 11, 10), -2.0, "Cool"),
+            (date(2026, 11, 11), -1.0, "Cool"),
+            (date(2026, 11, 12), -1.0, "Cool"),
+        )
+
+        assert settle_posture("Neutral", date(2026, 11, 13), history) == "Neutral"
+
+    def test_no_history_takes_the_measurement(self) -> None:
+        assert settle_posture("Neutral", date(2026, 11, 13), []) == "Neutral"
+
+    def test_too_little_history_keeps_what_was_held(self) -> None:
+        # Only one prior session: the move cannot have persisted three.
+        history = _readings((date(2026, 11, 12), -1.0, "Cool"))
+
+        assert settle_posture("Neutral", date(2026, 11, 13), history) == "Cool"
+
+    def test_todays_own_rows_are_not_history(self) -> None:
+        # A second run on the same day must not count itself.
+        history = _readings(
+            (date(2026, 11, 11), -2.0, "Cool"),
+            (date(2026, 11, 12), -1.0, "Cool"),
+            (date(2026, 11, 13), -1.0, "Cool"),
+        )
+
+        assert settle_posture("Neutral", date(2026, 11, 13), history) == "Cool"
+
+    def test_a_jump_adopts_the_least_extreme_posture_every_session_agrees_on(
+        self,
+    ) -> None:
+        # Held Neutral; measured Cool, Cold, Cold: colder all three
+        # sessions, Cool is how far all three agree.
+        history = _readings(
+            (date(2026, 11, 10), 0.0, "Neutral"),
+            (date(2026, 11, 11), -2.0, "Neutral"),
+            (date(2026, 11, 12), -5.0, "Neutral"),
+        )
+
+        assert settle_posture("Cold", date(2026, 11, 13), history) == "Cool"
+
+    def test_readings_on_both_sides_keep_what_was_held(self) -> None:
+        history = _readings(
+            (date(2026, 11, 11), 2.0, "Neutral"),
+            (date(2026, 11, 12), -2.0, "Neutral"),
+        )
+
+        assert settle_posture("Cool", date(2026, 11, 13), history) == "Neutral"
+
+    def test_sessions_must_be_positive(self) -> None:
+        with pytest.raises(ValueError):
+            settle_posture("Cool", date(2026, 11, 13), [], sessions=0)
+
+    def test_the_observed_series_flips_three_times_instead_of_eight(
+        self,
+    ) -> None:
+        # The live temperature_score, read from
+        # data/decisions/howard_marks/<day>.json, 2026-08-05..11-13.
+        scores = (
+            [("2026-08-05", 1.0), ("2026-08-07", -1.0)]
+            + [(d, -2.0) for d in ("2026-08-10", "2026-08-11", "2026-08-12")]
+            + [(d, -1.0) for d in ("2026-08-13", "2026-08-14", "2026-08-16")]
+            + [("2026-08-17", -2.0)]
+            + [(d, -1.0) for d in ("2026-08-18", "2026-08-19")]
+            + [(d, -2.0) for d in ("2026-08-20", "2026-08-21", "2026-09-01",
+                                   "2026-09-02", "2026-11-03")]
+            + [(d, -1.0) for d in ("2026-11-04", "2026-11-05")]
+            + [(d, -2.0) for d in ("2026-11-06", "2026-11-09", "2026-11-10",
+                                   "2026-11-11")]
+            + [(d, -1.0) for d in ("2026-11-12", "2026-11-13")]
+        )
+        measured_flips = 0
+        settled_flips = 0
+        history: list[PostureReading] = []
+        last_measured = None
+        for iso, score in scores:
+            day = date.fromisoformat(iso)
+            measured = posture_for_score(score)
+            settled = settle_posture(measured, day, history)
+            if last_measured is not None and measured != last_measured:
+                measured_flips += 1
+            if history and settled != history[-1].posture:
+                settled_flips += 1
+            last_measured = measured
+            history.append(PostureReading(as_of=day, score=score, posture=settled))
+
+        assert measured_flips == 8
+        assert settled_flips == 3
+        assert history[-1].posture == "Cool"

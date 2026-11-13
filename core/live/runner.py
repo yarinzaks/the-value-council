@@ -662,6 +662,10 @@ def build_default_adapters(
                 second_level_analyzer=layer.build("marks", SecondLevelAnalyzer),
                 llm_mode=mode,
                 decision_logger=decision_logger,
+                # A fresh process every day: the posture held yesterday
+                # is read back from the journal, so one day's score
+                # change does not flip it (audit item 21).
+                posture_from_journal=True,
             )
         ),
         KlarmanLive(
