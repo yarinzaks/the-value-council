@@ -10,13 +10,15 @@ import {
 } from "@/components/Cards";
 import { AgentCardsRow } from "@/components/AgentCardsRow";
 import { TodaysActivity } from "@/components/TodaysActivity";
+import { LiveRanking } from "@/components/LiveRanking";
 import { Term } from "@/components/Term";
 import {
   loadAgentDelta,
   loadCouncilLive,
   loadCouncilOverview,
+  loadSnapshots,
 } from "@/lib/data";
-import { AGENTS, metaLocalized, rankByReturn } from "@/lib/agents";
+import { AGENTS, isControl, metaLocalized } from "@/lib/agents";
 import type { AgentDailyDelta, AgentSlug } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
 
@@ -27,15 +29,21 @@ export const dynamic = process.env.NEXT_PUBLIC_SITE_LOCALE
   ? "force-static"
   : "force-dynamic";
 
-const MEDALS = ["🥇", "🥈", "🥉"];
-
 export default async function OverviewPage() {
   const { locale, t } = getServerI18n();
-  const [live, backtest, deltas] = await Promise.all([
+  const [live, backtest, deltas, histories] = await Promise.all([
     loadCouncilLive(),
     loadCouncilOverview(),
     Promise.all(AGENTS.map(async (a) => ({ slug: a.slug, delta: await loadAgentDelta(a.slug) }))),
+    Promise.all(AGENTS.map(async (a) => ({ slug: a.slug, snaps: await loadSnapshots(a.slug) }))),
   ]);
+  // Date and NAV only: the ranking is windowed in the browser, and
+  // thirteen books of whole snapshots would be half a megabyte of page.
+  const navHistory: Record<string, [string, number][]> = {};
+  for (const h of histories) {
+    if (isControl(h.slug)) continue;
+    navHistory[h.slug] = h.snaps.map((s) => [s.date, s.nav]);
+  }
   const deltaBySlug = new Map<AgentSlug, AgentDailyDelta>();
   for (const d of deltas) if (d.delta) deltaBySlug.set(d.slug, d.delta);
 
@@ -53,13 +61,6 @@ export default async function OverviewPage() {
   // Sort live portfolios by NAV descending — most successful first
   // (used by the Live portfolios table).
   const livePortfolios = [...live.portfolios].sort((a, b) => b.total_nav - a.total_nav);
-
-  // Ranked by total return since seed, best first, control books left
-  // out — the rule and the reason live in `rankByReturn`. A control book
-  // still appears in the cards and tables below, where a reader sees its
-  // own numbers rather than its position against books with six more
-  // months of market behind them.
-  const ranking = rankByReturn(live.portfolios);
 
   // Format USD with no fractional cents above $100.
   const fmtMoney = (v: number) =>
@@ -119,82 +120,17 @@ export default async function OverviewPage() {
             locale={locale}
           />
 
-          {/* Live performance ranking — agents sorted by P&L %. */}
-          <Card className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">{t("ranking_title")}</h2>
-              <span className="text-xs text-muted">{t("ranking_subtitle")}</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-muted border-b border-council-200 dark:border-council-800">
-                    <th className="py-2 pr-3 w-16">{t("col_rank")}</th>
-                    <th className="py-2 pr-3 w-12 text-center">{t("col_medal")}</th>
-                    <th className="py-2 pr-3">{t("col_agent")}</th>
-                    <th className="py-2 pr-3 text-right">{t("col_nav")}</th>
-                    <th className="py-2 pr-3 text-right">{t("col_pnl_usd")}</th>
-                    <th className="py-2 pr-3 text-right">{t("col_pnl_pct")}</th>
-                    <th className="py-2 pr-3 text-right">{t("col_positions")}</th>
-                    <th className="py-2 pl-3 text-right">{t("col_cash")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ranking.map((p, i) => {
-                    const meta = metaLocalized(p.agent, locale);
-                    const pnl = p.total_nav - p.initial_cash;
-                    const medal = MEDALS[i] ?? "";
-                    const rankClass =
-                      i === 0
-                        ? "font-semibold"
-                        : i === 3
-                          ? "text-muted"
-                          : "";
-                    return (
-                      <tr
-                        key={p.agent}
-                        className={`border-b border-council-100 dark:border-council-800 last:border-b-0 hover:bg-council-50 dark:hover:bg-council-800/30 ${rankClass}`}
-                      >
-                        <td className="py-2.5 pr-3 tabular text-muted">
-                          #{i + 1}
-                        </td>
-                        <td className="py-2.5 pr-3 text-center text-2xl leading-none">
-                          {medal}
-                        </td>
-                        <td className="py-2.5 pr-3">
-                          <Link
-                            href={`/agents/${p.agent}`}
-                            className="flex items-center gap-2 hover:underline"
-                          >
-                            <span
-                              className="inline-block w-2 h-2 rounded-full"
-                              style={{ backgroundColor: meta?.color ?? "#999" }}
-                            />
-                            <span>{meta?.display ?? p.agent}</span>
-                          </Link>
-                        </td>
-                        <td className="py-2.5 pr-3 text-right">
-                          <Money value={p.total_nav} />
-                        </td>
-                        <td className="py-2.5 pr-3 text-right">
-                          <Money value={pnl} signed digits={2} />
-                        </td>
-                        <td className="py-2.5 pr-3 text-right font-semibold">
-                          <PctCell value={p.cumulative_return_pct} />
-                        </td>
-                        <td className="py-2.5 pr-3 text-right tabular">
-                          {p.positions.length}
-                        </td>
-                        <td className="py-2.5 pl-3 text-right">
-                          <Money value={p.cash} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          {/* Live performance ranking, over the reader's window. */}
+          <LiveRanking
+            navHistory={navHistory}
+            books={livePortfolios.map((p) => ({
+              agent: p.agent,
+              nav: p.total_nav,
+              cash: p.cash,
+              positions: p.positions.length,
+              seed: p.initial_cash,
+            }))}
+          />
 
           <Card className="mb-8">
             <div className="flex items-center justify-between mb-4">

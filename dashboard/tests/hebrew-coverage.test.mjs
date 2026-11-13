@@ -277,7 +277,14 @@ function isAnalystProse(text) {
   // the longest of the eight the quantitative strategies write is
   // Graham's 99-character "price reaches the Graham Number; OR P/E or
   // P/B revert above thresholds; OR fundamentals deteriorate".
-  return /[;,]/.test(text) && text.length > 150;
+  if (/[;,]/.test(text) && text.length > 150) return true;
+  // A capitalised word opening a clause after a semicolon. Buffett
+  // wrote "Not applicable; no position held; Would revisit if a durable
+  // moat can be evidenced and a 10-year earnings record verified" — 118
+  // characters, first person nowhere, and prose in every other way. No
+  // template capitalises mid-string: the eight the strategies write
+  // follow a semicolon with "OR", "integrity" or "thesis".
+  return /; [A-Z][a-z]/.test(text);
 }
 
 test("nothing templated is left in English", () => {
