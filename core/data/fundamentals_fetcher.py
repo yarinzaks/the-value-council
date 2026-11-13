@@ -633,6 +633,12 @@ class CachedEdgarAdapter(EdgarAdapter):
     from the local Parquet cache.
     """
 
+    #: Listing is a local parquet read, so PointInTimeLoader asks this
+    #: adapter rather than replaying the list it stored on an earlier
+    #: run — which is how the live run kept reading April's filings from
+    #: a parquet refreshed every week (audit FUND-2).
+    lists_locally = True
+
     def __init__(self, fetcher: FundamentalsFetcher | None = None) -> None:
         self.fetcher = fetcher or FundamentalsFetcher()
 

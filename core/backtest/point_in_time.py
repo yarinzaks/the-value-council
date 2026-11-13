@@ -379,6 +379,9 @@ class PointInTimeLoader:
     ) -> None:
         self._adapter = adapter or EdgartoolsAdapter()
         self._cache_path = cache_path or DEFAULT_CACHE_PATH
+        # Filing lists already read from a local-cache adapter in this
+        # loader's lifetime. See list_filings.
+        self._listed: dict[tuple[str, tuple[str, ...]], list[FilingMetadata]] = {}
         self._cache_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
@@ -476,8 +479,29 @@ class PointInTimeLoader:
         form_types: tuple[str, ...] = ("10-K", "10-Q"),
         force_refresh: bool = False,
     ) -> list[FilingMetadata]:
-        """Return all known filings for ticker — from cache when possible."""
+        """Return all known filings for ticker — from cache when possible.
+
+        An adapter that reads a local cache (``lists_locally = True``,
+        as :class:`~core.data.fundamentals_fetcher.CachedEdgarAdapter`
+        does) is asked once per ticker per loader, and its answer is the
+        answer. The stored list is not consulted for it, because that
+        list never expires: ``edgar_filings.sqlite`` rides between daily
+        runs in the price cache, so a ticker listed once was listed the
+        same way on every later run however many filings the refreshed
+        parquet had gained (audit FUND-2). Asking costs a parquet read
+        the payload parse needed anyway, and nothing on the network.
+
+        Every other adapter keeps the stored list, which is what lets a
+        network-backed one run offline.
+        """
         ticker = ticker.upper()
+        if getattr(self._adapter, "lists_locally", False):
+            key = (ticker, form_types)
+            if force_refresh or key not in self._listed:
+                filings = self._adapter.list_filings(ticker, form_types=form_types)
+                self._store_filings(filings)
+                self._listed[key] = filings
+            return list(self._listed[key])
         if not force_refresh:
             cached = self._cached_filings(ticker)
             if cached:

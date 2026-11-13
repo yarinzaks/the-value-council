@@ -24,6 +24,13 @@ from core.backtest.point_in_time import (
     PointInTimeError,
     PointInTimeLoader,
 )
+from core.data.edgar_cache import EdgarCache
+from core.data.edgar_facts import XbrlFact
+from core.data.fundamentals_fetcher import (
+    CachedEdgarAdapter,
+    FundamentalsFetcher,
+    FundamentalsFetcherConfig,
+)
 
 
 class FakeAdapter(EdgarAdapter):
@@ -178,6 +185,189 @@ class TestCaching:
         # Second call: should hit the cache, no new parse
         loader.get_financials("AAPL", date(2015, 5, 1))
         assert adapter.parse_calls == []
+
+
+def _net_income_fact(
+    *, value: float, period_end: date, filed: date, accession: str
+) -> XbrlFact:
+    return XbrlFact(
+        concept="NetIncomeLoss",
+        namespace="us-gaap",
+        unit="USD",
+        value=value,
+        period_start=date(period_end.year - 1, period_end.month, 1),
+        period_end=period_end,
+        filed=filed,
+        form="10-K",
+        fiscal_year=period_end.year,
+        fiscal_period="FY",
+        accession_number=accession,
+    )
+
+
+def _parquet_loader(fc_dir: Path, sqlite: Path) -> PointInTimeLoader:
+    """The live run's loader: parquet-backed, never touching the network.
+
+    A fresh EdgarCache per call stands for a fresh process, so nothing
+    is shared between two of these but what is on disk.
+    """
+    fetcher = FundamentalsFetcher(
+        cache=EdgarCache(cache_dir=fc_dir),
+        client=None,
+        config=FundamentalsFetcherConfig(populate_cache_on_miss=False),
+    )
+    return PointInTimeLoader(
+        adapter=CachedEdgarAdapter(fetcher=fetcher), cache_path=sqlite
+    )
+
+
+#: UVV's two 10-Ks as the audit found them (FUND-2).
+_UVV_FY2025 = _net_income_fact(
+    value=95_047_000.0,
+    period_end=date(2025, 3, 31),
+    filed=date(2025, 6, 2),
+    accession="ACC-10K-2025",
+)
+_UVV_FY2026 = _net_income_fact(
+    value=32_637_000.0,
+    period_end=date(2026, 3, 31),
+    filed=date(2026, 6, 1),
+    accession="ACC-10K-2026",
+)
+
+
+class TestFilingListFollowsTheParquet:
+    """Audit FUND-2: a refreshed parquet must reach the decisions.
+
+    The weekly refresh publishes current filings and the daily run
+    extracts them, but ``edgar_filings.sqlite`` rides between runs in the
+    price cache and ``list_filings`` served its stored list without
+    asking the adapter. A ticker listed once was listed that way forever:
+    UVV was bought on 2026-11-10 on net income of $95.0M from its 10-K
+    for the year to March 2025, while the parquet that run had extracted
+    already carried the 10-K filed 2026-06-01 ($32.6M).
+    """
+
+    def test_filing_list_from_an_earlier_run_does_not_hide_a_newer_filing(
+        self, tmp_path: Path
+    ) -> None:
+        fc_dir, sqlite = tmp_path / "fundamentals_cache", tmp_path / "edgar.sqlite"
+        EdgarCache(cache_dir=fc_dir).save_facts(
+            "UVV", [_UVV_FY2025]
+        )
+        # An earlier run lists UVV and stores that list in the sqlite.
+        first = _parquet_loader(fc_dir, sqlite).get_financials(
+            "UVV", date(2026, 5, 1)
+        )
+        assert first is not None and first.net_income == pytest.approx(95_047_000.0)
+
+        # The refresh lands a new 10-K in the parquet; the sqlite survives.
+        EdgarCache(cache_dir=fc_dir).save_facts(
+            "UVV",
+            [_UVV_FY2025, _UVV_FY2026],
+        )
+
+        result = _parquet_loader(fc_dir, sqlite).get_financials(
+            "UVV", date(2026, 11, 10)
+        )
+
+        assert result is not None
+        assert result.source_filing.accession_number == "ACC-10K-2026"
+        assert result.source_filing.filing_date == date(2026, 6, 1)
+        assert result.net_income == pytest.approx(32_637_000.0)
+
+    def test_stored_list_holding_filings_the_parquet_lacks_is_not_served(
+        self, tmp_path: Path
+    ) -> None:
+        """Rows another adapter wrote into the shared sqlite do not leak in.
+
+        The real file holds synthetic ``FMP-<T>-FY-...`` rows for ten
+        holdings (audit FUND-9); a parquet-backed loader must answer from
+        the parquet alone.
+        """
+        fc_dir, sqlite = tmp_path / "fundamentals_cache", tmp_path / "edgar.sqlite"
+        EdgarCache(cache_dir=fc_dir).save_facts(
+            "UVV", [_UVV_FY2026]
+        )
+        loader = _parquet_loader(fc_dir, sqlite)
+        loader._store_filings(
+            [
+                FilingMetadata(
+                    ticker="UVV",
+                    cik=None,
+                    form_type="10-K",
+                    filing_date=date(2026, 9, 1),
+                    period_of_report=date(2026, 6, 30),
+                    accession_number="FMP-UVV-FY-2026-06-30",
+                )
+            ]
+        )
+
+        filing = loader.latest_filing_before("UVV", date(2026, 11, 10))
+
+        assert filing is not None
+        assert filing.accession_number == "ACC-10K-2026"
+
+    def test_parquet_is_listed_once_per_loader_not_once_per_call(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fc_dir, sqlite = tmp_path / "fundamentals_cache", tmp_path / "edgar.sqlite"
+        EdgarCache(cache_dir=fc_dir).save_facts(
+            "UVV", [_UVV_FY2026]
+        )
+        loader = _parquet_loader(fc_dir, sqlite)
+        calls: list[str] = []
+        original = CachedEdgarAdapter.list_filings
+
+        def counting(self: CachedEdgarAdapter, ticker: str, *, form_types: tuple[str, ...]) -> list[FilingMetadata]:
+            calls.append(ticker)
+            return original(self, ticker, form_types=form_types)
+
+        monkeypatch.setattr(CachedEdgarAdapter, "list_filings", counting)
+
+        loader.get_financials("UVV", date(2026, 11, 10))
+        loader.get_financials("UVV", date(2026, 11, 11))
+
+        assert calls == ["UVV"]
+
+    def test_ticker_with_no_parquet_lists_nothing(self, tmp_path: Path) -> None:
+        """No parquet, no filings — even when the sqlite remembers some."""
+        loader = _parquet_loader(tmp_path / "fundamentals_cache", tmp_path / "e.sqlite")
+        loader._store_filings(
+            [
+                FilingMetadata(
+                    ticker="GONE",
+                    cik=None,
+                    form_type="10-K",
+                    filing_date=date(2024, 3, 1),
+                    period_of_report=date(2023, 12, 31),
+                    accession_number="ACC-GONE",
+                )
+            ]
+        )
+
+        assert loader.list_filings("GONE") == []
+
+    def test_network_adapter_still_reads_the_stored_list(
+        self, adapter: FakeAdapter, tmp_path: Path
+    ) -> None:
+        """Unchanged for adapters that are not a local cache.
+
+        EdgartoolsAdapter lists over the network; its stored list is what
+        keeps a backtest offline, and this fix does not touch it.
+        """
+        sqlite = tmp_path / "edgar.sqlite"
+        PointInTimeLoader(adapter=adapter, cache_path=sqlite).list_filings("AAPL")
+        adapter._filings["AAPL"] = []
+
+        again = PointInTimeLoader(adapter=adapter, cache_path=sqlite).list_filings(
+            "AAPL"
+        )
+
+        assert {f.accession_number for f in again} == {
+            "ACC-10K-2014",
+            "ACC-10Q-2015Q1",
+        }
 
 
 class TestLatestFilingBefore:
