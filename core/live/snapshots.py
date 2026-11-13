@@ -19,7 +19,9 @@ Snapshot schema (``data/snapshots/<agent>/<YYYY-MM-DD>.json``)::
       "watchlist_count": 30,
       "buys": ["AAPL", ...],
       "sells": ["XYZ", ...],
-      "trade_count": 2
+      "trade_count": 2,
+      "fundamentals_newest_filed": "2026-11-12",
+      "fundamentals_stale": false
     }
 
 Backfill: ``backfill_from_decisions`` derives a snapshot from the
@@ -65,6 +67,14 @@ class DailySnapshot:
     #: field lets a reader separate income from price appreciation, so
     #: "total return" is auditable rather than inferred.
     dividends_received_usd: float = 0.0
+    #: Filing date of the newest filing the open scan read for any
+    #: universe member (audit FUND-2). None: not measured — a close
+    #: mark reads no filings, and files written before the field existed.
+    fundamentals_newest_filed: str | None = None
+    #: True when that filing was older than the freshness limit, or the
+    #: scan read no fundamentals at all. The run trades regardless; this
+    #: is what tells a reader it did so on old numbers. None: not measured.
+    fundamentals_stale: bool | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -75,6 +85,8 @@ def make_snapshot(
     *,
     as_of: date,
     trades: Iterable[TradeRecord] = (),
+    fundamentals_newest_filed: str | None = None,
+    fundamentals_stale: bool | None = None,
 ) -> DailySnapshot:
     buys = [t.ticker for t in trades if t.side == "BUY"]
     sells = [t.ticker for t in trades if t.side == "SELL"]
@@ -92,6 +104,8 @@ def make_snapshot(
         sells=sells,
         trade_count=len(buys) + len(sells),
         dividends_received_usd=round(portfolio.cumulative_dividends, 2),
+        fundamentals_newest_filed=fundamentals_newest_filed,
+        fundamentals_stale=fundamentals_stale,
     )
 
 
@@ -110,23 +124,35 @@ def save_snapshot(snap: DailySnapshot, *, root: Path = SNAPSHOTS_DIR) -> Path:
     had. Valuation fields still update, which is the close run's actual
     job. A save that does carry trades replaces them, so a re-run of
     the morning scan corrects rather than appends.
+
+    The fundamentals-freshness fields follow the same rule: only the
+    open scan reads filings, so a save that did not measure them
+    (``fundamentals_stale is None``) keeps what the day already had.
     """
     agent_dir = root / snap.agent
     agent_dir.mkdir(parents=True, exist_ok=True)
     path = agent_dir / f"{snap.date}.json"
 
-    if not snap.trade_count and path.exists():
+    keeps_trades = not snap.trade_count
+    keeps_freshness = snap.fundamentals_stale is None
+    if (keeps_trades or keeps_freshness) and path.exists():
         try:
             prior = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning(f"{snap.agent}@{snap.date}: unreadable snapshot: {exc}")
         else:
-            if prior.get("trade_count"):
+            if keeps_trades and prior.get("trade_count"):
                 snap = replace(
                     snap,
                     buys=list(prior.get("buys") or []),
                     sells=list(prior.get("sells") or []),
                     trade_count=int(prior["trade_count"]),
+                )
+            if keeps_freshness and prior.get("fundamentals_stale") is not None:
+                snap = replace(
+                    snap,
+                    fundamentals_newest_filed=prior.get("fundamentals_newest_filed"),
+                    fundamentals_stale=bool(prior["fundamentals_stale"]),
                 )
 
     path.write_text(json.dumps(snap.to_dict(), indent=2))

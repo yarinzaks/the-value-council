@@ -402,6 +402,10 @@ const en: Dict = {
   days_ago: "{n} days ago",
   stale_warning:
     "⚠️ Data not refreshed in over 24 hours — check the daily runner.",
+  fundamentals_stale_warning:
+    "The {date} scan traded on company filings no newer than {filed} — over 120 days old. Decisions are not using recent quarterly reports.",
+  fundamentals_missing_warning:
+    "The {date} scan traded without reading any company filings. Decisions are not using reported fundamentals.",
   next_us_update: "US",
   next_tase_update: "Israel",
   next_label: "next update",
@@ -796,6 +800,10 @@ const he: Dict = {
   days_ago: "לפני {n} ימים",
   stale_warning:
     "⚠️ נתונים לא מעודכנים מעל 24 שעות — בדוק את הסריקה היומית.",
+  fundamentals_stale_warning:
+    "הסריקה של {date} סחרה על דוחות חברות שהחדש שבהם הוגש ב-{filed} — לפני יותר מ-120 יום. ההחלטות לא משתמשות בדוחות הרבעוניים האחרונים.",
+  fundamentals_missing_warning:
+    "הסריקה של {date} סחרה בלי לקרוא אף דוח של חברה. ההחלטות לא משתמשות בנתונים מדווחים.",
   not_backtested: "לא נבדק היסטורית",
   punch_card: "כרטיס ניקוב",
   council_card_note:

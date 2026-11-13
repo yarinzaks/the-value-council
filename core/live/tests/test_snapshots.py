@@ -131,3 +131,78 @@ class TestSyncCollisionCopies:
         got = load_snapshots("graham", root=tmp_path)
 
         assert [s.date for s in got] == ["2026-11-06"]
+
+
+class TestFundamentalsStalenessFlag:
+    """The open scan records how old the filings it read were (FUND-2).
+
+    The close mark reads no filings, so it measures nothing and must not
+    wipe what the morning recorded — the same shape as the trades above.
+    """
+
+    def test_the_flag_is_written_and_read_back(self, tmp_path: Path) -> None:
+        p = LivePortfolio(agent="graham", cash=1_000.0)
+        snap = make_snapshot(
+            p,
+            as_of=date(2026, 11, 13),
+            fundamentals_newest_filed="2026-04-28",
+            fundamentals_stale=True,
+        )
+        save_snapshot(snap, root=tmp_path)
+
+        stored = json.loads((tmp_path / "graham" / "2026-11-13.json").read_text())
+        assert stored["fundamentals_stale"] is True
+        assert stored["fundamentals_newest_filed"] == "2026-04-28"
+        assert load_snapshots("graham", root=tmp_path)[0].fundamentals_stale is True
+
+    def test_the_close_mark_keeps_the_mornings_flag(self, tmp_path: Path) -> None:
+        p = LivePortfolio(agent="graham", cash=1_000.0)
+        save_snapshot(
+            make_snapshot(
+                p,
+                as_of=date(2026, 11, 13),
+                fundamentals_newest_filed="2026-04-28",
+                fundamentals_stale=True,
+            ),
+            root=tmp_path,
+        )
+
+        save_snapshot(make_snapshot(p, as_of=date(2026, 11, 13)), root=tmp_path)
+
+        stored = json.loads((tmp_path / "graham" / "2026-11-13.json").read_text())
+        assert stored["fundamentals_stale"] is True
+        assert stored["fundamentals_newest_filed"] == "2026-04-28"
+
+    def test_a_rerun_scan_that_finds_fresh_filings_clears_the_flag(
+        self, tmp_path: Path
+    ) -> None:
+        p = LivePortfolio(agent="graham", cash=1_000.0)
+        for stale, filed in ((True, "2026-04-28"), (False, "2026-11-12")):
+            save_snapshot(
+                make_snapshot(
+                    p,
+                    as_of=date(2026, 11, 13),
+                    fundamentals_newest_filed=filed,
+                    fundamentals_stale=stale,
+                ),
+                root=tmp_path,
+            )
+
+        stored = json.loads((tmp_path / "graham" / "2026-11-13.json").read_text())
+        assert stored["fundamentals_stale"] is False
+        assert stored["fundamentals_newest_filed"] == "2026-11-12"
+
+    def test_a_snapshot_written_before_the_field_existed_still_loads(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "graham").mkdir()
+        old = make_snapshot(LivePortfolio(agent="graham"), as_of=date(2026, 8, 7))
+        legacy = old.to_dict()
+        legacy.pop("fundamentals_stale")
+        legacy.pop("fundamentals_newest_filed")
+        (tmp_path / "graham" / "2026-08-07.json").write_text(json.dumps(legacy))
+
+        loaded = load_snapshots("graham", root=tmp_path)[0]
+
+        assert loaded.fundamentals_stale is None
+        assert loaded.fundamentals_newest_filed is None

@@ -2766,3 +2766,120 @@ class TestUnpricedHoldingsAreFlagged:
         assert pos.unpriced_since == "2026-07-29"
         assert pos.current_price == pytest.approx(9.20)
         assert any("LEG" in m for m in errors)
+
+
+# ---------------------------------------------------------------------------
+# Fundamentals freshness (audit FUND-2)
+# ---------------------------------------------------------------------------
+class _StubUniverse:
+    def __init__(self, members: list[str]) -> None:
+        self._members = members
+
+    def _ensure_loaded(self) -> None:
+        return None
+
+    def constituents_at(self, as_of: date) -> list[str]:
+        return list(self._members)
+
+
+class _StubPitLoader:
+    """Hands back one filing per ticker, filed on the date the test names."""
+
+    def __init__(self, filed: dict[str, date]) -> None:
+        self._filed = filed
+
+    def get_financials(self, ticker: str, as_of: date):  # type: ignore[no-untyped-def]
+        from core.backtest.point_in_time import FilingMetadata, PointInTimeFinancials
+
+        filed = self._filed.get(ticker)
+        if filed is None:
+            return None
+        return PointInTimeFinancials(
+            ticker=ticker,
+            as_of=as_of,
+            source_filing=FilingMetadata(
+                ticker=ticker,
+                cik=None,
+                form_type="10-Q",
+                filing_date=filed,
+                period_of_report=None,
+                accession_number=f"ACC-{ticker}",
+            ),
+            net_income=1.0,
+        )
+
+
+class TestFundamentalsFreshnessGate:
+    """The scan says loudly when the filings it reads are old — and trades.
+
+    Every live decision since about May 2026 read filings frozen at
+    2026-04-28 with nothing in the log, the books or the dashboard
+    saying so. Halting on it would freeze every book the day the check
+    shipped, because the cache is stale today; whether a stale corpus
+    should ever halt trading is the owner's call, so the default warns.
+    """
+
+    @pytest.fixture
+    def snaps(
+        self, runner: DailyRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> list[object]:
+        saved: list[object] = []
+        monkeypatch.setattr("core.live.runner.save_snapshot", saved.append)
+        monkeypatch.setattr("core.live.runner.export_sectors", lambda *a, **k: None)
+        monkeypatch.setattr("core.live.runner.export_prices", lambda *a, **k: None)
+        monkeypatch.setattr("core.live.runner.notify_run", lambda *a, **k: None)
+        runner.universe = _StubUniverse(["KO"])  # type: ignore[assignment]
+        runner.price_loader = _StubPriceLoader({"KO": 60.0})  # type: ignore[assignment]
+        runner.adapters = [  # type: ignore[list-item]
+            _StubAdapter("stub_agent", [_target("KO", weight=0.5)])
+        ]
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
+        return saved
+
+    def test_stale_fundamentals_log_error_flag_snapshot_and_still_trade(
+        self, runner: DailyRunner, snaps: list[object], errors: list[str]
+    ) -> None:
+        # 126 days before AS_OF (2026-08-05).
+        runner.pit_loader = _StubPitLoader({"KO": date(2026, 4, 1)})  # type: ignore[assignment]
+
+        results = runner.run(as_of=AS_OF)
+
+        # Not halted: the book still trades.
+        assert [t.ticker for t in results[0].trades] == ["KO"]
+        assert any("fundamentals are stale" in m and "2026-04-01" in m for m in errors)
+        assert len(snaps) == 1
+        snap = snaps[0]
+        assert snap.fundamentals_stale is True  # type: ignore[attr-defined]
+        assert snap.fundamentals_newest_filed == "2026-04-01"  # type: ignore[attr-defined]
+
+    def test_fresh_fundamentals_flag_false_and_log_no_error(
+        self, runner: DailyRunner, snaps: list[object], errors: list[str]
+    ) -> None:
+        runner.pit_loader = _StubPitLoader({"KO": date(2026, 7, 28)})  # type: ignore[assignment]
+
+        runner.run(as_of=AS_OF)
+
+        assert not any("fundamentals" in m for m in errors)
+        snap = snaps[0]
+        assert snap.fundamentals_stale is False  # type: ignore[attr-defined]
+        assert snap.fundamentals_newest_filed == "2026-07-28"  # type: ignore[attr-defined]
+
+    def test_no_fundamentals_at_all_is_flagged(
+        self, runner: DailyRunner, snaps: list[object], errors: list[str]
+    ) -> None:
+        runner.pit_loader = _StubPitLoader({})  # type: ignore[assignment]
+
+        runner.run(as_of=AS_OF)
+
+        assert any("fundamentals are stale" in m for m in errors)
+        snap = snaps[0]
+        assert snap.fundamentals_stale is True  # type: ignore[attr-defined]
+        assert snap.fundamentals_newest_filed is None  # type: ignore[attr-defined]
+
+    def test_the_close_mark_does_not_measure(
+        self, runner: DailyRunner, snaps: list[object]
+    ) -> None:
+        """It reads no filings, so it leaves the morning's flag alone."""
+        runner.run_mark_to_market(as_of=AS_OF)
+
+        assert snaps[0].fundamentals_stale is None  # type: ignore[attr-defined]

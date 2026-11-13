@@ -89,6 +89,7 @@ from core.live.agent_adapter import (
     ScanResult,
     SchlossLive,
 )
+from core.live.fundamentals_freshness import FundamentalsFreshness, assess_freshness
 from core.live.notify import notify_run
 from core.live.portfolio import (
     DEFAULT_COMMISSION_USD,
@@ -960,12 +961,19 @@ class DailyRunner:
             f"{as_of}: fundamentals available for "
             f"{sum(1 for v in fundamentals.values() if v is not None)}/{len(members)}"
         )
+        freshness = self._report_freshness(fundamentals, as_of)
 
         results: list[AgentRunResult] = []
         for adapter in self.adapters:
             try:
                 result = self._run_one(
-                    adapter, as_of, members, prices, fundamentals, force=force
+                    adapter,
+                    as_of,
+                    members,
+                    prices,
+                    fundamentals,
+                    force=force,
+                    freshness=freshness,
                 )
             except Exception as exc:
                 logger.error(f"{as_of}: {adapter.name} failed: {exc}")
@@ -1014,6 +1022,7 @@ class DailyRunner:
         *,
         force: bool = False,
         run_type: RunType | None = None,
+        freshness: FundamentalsFreshness | None = None,
     ) -> AgentRunResult:
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
@@ -1320,7 +1329,17 @@ class DailyRunner:
 
         # Persist a daily snapshot for History tab + Today's-activity.
         try:
-            snap = make_snapshot(portfolio, as_of=as_of, trades=trades)
+            snap = make_snapshot(
+                portfolio,
+                as_of=as_of,
+                trades=trades,
+                fundamentals_newest_filed=(
+                    freshness.newest_filed.isoformat()
+                    if freshness is not None and freshness.newest_filed is not None
+                    else None
+                ),
+                fundamentals_stale=None if freshness is None else freshness.stale,
+            )
             save_snapshot(snap)
         except Exception as exc:
             logger.warning(f"{as_of}: snapshot save for {adapter.name} failed: {exc}")
@@ -1758,6 +1777,39 @@ class DailyRunner:
                 logger.warning(f"price fetch {t} @ {as_of} failed: {exc}")
                 out[t] = None
         return out
+
+    def _report_freshness(
+        self,
+        fundamentals: dict[str, PointInTimeFinancials | None],
+        as_of: date,
+    ) -> FundamentalsFreshness:
+        """Say how old the filings this scan read are (audit FUND-2).
+
+        Logged at ERROR when past the limit, and recorded on every
+        book's snapshot by ``_run_one``. Never halts: the corpus was
+        stale the day this shipped, and stopping on it is an owner
+        decision this check does not take.
+        """
+        freshness = assess_freshness(fundamentals, as_of)
+        if freshness.stale:
+            newest = (
+                f"the newest filing read is {freshness.newest_filed} "
+                f"({freshness.age_days} days old)"
+                if freshness.newest_filed is not None
+                else "no member's fundamentals could be read"
+            )
+            logger.error(
+                f"{as_of}: fundamentals are stale — {newest}, over the "
+                f"{freshness.max_age_days}-day limit. Trading continues on "
+                f"them; check the Refresh EDGAR cache workflow and the "
+                f"filing list the loader reads (audit FUND-2)."
+            )
+        else:
+            logger.info(
+                f"{as_of}: newest filing read is {freshness.newest_filed} "
+                f"({freshness.age_days} days old)"
+            )
+        return freshness
 
     def _load_fundamentals(
         self, tickers: list[str], as_of: date

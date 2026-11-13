@@ -241,6 +241,13 @@ export interface DailySnapshot {
   buys: string[];
   sells: string[];
   trade_count: number;
+  /** Newest filing the open scan read for any universe member (audit
+   *  FUND-2). Absent/null when not measured: files written before the
+   *  field existed; also null when the scan read no fundamentals. */
+  fundamentals_newest_filed?: string | null;
+  /** True when that filing was over 120 days old, or none was read. The
+   *  run traded regardless. Absent/null when not measured. */
+  fundamentals_stale?: boolean | null;
 }
 
 export interface AgentDailyDelta {

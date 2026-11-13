@@ -3,7 +3,9 @@ import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Providers } from "@/components/Providers";
-import { loadCouncilLive } from "@/lib/data";
+import { AGENTS } from "@/lib/agents";
+import { loadCouncilLive, loadLatestSnapshot } from "@/lib/data";
+import { fundamentalsStaleness } from "@/lib/fundamentals-freshness";
 import { readLocale } from "@/lib/locale-server";
 import {
   formatAbsolute,
@@ -42,6 +44,11 @@ export default async function RootLayout({
   // in the browser, against the reader's own clock.
   const lastSyncAbsolute = mostRecent ? formatAbsolute(mostRecent, locale) : "";
   const stale = mostRecent ? isStale(mostRecent, 24, now) : true;
+  // Whether the latest scan traded on filings over 120 days old
+  // (audit FUND-2). Recorded on every book's snapshot by the runner.
+  const staleFundamentals = fundamentalsStaleness(
+    await Promise.all(AGENTS.map((a) => loadLatestSnapshot(a.slug))),
+  );
   const nextUsLabel = nextScheduledLabel("US", locale, now);
   const nextTaseLabel = nextScheduledLabel("TASE", locale, now);
 
@@ -53,6 +60,7 @@ export default async function RootLayout({
             lastSyncIso={mostRecent}
             lastSyncAbsolute={lastSyncAbsolute}
             stale={stale}
+            staleFundamentals={staleFundamentals}
             nextUsLabel={nextUsLabel}
             nextTaseLabel={nextTaseLabel}
           >
