@@ -899,6 +899,21 @@ class TestApplySplit:
 
         assert p.positions[0].shares == 1.0
 
+    @pytest.mark.parametrize(("shares", "expected"), [(300.0, 100.0), (600.0, 200.0)])
+    def test_a_vendor_rounded_reverse_ratio_keeps_every_share_of_a_large_line(
+        self, shares: float, expected: float
+    ) -> None:
+        # The vendor's rounding error grows with the line: 300 x 0.333333
+        # is 99.9999, outside an absolute snap of 1e-4. A real 1-for-3
+        # turns 300 shares into exactly 100, with no cash in lieu.
+        p = self._book(shares=shares, entry=1.0, mark=1.0)
+
+        record = p.apply_split("NVDA", ratio=0.333333, ex_date="2026-08-05", price=3.0)
+
+        assert p.positions[0].shares == expected
+        assert record is not None
+        assert record.cash_in_lieu == pytest.approx(0.0, abs=1e-9)
+
     def test_an_absent_ticker_is_a_no_op(self) -> None:
         p = self._book()
 

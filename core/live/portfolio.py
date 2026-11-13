@@ -19,6 +19,7 @@ import tempfile
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, date, datetime
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,12 @@ DEFAULT_INITIAL_CASH: float = 10_000.0
 #: charged 0.1% of the gross instead — 48c on a typical $480 order where
 #: the broker takes $2.50 — and understated its costs about six-fold.
 DEFAULT_COMMISSION_USD: float = 2.50
+
+# A vendor split ratio within this relative distance of a simple fraction
+# (denominator at most _SPLIT_MAX_DENOMINATOR) is read as that fraction:
+# yfinance reports a 1-for-3 as 0.333333.
+_SPLIT_MAX_DENOMINATOR = 1000
+_SPLIT_RATIO_RTOL = 1e-5
 
 #: A proportional cost charged on top of the commission, as a fraction of
 #: the gross. Zero in the live book: the broker charges no such thing.
@@ -546,9 +553,11 @@ class LivePortfolio:
         charged: cash in lieu is not an order. A reverse split that
         leaves less than one share closes the line entirely for cash.
 
-        A product within 1e-4 of a whole number is taken as that number,
-        because the vendor reports a 1-for-3 as 0.333333 and three
-        shares must become one, not 0.999999 of one.
+        The vendor rounds ratios: a 1-for-3 arrives as 0.333333. A ratio
+        within one part in 100,000 of a fraction with a denominator of at
+        most 1,000 is taken as that fraction, so 300 shares become 100,
+        not 99 and 0.9999 of one in cash. A product within 1e-4 of a
+        whole number is also taken as that number.
 
         Idempotent per ``(ticker, ex_date)``: returns None when that
         split was already applied, or when the ticker is not held.
@@ -567,13 +576,19 @@ class LivePortfolio:
         pos = self.positions[idx]
         shares_before = pos.shares
         entry_before = pos.entry_price
-        raw = shares_before * ratio
+        exact = Fraction(ratio).limit_denominator(_SPLIT_MAX_DENOMINATOR)
+        if abs(float(exact) - ratio) <= _SPLIT_RATIO_RTOL * ratio:
+            effective = float(exact)
+            raw = float(Fraction(shares_before) * exact)
+        else:
+            effective = ratio
+            raw = shares_before * ratio
         if abs(raw - round(raw)) < 1e-4:
             raw = float(round(raw))
         whole = float(math.floor(raw))
         fraction = raw - whole
-        entry_after = entry_before / ratio
-        mark_after = pos.current_price / ratio
+        entry_after = entry_before / effective
+        mark_after = pos.current_price / effective
         lieu_price = price if price is not None and price > 0 else mark_after
         cash_in_lieu = fraction * lieu_price
         realized = (lieu_price - entry_after) * fraction
