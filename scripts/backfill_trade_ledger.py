@@ -42,6 +42,10 @@ a row unlike a fill:
 * ``fractional-era`` — dated 2026-08-07..2026-10-30, when the books held
   fractional shares the broker cannot hold (from the open run
   ``1421cc78`` to the floor in ``76405a9d``).
+* ``closed-session`` — dated to a day the US market was shut. A row is
+  dated by the commit that changed the book, and a commit on a holiday
+  or a weekend is not a session (audit RK-06). Kept, not dropped:
+  removing history is the owner's call.
 
 So every entry this writes is marked ``reconstructed``, the breakdown
 keeps reporting the remainder as unattributed, and the page shows the
@@ -68,6 +72,7 @@ from pathlib import Path
 
 from core.live.trade_ledger import LedgerEntry
 from core.logger import get_logger
+from core.market_calendar import why_closed
 from core.paths import trade_ledger_dir
 
 logger = get_logger("scripts.backfill_trade_ledger")
@@ -85,6 +90,11 @@ MAX_CARRY_FORWARD_DAYS = 5
 #: First and last session whose books held fractional shares (CE-1b /
 #: ENG-1b): the open run ``1421cc78`` through the floor in ``76405a9d``.
 FRACTIONAL_ERA = ("2026-08-07", "2026-10-30")
+
+#: The tag on a row dated to a day the market was shut. Shared with
+#: ``scripts.tag_closed_sessions``, which wrote it onto the rows this
+#: script reconstructed before it knew the rule.
+CLOSED_SESSION_TAG = "closed-session"
 
 #: Commits that settled a corporate action by hand instead of trading.
 #: Keyed by full SHA, then ticker: (tag, settlement price or None). A
@@ -253,6 +263,8 @@ def reconstruct(
                         tags.append("frozen-price")
                     if FRACTIONAL_ERA[0] <= day <= FRACTIONAL_ERA[1]:
                         tags.append("fractional-era")
+                    if why_closed(date.fromisoformat(day)) is not None:
+                        tags.append(CLOSED_SESSION_TAG)
                     by_day[day].append(
                         LedgerEntry(
                             date=day,

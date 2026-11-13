@@ -385,3 +385,29 @@ class TestWriteDays:
         ]))
         assert bf.write_days(tmp_path, "g", {"2026-10-30": []},
                              refresh_reconstructed=True) == (0, 1)
+
+
+class TestClosedSession:
+    """A row dated to a day the market was shut says so (audit RK-06).
+
+    The books were diffed per commit and dated by the commit, so a
+    commit on Labor Day produced sales on Labor Day. The rows stay —
+    deleting history is the owner's call — but carry ``closed-session``,
+    so a rerun with ``--refresh-reconstructed`` keeps the tag the
+    one-off tagging wrote.
+    """
+
+    @pytest.mark.parametrize(("day", "tagged"), [
+        ("2026-09-07", True),   # Labor Day
+        ("2026-08-16", True),   # a Sunday
+        ("2026-09-08", False),  # an ordinary Tuesday
+    ])
+    def test_a_sale_on_a_shut_day_is_tagged(
+        self, monkeypatch: pytest.MonkeyPatch, day: str, tagged: bool
+    ) -> None:
+        books = {
+            "a": _book("2026-09-01", [_pos("X", 2, 10.0, "2026-09-01", 11.0)]),
+            "b": _book(day, []),
+        }
+        (row,) = _run(monkeypatch, books)[day]
+        assert ("closed-session" in row.tags) is tagged

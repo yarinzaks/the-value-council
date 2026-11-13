@@ -75,9 +75,27 @@ class DailySnapshot:
     #: scan read no fundamentals at all. The run trades regardless; this
     #: is what tells a reader it did so on old numbers. None: not measured.
     fundamentals_stale: bool | None = None
+    #: True on a file dated to a day the US market was shut (audit
+    #: RK-06). The runner has declined those days since the market
+    #: calendar went in; the 55 written before it are kept and marked by
+    #: ``scripts.tag_closed_sessions`` rather than deleted, so a reader
+    #: can leave them out without the history losing them.
+    closed_session: bool = False
+    #: Where a snapshot recovered after the fact came from, when it was
+    #: not written by its own day's run — 2026-08-06 was filed as
+    #: 2026-08-07 by a run that crossed midnight and was then
+    #: overwritten, and is restored from that commit.
+    restored_from: str | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        out = asdict(self)
+        # Written only when they say something, so an ordinary day's
+        # file is what it was before the two markers existed.
+        if not self.closed_session:
+            del out["closed_session"]
+        if self.restored_from is None:
+            del out["restored_from"]
+        return out
 
 
 def make_snapshot(

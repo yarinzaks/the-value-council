@@ -206,3 +206,55 @@ class TestFundamentalsStalenessFlag:
 
         assert loaded.fundamentals_stale is None
         assert loaded.fundamentals_newest_filed is None
+
+
+class TestProvenanceMarkers:
+    """``closed_session`` and ``restored_from`` (audit RK-06).
+
+    55 committed snapshots sit on days the market was shut and one day,
+    2026-08-06, was restored from the commit that misdated it. Both are
+    annotated in the file rather than deleted or silently rewritten, and
+    ``load_snapshots`` builds the dataclass from every key — so a key it
+    does not know makes it drop the whole day with a warning.
+    """
+
+    @staticmethod
+    def _write(root: Path, extra: dict[str, object]) -> None:
+        folder = root / "a"
+        folder.mkdir(parents=True)
+        (folder / "2026-09-07.json").write_text(json.dumps({
+            "agent": "a", "date": "2026-09-07", "nav": 1.0, "cash": 1.0,
+            "invested": 0.0, "pnl_usd": 0.0, "pnl_pct": 0.0,
+            "position_count": 0, "watchlist_count": 0, "buys": [],
+            "sells": [], "trade_count": 0, **extra,
+        }))
+
+    def test_a_tagged_snapshot_still_loads(self, tmp_path: Path) -> None:
+        self._write(tmp_path, {"closed_session": True})
+
+        (snap,) = load_snapshots("a", root=tmp_path)
+
+        assert snap.closed_session is True
+
+    def test_a_restored_snapshot_still_loads(self, tmp_path: Path) -> None:
+        self._write(tmp_path, {"restored_from": "8ac0c8bf"})
+
+        (snap,) = load_snapshots("a", root=tmp_path)
+
+        assert snap.restored_from == "8ac0c8bf"
+        assert snap.closed_session is False
+
+    def test_an_ordinary_snapshot_is_written_without_them(
+        self, tmp_path: Path
+    ) -> None:
+        # Every file the runner writes would otherwise grow two keys
+        # that say nothing.
+        book = LivePortfolio(agent="a", cash=100.0)
+        path = save_snapshot(
+            make_snapshot(book, as_of=date(2026, 9, 8)), root=tmp_path
+        )
+
+        written = json.loads(path.read_text())
+
+        assert "closed_session" not in written
+        assert "restored_from" not in written
