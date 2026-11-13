@@ -74,6 +74,30 @@ class TestASaleRemembersItsEntry:
         assert LedgerEntry.from_dict(e.to_dict()).entry_price == 0.0
 
 
+class TestTags:
+    """What a reconstruction knows is wrong with its own row (CE-1b)."""
+
+    def _entry(self, tags: tuple[str, ...]) -> LedgerEntry:
+        return LedgerEntry(date="2026-08-07", agent="peter_lynch", ticker="THR",
+                           side="SELL", shares=4, price=63.89, gross_value=255.56,
+                           cost_paid=0, realized_pnl_usd=-21.6,
+                           source="reconstructed", tags=tags)
+
+    def test_tags_survive_the_round_trip(self) -> None:
+        e = self._entry(("cash-merger", "fractional-era"))
+        assert e.to_dict()["tags"] == ["cash-merger", "fractional-era"]
+        assert LedgerEntry.from_dict(e.to_dict()).tags == ("cash-merger",
+                                                           "fractional-era")
+
+    def test_an_untagged_row_writes_no_key(self) -> None:
+        """Every executed row stays byte-identical to what it was."""
+        assert "tags" not in self._entry(()).to_dict()
+
+    def test_a_row_written_before_the_field_existed_has_no_tags(self) -> None:
+        old = {k: v for k, v in self._entry(()).to_dict().items()}
+        assert LedgerEntry.from_dict(old).tags == ()
+
+
 class TestRecordingADay:
     def test_a_sale_keeps_the_number_that_used_to_be_thrown_away(
         self, tmp_path: Path
