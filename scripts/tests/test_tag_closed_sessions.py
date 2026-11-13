@@ -12,6 +12,8 @@ from core.live.snapshots import load_snapshots
 from core.live.trade_ledger import read_ledger
 from scripts import tag_closed_sessions as mod
 
+REPO_DATA = Path(__file__).resolve().parents[2] / "data"
+
 
 def _snapshot(day: str) -> dict[str, Any]:
     return {
@@ -137,4 +139,23 @@ class TestTagging:
 
         assert "a/2026-09-07 2.json" not in report.snapshots
         assert "closed_session" not in json.loads(copy.read_text())
+
+
+class TestTheCommittedData:
+    """Every committed day on a shut market carries the tag.
+
+    The runner has declined closed sessions since the market calendar
+    went in; this pins the history it left behind, so a new file on a
+    shut day — or a backfill that rewrites one without the tag — fails
+    here rather than going unnoticed.
+    """
+
+    def test_no_untagged_snapshot_or_ledger_row_on_a_closed_day(self) -> None:
+        report = mod.tag(
+            REPO_DATA / "snapshots", REPO_DATA / "trades", apply=False
+        )
+
+        assert report.errors == []
+        assert report.snapshots == []
+        assert report.ledger_rows == 0
 
