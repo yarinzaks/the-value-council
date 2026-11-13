@@ -29,6 +29,13 @@ borrowings. A company missing those did not tell us anything.
 Against the same sample that splits 62 into 49 genuinely debt-free
 (SNOW, XMTR, TPL, ZUMZ) and 13 unknown (BSX, EXPD — both of which
 plainly do carry debt and were being scored 0.00).
+
+A complete balance sheet is not enough on its own, though. Audit FUND-4
+found ten holdings with a full balance sheet whose debt sat in elements
+the composer did not read, all scored 0.00 — HRI with liabilities 6.1x
+equity, WH 7.9x, RPD 10.2x. A debt-free company does not carry
+liabilities well beyond its equity on operating items alone, so above
+:data:`MAX_DEBT_FREE_LIABILITIES_TO_EQUITY` absence stays unknown.
 """
 
 from __future__ import annotations
@@ -37,6 +44,13 @@ from core.backtest.point_in_time import PointInTimeFinancials
 
 # Fields that together constitute "this filer tagged a balance sheet".
 _BALANCE_SHEET_FIELDS = ("total_assets", "total_liabilities", "current_liabilities")
+
+# Above this liabilities/equity, an absent debt concept is not read as
+# zero debt. Against the FUND-4 holdings: CRTO 0.88, SIRI 1.36 and ALRM
+# 1.47 sit below it and are caught only by the composer reading their
+# tags; APH 1.69, FISV 2.11, GOLD 2.33, COLL 4.49, HRI 6.07, WH 7.94 and
+# RPD 10.16 sit above.
+MAX_DEBT_FREE_LIABILITIES_TO_EQUITY = 1.5
 
 
 def reported_debt(fin: PointInTimeFinancials) -> float | None:
@@ -59,7 +73,10 @@ def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
 
     * equity is missing or non-positive — the ratio is undefined;
     * no debt concept was tagged *and* the balance sheet is too sparse
-      to read that absence as zero.
+      to read that absence as zero;
+    * no debt concept was tagged *and* liabilities exceed
+      :data:`MAX_DEBT_FREE_LIABILITIES_TO_EQUITY` times equity — too
+      leveraged for absence to mean no borrowings.
     """
     if fin is None or fin.total_equity is None or fin.total_equity <= 0:
         return None
@@ -67,11 +84,20 @@ def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
     if debt is None:
         if not has_complete_balance_sheet(fin):
             return None
+        # has_complete_balance_sheet guarantees total_liabilities is set;
+        # the None check only narrows the type.
+        if (
+            fin.total_liabilities is not None
+            and fin.total_liabilities / fin.total_equity
+            > MAX_DEBT_FREE_LIABILITIES_TO_EQUITY
+        ):
+            return None
         debt = 0.0
     return debt / fin.total_equity
 
 
 __all__ = [
+    "MAX_DEBT_FREE_LIABILITIES_TO_EQUITY",
     "debt_to_equity",
     "has_complete_balance_sheet",
     "reported_debt",

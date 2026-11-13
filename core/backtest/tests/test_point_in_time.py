@@ -695,3 +695,27 @@ class TestPayloadVersioning:
             )
 
         assert loader._cached_financials("acc-1") is None
+
+    def test_payload_written_before_the_debt_rollups_is_a_miss(
+        self, tmp_path: Path
+    ) -> None:
+        """Audit FUND-4: version-3 rows were parsed before total_debt
+        read the lease-inclusive and per-instrument elements, so the live
+        sqlite serves total_debt=None for FISV, HRI and RPD. They must be
+        re-parsed, not served."""
+        import json
+        import sqlite3
+
+        path = tmp_path / "pit.sqlite"
+        loader = PointInTimeLoader(cache_path=path)
+        loader._store_financials("acc-1", {"revenue": 100.0})
+        with sqlite3.connect(path) as conn:
+            conn.execute(
+                "UPDATE financials SET payload_json = ? WHERE accession_number = ?",
+                (
+                    json.dumps({"revenue": 100.0, "total_debt": None, _VERSION_KEY: 3}),
+                    "acc-1",
+                ),
+            )
+
+        assert loader._cached_financials("acc-1") is None

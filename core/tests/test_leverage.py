@@ -130,6 +130,32 @@ class TestDebtToEquity:
     def test_highly_levered_company(self) -> None:
         assert debt_to_equity(_fin(total_debt=3_000.0)) == pytest.approx(3.0)
 
+    def test_high_liab_eq_without_debt_tag_returns_none(self) -> None:
+        # Audit FUND-4, HRI at FY2025: a full balance sheet, no debt
+        # concept the composer read, and liabilities 6.1x equity. It was
+        # scored D/E 0.00 and bought on it; it carries ~$8bn of debt.
+        hri = _fin(
+            total_equity=1_898.0,
+            total_assets=13_564.0,
+            total_liabilities=11_666.0,
+            current_liabilities=628.0,
+        )
+        assert debt_to_equity(hri) is None
+
+    def test_liab_eq_exactly_at_the_threshold_still_reads_as_debt_free(
+        self,
+    ) -> None:
+        assert debt_to_equity(_fin(total_liabilities=1_500.0)) == 0.0
+
+    def test_liab_eq_just_over_the_threshold_abstains(self) -> None:
+        assert debt_to_equity(_fin(total_liabilities=1_500.01)) is None
+
+    def test_reported_debt_on_a_levered_sheet_is_still_scored(self) -> None:
+        # The guard is only for absence; a tagged figure is used as-is.
+        assert debt_to_equity(
+            _fin(total_debt=2_000.0, total_liabilities=6_000.0)
+        ) == pytest.approx(2.0)
+
 
 class TestAgentsShareTheRule:
     """All nine agents must resolve to this implementation — the rule is

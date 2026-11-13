@@ -207,6 +207,77 @@ _STOCK_CONCEPTS: frozenset[str] = frozenset(
     ]
 )
 
+# Debt tags read by ``_compute_total_debt`` beyond the LongTermDebt
+# family (audit FUND-4). Ten holdings were scored D/E 0.00 because their
+# debt sat only in these elements. Each entry is ``(label, concepts)``;
+# the concepts are summed, and see ``_resolve_debt_shapes`` for how one
+# shape is chosen over another.
+#
+# Lease-inclusive totals. Measured in the cache at FY2025: FISV tags
+# DebtAndCapitalLeaseObligations ($28,997M); APH, SIRI, HRI and WH tag
+# LongTermDebtAndCapitalLeaseObligations (noncurrent) with its Current
+# counterpart, and APH/SIRI/HRI/WH also the IncludingCurrentMaturities
+# roll-up. DebtAndCapitalLeaseObligations is defined as short- AND
+# long-term debt, so it is never topped up with short-term tags.
+_LEASE_INCLUSIVE_DEBT_SHAPES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "lease_rollup",
+        ("LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",),
+    ),
+    ("debt_and_lease_total", ("DebtAndCapitalLeaseObligations",)),
+    (
+        "lease_split",
+        (
+            "LongTermDebtAndCapitalLeaseObligations",
+            "LongTermDebtAndCapitalLeaseObligationsCurrent",
+        ),
+    ),
+    ("lease_noncurrent_only", ("LongTermDebtAndCapitalLeaseObligations",)),
+    ("lease_current_only", ("LongTermDebtAndCapitalLeaseObligationsCurrent",)),
+)
+
+
+def _instrument_family(
+    name: str, rollup: str, noncurrent: str, current: str
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return (
+        (f"{name}_rollup", (rollup,)),
+        (f"{name}_split", (noncurrent, current)),
+        (f"{name}_noncurrent_only", (noncurrent,)),
+        (f"{name}_current_only", (current,)),
+    )
+
+
+# Per-instrument balance-sheet lines, read only when no total exists.
+# Measured in the cache at FY2025: RPD ConvertibleDebtNoncurrent
+# ($892M); COLL ConvertibleLongTermNotesPayable ($238M) beside
+# LongTermLoansPayable + LoansPayableCurrent ($571M); ALRM
+# SeniorLongTermNotes + SeniorNotesCurrent ($990M); GOLD
+# LongTermLineOfCredit ($300M) + LongTermNotesPayable/NotesPayableCurrent;
+# CRTO NotesPayableCurrent ($37M). The two convertible element sets
+# describe the same instrument, so they are one family, not two.
+_INSTRUMENT_DEBT_FAMILIES: tuple[tuple[tuple[str, tuple[str, ...]], ...], ...] = (
+    (
+        ("convertible_rollup", ("ConvertibleDebt",)),
+        ("convertible_notes_rollup", ("ConvertibleNotesPayable",)),
+        ("convertible_split", ("ConvertibleDebtNoncurrent", "ConvertibleDebtCurrent")),
+        (
+            "convertible_notes_split",
+            ("ConvertibleLongTermNotesPayable", "ConvertibleNotesPayableCurrent"),
+        ),
+        ("convertible_noncurrent_only", ("ConvertibleDebtNoncurrent",)),
+        ("convertible_notes_noncurrent_only", ("ConvertibleLongTermNotesPayable",)),
+        ("convertible_current_only", ("ConvertibleDebtCurrent",)),
+        ("convertible_notes_current_only", ("ConvertibleNotesPayableCurrent",)),
+    ),
+    _instrument_family("senior_notes", "SeniorNotes", "SeniorLongTermNotes", "SeniorNotesCurrent"),
+    _instrument_family("loans", "LoansPayable", "LongTermLoansPayable", "LoansPayableCurrent"),
+    _instrument_family("notes", "NotesPayable", "LongTermNotesPayable", "NotesPayableCurrent"),
+    _instrument_family(
+        "line_of_credit", "LineOfCredit", "LongTermLineOfCredit", "LinesOfCreditCurrent"
+    ),
+)
+
 # Concepts that flow over time (income/cash flow). We prefer the most
 # recent annual (10-K) filing for these unless a fresher 10-Q exists.
 _FLOW_CONCEPTS: frozenset[str] = frozenset(
@@ -480,6 +551,12 @@ class FundamentalsFetcher:
     def _debt_component(
         self, ticker: str, concept: str, as_of: date | datetime
     ) -> float | None:
+        fact = self._debt_fact(ticker, concept, as_of)
+        return None if fact is None else fact.value
+
+    def _debt_fact(
+        self, ticker: str, concept: str, as_of: date | datetime
+    ) -> XbrlFact | None:
         fact = self.cache.latest_value_at(
             ticker,
             concept,
@@ -494,7 +571,60 @@ class FundamentalsFetcher:
         as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
         if fact.period_end < as_of_d - timedelta(days=MAX_FACT_AGE_DAYS):
             return None
-        return fact.value
+        return fact
+
+    def _resolve_debt_shapes(
+        self,
+        ticker: str,
+        as_of: date | datetime,
+        shapes: tuple[tuple[str, tuple[str, ...]], ...],
+    ) -> tuple[float, date, str] | None:
+        """Resolve one family of alternative debt tags to a single figure.
+
+        Each shape is ``(label, concepts)``: the concepts are summed and
+        all of them must be present. The shape describing the newest
+        balance sheet wins (a shape is as old as its oldest component),
+        and on a tie the earlier shape wins — so a roll-up is never added
+        to its own split, and a split beats either half on its own.
+
+        Returns ``(value, period_end, label)``, or ``None`` when no shape
+        has every component within the age bound.
+        """
+        cache: dict[str, XbrlFact | None] = {}
+        best: tuple[float, date, str] | None = None
+        for label, concepts in shapes:
+            facts: list[XbrlFact] = []
+            for concept in concepts:
+                if concept not in cache:
+                    cache[concept] = self._debt_fact(ticker, concept, as_of)
+                fact = cache[concept]
+                if fact is None:
+                    break
+                facts.append(fact)
+            else:
+                period_end = min(f.period_end for f in facts)
+                if best is None or period_end > best[1]:
+                    best = (sum(f.value for f in facts), period_end, label)
+        return best
+
+    def _instrument_debt(
+        self, ticker: str, as_of: date | datetime
+    ) -> float | None:
+        """Debt summed from per-instrument tags, for filers with no total.
+
+        Some filers never tag a long-term-debt total at all and put each
+        borrowing on its own balance-sheet line: RPD's convertible, ALRM's
+        senior notes, COLL's term loan beside its convertible, GOLD's
+        revolver. Each family is resolved roll-up-or-split on its own,
+        then the families are summed. Only reached when no total exists,
+        because a total already contains these lines.
+        """
+        found = [
+            resolved[0]
+            for family in _INSTRUMENT_DEBT_FAMILIES
+            if (resolved := self._resolve_debt_shapes(ticker, as_of, family)) is not None
+        ]
+        return sum(found) if found else None
 
     def _compute_total_debt(
         self, ticker: str, as_of: date | datetime
@@ -515,30 +645,60 @@ class FundamentalsFetcher:
         maturities, so it is never added to the split components —
         that is the double-count guard.
 
-        Finance leases are deliberately excluded. They are debt-like, but
-        ASC 842 capitalised them in 2019 and including them would make
-        leverage incomparable across the history these agents screen on.
+        Finance leases are deliberately excluded from the primary
+        ``LongTermDebt`` reading. They are debt-like, but ASC 842
+        capitalised them in 2019 and including them would make leverage
+        incomparable across the history these agents screen on. The
+        lease-inclusive elements are read only when that family is absent
+        or older (see :data:`_LEASE_INCLUSIVE_DEBT_SHAPES`): a figure that
+        carries a few percent of leases beats reading a levered balance
+        sheet as debt-free (audit FUND-4).
+
+        When neither total exists, per-instrument tags are summed (see
+        :meth:`_instrument_debt`).
         """
-        ltd_noncurrent = self._debt_component(ticker, "LongTermDebtNoncurrent", as_of)
-        ltd_current = self._debt_component(ticker, "LongTermDebtCurrent", as_of)
-        ltd_rollup = self._debt_component(ticker, "LongTermDebt", as_of)
+        ltd_noncurrent = self._debt_fact(ticker, "LongTermDebtNoncurrent", as_of)
+        ltd_current = self._debt_fact(ticker, "LongTermDebtCurrent", as_of)
+        ltd_rollup = self._debt_fact(ticker, "LongTermDebt", as_of)
         short_term, short_source = self._short_term_debt(ticker, as_of)
 
+        used: list[XbrlFact]
         if ltd_noncurrent is not None and ltd_current is not None:
-            long_term: float | None = ltd_noncurrent + ltd_current
+            used = [ltd_noncurrent, ltd_current]
             source = "split"
         elif ltd_rollup is not None:
-            long_term = ltd_rollup  # already includes current maturities
+            used = [ltd_rollup]  # already includes current maturities
             source = "rollup"
         elif ltd_noncurrent is not None:
-            long_term = ltd_noncurrent
+            used = [ltd_noncurrent]
             source = "noncurrent_only"
         elif ltd_current is not None:
-            long_term = ltd_current
+            used = [ltd_current]
             source = "current_only"
         else:
-            long_term = None
+            used = []
             source = "absent"
+        long_term: float | None = sum(f.value for f in used) if used else None
+
+        # Audit FUND-4: the lease-inclusive elements. A filer that tags
+        # its debt only here (FISV, APH, SIRI, HRI, WH) read as debt-free.
+        # Used when the LongTermDebt family is absent, or when it
+        # describes an older balance sheet than this one does — the
+        # signature of a filer that moved from one element to the other.
+        lease = self._resolve_debt_shapes(ticker, as_of, _LEASE_INCLUSIVE_DEBT_SHAPES)
+        if lease is not None and (
+            not used or lease[1] > max(f.period_end for f in used)
+        ):
+            long_term, _lease_end, source = lease
+            if source == "debt_and_lease_total":
+                # Defined as short- AND long-term debt: adding the
+                # short-term tags on top would count them twice.
+                return long_term, source
+
+        if long_term is None:
+            long_term = self._instrument_debt(ticker, as_of)
+            if long_term is not None:
+                source = "instruments"
 
         if long_term is None and short_term is None:
             return None, "absent"

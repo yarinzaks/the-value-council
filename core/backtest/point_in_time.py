@@ -365,7 +365,9 @@ CREATE TABLE IF NOT EXISTS financials (
 #
 # 2: sic_code populated from the bundled SEC map (was always None).
 # 3: goodwill and intangible_assets, for tangible common equity.
-_PAYLOAD_VERSION = 3
+# 4: total_debt reads lease-inclusive and per-instrument debt elements
+#    (audit FUND-4); v3 rows hold total_debt=None for e.g. FISV and HRI.
+_PAYLOAD_VERSION = 4
 _VERSION_KEY = "_payload_version"
 
 

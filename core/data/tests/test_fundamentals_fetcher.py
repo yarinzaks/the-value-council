@@ -773,6 +773,220 @@ class TestTotalDebt:
         assert source == "absent"
 
 
+class TestDebtRollupsAndInstruments:
+    """Audit FUND-4: ten holdings carried debt in concepts the composer
+    never read, so total_debt came back ``None`` and the leverage rule
+    scored them D/E 0.00. Values below are the ones the real cache holds
+    for those filers at their FY2025 balance sheet (USD millions)."""
+
+    AS_OF = date(2026, 11, 13)
+
+    @staticmethod
+    def _at(
+        concept: str,
+        value: float,
+        period_end: date = date(2025, 12, 31),
+        filed: date = date(2026, 2, 20),
+    ) -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace="us-gaap",
+            unit="USD",
+            value=value,
+            period_start=None,
+            period_end=period_end,
+            filed=filed,
+            form="10-K",
+            fiscal_year=period_end.year,
+            fiscal_period="FY",
+            accession_number=f"acc-{concept}-{period_end.isoformat()}",
+        )
+
+    def _total(self, tmp_path: Path, *facts: XbrlFact) -> tuple[float | None, str]:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("ACME", list(facts))
+        fetcher = FundamentalsFetcher(cache=cache, client=None)
+        return fetcher._compute_total_debt("ACME", self.AS_OF)
+
+    def test_fisv_debt_is_read_from_rollup(self, tmp_path: Path) -> None:
+        # FISV tags its whole debt only as DebtAndCapitalLeaseObligations
+        # (plus the noncurrent/current split of the same figure).
+        total, source = self._total(
+            tmp_path,
+            self._at("DebtAndCapitalLeaseObligations", 28_997.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 27_758.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 1_239.0),
+        )
+        assert total == 28_997.0
+        assert source == "debt_and_lease_total"
+
+    def test_debt_and_lease_total_is_not_topped_up_with_short_term(
+        self, tmp_path: Path
+    ) -> None:
+        # DebtAndCapitalLeaseObligations is defined as short- AND
+        # long-term debt; adding ShortTermBorrowings would count it twice.
+        total, source = self._total(
+            tmp_path,
+            self._at("DebtAndCapitalLeaseObligations", 1_000.0),
+            self._at("ShortTermBorrowings", 200.0),
+        )
+        assert total == 1_000.0
+        assert source == "debt_and_lease_total"
+
+    def test_lease_inclusive_split_is_summed(self, tmp_path: Path) -> None:
+        # APH / HRI / WH: noncurrent plus current maturities.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtAndCapitalLeaseObligations", 14_564.8),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 937.2),
+        )
+        assert total == pytest.approx(15_502.0)
+        assert source == "lease_split"
+
+    def test_lease_inclusive_rollup_is_not_added_to_its_split(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                9_717.0,
+            ),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 8_648.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 1_058.0),
+        )
+        assert total == 9_717.0
+        assert source == "lease_rollup"
+
+    def test_lease_inclusive_long_term_takes_short_term_borrowings(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtAndCapitalLeaseObligations", 800.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 100.0),
+            self._at("CommercialPaper", 50.0),
+        )
+        assert total == 950.0
+        assert source == "lease_split+short_term_components"
+
+    def test_fresher_lease_inclusive_total_beats_a_stale_long_term_debt(
+        self, tmp_path: Path
+    ) -> None:
+        # A filer that moved from LongTermDebt to the lease-inclusive
+        # element: the abandoned tag is still inside the age bound, but
+        # it describes a balance sheet a year older.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 3_000.0, period_end=date(2024, 12, 31),
+                     filed=date(2025, 2, 20)),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 7_958.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 27.0),
+        )
+        assert total == 7_985.0
+        assert source == "lease_split"
+
+    def test_same_period_long_term_debt_keeps_precedence(
+        self, tmp_path: Path
+    ) -> None:
+        # Existing behaviour: a filer that tags LongTermDebt at the same
+        # balance-sheet date is still read from LongTermDebt.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 900.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 950.0),
+        )
+        assert total == 900.0
+        assert source == "rollup"
+
+    def test_convertible_notes_are_debt(self, tmp_path: Path) -> None:
+        # RPD: its only borrowing is a convertible.
+        total, source = self._total(
+            tmp_path,
+            self._at("ConvertibleDebtNoncurrent", 892.3),
+            self._at("ConvertibleDebtCurrent", 0.0),
+        )
+        assert total == pytest.approx(892.3)
+        assert source == "instruments"
+
+    def test_senior_notes_split_is_summed(self, tmp_path: Path) -> None:
+        # ALRM: notes due within a year sit in SeniorNotesCurrent.
+        total, source = self._total(
+            tmp_path,
+            self._at("SeniorLongTermNotes", 489.6),
+            self._at("SeniorNotesCurrent", 499.9),
+        )
+        assert total == pytest.approx(989.5)
+        assert source == "instruments"
+
+    def test_instrument_families_are_summed(self, tmp_path: Path) -> None:
+        # COLL: a term loan and a convertible, tagged separately.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermLoansPayable", 542.1),
+            self._at("LoansPayableCurrent", 29.0),
+            self._at("ConvertibleLongTermNotesPayable", 238.2),
+        )
+        assert total == pytest.approx(809.3)
+        assert source == "instruments"
+
+    def test_line_of_credit_and_notes_count(self, tmp_path: Path) -> None:
+        # GOLD: a drawn revolver plus small notes; CRTO: notes only.
+        total, _ = self._total(
+            tmp_path,
+            self._at("LongTermLineOfCredit", 300.0),
+            self._at("LongTermNotesPayable", 3.3),
+            self._at("NotesPayableCurrent", 4.0),
+        )
+        assert total == pytest.approx(307.3)
+
+    def test_instrument_rollup_is_not_added_to_its_split(
+        self, tmp_path: Path
+    ) -> None:
+        total, _ = self._total(
+            tmp_path,
+            self._at("ConvertibleNotesPayable", 500.0),
+            self._at("ConvertibleLongTermNotesPayable", 450.0),
+            self._at("ConvertibleNotesPayableCurrent", 50.0),
+        )
+        assert total == 500.0
+
+    def test_instruments_are_not_added_to_a_long_term_debt_total(
+        self, tmp_path: Path
+    ) -> None:
+        # LongTermDebt already contains the notes; the instrument tier is
+        # a fallback only, or a filer that tags both counts them twice.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 1_000.0),
+            self._at("ConvertibleDebtNoncurrent", 400.0),
+        )
+        assert total == 1_000.0
+        assert source == "rollup"
+
+    def test_instruments_take_short_term_borrowings(self, tmp_path: Path) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("ConvertibleDebtNoncurrent", 400.0),
+            self._at("ShortTermBorrowings", 60.0),
+        )
+        assert total == 460.0
+        assert source == "instruments+short_term"
+
+    def test_stale_rollups_and_instruments_are_ignored(
+        self, tmp_path: Path
+    ) -> None:
+        old = date(2018, 12, 31)
+        total, source = self._total(
+            tmp_path,
+            self._at("DebtAndCapitalLeaseObligations", 5_000.0, period_end=old,
+                     filed=date(2019, 2, 20)),
+            self._at("SeniorNotes", 700.0, period_end=old, filed=date(2019, 2, 20)),
+        )
+        assert total is None
+        assert source == "absent"
+
+
 class TestSicCodePopulation:
     """sic_code was hard-coded None, so Greenblatt's mandatory
     financials-and-utilities exclusion never fired once. Measured across
