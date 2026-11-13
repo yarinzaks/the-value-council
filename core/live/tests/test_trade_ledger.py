@@ -230,3 +230,33 @@ class TestDecomposeReturn:
             "initial_cash", "realized", "unrealized", "dividends",
             "costs", "nav", "return_pct", "attributed", "unattributed",
         }
+
+
+class TestSyncCollisionCopies:
+    """macOS file sync keeps both sides of a write collision and renames
+    one "<day> 2.json". 122 such copies sat beside data/trades on the
+    Mac and read_ledger globbed "*.json", so david_dreman read 139 rows
+    where the ledger held 106 (audit RK-03, ENG-7)."""
+
+    def test_icloud_collision_copies_are_ignored(self, tmp_path: Path) -> None:
+        path = record_day("g", AS_OF, [_trade("A", "SELL", realized=10.0)],
+                          directory=tmp_path)
+        assert path is not None
+        (path.parent / "2026-08-07 2.json").write_text(path.read_text())
+
+        got = read_ledger("g", directory=tmp_path)
+
+        assert [(e.ticker, e.realized_pnl_usd) for e in got] == [("A", 10.0)]
+
+    def test_a_differing_copy_does_not_add_its_rows(self, tmp_path: Path) -> None:
+        # The original is what the runner wrote last; the copy is the
+        # losing side of the collision.
+        path = record_day("g", AS_OF, [_trade("A", "SELL", realized=10.0)],
+                          directory=tmp_path)
+        assert path is not None
+        record_day("h", AS_OF, [_trade("B", "SELL", realized=5.0)],
+                   directory=tmp_path)
+        other = (tmp_path / "h" / "2026-08-07.json").read_text()
+        (path.parent / "2026-08-07 2.json").write_text(other)
+
+        assert [e.ticker for e in read_ledger("g", directory=tmp_path)] == ["A"]

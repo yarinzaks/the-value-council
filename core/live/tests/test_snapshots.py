@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 
 from core.live.portfolio import LivePortfolio, TradeRecord
-from core.live.snapshots import make_snapshot, save_snapshot
+from core.live.snapshots import load_snapshots, make_snapshot, save_snapshot
 
 
 class TestTheCloseRunDoesNotEraseTheMorningsTrades:
@@ -110,3 +110,24 @@ class TestTheCloseRunDoesNotEraseTheMorningsTrades:
 
         stored = json.loads((tmp_path / "graham" / "2026-08-07.json").read_text())
         assert stored["trade_count"] == 0
+
+
+class TestSyncCollisionCopies:
+    """A "<day> 2.json" sync copy is not a second day (audit RK-03).
+
+    load_snapshots globbed "*.json", so seth_klarman's history held
+    2026-11-06 twice on the Mac and a NAV chart drew the day twice.
+    """
+
+    def test_a_collision_copy_does_not_repeat_the_day(
+        self, tmp_path: Path
+    ) -> None:
+        p = LivePortfolio(agent="graham", cash=1_000.0)
+        path = save_snapshot(
+            make_snapshot(p, as_of=date(2026, 11, 6), trades=[]), root=tmp_path
+        )
+        (path.parent / "2026-11-06 2.json").write_text(path.read_text())
+
+        got = load_snapshots("graham", root=tmp_path)
+
+        assert [s.date for s in got] == ["2026-11-06"]

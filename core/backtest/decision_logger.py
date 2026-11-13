@@ -45,6 +45,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any, Literal
 
+from core.day_files import canonical_day_files
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
 
@@ -292,7 +293,8 @@ class DecisionLogger:
         if not agent_dir.exists():
             return []
         results: list[Decision] = []
-        for path in sorted(agent_dir.glob("*.json")):
+        # One file per day: a "<day> 2.json" sync copy is not more history.
+        for path in canonical_day_files(agent_dir.glob("*.json")):
             try:
                 raw = json.loads(path.read_text())
                 if isinstance(raw, list):

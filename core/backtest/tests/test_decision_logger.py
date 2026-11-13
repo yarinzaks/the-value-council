@@ -363,3 +363,27 @@ class TestARerunDoesNotDuplicate:
 
         loaded = log.read_day("greenblatt", date(2024, 6, 30))
         assert [d.ticker for d in loaded] == ["INGR", "INGR", "HOG"]
+
+
+class TestSyncCollisionCopies:
+    """A "<day> 2.json" sync copy is not more history (audit RK-03).
+
+    Fourteen such copies sat under data/decisions on the Mac, and
+    read_all_for_agent globbed "*.json", so a day's decisions counted
+    twice — and benjamin_graham's 2026-10-30 copy carried a BUY the
+    original did not.
+    """
+
+    def test_a_collision_copy_is_not_read(self, tmp_path: Path) -> None:
+        log = DecisionLogger(root=tmp_path)
+        log.log(_decision(ticker="AAPL", timestamp="2026-10-30T14:00:00+00:00"))
+        original = tmp_path / "greenblatt" / "2026-10-30.json"
+        rows = json.loads(original.read_text())
+        extra = dict(rows[0], ticker="SEB")
+        (original.parent / "2026-10-30 2.json").write_text(
+            json.dumps([*rows, extra])
+        )
+
+        got = log.read_all_for_agent("greenblatt")
+
+        assert [d.ticker for d in got] == ["AAPL"]

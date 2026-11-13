@@ -35,6 +35,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import date
 from pathlib import Path
 
+from core.day_files import canonical_day_files
 from core.live.portfolio import LivePortfolio, TradeRecord
 from core.logger import get_logger
 from core.paths import DATA_ROOT
@@ -140,7 +141,8 @@ def load_snapshots(
     if not agent_dir.exists():
         return []
     out: list[DailySnapshot] = []
-    for f in sorted(agent_dir.glob("*.json")):
+    # One file per day: a "<day> 2.json" sync copy is not a second day.
+    for f in canonical_day_files(agent_dir.glob("*.json")):
         try:
             data = json.loads(f.read_text())
             out.append(DailySnapshot(**data))

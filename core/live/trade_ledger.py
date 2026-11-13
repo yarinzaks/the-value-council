@@ -33,6 +33,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from core.day_files import canonical_day_files
 from core.live.portfolio import LivePortfolio, TradeRecord
 from core.logger import get_logger
 
@@ -199,7 +200,8 @@ def read_ledger(agent: str, *, directory: Path) -> list[LedgerEntry]:
     if not folder.is_dir():
         return []
     out: list[LedgerEntry] = []
-    for path in sorted(folder.glob("*.json")):
+    # One file per day: a "<day> 2.json" sync copy is not more trades.
+    for path in canonical_day_files(folder.glob("*.json")):
         try:
             rows = json.loads(path.read_text())
             out.extend(LedgerEntry.from_dict(r) for r in rows)
