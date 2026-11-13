@@ -207,6 +207,22 @@ class LivePortfolio:
     #: on its own.
     paid_dividends: dict[str, list[str]] = field(default_factory=dict)
 
+    #: The earliest split ex-date this book may be restated for, as ISO.
+    #:
+    #: Stamped once by the runner, at the book's last mark before split
+    #: handling first ran, and never moved. A split from before it is
+    #: one the book already priced through without adjusting — restating
+    #: it now would be a correction of history, which is the owner's
+    #: call, not a daily run's (audit item 22).
+    split_floor_date: str = ""
+
+    #: Split ex-dates already applied, per ticker:
+    #: ``{"NVDA": ["2024-06-10"]}``. Applying a split twice doubles a
+    #: line for nothing, so the record, not a date window, is what makes
+    #: a re-run or a late-arriving cache row safe. Dropped with the line,
+    #: exactly like :attr:`paid_dividends`.
+    applied_splits: dict[str, list[str]] = field(default_factory=dict)
+
     # ------------------------------------------------------------------
     # Derived metrics (computed against current_price on positions)
     # ------------------------------------------------------------------
@@ -309,6 +325,7 @@ class LivePortfolio:
             # carries a new entry date, and settlement never looks before
             # that — so dropping these cannot resurrect an old payment.
             self.paid_dividends.pop(ticker.upper(), None)
+            self.applied_splits.pop(ticker.upper(), None)
         else:
             pos.shares = remaining
 
@@ -416,6 +433,12 @@ class LivePortfolio:
             merged = set(self.paid_dividends.pop(old_u))
             merged.update(self.paid_dividends.get(new_u, []))
             self.paid_dividends[new_u] = sorted(merged)
+        # So are splits already applied: the vendor's history under the
+        # new symbol carries the old one's ex-dates.
+        if old_u in self.applied_splits:
+            done = set(self.applied_splits.pop(old_u))
+            done.update(self.applied_splits.get(new_u, []))
+            self.applied_splits[new_u] = sorted(done)
 
         return True
 
@@ -445,6 +468,86 @@ class LivePortfolio:
         if ex_date > self.last_dividend_date:
             self.last_dividend_date = ex_date
         return cash
+
+    def apply_split(
+        self,
+        ticker: str,
+        *,
+        ratio: float,
+        ex_date: str,
+        price: float | None,
+    ) -> SplitRecord | None:
+        """Restate the holding of ``ticker`` for a stock split.
+
+        ``ratio`` is new shares per old share (2.0 for 2-for-1, 1.5 for
+        3-for-2, 0.1 for 1-for-10). Shares are multiplied by it and the
+        entry price and last mark divided by it, so cost basis and value
+        are the same money in the new units. The price cache is
+        split-adjusted; without this the ex-date's quote halved a 2:1
+        line's value with nothing having happened to the investment.
+
+        Whole shares stay whole. A result that is not whole (3 shares
+        through a 3-for-2 is 4.5) is floored, and the fraction is paid
+        out as cash in lieu at ``price`` — the post-split quote — or, if
+        there is none today, at the restated last mark. That is what a
+        broker does with a fractional entitlement. No commission is
+        charged: cash in lieu is not an order. A reverse split that
+        leaves less than one share closes the line entirely for cash.
+
+        A product within 1e-4 of a whole number is taken as that number,
+        because the vendor reports a 1-for-3 as 0.333333 and three
+        shares must become one, not 0.999999 of one.
+
+        Idempotent per ``(ticker, ex_date)``: returns None when that
+        split was already applied, or when the ticker is not held.
+        Raises LivePortfolioError for a ratio that is not a finite
+        positive number.
+        """
+        if not (math.isfinite(ratio) and ratio > 0):
+            raise LivePortfolioError(f"invalid split ratio for {ticker}: {ratio}")
+        idx = self._index_of(ticker)
+        if idx is None:
+            return None
+        key = ticker.upper()
+        if ex_date in self.applied_splits.get(key, ()):
+            return None
+
+        pos = self.positions[idx]
+        shares_before = pos.shares
+        entry_before = pos.entry_price
+        raw = shares_before * ratio
+        if abs(raw - round(raw)) < 1e-4:
+            raw = float(round(raw))
+        whole = float(math.floor(raw))
+        fraction = raw - whole
+        entry_after = entry_before / ratio
+        mark_after = pos.current_price / ratio
+        lieu_price = price if price is not None and price > 0 else mark_after
+        cash_in_lieu = fraction * lieu_price
+        realized = (lieu_price - entry_after) * fraction
+
+        self.cash += cash_in_lieu
+        if whole <= 0:
+            self.positions.pop(idx)
+            self.paid_dividends.pop(key, None)
+            self.applied_splits.pop(key, None)
+        else:
+            pos.shares = whole
+            pos.entry_price = entry_after
+            pos.current_price = mark_after
+            self.applied_splits.setdefault(key, []).append(ex_date)
+        return SplitRecord(
+            ticker=key,
+            ex_date=ex_date,
+            ratio=ratio,
+            shares_before=shares_before,
+            shares_after=whole,
+            entry_price_before=entry_before,
+            entry_price_after=entry_after,
+            cash_in_lieu=cash_in_lieu,
+            lieu_price=lieu_price,
+            realized_pnl_usd=realized,
+        )
 
     def buy(
         self,
@@ -591,6 +694,10 @@ class LivePortfolio:
             "paid_dividends": {
                 k: sorted(v) for k, v in sorted(self.paid_dividends.items())
             },
+            "split_floor_date": self.split_floor_date,
+            "applied_splits": {
+                k: sorted(v) for k, v in sorted(self.applied_splits.items())
+            },
             "positions": [_round_position(p) for p in self.positions],
             "watchlist": [asdict(w) for w in self.watchlist],
             "last_updated": self.last_updated,
@@ -668,6 +775,11 @@ class LivePortfolio:
                 str(k).upper(): [str(d) for d in v]
                 for k, v in dict(data.get("paid_dividends", {})).items()
             },
+            split_floor_date=str(data.get("split_floor_date", "")),
+            applied_splits={
+                str(k).upper(): [str(d) for d in v]
+                for k, v in dict(data.get("applied_splits", {})).items()
+            },
         )
 
     @classmethod
@@ -722,6 +834,28 @@ class TradeRecord:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class SplitRecord:
+    """What :meth:`LivePortfolio.apply_split` did to one holding.
+
+    Not a trade — no order was placed — so it never reaches the trade
+    ledger. ``cash_in_lieu`` and ``realized_pnl_usd`` are the fraction
+    of a share the split left over, paid out at ``lieu_price``; both are
+    zero when the result was whole.
+    """
+
+    ticker: str
+    ex_date: str
+    ratio: float
+    shares_before: float
+    shares_after: float
+    entry_price_before: float
+    entry_price_after: float
+    cash_in_lieu: float
+    lieu_price: float
+    realized_pnl_usd: float
 
 
 def _check_commission(ticker: str, commission: float) -> None:
@@ -788,6 +922,7 @@ __all__ = [
     "LivePortfolio",
     "LivePortfolioError",
     "Position",
+    "SplitRecord",
     "TradeRecord",
     "WatchEntry",
     "now_iso",

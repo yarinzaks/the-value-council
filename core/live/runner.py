@@ -30,6 +30,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
+from fractions import Fraction
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
@@ -101,6 +102,7 @@ from core.live.portfolio import (
     LivePortfolio,
     LivePortfolioError,
     Position,
+    SplitRecord,
     TradeRecord,
     WatchEntry,
     now_iso,
@@ -1006,6 +1008,9 @@ class DailyRunner:
                             f"close-of-day price for {t} @ {as_of} failed: {exc}"
                         )
                         fresh[t] = None
+                # Before the mark: today's quote is on the post-split
+                # basis, so the share count has to be too.
+                self._apply_splits(portfolio, as_of, fresh)
                 portfolio.mark_to_market(fresh)
                 self._flag_unpriced(portfolio, fresh, as_of)
                 stamp = now_iso()
@@ -1207,6 +1212,11 @@ class DailyRunner:
                 held_prices[pos.ticker] = self.price_loader.get_price_on(
                     pos.ticker, as_of
                 )
+        # ---- SPLITS: restate holdings before they are marked ----------
+        # The quotes just fetched are split-adjusted; a held line whose
+        # share count is not would be marked at half (or double) its
+        # value, and every weight, trim and buy below would act on that.
+        self._apply_splits(portfolio, as_of, held_prices)
         portfolio.mark_to_market(held_prices)
         self._flag_unpriced(portfolio, held_prices, as_of)
 
@@ -1787,6 +1797,130 @@ class DailyRunner:
         # nothing, which is the assumption that hid this bug.
         return total
 
+    def _apply_splits(
+        self,
+        portfolio: LivePortfolio,
+        as_of: date,
+        prices: dict[str, float | None],
+    ) -> list[SplitRecord]:
+        """Restate every holding for the stock splits since it was marked.
+
+        Audit item 22 / CE-5. The price cache is split-adjusted, the book
+        was not: on a 2:1 ex-date a line's quote halved while its share
+        count stayed put, so its value halved with nothing having
+        happened. Each split with an ex-date after the later of the
+        position's entry date and :attr:`LivePortfolio.split_floor_date`,
+        up to ``as_of``, is applied through
+        :meth:`LivePortfolio.apply_split` and journaled as a ``SPLIT``
+        row. A position bought on the ex-date is not split: it was bought
+        at the post-split price.
+
+        The floor is stamped on the first run that sees positions, at
+        the book's last mark (the later of its last open and close
+        dates), and never moved. Splits before it are ones the book
+        already priced through; restating them would rewrite history,
+        which is not a daily run's call. Splits after it are applied
+        even if the cache learns of them late, because the record of
+        applied ex-dates, not a date window, is what prevents a second
+        application.
+
+        Known limit: a split the cache learns of only after the ex-date
+        leaves the runs in between marking the old share count at the
+        new price, and anything they trade in that name on that wrong
+        weight (a rebalance top-up, bought at post-split prices) is then
+        split again when the event arrives. The morning fetch and the
+        close mark's refresh both read the ex-date's bar, so this needs
+        the vendor to omit the event from both.
+
+        A failed lookup is logged and changes nothing for that name, the
+        same as a failed dividend lookup.
+        """
+        if not portfolio.positions:
+            return []
+        if not portfolio.split_floor_date:
+            marks = [
+                d[:10]
+                for d in (portfolio.last_open_date, portfolio.last_close_date)
+                if d
+            ]
+            portfolio.split_floor_date = max(marks) if marks else as_of.isoformat()
+        floor = portfolio.split_floor_date[:10]
+
+        applied: list[SplitRecord] = []
+        for pos in list(portfolio.positions):
+            ticker = pos.ticker
+            since = max(pos.entry_date[:10], floor)
+            try:
+                events = self.price_loader.splits_between(ticker, since, as_of)
+            except Exception as exc:
+                logger.warning(f"{as_of}: split lookup {ticker} failed: {exc}")
+                continue
+            for i, (ex_date, ratio) in enumerate(events):
+                # Today's quote is on the basis after every split, so it
+                # can value only the last one's fraction; an earlier one
+                # is paid at the restated mark.
+                price = prices.get(ticker) if i == len(events) - 1 else None
+                try:
+                    record = portfolio.apply_split(
+                        ticker, ratio=ratio, ex_date=ex_date.isoformat(), price=price
+                    )
+                except LivePortfolioError as exc:
+                    logger.warning(f"{as_of}: split of {ticker} refused: {exc}")
+                    continue
+                if record is None:
+                    continue
+                applied.append(record)
+                logger.info(
+                    f"{as_of}: {portfolio.agent} {ticker} split "
+                    f"{_split_label(ratio)} (ex {ex_date}): "
+                    f"{record.shares_before:g} -> {record.shares_after:g} shares, "
+                    f"cash in lieu ${record.cash_in_lieu:,.2f}"
+                )
+                self._log_split(portfolio.agent, record, as_of)
+        return applied
+
+    def _log_split(self, agent: str, record: SplitRecord, as_of: date) -> None:
+        """Journal one applied split. Never fatal, said at WARNING."""
+        label = _split_label(record.ratio)
+        lieu = (
+            f"; {record.shares_before * record.ratio - record.shares_after:.4f} "
+            f"of a share paid as ${record.cash_in_lieu:,.2f} cash in lieu at "
+            f"${record.lieu_price:.2f}"
+            if record.cash_in_lieu
+            else ""
+        )
+        try:
+            self.decision_logger.log(
+                make_decision(
+                    ticker=record.ticker,
+                    decision="SPLIT",
+                    agent=agent,
+                    timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
+                    criteria_met=[f"{label} split, ex {record.ex_date}"],
+                    market_conditions={
+                        "corporate_action": "split",
+                        "ex_date": record.ex_date,
+                        "ratio": record.ratio,
+                        "shares_before": record.shares_before,
+                        "shares_after": record.shares_after,
+                        "entry_price_before": record.entry_price_before,
+                        "cash_in_lieu": round(record.cash_in_lieu, 2),
+                        "realized_pnl_usd": round(record.realized_pnl_usd, 2),
+                    },
+                    entry_price=record.entry_price_after,
+                    rationale=(
+                        f"{label} stock split: {record.shares_before:g} shares "
+                        f"became {record.shares_after:g}, entry "
+                        f"${record.entry_price_before:.2f} restated to "
+                        f"${record.entry_price_after:.2f}{lieu}"
+                    ),
+                )
+            )
+        except Exception as exc:
+            logger.warning(
+                f"{as_of}: split journal for {agent} {record.ticker} failed: {exc}"
+            )
+
     # ------------------------------------------------------------------
     def _rebalance(
         self,
@@ -2258,6 +2392,12 @@ class DailyRunner:
             )
         except Exception as exc:
             logger.debug(f"decision log SELL {pos.ticker} failed: {exc}")
+
+
+def _split_label(ratio: float) -> str:
+    """``2.0`` -> ``"2-for-1"``, ``1.5`` -> ``"3-for-2"``, ``0.1`` -> ``"1-for-10"``."""
+    frac = Fraction(ratio).limit_denominator(1000)
+    return f"{frac.numerator}-for-{frac.denominator}"
 
 
 __all__ = [

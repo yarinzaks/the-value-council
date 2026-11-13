@@ -193,6 +193,20 @@ CREATE TABLE IF NOT EXISTS dividends (
 );
 CREATE INDEX IF NOT EXISTS idx_dividends_ticker ON dividends(ticker);
 
+-- Stock splits by ex-date, as yfinance's ``Stock Splits`` column gives
+-- them: new shares per old share (2.0 for 2-for-1, 1.5 for 3-for-2,
+-- 0.1 for 1-for-10). The prices above are split-adjusted, so on an
+-- ex-date a held line's quote moves by the ratio while the book's share
+-- count does not; the live runner reads this table to restate the
+-- holding (audit item 22 / CE-5). The column used to be discarded.
+CREATE TABLE IF NOT EXISTS splits (
+    ticker      TEXT NOT NULL,
+    ex_date     TEXT NOT NULL,   -- ISO YYYY-MM-DD
+    ratio       REAL NOT NULL,   -- new shares per old share
+    PRIMARY KEY (ticker, ex_date)
+);
+CREATE INDEX IF NOT EXISTS idx_splits_ticker ON splits(ticker);
+
 -- The last calendar day each ticker's full dividend history was read,
 -- so the extra request is made at most once a day per ticker.
 CREATE TABLE IF NOT EXISTS dividend_history_sync (
@@ -391,6 +405,68 @@ class PriceDataLoader:
             rows = conn.execute(
                 """
                 SELECT ex_date, amount FROM dividends
+                WHERE ticker = ? AND ex_date > ? AND ex_date <= ?
+                ORDER BY ex_date
+                """,
+                (ticker.upper(), start_d.isoformat(), end_d.isoformat()),
+            ).fetchall()
+        return [(_to_date(r[0]), float(r[1])) for r in rows]
+
+    def _write_splits(self, ticker: str, df: pd.DataFrame) -> int:
+        """Persist the fetch window's stock splits.
+
+        Every bar carries a ``Stock Splits`` value and all but the
+        ex-date's are 0. A ratio of exactly 1 changes nothing and is
+        skipped with the zeros; a missing column (an older yfinance, a
+        test frame) writes nothing. A refetch replaces the row for the
+        same ex-date rather than adding one.
+
+        Only the fetched window is read. That is enough for a held name,
+        whose bars the runner fetches every session: the ex-date's bar is
+        fetched on the ex-date by the morning run and again by the close
+        mark's refresh window.
+        """
+        if df.empty or "Stock Splits" not in df.columns:
+            return 0
+        ticker = ticker.upper()
+        rows: list[tuple[str, str, float]] = []
+        for idx, value in df["Stock Splits"].items():
+            ratio = _f(value)
+            if ratio is None or ratio <= 0 or ratio == 1.0:
+                continue
+            # A tz-aware stamp keeps its local calendar date, as for
+            # dividends.
+            d = idx.date() if isinstance(idx, pd.Timestamp) else idx
+            rows.append((ticker, d.isoformat(), ratio))
+        if rows:
+            with self._connect() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO splits (ticker, ex_date, ratio)
+                    VALUES (?, ?, ?)
+                    """,
+                    rows,
+                )
+        return len(rows)
+
+    def splits_between(
+        self,
+        ticker: str,
+        start: date | datetime | str,
+        end: date | datetime | str,
+    ) -> list[tuple[date, float]]:
+        """Stock splits with ex-date in ``(start, end]``, oldest first.
+
+        The lower bound is exclusive for the same reason as
+        :meth:`dividends_between`, and one more: a position bought on
+        the ex-date paid the post-split price, so passing its entry date
+        must not split it.
+        """
+        start_d, end_d = _to_date(start), _to_date(end)
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT ex_date, ratio FROM splits
                 WHERE ticker = ? AND ex_date > ? AND ex_date <= ?
                 ORDER BY ex_date
                 """,
@@ -661,7 +737,10 @@ class PriceDataLoader:
             self._restate_basis(ticker, df)
             n = self._write_cache(ticker, df)
             d = self._write_dividends(ticker, df)
-            logger.debug(f"cached {n} rows for {ticker} ({d} dividends)")
+            sp = self._write_splits(ticker, df)
+            logger.debug(
+                f"cached {n} rows for {ticker} ({d} dividends, {sp} splits)"
+            )
         elif cached_range is None:
             # Empty *without* an exception — _fetch_yfinance turns network
             # and rate-limit failures into PriceDataError, so this is the
@@ -1051,9 +1130,10 @@ class PriceDataLoader:
                 end=end_excl.isoformat(),
                 progress=False,
                 auto_adjust=False,
-                # actions=True adds a Dividends column. It used to be
-                # False, so cash dividends were invisible to the whole
-                # system and NAV tracked price return only.
+                # actions=True adds the Dividends and Stock Splits
+                # columns. It used to be False, so cash dividends were
+                # invisible to the whole system and NAV tracked price
+                # return only; splits are kept since audit item 22.
                 actions=True,
                 threads=False,
             )

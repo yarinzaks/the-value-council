@@ -796,3 +796,134 @@ class TestUnpricedPersistence:
         )
         loaded = LivePortfolio.load_or_seed("old", directory=tmp_path)
         assert loaded.positions[0].unpriced_since == ""
+
+
+# ---------------------------------------------------------------------------
+# Stock splits (audit item 22 / CE-5)
+# ---------------------------------------------------------------------------
+class TestApplySplit:
+    """The price cache is split-adjusted, the book's share count was
+    not: the first split inside a holding window would have halved (or
+    doubled) that line's value with nothing having happened to it."""
+
+    @staticmethod
+    def _book(shares: float = 10.0, entry: float = 100.0, mark: float = 120.0) -> LivePortfolio:
+        p = LivePortfolio(agent="t", cash=500.0)
+        p.positions.append(
+            Position(
+                ticker="NVDA",
+                shares=shares,
+                entry_price=entry,
+                entry_date="2026-07-01",
+                current_price=mark,
+            )
+        )
+        return p
+
+    def test_two_for_one_doubles_whole_shares_and_keeps_nav(self) -> None:
+        p = self._book()
+        nav_before = p.total_nav  # 500 + 10 x 120
+
+        rec = p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+        p.mark_to_market({"NVDA": 60.0})
+
+        assert rec is not None
+        pos = p.positions[0]
+        assert pos.shares == 20.0
+        assert pos.entry_price == pytest.approx(50.0)
+        assert rec.cash_in_lieu == 0.0
+        assert p.total_nav == pytest.approx(nav_before)
+        # The cost basis is the same money, restated per share.
+        assert pos.cost_basis == pytest.approx(1_000.0)
+
+    def test_three_for_two_floors_and_pays_cash_in_lieu(self) -> None:
+        # 3 shares x 1.5 = 4.5: the broker holds whole shares, so 4
+        # stay and the half share is paid out at the post-split price.
+        p = self._book(shares=3.0, entry=90.0, mark=150.0)
+        nav_before = p.total_nav
+
+        rec = p.apply_split("NVDA", ratio=1.5, ex_date="2026-08-05", price=100.0)
+        p.mark_to_market({"NVDA": 100.0})
+
+        assert rec is not None
+        assert p.positions[0].shares == 4.0
+        assert p.positions[0].entry_price == pytest.approx(60.0)
+        assert rec.cash_in_lieu == pytest.approx(50.0)
+        assert p.cash == pytest.approx(550.0)
+        assert rec.realized_pnl_usd == pytest.approx((100.0 - 60.0) * 0.5)
+        assert p.total_nav == pytest.approx(nav_before)
+        # Cash in lieu is not an order: no commission is charged.
+        assert p.cumulative_costs == 0.0
+
+    def test_it_is_applied_once_per_ex_date(self) -> None:
+        p = self._book()
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+
+        again = p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+
+        assert again is None
+        assert p.positions[0].shares == 20.0
+
+    def test_without_a_fresh_price_the_mark_is_restated_too(self) -> None:
+        # If no post-split quote arrives today, mark_to_market keeps the
+        # last mark. That mark is pre-split, so it must be restated with
+        # the shares or the line's value doubles.
+        p = self._book()
+        nav_before = p.total_nav
+
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=None)
+        p.mark_to_market({})
+
+        assert p.positions[0].current_price == pytest.approx(60.0)
+        assert p.total_nav == pytest.approx(nav_before)
+
+    def test_a_reverse_split_below_one_share_closes_the_line_for_cash(self) -> None:
+        p = self._book(shares=5.0, entry=2.0, mark=3.0)
+        p.paid_dividends["NVDA"] = ["2026-07-15"]
+        nav_before = p.total_nav
+
+        rec = p.apply_split("NVDA", ratio=0.1, ex_date="2026-08-05", price=30.0)
+
+        assert rec is not None and rec.shares_after == 0.0
+        assert not p.has("NVDA")
+        assert "NVDA" not in p.paid_dividends
+        assert p.cash == pytest.approx(500.0 + 0.5 * 30.0)
+        assert p.total_nav == pytest.approx(nav_before)
+
+    def test_a_vendor_rounded_reverse_ratio_does_not_lose_a_share(self) -> None:
+        # yfinance reports 1-for-3 as 0.333333; 3 shares must become 1,
+        # not 0 shares and 0.999999 of a share in cash.
+        p = self._book(shares=3.0, entry=1.0, mark=1.0)
+
+        p.apply_split("NVDA", ratio=0.333333, ex_date="2026-08-05", price=3.0)
+
+        assert p.positions[0].shares == 1.0
+
+    def test_an_absent_ticker_is_a_no_op(self) -> None:
+        p = self._book()
+
+        assert p.apply_split("AAPL", ratio=4.0, ex_date="2026-08-05", price=1.0) is None
+        assert p.cash == 500.0
+
+    @pytest.mark.parametrize("ratio", [0.0, -2.0, float("nan"), float("inf")])
+    def test_a_nonsense_ratio_is_refused(self, ratio: float) -> None:
+        p = self._book()
+
+        with pytest.raises(LivePortfolioError):
+            p.apply_split("NVDA", ratio=ratio, ex_date="2026-08-05", price=60.0)
+        assert p.positions[0].shares == 10.0
+
+    def test_the_record_survives_a_round_trip_and_a_full_sale_clears_it(
+        self, tmp_path: Path
+    ) -> None:
+        p = self._book()
+        p.split_floor_date = "2026-08-04"
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+        p.save(directory=tmp_path)
+
+        loaded = LivePortfolio.load_or_seed("t", directory=tmp_path)
+        assert loaded.applied_splits == {"NVDA": ["2026-08-05"]}
+        assert loaded.split_floor_date == "2026-08-04"
+
+        loaded.sell("NVDA", price=60.0)
+        assert loaded.applied_splits == {}

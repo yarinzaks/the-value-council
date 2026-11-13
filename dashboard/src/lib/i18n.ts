@@ -254,6 +254,7 @@ const en: Dict = {
   pos_event_changed: "Changed its view",
   pos_event_added: "Topped up to target weight",
   pos_event_trimmed: "Trimmed back to target weight",
+  pos_event_split: "Stock split: share count and entry price restated",
   // Where a story starts on a watchlist row rather than a purchase,
   // which is most of them: a name is screened before it is bought.
   pos_event_watched: "Put on the watchlist",
@@ -656,6 +657,7 @@ const he: Dict = {
   pos_event_changed: "שינה את דעתו",
   pos_event_added: "הוסיף כדי לחזור למשקל היעד",
   pos_event_trimmed: "קיצץ כדי לחזור למשקל היעד",
+  pos_event_split: "פיצול מניות: כמות המניות ומחיר הכניסה עודכנו",
   pos_event_watched: "נכנסה למעקב",
   pos_still_held: "מוחזקת מאז ללא שינוי, לאורך {days} ימי מסחר.",
   market_was_closed: "השוק היה סגור",

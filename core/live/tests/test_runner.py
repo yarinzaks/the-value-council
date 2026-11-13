@@ -1426,6 +1426,251 @@ class TestDividends:
 
 
 # ---------------------------------------------------------------------------
+# Stock splits (audit item 22 / CE-5)
+# ---------------------------------------------------------------------------
+class _StubPriceLoaderWithSplits(_StubPriceLoader):
+    def __init__(
+        self,
+        prices: dict[str, float | None],
+        splits: dict[str, list[tuple[date, float]]] | None = None,
+    ) -> None:
+        super().__init__(prices)
+        self._splits = splits or {}
+        self.split_queries: list[tuple[str, date, date]] = []
+
+    def splits_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
+        from core.backtest.data_loader import _to_date
+
+        s, e = _to_date(start), _to_date(end)
+        self.split_queries.append((ticker, s, e))
+        return [(d, r) for d, r in self._splits.get(ticker, []) if s < d <= e]
+
+
+class TestSplitsAdjustTheBook:
+    """The cache is split-adjusted, so on an ex-date the quote halves
+    (2:1) while the book still held the old share count — the line's
+    value halved with nothing having happened to the investment."""
+
+    EX = AS_OF  # the split takes effect on the day being run
+
+    def _held(
+        self,
+        runner: DailyRunner,
+        *,
+        shares: float = 10.0,
+        entry_date: str = "2026-07-01",
+        last_close: str = "2026-08-04",
+    ) -> None:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="NVDA",
+                shares=shares,
+                entry_price=100.0,
+                entry_date=entry_date,
+                current_price=120.0,  # yesterday's close, pre-split
+                why_en="",
+                why_he="",
+            )
+        )
+        p.cash = 1_000.0
+        p.last_close_date = last_close
+        p.last_open_date = last_close
+        p.last_rebalance_date = "2026-08-03"
+        p.save(directory=runner.portfolio_dir)
+
+    def _run(self, runner: DailyRunner, loader, *, weight: float = 0.55):  # type: ignore[no-untyped-def]
+        runner.price_loader = loader
+        # Keep NVDA a target at about the weight it already has, so the
+        # run neither sells nor rebalances it and NAV isolates the split.
+        adapter = _StubAdapter("stub_agent", [_target("NVDA", weight=weight)])
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA"],
+            {"NVDA": 60.0},
+            {"NVDA": None},
+        )
+
+    def test_two_for_one_split_leaves_nav_unchanged(
+        self, runner: DailyRunner
+    ) -> None:
+        self._held(runner)
+        nav_before = 1_000.0 + 10 * 120.0
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        book = result.portfolio
+        pos = book.positions[0]
+        assert pos.shares == 20.0
+        assert pos.shares == int(pos.shares)
+        assert pos.entry_price == pytest.approx(50.0)
+        assert result.trades == []
+        assert book.total_nav == pytest.approx(nav_before)
+        # And it is what was saved, not just what was returned.
+        saved = LivePortfolio.load_or_seed(
+            "stub_agent", directory=runner.portfolio_dir
+        )
+        assert saved.positions[0].shares == 20.0
+
+    def test_three_for_two_floors_with_cash_in_lieu(
+        self, runner: DailyRunner
+    ) -> None:
+        # 3 shares x 1.5 = 4.5 -> 4 shares and half a share in cash at
+        # the post-split price: $40.
+        self._held(runner, shares=3.0)
+        nav_before = 1_000.0 + 3 * 120.0
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 80.0}, {"NVDA": [(self.EX, 1.5)]}
+        )
+        runner.price_loader = loader
+        adapter = _StubAdapter("stub_agent", [_target("NVDA", weight=0.25)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA"],
+            {"NVDA": 80.0},
+            {"NVDA": None},
+        )
+
+        book = result.portfolio
+        assert book.positions[0].shares == 4.0
+        assert book.cash == pytest.approx(1_040.0)
+        assert book.total_nav == pytest.approx(nav_before)
+
+    def test_the_split_is_journaled_as_a_corporate_action(
+        self, runner: DailyRunner, tmp_path: Path
+    ) -> None:
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        self._run(runner, loader)
+
+        rows = DecisionLogger(root=tmp_path / "decisions").read_day(
+            "stub_agent", AS_OF
+        )
+        splits = [r for r in rows if r.decision == "SPLIT"]
+        assert len(splits) == 1
+        row = splits[0]
+        assert row.ticker == "NVDA"
+        assert row.market_conditions["corporate_action"] == "split"
+        assert row.market_conditions["ratio"] == 2.0
+        assert row.market_conditions["shares_before"] == 10.0
+        assert row.market_conditions["shares_after"] == 20.0
+        assert row.market_conditions["cash_in_lieu"] == 0.0
+        assert row.entry_price == pytest.approx(50.0)
+        assert "2-for-1" in (row.rationale or "")
+
+    def test_a_second_run_does_not_split_again(self, runner: DailyRunner) -> None:
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+        self._run(runner, loader)
+
+        again = runner._run_one(
+            _StubAdapter("stub_agent", [_target("NVDA", weight=0.55)]),  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA"],
+            {"NVDA": 60.0},
+            {"NVDA": None},
+            force=True,
+        )
+
+        assert again.portfolio.positions[0].shares == 20.0
+
+    def test_a_split_on_the_entry_date_is_not_applied(
+        self, runner: DailyRunner
+    ) -> None:
+        # Bought on the ex-date means bought at the post-split price.
+        self._held(runner, entry_date=self.EX.isoformat())
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.positions[0].shares == 10.0
+
+    def test_the_floor_is_the_books_last_mark_and_older_splits_are_left(
+        self, runner: DailyRunner
+    ) -> None:
+        # A split from before this book was last marked is history the
+        # book already priced through (or an owner's decision to
+        # backfill), not today's event.
+        self._held(runner, last_close="2026-08-04")
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(date(2026, 8, 3), 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.split_floor_date == "2026-08-04"
+        assert result.portfolio.positions[0].shares == 10.0
+
+    def test_a_split_learned_a_day_late_is_still_applied(
+        self, runner: DailyRunner
+    ) -> None:
+        # The floor is stamped once and never moved, so an ex-date the
+        # cache records after the day it happened is still caught.
+        self._held(runner, last_close="2026-08-03")
+        book = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)
+        book.split_floor_date = "2026-08-03"
+        book.save(directory=runner.portfolio_dir)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(date(2026, 8, 4), 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.positions[0].shares == 20.0
+
+    def test_a_failed_lookup_changes_nothing_and_is_said(
+        self, runner: DailyRunner
+    ) -> None:
+        # The project logs through loguru, which caplog never sees.
+        from loguru import logger as loguru_logger
+
+        self._held(runner)
+
+        class _Broken(_StubPriceLoader):
+            def splits_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
+                raise RuntimeError("sqlite is locked")
+
+        seen: list[str] = []
+        sink = loguru_logger.add(
+            lambda m: seen.append(m.record["message"]), level="WARNING"
+        )
+        try:
+            result = self._run(runner, _Broken({"NVDA": 60.0}))
+        finally:
+            loguru_logger.remove(sink)
+
+        assert result.portfolio.positions[0].shares == 10.0
+        assert any("split lookup NVDA failed" in m for m in seen)
+
+    def test_the_close_of_day_mark_applies_it(self, runner: DailyRunner) -> None:
+        self._held(runner)
+        nav_before = 1_000.0 + 10 * 120.0
+        runner.price_loader = _StubPriceLoaderWithSplits(  # type: ignore[assignment]
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        book = results[0].portfolio
+        assert book.positions[0].shares == 20.0
+        assert book.total_nav == pytest.approx(nav_before)
+
+
+# ---------------------------------------------------------------------------
 # What the strategy is allowed to see
 # ---------------------------------------------------------------------------
 class TestHeldPositionsAreVisible:

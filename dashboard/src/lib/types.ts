@@ -90,7 +90,10 @@ export type DecisionKind =
   | "TRIM"
   | "ADD"
   | "FILL"
-  | "EXIT";
+  | "EXIT"
+  /** A stock split the runner applied to a holding — a corporate
+   *  action, not anyone's decision (audit item 22). */
+  | "SPLIT";
 
 export interface DecisionRow {
   ticker: string;

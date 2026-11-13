@@ -342,6 +342,102 @@ class TestDividends:
         assert loader.dividends_between("KO", date(2026, 8, 1), date(2026, 8, 5)) == []
 
 
+class TestSplits:
+    """Audit item 22 / CE-5: yfinance's ``Stock Splits`` column was
+    fetched with every price and thrown away, so the live book had no
+    way to learn that a holding's share count had changed."""
+
+    @staticmethod
+    def _frame(splits: list[float]) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "Open": [100.0, 50.0, 51.0],
+                "High": [101.0, 51.0, 52.0],
+                "Low": [99.0, 49.0, 50.0],
+                "Close": [100.0, 50.0, 51.0],
+                "Adj Close": [100.0, 50.0, 51.0],
+                "Volume": [1000, 2000, 2100],
+                "Dividends": [0.0, 0.0, 0.0],
+                "Stock Splits": splits,
+            },
+            index=pd.DatetimeIndex(["2026-08-03", "2026-08-04", "2026-08-05"]),
+        )
+
+    def _loaded(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        splits: list[float] | None = None,
+    ) -> PriceDataLoader:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        frame = self._frame(splits if splits is not None else [0.0, 2.0, 0.0])
+        monkeypatch.setattr(
+            loader, "_fetch_yfinance", lambda ticker, start, end: frame
+        )
+        loader.get_history("NVDA", date(2026, 8, 3), date(2026, 8, 5))
+        return loader
+
+    def test_a_split_is_persisted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = self._loaded(tmp_path, monkeypatch)
+
+        found = loader.splits_between("nvda", date(2026, 8, 1), date(2026, 8, 5))
+
+        assert found == [(date(2026, 8, 4), pytest.approx(2.0))]
+
+    def test_zero_and_one_are_not_splits(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Every bar carries the column; 0 means nothing happened, and a
+        # 1.0 ratio would change nothing if it were applied.
+        loader = self._loaded(tmp_path, monkeypatch, splits=[0.0, 1.0, 0.0])
+
+        assert loader.splits_between("NVDA", date(2026, 8, 1), date(2026, 8, 5)) == []
+
+    def test_a_reverse_split_is_kept_as_its_ratio(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = self._loaded(tmp_path, monkeypatch, splits=[0.0, 0.0, 0.1])
+
+        found = loader.splits_between("NVDA", date(2026, 8, 1), date(2026, 8, 5))
+
+        assert found == [(date(2026, 8, 5), pytest.approx(0.1))]
+
+    def test_the_lower_bound_is_exclusive_and_the_upper_inclusive(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A position bought on the ex-date paid the post-split price, so
+        # the caller passes its entry date as the exclusive lower bound.
+        loader = self._loaded(tmp_path, monkeypatch)
+
+        assert loader.splits_between("NVDA", date(2026, 8, 4), date(2026, 8, 5)) == []
+        assert len(loader.splits_between("NVDA", date(2026, 8, 3), date(2026, 8, 4))) == 1
+
+    def test_refetching_does_not_duplicate(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = self._loaded(tmp_path, monkeypatch)
+        loader.get_history(
+            "NVDA", date(2026, 8, 3), date(2026, 8, 5), force_refresh=True
+        )
+
+        assert len(loader.splits_between("NVDA", date(2026, 8, 1), date(2026, 8, 5))) == 1
+
+    def test_a_frame_without_the_column_is_tolerated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "prices.sqlite")
+        frame = self._frame([0.0, 2.0, 0.0]).drop(columns=["Stock Splits"])
+        monkeypatch.setattr(
+            loader, "_fetch_yfinance", lambda ticker, start, end: frame
+        )
+
+        loader.get_history("NVDA", date(2026, 8, 3), date(2026, 8, 5))
+
+        assert loader.splits_between("NVDA", date(2026, 8, 1), date(2026, 8, 5)) == []
+
+
 class TestCarryForwardIsBounded:
     """A price may be carried over a closed market, not over a data hole.
 

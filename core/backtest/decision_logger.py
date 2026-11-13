@@ -60,8 +60,14 @@ DEFAULT_DECISIONS_DIR = _decisions_dir()
 # did about it, at what price. They were both logged as BUY, so every
 # executed purchase appeared twice for the same ticker on the same day
 # and no consumer could tell a rejected intent from a filled one.
+#
+# SPLIT is neither: a corporate action the runner applied to a holding
+# (shares × ratio, entry price ÷ ratio, any fraction paid as cash in
+# lieu). It records no decision by anyone, which is why it has a kind of
+# its own rather than borrowing one (audit item 22).
 DecisionType = Literal[
-    "BUY", "SELL", "WATCH", "REJECT", "HOLD", "TRIM", "ADD", "FILL", "EXIT"
+    "BUY", "SELL", "WATCH", "REJECT", "HOLD", "TRIM", "ADD", "FILL", "EXIT",
+    "SPLIT",
 ]
 VALID_DECISION_TYPES: tuple[str, ...] = (
     "BUY",
@@ -73,6 +79,7 @@ VALID_DECISION_TYPES: tuple[str, ...] = (
     "ADD",
     "FILL",
     "EXIT",
+    "SPLIT",
 )
 
 

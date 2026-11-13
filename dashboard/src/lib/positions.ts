@@ -106,6 +106,12 @@ const BUY_KINDS = new Set(["BUY", "FILL", "ADD"]);
 //: trade rather than a verdict restated.
 const REBALANCE_KINDS = new Set(["ADD", "TRIM"]);
 
+//: A stock split the runner applied (audit item 22). It is in the
+//: timeline because it changed the share count, but it is nobody's
+//: verdict: it never supplies the card's criteria or "last flagged"
+//: date, and it never reads as a change of view.
+const CORPORATE_ACTION_KINDS = new Set(["SPLIT"]);
+
 function dayOf(timestamp: string): string {
   return timestamp.slice(0, 10);
 }
@@ -145,8 +151,9 @@ export function buildPositionStories(
     const position = held.get(ticker);
     const buys = rows.filter((r) => BUY_KINDS.has(r.decision));
     const affirmed = new Set(buys.map((r) => dayOf(r.timestamp)));
-    const newest = rows[0] ?? null;
-    const oldest = rows[rows.length - 1] ?? null;
+    const verdicts = rows.filter((r) => !CORPORATE_ACTION_KINDS.has(r.decision));
+    const newest = verdicts[0] ?? null;
+    const oldest = verdicts[verdicts.length - 1] ?? null;
 
     // Affirmed days since the last exit. `affirmed` spans the whole
     // retained journal and never resets, which is right for "days this
@@ -312,7 +319,8 @@ export interface Movement {
     | "changed"
     | "added"
     | "trimmed"
-    | "watched";
+    | "watched"
+    | "split";
   note: string | null;
 }
 
@@ -351,6 +359,12 @@ export function movements(story: PositionStory): Movement[] {
     // collapses to a single entry. A repeated execution is a second
     // trade — the rebalance can top the same name up in March and
     // again in May — and each one has to show.
+    if (CORPORATE_ACTION_KINDS.has(r.decision)) {
+      // Its own event, and transparent to the verdict comparison: the
+      // rows either side of it are compared with each other.
+      out.push({ date: dayOf(r.timestamp), kind: "split", note: r.rationale ?? null });
+      continue;
+    }
     const isExecution = REBALANCE_KINDS.has(r.decision);
     if (r.decision === prev && !isExecution) continue;
     prev = r.decision;
