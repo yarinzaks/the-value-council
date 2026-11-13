@@ -7,6 +7,7 @@ file. Live yfinance fetches are tested separately with the
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -758,3 +759,286 @@ class TestTrailingReturn:
             loader.trailing_return(
                 "X", date(2024, 12, 31), lookback_months=1, skip_months=12
             )
+
+
+class TestOneAdjustmentBasisPerTicker:
+    """Audit PD-05 / CE-5: the cache must hold each ticker on one basis.
+
+    yfinance restates the whole history whenever a split or a dividend
+    is applied, but the cache only ever replaced the window it had just
+    fetched. ``get_price_on`` fetched by calendar year, so each year was
+    adjusted as of the day it happened to be fetched: APH reads 135.14
+    on 2025-12-31 and 69.86 on 2026-01-02 — its 2:1 split applied to
+    2026 only — and its dividend table halves at the same boundary.
+    """
+
+    SPLIT_DAY = date(2026, 1, 2)
+    TODAY = date(2026, 1, 9)
+
+    @staticmethod
+    def _frame(
+        days: list[pd.Timestamp],
+        close: list[float],
+        adj: list[float],
+        volume: list[int],
+        dividends: list[float] | None = None,
+    ) -> pd.DataFrame:
+        data: dict[str, list[float] | list[int]] = {
+            "Open": close,
+            "High": [c * 1.01 for c in close],
+            "Low": [c * 0.99 for c in close],
+            "Close": close,
+            "Adj Close": adj,
+            "Volume": volume,
+        }
+        if dividends is not None:
+            data["Dividends"] = dividends
+        return pd.DataFrame(data, index=pd.DatetimeIndex(days))
+
+    def _seed_old_basis(
+        self,
+        loader: PriceDataLoader,
+        days: list[pd.Timestamp],
+        close: float,
+        adj: float,
+        dividend: tuple[str, float] | None = None,
+    ) -> None:
+        divs = None
+        if dividend is not None:
+            divs = [dividend[1] if d == pd.Timestamp(dividend[0]) else 0.0 for d in days]
+        df = self._frame(
+            days, [close] * len(days), [adj] * len(days), [1000] * len(days), divs
+        )
+        loader._write_cache("SPL", df)
+        loader._write_dividends("SPL", df)
+
+    @staticmethod
+    def _days(start: str, end: str) -> list[pd.Timestamp]:
+        return list(pd.bdate_range(start, end))
+
+    def _vendor(
+        self,
+        pre_close: float,
+        pre_adj: float,
+        post_close: float,
+        dividend: tuple[str, float] | None = None,
+        cutover: date | None = None,
+    ) -> tuple[Callable[[str, date, date], pd.DataFrame], list[tuple[date, date]]]:
+        """A stub yfinance serving every bar on today's basis."""
+        cut = cutover or self.SPLIT_DAY
+        calls: list[tuple[date, date]] = []
+
+        def fetch(ticker: str, start: date, end: date) -> pd.DataFrame:
+            calls.append((start, end))
+            days = list(pd.bdate_range(start, min(end, self.TODAY)))
+            if not days:
+                return pd.DataFrame()
+            close = [pre_close if d.date() < cut else post_close for d in days]
+            adj = [pre_adj if d.date() < cut else post_close for d in days]
+            vol = [2000 for _ in days]
+            divs = [
+                dividend[1] if dividend and d == pd.Timestamp(dividend[0]) else 0.0
+                for d in days
+            ]
+            return self._frame(days, close, adj, vol, divs)
+
+        return fetch, calls
+
+    def _row(self, loader: PriceDataLoader, day: str) -> pd.Series:
+        df = loader._read_cached("SPL", date.fromisoformat(day), date.fromisoformat(day))
+        assert len(df) == 1, f"no cached bar on {day}"
+        return df.iloc[0]
+
+    def test_refetch_with_constant_factor_restates_full_history(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 2025 was cached before a 2:1 split at 140; the vendor now
+        # serves it at 70. Asking for a 2026 date must not leave 2025 at
+        # 140 next to 2026 at 71.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader,
+            self._days("2025-06-02", "2025-06-06") + self._days("2025-12-01", "2025-12-31"),
+            close=140.0,
+            adj=140.0,
+            dividend=("2025-06-03", 0.25),
+        )
+        fetch, _ = self._vendor(pre_close=70.0, pre_adj=70.0, post_close=71.0)
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        assert loader.get_price_on("SPL", date(2026, 1, 5)) == pytest.approx(71.0)
+
+        # Inside the overlap and far outside any fetched window alike.
+        for day in ("2025-12-31", "2025-06-04"):
+            bar = self._row(loader, day)
+            assert bar["close"] == pytest.approx(70.0)
+            assert bar["adj_close"] == pytest.approx(70.0)
+            assert bar["open"] == pytest.approx(70.0)
+            assert bar["volume"] == 2000
+        paid = loader.dividends_between("SPL", date(2025, 6, 1), date(2025, 6, 30))
+        assert [d for d, _ in paid] == [date(2025, 6, 3)]
+        assert paid[0][1] == pytest.approx(0.125)
+        # The year boundary carries no phantom -49%.
+        r = loader.trailing_return(
+            "SPL", date(2026, 1, 5), lookback_months=1, skip_months=0
+        )
+        assert r == pytest.approx((71.0 / 70.0 - 1) * 100)
+
+    def test_a_new_year_fetch_reaches_back_into_the_cache(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The fetch must share bars with the cache, or there is nothing
+        # to measure the basis against.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader, self._days("2025-12-01", "2025-12-31"), close=140.0, adj=140.0
+        )
+        fetch, calls = self._vendor(pre_close=140.0, pre_adj=140.0, post_close=141.0)
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        loader.get_price_on("SPL", date(2026, 1, 5))
+
+        assert len(calls) == 1
+        start, end = calls[0]
+        assert start < date(2025, 12, 31) and end == date(2026, 12, 31)
+
+    def test_a_dividend_readjustment_moves_adj_close_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A new ex-date rescales adj_close for every earlier bar and
+        # leaves close, volume and the cash dividends alone.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader,
+            self._days("2025-06-02", "2025-06-06") + self._days("2025-12-01", "2025-12-31"),
+            close=100.0,
+            adj=100.0,
+            dividend=("2025-06-03", 0.5),
+        )
+        fetch, _ = self._vendor(pre_close=100.0, pre_adj=99.0, post_close=100.0)
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        loader.get_price_on("SPL", date(2026, 1, 5))
+
+        bar = self._row(loader, "2025-06-04")
+        assert bar["adj_close"] == pytest.approx(99.0)
+        assert bar["close"] == pytest.approx(100.0)
+        assert bar["volume"] == 1000
+        paid = loader.dividends_between("SPL", date(2025, 6, 1), date(2025, 6, 30))
+        assert [d for d, _ in paid] == [date(2025, 6, 3)]
+        assert paid[0][1] == pytest.approx(0.5)
+
+    def test_an_ex_date_inside_the_window_restates_the_older_bars(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The close-of-day refresh is a short window that usually holds
+        # the new ex-date. Bars older than the window take the factor
+        # seen on the window's oldest bars — every event in the window
+        # is after them.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader,
+            self._days("2025-06-02", "2025-06-06") + self._days("2025-12-01", "2025-12-31"),
+            close=100.0,
+            adj=100.0,
+        )
+        fetch, _ = self._vendor(
+            pre_close=100.0, pre_adj=99.0, post_close=100.0, cutover=date(2025, 12, 29)
+        )
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        loader.get_history(
+            "SPL", date(2025, 12, 15), date(2025, 12, 31), force_refresh=True
+        )
+
+        assert self._row(loader, "2025-06-04")["adj_close"] == pytest.approx(99.0)
+        assert self._row(loader, "2025-12-01")["adj_close"] == pytest.approx(99.0)
+        assert self._row(loader, "2025-12-30")["adj_close"] == pytest.approx(100.0)
+
+    def test_fetching_earlier_history_restates_the_newer_cache(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 2026 was cached before the split; a backtest now asks for 2025.
+        # The newer bars must move to the vendor's current basis too.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader, self._days("2026-01-02", "2026-03-31"), close=140.0, adj=140.0
+        )
+        monkeypatch.setattr(self, "TODAY", date(2026, 4, 15))
+        fetch, calls = self._vendor(
+            pre_close=70.0, pre_adj=70.0, post_close=70.0, cutover=date(2027, 1, 1)
+        )
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        loader.get_history("SPL", date(2025, 12, 1), date(2025, 12, 31))
+
+        # Widened only far enough to share bars with the cache's start,
+        # so March is outside the fetch and must be restated, not refetched.
+        assert date(2026, 1, 2) < calls[0][1] < date(2026, 3, 1)
+        bar = self._row(loader, "2026-03-31")
+        assert bar["close"] == pytest.approx(70.0)
+        assert bar["volume"] == 2000
+
+    def test_an_inconsistent_ratio_restates_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # No constant factor, no restatement: a vendor that disagrees
+        # bar by bar is not a split, and guessing would corrupt history.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        old_days = self._days("2025-06-02", "2025-06-06") + self._days(
+            "2025-12-01", "2025-12-31"
+        )
+        self._seed_old_basis(loader, old_days, close=100.0, adj=100.0)
+
+        def noisy(ticker: str, start: date, end: date) -> pd.DataFrame:
+            days = list(pd.bdate_range(start, min(end, self.TODAY)))
+            px = [100.0 * (1 + 0.03 * (i % 4)) for i in range(len(days))]
+            return self._frame(days, px, px, [1000] * len(days))
+
+        monkeypatch.setattr(loader, "_fetch_yfinance", noisy)
+        loader.get_price_on("SPL", date(2026, 1, 5))
+
+        bar = self._row(loader, "2025-06-04")
+        assert bar["close"] == pytest.approx(100.0)
+        assert bar["adj_close"] == pytest.approx(100.0)
+
+    def test_an_empty_refetch_leaves_the_cache_alone(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader, self._days("2025-12-01", "2025-12-31"), close=140.0, adj=140.0
+        )
+        monkeypatch.setattr(
+            loader, "_fetch_yfinance", lambda ticker, start, end: pd.DataFrame()
+        )
+
+        loader.get_price_on("SPL", date(2026, 1, 5))
+
+        assert self._row(loader, "2025-12-31")["close"] == pytest.approx(140.0)
+
+    def test_one_stale_intraday_bar_is_not_a_basis_change(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The morning run caches an intraday quote under today's date;
+        # the evening refresh replaces it. That single disagreeing bar
+        # must not be read as a re-adjustment of the whole history.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._seed_old_basis(
+            loader,
+            self._days("2025-06-02", "2025-06-06") + self._days("2026-01-02", "2026-01-08"),
+            close=71.0,
+            adj=71.0,
+        )
+        loader._write_cache(
+            "SPL", self._frame([pd.Timestamp("2026-01-09")], [73.0], [73.0], [500])
+        )
+        fetch, _ = self._vendor(pre_close=71.0, pre_adj=71.0, post_close=71.0)
+        monkeypatch.setattr(loader, "_fetch_yfinance", fetch)
+
+        assert loader.get_price_on(
+            "SPL", date(2026, 1, 9), force_refresh=True
+        ) == pytest.approx(71.0)
+        bar = self._row(loader, "2025-06-04")
+        assert bar["close"] == pytest.approx(71.0)
+        assert bar["volume"] == 1000

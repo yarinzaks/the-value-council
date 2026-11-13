@@ -102,6 +102,31 @@ MAX_CARRY_FORWARD_DAYS = 5
 #: forever.
 NO_DATA_TTL_DAYS = 7
 
+#: One adjustment basis per ticker (audit PD-05 / CE-5).
+#:
+#: yfinance returns every bar restated as of the day it is asked: a
+#: split or a new ex-date rescales the whole history. The cache only
+#: replaces the window it fetched, so without a correction each window
+#: stays on the basis of its own fetch day. Fetching by calendar year
+#: made that systematic — APH read 135.14 on 2025-12-31 and 69.86 on
+#: 2026-01-02, a 2:1 split applied to 2026 only, and 86 of 5,186 cached
+#: tickers jumped more than 60% across that one year boundary.
+#:
+#: The fix measures the ratio between fetched and cached bars on the
+#: dates they share and applies it to every cached bar the fetch did
+#: not replace. These constants govern that measurement.
+#:
+#: Calendar days of cached history a fetch is widened to include when it
+#: would otherwise share too few bars with the cache to measure a basis.
+BASIS_ANCHOR_DAYS = 14
+#: Shared bars needed before the cache is trusted to measure a basis.
+MIN_BASIS_OVERLAP = 3
+#: Relative tolerance for two ratios to count as the same factor, and
+#: the smallest factor worth applying. Vendor rounding of a two-decimal
+#: close sits well under it; a split is orders of magnitude over it; a
+#: quarterly dividend under ~0.1% of the price is below it and ignored.
+BASIS_RTOL = 1e-3
+
 
 class PriceDataError(ValueCouncilError):
     """Raised when price data cannot be retrieved."""
@@ -343,6 +368,169 @@ class PriceDataLoader:
         return len(rows)
 
     # ------------------------------------------------------------------
+    # Adjustment basis
+    # ------------------------------------------------------------------
+    def _cached_count(self, ticker: str, start: date, end: date) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM prices WHERE ticker = ? "
+                "AND trade_date BETWEEN ? AND ?",
+                (ticker.upper(), start.isoformat(), end.isoformat()),
+            ).fetchone()
+        return int(row[0])
+
+    def _basis_window(
+        self,
+        ticker: str,
+        start: date,
+        end: date,
+        cached_range: tuple[date, date] | None,
+    ) -> tuple[date, date]:
+        """The window to fetch so it shares enough bars with the cache.
+
+        A fetch that shares no bars with the cache cannot tell whether
+        the vendor's basis has moved since the cache was written — the
+        old calendar-year fetch was exactly that. The requested window
+        is kept when it already overlaps by :data:`MIN_BASIS_OVERLAP`
+        bars; otherwise it is stretched :data:`BASIS_ANCHOR_DAYS` into
+        the near edge of the cache; failing that (the request sits in a
+        hole, or the cache is tiny) the whole cached span is refetched,
+        which restates it outright.
+        """
+        if cached_range is None:
+            return start, end
+        cmin, cmax = cached_range
+        anchor = timedelta(days=BASIS_ANCHOR_DAYS)
+        candidates = [(start, end)]
+        if end >= cmax:
+            candidates.append((min(start, cmax - anchor), end))
+        if start <= cmin:
+            candidates.append((start, max(end, cmin + anchor)))
+        for s, e in candidates:
+            if self._cached_count(ticker, s, e) >= MIN_BASIS_OVERLAP:
+                return s, e
+        return min(start, cmin), max(end, cmax)
+
+    @staticmethod
+    def _consensus(ratios: list[float]) -> float | None:
+        """The factor at least two of ``ratios`` agree on, else None.
+
+        Called with the three shared bars at one edge of a fetch. One
+        dissenter is tolerated because one is expected: the morning run
+        caches an intraday quote that the evening refresh replaces, so
+        the newest cached bar routinely differs from the vendor's
+        settled close without any basis having changed.
+        """
+        if len(ratios) < 2:
+            return None
+        mid = float(np.median(ratios))
+        if mid <= 0:
+            return None
+        agree = [r for r in ratios if abs(r / mid - 1.0) <= BASIS_RTOL]
+        if len(agree) < 2:
+            return None
+        return float(np.mean(agree))
+
+    def _restate_basis(self, ticker: str, fetched: pd.DataFrame) -> None:
+        """Put the cached bars the fetch will not replace on its basis.
+
+        Ratios of fetched to cached values on the dates both hold give
+        the factor; ``close`` and ``adj_close`` are measured separately
+        because a split moves both while a new ex-date moves only the
+        adjusted series. Bars older than the fetch take the factor seen
+        on its oldest shared bars — every adjustment event inside the
+        window is later than them — and bars newer than the fetch take
+        the factor from its newest shared bars. A close factor also
+        rescales open/high/low, divides volume (so close × volume, the
+        dollars traded, is unchanged) and rescales cash dividends, which
+        the vendor reports split-adjusted. With no agreed factor nothing
+        is restated: a vendor disagreeing bar by bar is not a split, and
+        guessing would corrupt history that is at least self-consistent.
+        """
+        if (
+            fetched.empty
+            or "Close" not in fetched.columns
+            or not isinstance(fetched.index, pd.DatetimeIndex)
+        ):
+            return
+        ticker = ticker.upper()
+        index = fetched.index
+        if index.tz is not None:
+            index = index.tz_localize(None)
+        first = index.min().date()
+        last = index.max().date()
+        cached = self._read_cached(ticker, first, last)
+        if cached.empty:
+            return
+
+        new = pd.DataFrame(
+            {
+                "close": pd.to_numeric(fetched["Close"], errors="coerce").to_numpy(),
+                "adj_close": pd.to_numeric(
+                    fetched.get("Adj Close", fetched["Close"]), errors="coerce"
+                ).to_numpy(),
+            },
+            index=index.normalize(),
+        )
+        new = new[~new.index.duplicated(keep="last")]
+        shared = cached[["close", "adj_close"]].join(
+            new, how="inner", rsuffix="_new"
+        )
+
+        def edge_factor(column: str, oldest: bool) -> float:
+            pair = shared[[column, f"{column}_new"]].dropna()
+            pair = pair[(pair[column] > 0) & (pair[f"{column}_new"] > 0)]
+            pair = pair.head(MIN_BASIS_OVERLAP) if oldest else pair.tail(MIN_BASIS_OVERLAP)
+            ratios = (pair[f"{column}_new"] / pair[column]).tolist()
+            factor = self._consensus(ratios)
+            if factor is None:
+                if ratios:
+                    logger.warning(
+                        f"{ticker}: no agreed {column} factor between the "
+                        f"cache and the fetch ({[round(r, 6) for r in ratios]}) "
+                        f"— the bars outside {first}..{last} are left as they are"
+                    )
+                return 1.0
+            return factor if abs(factor - 1.0) > BASIS_RTOL else 1.0
+
+        with self._connect() as conn:
+            for oldest, op, edge in ((True, "<", first), (False, ">", last)):
+                outside = conn.execute(
+                    f"SELECT COUNT(*) FROM prices WHERE ticker = ? AND trade_date {op} ?",
+                    (ticker, edge.isoformat()),
+                ).fetchone()[0]
+                if not outside:
+                    continue
+                f_close = edge_factor("close", oldest)
+                f_adj = edge_factor("adj_close", oldest)
+                if f_close == 1.0 and f_adj == 1.0:
+                    continue
+                logger.info(
+                    f"{ticker}: restating {outside} cached bars "
+                    f"{'before' if oldest else 'after'} {edge} onto the vendor's "
+                    f"current basis (close ×{f_close:.6g}, adj_close ×{f_adj:.6g})"
+                )
+                conn.execute(
+                    f"""
+                    UPDATE prices SET
+                        open = open * ?, high = high * ?, low = low * ?,
+                        close = close * ?, adj_close = adj_close * ?,
+                        volume = CAST(ROUND(volume / ?) AS INTEGER)
+                    WHERE ticker = ? AND trade_date {op} ?
+                    """,
+                    (
+                        f_close, f_close, f_close, f_close, f_adj, f_close,
+                        ticker, edge.isoformat(),
+                    ),
+                )
+                if f_close != 1.0:
+                    conn.execute(
+                        f"UPDATE dividends SET amount = amount * ? "
+                        f"WHERE ticker = ? AND ex_date {op} ?",
+                        (f_close, ticker, edge.isoformat()),
+                    )
+
+    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def get_history(
@@ -356,7 +544,12 @@ class PriceDataLoader:
         """Return daily OHLCV + adj_close for ``ticker`` between dates.
 
         Cached results are returned when available; missing ranges are
-        fetched from yfinance and added to the cache.
+        fetched from yfinance and added to the cache. A fetch is widened
+        to share bars with the cache, and every cached bar it does not
+        replace is rescaled onto its basis when the shared bars show a
+        consistent factor (a split or a dividend re-adjustment), so one
+        ticker's cache never mixes adjustment bases — see
+        :data:`BASIS_ANCHOR_DAYS` and :meth:`_restate_basis`.
 
         Args:
             ticker: Symbol (e.g., "AAPL"). Case-insensitive.
@@ -394,10 +587,17 @@ class PriceDataLoader:
                 return self._read_cached(ticker, start_d, end_d)
 
         # Fetch from yfinance — we always fetch the full requested range
-        # (yfinance is fast enough and merging partial fetches is fragile).
-        logger.info(f"fetching {ticker} {start_d}..{end_d} from yfinance")
-        df = self._fetch_yfinance(ticker, start_d, end_d)
+        # (yfinance is fast enough and merging partial fetches is fragile),
+        # widened where needed so it shares bars with the cache and the
+        # rest of the cached history can be put on the same basis.
+        fetch_start, fetch_end = self._basis_window(
+            ticker, start_d, end_d, cached_range
+        )
+        logger.info(f"fetching {ticker} {fetch_start}..{fetch_end} from yfinance")
+        df = self._fetch_yfinance(ticker, fetch_start, fetch_end)
         if not df.empty:
+            # Before the write: the comparison needs the old cached rows.
+            self._restate_basis(ticker, df)
             n = self._write_cache(ticker, df)
             d = self._write_dividends(ticker, df)
             logger.debug(f"cached {n} rows for {ticker} ({d} dividends)")
@@ -699,6 +899,10 @@ class PriceDataLoader:
            boundaries).
         2. On true cache miss, fetch the entire calendar year so
            subsequent daily lookups in the same year are free.
+           ``get_history`` stretches that year back (or forward) into
+           the cached history and restates the rest of the ticker onto
+           the fetch's basis, so a split between two fetches no longer
+           leaves the years on different bases (audit PD-05).
 
         Args:
             force_refresh: Re-fetch ``as_of``'s bar even when the cache
