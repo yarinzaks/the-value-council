@@ -406,3 +406,56 @@ class TestTheNamesAnAgentUsedToHold:
         n = export_prices([_portfolio("g", [])], as_of=AS_OF, loader=loader,
                           root=tmp_path / "prices", benchmarks=(), ledger_dir=ledger)
         assert n == 0 and not (tmp_path / "prices" / "DELISTED.json").exists()
+
+    def test_a_symbol_that_is_not_a_ticker_never_becomes_a_filename(
+        self, tmp_path: Path
+    ) -> None:
+        from core.live.price_export import former_names
+
+        ledger = self._ledger(tmp_path, "g", [
+            self._sell("../../etc/passwd"), self._sell("A B"), self._sell(""),
+            self._sell("BRK.B"), self._sell("RDS-A"),
+        ])
+        assert set(former_names(["g"], ledger)) == {"BRK.B", "RDS-A"}
+
+    def test_an_entry_after_the_sale_is_not_a_date(self, tmp_path: Path) -> None:
+        from core.live.price_export import former_names
+
+        ledger = self._ledger(tmp_path, "g", [self._sell("X", entry_date="2027-01-01")])
+        assert former_names(["g"], ledger) == {"X": None}
+
+    def test_the_window_never_opens_more_than_five_years_back(
+        self, tmp_path: Path
+    ) -> None:
+        from datetime import timedelta
+
+        from core.live.price_export import MAX_WINDOW_DAYS
+
+        class Recording(_StubLoader):
+            def __init__(self) -> None:
+                super().__init__({"OLD": [("2026-08-06", 1.0)]})
+                self.starts: dict[str, date] = {}
+
+            def get_history(self, ticker: str, *, start: date, end: date) -> pd.DataFrame:
+                self.starts[ticker] = start
+                return super().get_history(ticker, start=start, end=end)
+
+        loader = Recording()
+        ledger = self._ledger(tmp_path, "g", [self._sell("OLD", entry_date="1999-01-04")])
+        export_prices([_portfolio("g", [])], as_of=AS_OF, loader=loader,
+                      root=tmp_path / "prices", benchmarks=(), ledger_dir=ledger)
+        assert loader.starts["OLD"] == AS_OF - timedelta(days=MAX_WINDOW_DAYS)
+
+    def test_a_sold_name_the_run_never_cached_is_not_fetched(self, tmp_path: Path) -> None:
+        """A delisted name must not cost a network round trip every day."""
+
+        class CacheAware(_StubLoader):
+            def cached_range(self, ticker: str) -> tuple[date, date] | None:
+                return (date(2026, 1, 1), date(2026, 8, 6)) if ticker == "HELD" else None
+
+        loader = CacheAware({"HELD": [("2026-08-06", 1.0)], "DEAD": [("2026-08-06", 2.0)]})
+        ledger = self._ledger(tmp_path, "g", [self._sell("DEAD"), self._sell("HELD")])
+        export_prices([_portfolio("g", ["HELD"])], as_of=AS_OF, loader=loader,
+                      root=tmp_path / "prices", benchmarks=(), ledger_dir=ledger)
+        assert loader.asked == ["HELD"]
+

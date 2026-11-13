@@ -57,6 +57,7 @@ chart line and nothing else.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
@@ -75,6 +76,15 @@ PRICES_DIR: Path = DATA_ROOT / "prices"
 #: range Schloss's entry condition speaks in, and keeps each file to a
 #: few hundred points.
 DEFAULT_WINDOW_DAYS: int = 365
+
+#: A ticker as the exchanges write one. The ledger is this project's own
+#: file, but a symbol from it becomes a filename below and an argument
+#: to a price fetch, and neither should accept whatever a file says.
+_TICKER = re.compile(r"[A-Z0-9][A-Z0-9.\-]{0,11}")
+
+#: The furthest back a sold name's window may open, whatever entry the
+#: ledger claims for it. Five years is longer than any book here.
+MAX_WINDOW_DAYS: int = 5 * 365
 
 #: How far before a closed position's entry its series starts, so the
 #: first days of the holding are drawn with a little context behind
@@ -131,13 +141,23 @@ def export_prices(
 
     root.mkdir(parents=True, exist_ok=True)
     default_start = as_of - timedelta(days=window_days)
+    floor = as_of - timedelta(days=MAX_WINDOW_DAYS)
+    # Only a name the daily run already cached is read for a sold
+    # position. A held name is cached by the run that holds it; a sold
+    # one may be delisted, and asking the network for a year of a dead
+    # symbol every day is the one thing this export promised not to do.
+    cached_range = getattr(price_loader, "cached_range", None)
     written = 0
     for ticker in tickers:
         is_benchmark = ticker in wanted_benchmarks
+        only_former = ticker in former and ticker not in held and not is_benchmark
+        if only_former and cached_range is not None and cached_range(ticker) is None:
+            logger.debug(f"price export {ticker}: sold, not cached; skipped")
+            continue
         start = default_start
         earliest = former.get(ticker)
         if earliest is not None:
-            start = min(start, earliest - timedelta(days=ENTRY_LEAD_DAYS))
+            start = max(floor, min(start, earliest - timedelta(days=ENTRY_LEAD_DAYS)))
         try:
             df = price_loader.get_history(ticker, start=start, end=as_of)
         except Exception as exc:
@@ -191,11 +211,17 @@ def former_names(
             if row.side != "SELL":
                 continue
             ticker = row.ticker.upper()
+            if not _TICKER.fullmatch(ticker):
+                logger.warning(f"ledger {agent}: ignoring symbol {row.ticker!r}")
+                continue
             entered: date | None = None
             if row.entry_date:
                 try:
                     entered = date.fromisoformat(row.entry_date)
                 except ValueError:
+                    entered = None
+                # An entry after the sale is a corrupt row, not a date.
+                if entered is not None and entered > date.fromisoformat(row.date):
                     entered = None
             known = out.get(ticker)
             if ticker not in out or (
