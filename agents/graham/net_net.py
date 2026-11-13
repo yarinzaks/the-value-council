@@ -34,9 +34,11 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict
 from core.logger import get_logger
 from core.watchlist import WatchCandidate
 
+from . import exits as graham_exits
 from .filters import (
     DEFAULT_DEFENSIVE_MAX_PB,
     DEFAULT_DEFENSIVE_MAX_PE,
@@ -153,6 +155,11 @@ class BenjaminGraham(Strategy):
         self.defensive_min_current_ratio = defensive_min_current_ratio
         self.decision_logger = decision_logger
         self.selection_history: list[GrahamSelection] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.graham.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -165,6 +172,11 @@ class BenjaminGraham(Strategy):
     ) -> dict[str, float]:
         logger.info(
             f"{as_of}: starting Graham selection over {len(universe)} candidates"
+        )
+        # First, so it is published even when nothing qualifies today —
+        # an empty screen is when a held name's verdict matters most.
+        self.last_exit_decisions = graham_exits.verdicts(
+            held, prices, fundamentals, as_of=as_of, max_p_ncav=self.max_p_ncav
         )
 
         triples: list[
