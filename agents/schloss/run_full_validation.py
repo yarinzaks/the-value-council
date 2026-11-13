@@ -99,6 +99,7 @@ def main() -> None:
         max_de=1.0,
         min_years_public=0,
         min_market_cap=300_000_000.0,
+        edgar_cache=cache,
     )
     result = runner.run(strategy)
     report_dir = write_report(result)

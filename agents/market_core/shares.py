@@ -27,11 +27,13 @@ the caller.
 
 from __future__ import annotations
 
+import math
 from datetime import date
 
 import pandas as pd
 
 from core.data.edgar_cache import EdgarCache
+from core.data.fundamentals_fetcher import MAX_FACT_AGE_DAYS
 from core.logger import get_logger
 from core.research.splits import adjusted_shares
 
@@ -74,6 +76,22 @@ def split_adjusted_shares(cache: EdgarCache, ticker: str) -> pd.Series:
     return adjusted_shares(ordered.groupby("filed")["value"].last())
 
 
+def _newest_known(
+    cache: EdgarCache, ticker: str, as_of: date
+) -> tuple[date, float] | None:
+    """``(filed, count)`` of the newest split-adjusted count filed by ``as_of``."""
+    series = split_adjusted_shares(cache, ticker)
+    if series.empty:
+        return None
+    known = series[series.index <= as_of]
+    if known.empty:
+        return None
+    value = float(known.iloc[-1])
+    if value <= 0:
+        return None
+    return known.index[-1], value
+
+
 def shares_known_at(
     cache: EdgarCache, tickers: list[str], as_of: date
 ) -> dict[str, float]:
@@ -85,16 +103,64 @@ def shares_known_at(
     """
     out: dict[str, float] = {}
     for ticker in tickers:
-        series = split_adjusted_shares(cache, ticker)
-        if series.empty:
-            continue
-        known = series[series.index <= as_of]
-        if known.empty:
-            continue
-        value = float(known.iloc[-1])
-        if value > 0:
-            out[ticker] = value
+        hit = _newest_known(cache, ticker, as_of)
+        if hit is not None:
+            out[ticker] = hit[1]
     return out
 
 
-__all__ = ["SHARE_CONCEPTS", "shares_known_at", "split_adjusted_shares"]
+def market_cap_at(
+    cache: EdgarCache | None,
+    ticker: str,
+    as_of: date,
+    price: float | None,
+    filed_shares: float | None,
+) -> float | None:
+    """Market capitalisation in the adjusted price's units (audit FUND-5).
+
+    ``price`` is split-adjusted, so the share count must be too. The
+    count used is the newest one filed on or before ``as_of`` — a 10-Q's
+    cover count beats the last 10-K's, which is what the point-in-time
+    loader's ``shares_outstanding`` hands back — restated for every
+    split detected after that filing (:func:`shares_known_at`).
+
+    ``filed_shares`` (the loader's count, as filed) is used only when no
+    such count exists: no cache, a ticker without cover or balance-sheet
+    share facts, or a newest count older than the loader's own
+    :data:`~core.data.fundamentals_fetcher.MAX_FACT_AGE_DAYS` bound. A
+    series that went dark years ago (AOS's stops in 2015) is not "the
+    newest count known" in any sense a screen should act on. That
+    fallback carries the old unit risk, and it is the same number every
+    agent used before this helper existed.
+
+    Returns ``None`` when there is no usable price or no positive count:
+    a zero share count is a parse failure, not a worthless company.
+    """
+    if price is None or not math.isfinite(price) or price <= 0:
+        return None
+    shares: float | None = None
+    if cache is not None:
+        hit = _newest_known(cache, ticker, as_of)
+        if hit is not None:
+            filed, count = hit
+            if (as_of - filed).days <= MAX_FACT_AGE_DAYS:
+                shares = count
+            else:
+                logger.debug(
+                    f"{ticker} @ {as_of}: newest share count filed {filed} "
+                    f"is older than {MAX_FACT_AGE_DAYS} days; "
+                    f"using the loader's count"
+                )
+    if shares is None:
+        shares = filed_shares
+    if shares is None or not math.isfinite(shares) or shares <= 0:
+        return None
+    return price * shares
+
+
+__all__ = [
+    "SHARE_CONCEPTS",
+    "market_cap_at",
+    "shares_known_at",
+    "split_adjusted_shares",
+]

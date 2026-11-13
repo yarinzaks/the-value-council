@@ -413,11 +413,11 @@ def build_default_adapters(
     on a later start date, so the pair isolates entry timing. See
     :class:`~core.live.agent_adapter.GrahamSecondCohortLive`.
 
-    The 4 original quant agents (Greenblatt, Schloss, Graham, Dreman)
-    don't need ``edgar_cache`` (they read fundamentals via the runner's
-    ``FundamentalsLookup``). The 6 hybrid agents (Neff, Buffett, Lynch,
-    Marks, Klarman, Fisher) DO need it for trailing growth / FCF /
-    margin-trend lookups, so we pass the runner's cache through.
+    Every agent gets ``edgar_cache``: its market cap is price times the
+    newest filed share count restated into the split-adjusted price's
+    units, and that count is read from the cache (audit FUND-5). The 6
+    hybrid agents (Neff, Buffett, Lynch, Marks, Klarman, Fisher) and
+    Dreman also use it for trailing growth / FCF / margin-trend lookups.
 
     Schloss additionally takes the price loader: his entry condition is
     a 52-week low and a five-year high, which are price facts rather
@@ -448,6 +448,7 @@ def build_default_adapters(
             MagicFormula(
                 portfolio_size=30,
                 min_market_cap=500_000_000.0,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -461,6 +462,7 @@ def build_default_adapters(
                 # tested behind a flag no caller passed.
                 price_loader=prices,
                 require_distressed_price=True,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -468,6 +470,7 @@ def build_default_adapters(
             BenjaminGraham(
                 portfolio_size=30,
                 min_market_cap=500_000_000.0,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -480,6 +483,7 @@ def build_default_adapters(
             BenjaminGraham(
                 portfolio_size=30,
                 min_market_cap=500_000_000.0,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),

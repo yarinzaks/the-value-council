@@ -98,6 +98,7 @@ def main() -> None:
         max_de=1.0,
         min_years_public=0,  # see README D7
         min_market_cap=500_000_000.0,  # raised per priority spec
+        edgar_cache=cache,
         decision_logger=decision_logger,
     )
     result = runner.run(strategy)

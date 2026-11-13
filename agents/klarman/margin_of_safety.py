@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from agents.market_core.shares import market_cap_at
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -184,7 +185,7 @@ class SethKlarman(Strategy):
         for ticker in universe:
             fin = fundamentals.get(ticker)
             price = prices.get(ticker)
-            mcap = self._market_cap(fin, price)
+            mcap = self._market_cap(ticker, as_of, fin, price)
             triples.append((fin, mcap, price))
 
         with_data = sum(1 for fin, _, _ in triples if fin is not None)
@@ -269,15 +270,23 @@ class SethKlarman(Strategy):
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
-    @staticmethod
     def _market_cap(
-        fin: PointInTimeFinancials | None, price: float | None
+        self,
+        ticker: str,
+        as_of: date,
+        fin: PointInTimeFinancials | None,
+        price: float | None,
     ) -> float | None:
-        if fin is None or fin.shares_outstanding is None:
+        """Price times the newest split-adjusted share count (audit FUND-5).
+
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
+        """
+        if fin is None:
             return None
-        if price is None or price <= 0:
-            return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _llm_filter(
         self,
