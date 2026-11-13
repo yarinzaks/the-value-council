@@ -474,7 +474,11 @@ jobs:
         if: needs.wait.outputs.market != 'TASE'
         env:
           MODE: ${{ needs.wait.outputs.mode }}
-        run: python -m scripts.verify_run_state --mode "$MODE"
+        # --baseline-ref HEAD: the checkout is the books as they stood
+        # before this run, so a book whose holdings moved with no
+        # data/trades/<agent>/<day>.json fails here instead of reaching
+        # the repo as a share change nothing records (audit ENG-7).
+        run: python -m scripts.verify_run_state --mode "$MODE" --baseline-ref HEAD
 
       - name: Commit updated state back to the repo
         env:

@@ -31,10 +31,23 @@ the flag, and fails the run when one does not. A flagged one passes,
 with a warning, because the flag is the correct output until the
 holding is settled from the filings.
 
+A ledger day for every run that moved shares
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The runner writes ``data/trades/<agent>/<day>.json`` best-effort and
+swallows a failure, and until 9558bc0f the workflow never staged that
+directory: 2,235 share changes reached the repo and not one ``executed``
+ledger row did (audit ENG-7, RK-01). With ``--baseline-ref``, this gate
+reads each book as it stood at that commit — in CI the checkout, which
+is the state before this run — and fails the run when a book's holdings
+moved but no ledger file for the day exists. A day without trades writes
+no ledger file by design, so unchanged holdings need none.
+
 Usage::
 
     python -m scripts.verify_run_state --mode open
     python -m scripts.verify_run_state --mode close --as-of 2026-08-05
+    python -m scripts.verify_run_state --mode open --baseline-ref HEAD
 """
 
 from __future__ import annotations
@@ -42,6 +55,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -50,10 +64,17 @@ from pathlib import Path
 
 from core.live.portfolio import unpriced_since_for
 from core.market_calendar import why_closed
-from core.paths import portfolios_dir, prices_db
+from core.paths import portfolios_dir, prices_db, trade_ledger_dir
 
 #: Newest cached bar for a ticker, or ``None`` when the cache has none.
 LastBar = Callable[[str], date | None]
+
+#: Shares per ticker in a book file as it stood before the run; ``{}``
+#: for a book the baseline does not hold.
+PreviousShares = Callable[[Path], dict[str, float]]
+
+#: Share counts are compared at the precision the book stores them.
+_SHARE_DECIMALS = 6
 
 # Which timestamp each mode is expected to refresh. ``run()`` stamps
 # ``last_open_run``; ``run_mark_to_market()`` stamps ``last_close_run``.
@@ -80,17 +101,21 @@ class VerifyReport:
     unflagged: list[str] = field(default_factory=list)
     #: ``agent:TICKER (...)`` for every unpriced holding that carries it.
     flagged: list[str] = field(default_factory=list)
+    #: ``agent (changes)`` for every book whose holdings moved with no
+    #: ledger file for the day.
+    unledgered: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         """True only when at least one portfolio was found, every one of
-        them is readable and freshly stamped, and no unpriced holding
-        is left unflagged."""
+        them is readable and freshly stamped, no unpriced holding is
+        left unflagged, and no book moved shares without a ledger day."""
         return (
             bool(self.rows)
             and not self.stale
             and not self.unreadable
             and not self.unflagged
+            and not self.unledgered
         )
 
 
@@ -118,6 +143,76 @@ def last_bar_reader(db: Path) -> LastBar:
     return last_bar
 
 
+def _holdings(positions: object) -> dict[str, float]:
+    """Ticker → shares for a book's ``positions`` list.
+
+    Raises ``ValueError``/``TypeError``/``KeyError`` on a malformed
+    list, which the caller reports as an unreadable book.
+    """
+    if not isinstance(positions, list):
+        raise TypeError(f"positions is {type(positions).__name__}, not a list")
+    return {
+        str(p["ticker"]).upper(): round(float(p["shares"]), _SHARE_DECIMALS)
+        for p in positions
+    }
+
+
+def git_baseline_reader(directory: Path, ref: str) -> PreviousShares | None:
+    """Read each book in *directory* as committed at *ref*.
+
+    ``None`` when *ref* does not resolve to a commit in the repository
+    holding *directory* (or there is no repository): the caller must
+    then refuse rather than compare against nothing. A book file the
+    commit does not hold reads as ``{}`` — a new book starts empty.
+    """
+    # A ref is never an option; refusing a leading dash keeps git from
+    # reading one as such.
+    if not ref or ref.startswith("-"):
+        return None
+    probe = subprocess.run(
+        ["git", "-C", str(directory), "rev-parse", "--verify", "--quiet",
+         f"{ref}^{{commit}}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if probe.returncode != 0:
+        return None
+    commit = probe.stdout.strip()
+
+    def previous(path: Path) -> dict[str, float]:
+        # "<rev>:./<name>" resolves against -C's directory, so no
+        # repository-relative path has to be computed.
+        shown = subprocess.run(
+            ["git", "-C", str(directory), "show", f"{commit}:./{path.name}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if shown.returncode != 0:
+            return {}
+        committed = json.loads(shown.stdout)
+        if not isinstance(committed, dict):
+            raise TypeError(f"committed {path.name} is not a JSON object")
+        return _holdings(committed.get("positions", []))
+
+    return previous
+
+
+def _describe(before: dict[str, float], after: dict[str, float]) -> str:
+    """``+NEW, -GONE, KEPT 54→42`` — what moved, sorted by ticker."""
+    parts: list[str] = []
+    for ticker in sorted(before.keys() | after.keys()):
+        old, new = before.get(ticker), after.get(ticker)
+        if old is None:
+            parts.append(f"+{ticker}")
+        elif new is None:
+            parts.append(f"-{ticker}")
+        elif old != new:
+            parts.append(f"{ticker} {old:g}→{new:g}")
+    return ", ".join(parts)
+
+
 def _stamp_date(stamp: str) -> str:
     """Date portion of an ISO stamp, or ``""`` when absent or malformed.
 
@@ -138,15 +233,24 @@ def check_portfolios(
     mode: str,
     as_of: date,
     last_bar: LastBar | None = None,
+    previous: PreviousShares | None = None,
+    ledger_dir: Path | None = None,
 ) -> VerifyReport:
     """Assert every portfolio in *directory* was written by today's run.
 
     With *last_bar*, also assert every unpriced holding is flagged as
     such; without it that check is not run.
 
+    With *previous* and *ledger_dir*, also assert that every book whose
+    holdings differ from *previous* has a ledger file for *as_of*;
+    without them that check is not run.
+
     Raises ``KeyError`` for an unknown *mode* rather than guessing which
-    timestamp to read.
+    timestamp to read, and ``ValueError`` when only one of *previous*
+    and *ledger_dir* is given.
     """
+    if (previous is None) != (ledger_dir is None):
+        raise ValueError("previous and ledger_dir are given together or not at all")
     field_name = STAMP_FIELD[mode]
     expected = as_of.isoformat()
 
@@ -155,12 +259,18 @@ def check_portfolios(
     unreadable: list[str] = []
     unflagged: list[str] = []
     flagged: list[str] = []
+    unledgered: list[str] = []
 
     for path in sorted(directory.glob("*.json")):
+        before: dict[str, float] = {}
+        after: dict[str, float] = {}
         try:
             data = json.loads(path.read_text())
             agent = str(data["agent"])
             nav = float(data["total_nav"])
+            if previous is not None:
+                before = previous(path)
+                after = _holdings(data.get("positions", []))
         except (OSError, ValueError, KeyError, TypeError) as exc:
             unreadable.append(f"{path.name}: {exc}")
             continue
@@ -178,6 +288,14 @@ def check_portfolios(
         )
         if not fresh:
             stale.append(agent)
+
+        if (
+            previous is not None
+            and ledger_dir is not None
+            and before != after
+            and not (ledger_dir / agent / f"{expected}.json").is_file()
+        ):
+            unledgered.append(f"{agent} ({_describe(before, after)})")
 
         if last_bar is None:
             continue
@@ -201,6 +319,7 @@ def check_portfolios(
         unreadable=unreadable,
         unflagged=unflagged,
         flagged=flagged,
+        unledgered=unledgered,
     )
 
 
@@ -234,6 +353,13 @@ def format_report(report: VerifyReport, *, mode: str, as_of: date) -> str:
         lines.append(
             f"::error::unpriced holding not flagged — {entry}. The run "
             f"carried it at its last mark without saying so."
+        )
+
+    for entry in report.unledgered:
+        lines.append(
+            f"::error::holdings moved with no ledger day — {entry}. The "
+            f"run changed shares but wrote no trades file for {as_of}, "
+            f"so what it executed, and at what price, is not on record."
         )
 
     for entry in report.flagged:
@@ -270,6 +396,20 @@ def main(argv: list[str] | None = None) -> int:
         help="price cache to date each holding's last bar against; "
         "defaults to the resolved data root's",
     )
+    parser.add_argument(
+        "--trades",
+        type=Path,
+        default=None,
+        help="trade ledger directory; defaults to the resolved data root's",
+    )
+    parser.add_argument(
+        "--baseline-ref",
+        default=None,
+        help="git ref holding the books as they stood before this run "
+        "(in CI: HEAD). When given, a book whose holdings moved without a "
+        "ledger file for the day fails the run; omitted, that check is "
+        "not run",
+    )
     args = parser.parse_args(argv)
 
     as_of = args.as_of or datetime.now(UTC).date()
@@ -297,8 +437,30 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
+    previous: PreviousShares | None = None
+    ledger_dir: Path | None = None
+    if args.baseline_ref is not None:
+        previous = git_baseline_reader(directory, args.baseline_ref)
+        # Asked to compare and unable to is not the same as nothing
+        # moved: without the baseline no share change can be seen.
+        if previous is None:
+            print(
+                f"::error::cannot read the baseline ref {args.baseline_ref!r} "
+                f"from the repository holding {directory} — cannot check "
+                f"that every run that moved shares wrote a ledger day"
+            )
+            return 1
+        ledger_dir = args.trades or trade_ledger_dir()
+    else:
+        print("ledger check not run: no --baseline-ref given")
+
     report = check_portfolios(
-        directory, mode=args.mode, as_of=as_of, last_bar=last_bar_reader(db)
+        directory,
+        mode=args.mode,
+        as_of=as_of,
+        last_bar=last_bar_reader(db),
+        previous=previous,
+        ledger_dir=ledger_dir,
     )
     print(format_report(report, mode=args.mode, as_of=as_of))
     return 0 if report.ok else 1
