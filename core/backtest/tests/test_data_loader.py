@@ -384,7 +384,9 @@ class TestSplits:
 
         found = loader.splits_between("nvda", date(2026, 8, 1), date(2026, 8, 5))
 
-        assert found == [(date(2026, 8, 4), pytest.approx(2.0))]
+        ((ex_date, ratio),) = found
+        assert ex_date == date(2026, 8, 4)
+        assert ratio == pytest.approx(2.0)
 
     def test_zero_and_one_are_not_splits(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -402,7 +404,9 @@ class TestSplits:
 
         found = loader.splits_between("NVDA", date(2026, 8, 1), date(2026, 8, 5))
 
-        assert found == [(date(2026, 8, 5), pytest.approx(0.1))]
+        ((ex_date, ratio),) = found
+        assert ex_date == date(2026, 8, 5)
+        assert ratio == pytest.approx(0.1)
 
     def test_the_lower_bound_is_exclusive_and_the_upper_inclusive(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

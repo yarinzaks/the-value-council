@@ -1712,7 +1712,8 @@ class TestSplitsAdjustTheBook:
         loader = _StubPriceLoaderWithSplits(
             {"NVDA": 80.0}, {"NVDA": [(self.EX, 1.5)]}
         )
-        runner.price_loader = loader
+        # The stub duck-types PriceDataLoader; it is not a subclass.
+        runner.price_loader = loader  # type: ignore[assignment]
         adapter = _StubAdapter("stub_agent", [_target("NVDA", weight=0.25)])
 
         result = runner._run_one(
@@ -3587,8 +3588,9 @@ class TestFundamentalsFreshnessGate:
         monkeypatch.setattr("core.live.runner.notify_run", lambda *a, **k: None)
         runner.universe = _StubUniverse(["KO"])  # type: ignore[assignment]
         runner.price_loader = _StubPriceLoader({"KO": 60.0})  # type: ignore[assignment]
-        runner.adapters = [  # type: ignore[list-item]
-            _StubAdapter("stub_agent", [_target("KO", weight=0.5)])
+        # The stub duck-types AgentAdapter; mypy reports the item's line.
+        runner.adapters = [
+            _StubAdapter("stub_agent", [_target("KO", weight=0.5)])  # type: ignore[list-item]
         ]
         _not_a_rebalance_book().save(directory=runner.portfolio_dir)
         return saved
