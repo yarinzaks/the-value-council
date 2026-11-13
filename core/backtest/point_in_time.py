@@ -367,7 +367,10 @@ CREATE TABLE IF NOT EXISTS financials (
 # 3: goodwill and intangible_assets, for tangible common equity.
 # 4: total_debt reads lease-inclusive and per-instrument debt elements
 #    (audit FUND-4); v3 rows hold total_debt=None for e.g. FISV and HRI.
-_PAYLOAD_VERSION = 4
+# 5: balance-sheet fields take the newest instant instead of preferring
+#    the last 10-K (audit FUND-6); v4 rows stored under a 10-Q accession
+#    hold that 10-K's balance sheet, CALM's three quarters old.
+_PAYLOAD_VERSION = 5
 _VERSION_KEY = "_payload_version"
 
 

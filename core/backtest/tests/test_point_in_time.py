@@ -719,3 +719,185 @@ class TestPayloadVersioning:
             )
 
         assert loader._cached_financials("acc-1") is None
+
+
+def _calm_fact(
+    concept: str,
+    value: float,
+    period_end: date,
+    *,
+    filing: str,
+    period_start: date | None = None,
+    namespace: str = "us-gaap",
+    unit: str = "USD",
+) -> XbrlFact:
+    """One CALM fact as the parquet holds it, attached to ``filing``."""
+    form, filed, accession, fy, fp = _CALM_FILINGS[filing]
+    return XbrlFact(
+        concept=concept,
+        namespace=namespace,
+        unit=unit,
+        value=value,
+        period_start=period_start,
+        period_end=period_end,
+        filed=filed,
+        form=form,
+        fiscal_year=fy,
+        fiscal_period=fp,
+        accession_number=accession,
+    )
+
+
+#: Cal-Maine's FY2025 10-K and its fiscal Q3 2026 10-Q as the audit found
+#: them (FUND-6). Accessions, dates and values are CALM's own, read from
+#: the fundamentals parquet.
+_CALM_FILINGS: dict[str, tuple[str, date, str, int, str]] = {
+    "10-K": ("10-K", date(2025, 7, 22), "0001562762-25-000170", 2025, "FY"),
+    "10-Q": ("10-Q", date(2026, 4, 1), "0001562762-26-000046", 2026, "Q3"),
+}
+_CALM_FY2024_END = date(2024, 6, 1)
+_CALM_FY2025_END = date(2025, 5, 31)
+_CALM_Q3_END = date(2026, 2, 28)
+
+
+def _calm_facts() -> list[XbrlFact]:
+    k, q = "10-K", "10-Q"
+    return [
+        # The 10-K: FY2025 balance sheet beside its FY2024 comparative,
+        # the annual flows, and two cover facts dated neither period end.
+        _calm_fact("Assets", 2_184_761_000.0, _CALM_FY2024_END, filing=k),
+        _calm_fact("Liabilities", 387_718_000.0, _CALM_FY2024_END, filing=k),
+        _calm_fact("StockholdersEquity", 1_800_147_000.0, _CALM_FY2024_END, filing=k),
+        _calm_fact("Assets", 3_084_619_000.0, _CALM_FY2025_END, filing=k),
+        _calm_fact("Liabilities", 518_604_000.0, _CALM_FY2025_END, filing=k),
+        _calm_fact("StockholdersEquity", 2_560_624_000.0, _CALM_FY2025_END, filing=k),
+        _calm_fact(
+            "CashAndCashEquivalentsAtCarryingValue", 499_392_000.0, _CALM_FY2025_END, filing=k
+        ),
+        _calm_fact(
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+            4_261_885_000.0,
+            _CALM_FY2025_END,
+            period_start=date(2024, 6, 2),
+            filing=k,
+        ),
+        _calm_fact(
+            "NetIncomeLoss",
+            1_220_048_000.0,
+            _CALM_FY2025_END,
+            period_start=date(2024, 6, 2),
+            filing=k,
+        ),
+        _calm_fact(
+            "EntityPublicFloat", 4_128_739_000.0, date(2024, 11, 29),
+            namespace="dei", filing=k,
+        ),
+        _calm_fact(
+            "EntityCommonStockSharesOutstanding", 48_497_480.0, date(2025, 7, 22),
+            namespace="dei", unit="shares", filing=k,
+        ),
+        # The 10-Q: the 2026-02-28 balance sheet beside the year-end
+        # comparative it reprints, year-to-date flows, the cover count.
+        _calm_fact("Assets", 3_084_619_000.0, _CALM_FY2025_END, filing=q),
+        _calm_fact("Liabilities", 518_604_000.0, _CALM_FY2025_END, filing=q),
+        _calm_fact("StockholdersEquity", 2_560_624_000.0, _CALM_FY2025_END, filing=q),
+        _calm_fact("Assets", 3_139_261_000.0, _CALM_Q3_END, filing=q),
+        _calm_fact("Liabilities", 432_129_000.0, _CALM_Q3_END, filing=q),
+        _calm_fact("StockholdersEquity", 2_700_168_000.0, _CALM_Q3_END, filing=q),
+        _calm_fact(
+            "CashAndCashEquivalentsAtCarryingValue", 392_159_000.0, _CALM_Q3_END, filing=q
+        ),
+        _calm_fact(
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+            2_359_051_000.0,
+            _CALM_Q3_END,
+            period_start=date(2025, 6, 1),
+            filing=q,
+        ),
+        _calm_fact(
+            "NetIncomeLoss",
+            352_558_000.0,
+            _CALM_Q3_END,
+            period_start=date(2025, 6, 1),
+            filing=q,
+        ),
+        _calm_fact(
+            "EntityCommonStockSharesOutstanding", 47_376_588.0, date(2026, 4, 1),
+            namespace="dei", unit="shares", filing=q,
+        ),
+    ]
+
+
+class TestBalanceSheetFollowsTheNewestFiling:
+    """Audit FUND-6: a newer 10-Q's balance sheet beats an older 10-K's.
+
+    Instant concepts were looked up with ``prefer_annual=True``, so CALM
+    on 2026-04-15 was read with its 2025-05-31 balance sheet, three
+    quarters old, while the 10-Q filed 2026-04-01 carried 2026-02-28's.
+    The payload was stored under the 10-Q's accession all the same, so
+    ``source_filing`` named a filing whose numbers it did not hold, and
+    its ``period_of_report`` was the cover-page date 2026-04-01 rather
+    than any period the filing reports.
+    """
+
+    AS_OF = date(2026, 4, 15)
+
+    def _loader(self, tmp_path: Path) -> PointInTimeLoader:
+        fc_dir = tmp_path / "fundamentals_cache"
+        EdgarCache(cache_dir=fc_dir).save_facts("CALM", _calm_facts())
+        return _parquet_loader(fc_dir, tmp_path / "edgar.sqlite")
+
+    def test_calm_balance_sheet_is_10q_2026_02_28_and_source_filing_matches(
+        self, tmp_path: Path
+    ) -> None:
+        result = self._loader(tmp_path).get_financials("CALM", self.AS_OF)
+
+        assert result is not None
+        assert result.source_filing.form_type == "10-Q"
+        assert result.source_filing.accession_number == "0001562762-26-000046"
+        assert result.source_filing.filing_date == date(2026, 4, 1)
+        assert result.source_filing.period_of_report == _CALM_Q3_END
+        assert result.total_assets == pytest.approx(3_139_261_000.0)
+        assert result.total_liabilities == pytest.approx(432_129_000.0)
+        assert result.total_equity == pytest.approx(2_700_168_000.0)
+        assert result.cash_and_equivalents == pytest.approx(392_159_000.0)
+        assert result.shares_outstanding == pytest.approx(47_376_588.0)
+        # Flows stay annual: a nine-month year-to-date is not a year.
+        assert result.revenue == pytest.approx(4_261_885_000.0)
+
+    def test_before_the_10q_the_10k_balance_sheet_and_period_are_used(
+        self, tmp_path: Path
+    ) -> None:
+        result = self._loader(tmp_path).get_financials("CALM", date(2025, 8, 1))
+
+        assert result is not None
+        assert result.source_filing.accession_number == "0001562762-25-000170"
+        assert result.source_filing.period_of_report == _CALM_FY2025_END
+        assert result.total_assets == pytest.approx(3_084_619_000.0)
+
+    def test_payload_cached_with_the_10k_balance_sheet_is_reparsed(
+        self, tmp_path: Path
+    ) -> None:
+        """A version-4 row under the 10-Q's accession holds 10-K values.
+
+        Every such row in the live sqlite was written by the old lookup,
+        so it must be a miss rather than replayed.
+        """
+        import json
+        import sqlite3
+
+        loader = self._loader(tmp_path)
+        loader._store_financials("0001562762-26-000046", {"total_assets": 0.0})
+        with sqlite3.connect(tmp_path / "edgar.sqlite") as conn:
+            conn.execute(
+                "UPDATE financials SET payload_json = ? WHERE accession_number = ?",
+                (
+                    json.dumps({"total_assets": 3_084_619_000.0, _VERSION_KEY: 4}),
+                    "0001562762-26-000046",
+                ),
+            )
+
+        result = loader.get_financials("CALM", self.AS_OF)
+
+        assert result is not None
+        assert result.total_assets == pytest.approx(3_139_261_000.0)

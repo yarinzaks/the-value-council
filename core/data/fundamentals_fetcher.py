@@ -37,6 +37,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+import pandas as pd
+
 from core.backtest.point_in_time import (
     EdgarAdapter,
     FilingMetadata,
@@ -399,7 +401,13 @@ class FundamentalsFetcher:
             raise FundamentalsError(f"unknown field {field!r}")
         if not self.cache.has_ticker(ticker) and self.config.populate_cache_on_miss:
             self.ensure_cached(ticker)
-        prefer_annual = field in _STOCK_CONCEPTS  # balance sheet stocks
+        # Balance-sheet stocks take the newest instant, whichever form
+        # carried it. They used to prefer 10-K facts whenever any existed,
+        # so a 10-Q's balance sheet never won: 50 of 182 holdings were read
+        # from one older than the cache held, CALM's by three quarters
+        # (audit FUND-6). Flow concepts are kept annual by the duration
+        # window below, not by the form.
+        #
         # Flow concepts must come from a full-year period. Without this,
         # the highest period_end wins and a 10-Q's year-to-date figure
         # beats the last 10-K's annual one, so revenue, EBIT and net
@@ -423,7 +431,6 @@ class FundamentalsFetcher:
                 as_of,
                 namespace=namespace,
                 forms=("10-K", "10-Q"),
-                prefer_annual=prefer_annual,
                 duration_days=duration_days,
                 units=expected_units(field),
             )
@@ -557,13 +564,15 @@ class FundamentalsFetcher:
     def _debt_fact(
         self, ticker: str, concept: str, as_of: date | datetime
     ) -> XbrlFact | None:
+        # Newest instant, like every other balance-sheet field (audit
+        # FUND-6): debt from the last 10-K beside equity from a later
+        # 10-Q would price leverage off two different balance sheets.
         fact = self.cache.latest_value_at(
             ticker,
             concept,
             as_of,
             namespace="us-gaap",
             forms=("10-K", "10-Q"),
-            prefer_annual=True,
             units=("USD",),
         )
         if fact is None:
@@ -781,6 +790,35 @@ class FundamentalsFetcher:
         return values, meta
 
 
+def _report_periods(df: pd.DataFrame) -> dict[str, date]:
+    """The period each accession reports, keyed by accession number.
+
+    A filing's facts span its own period, the comparatives it reprints,
+    and cover-page dates. ``list_filings`` used to take whichever row came
+    first, so CALM's 10-Q reported 2026-04-01 (its share-count date) and
+    its 10-K 2024-11-29 (its public-float date) (audit FUND-6).
+
+    The answer is the latest us-gaap period end carrying at least half as
+    many facts as the most common one. The most common alone picks a
+    prior-year comparative in 10-Ks that tag the prior year slightly more
+    often (147 of 12,067 cached accessions: VERI, SEGG, KANP); the latest
+    alone picks a subsequent-event date (XELB, NMHI, CNTM), which carries
+    one to three facts. Neither failure survived the half-count rule in
+    that sample. An accession with no us-gaap facts keeps its latest date.
+    """
+    latest = df.groupby("accession_number")["period_end"].max()
+    periods: dict[str, date] = {
+        str(acc): pe.date() for acc, pe in latest.items()
+    }
+    gaap = df[df["namespace"] == "us-gaap"]
+    counts = gaap.groupby(["accession_number", "period_end"]).size()
+    for acc, per_period in counts.groupby(level="accession_number"):
+        by_end = per_period.droplevel("accession_number")
+        qualifying = by_end[by_end * 2 >= by_end.max()]
+        periods[str(acc)] = max(qualifying.index).date()
+    return periods
+
+
 # ----------------------------------------------------------------------
 # EdgarAdapter implementation backed by the cache
 # ----------------------------------------------------------------------
@@ -815,6 +853,7 @@ class CachedEdgarAdapter(EdgarAdapter):
         df = df[df["form"].isin(form_types)]
         if df.empty:
             return []
+        periods = _report_periods(df)
         unique = df.drop_duplicates(subset=["accession_number"]).sort_values(
             "filed", ascending=False
         )
@@ -827,7 +866,7 @@ class CachedEdgarAdapter(EdgarAdapter):
                         cik=None,
                         form_type=str(row["form"]),
                         filing_date=row["filed"].date(),
-                        period_of_report=row["period_end"].date(),
+                        period_of_report=periods[str(row["accession_number"])],
                         accession_number=str(row["accession_number"]),
                     )
                 )

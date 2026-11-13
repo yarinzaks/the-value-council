@@ -1217,3 +1217,235 @@ class TestDebtWithZeroEvidence:
         cache = self._cache(tmp_path, [_fact(concept="Assets", value=5_000.0)])
         fetcher = self._fetcher(cache)
         assert fetcher._compute_total_debt("NC", self.AS_OF)[0] is None
+
+
+class TestInstantConceptsFollowTheNewestBalanceSheet:
+    """Audit FUND-6: a newer 10-Q balance sheet beats an older 10-K one.
+
+    Instant concepts were looked up with ``prefer_annual=True``, which
+    keeps 10-K facts whenever any exist. 50 of 182 holdings were read
+    from a balance sheet older than one already in the cache: AAPL's
+    2025-09-27 10-K over its 2025-12-27 10-Q, CALM's 2025-05-31 10-K
+    over its 2026-02-28 10-Q.
+    """
+
+    AS_OF = date(2026, 4, 15)
+
+    @staticmethod
+    def _instant(
+        concept: str,
+        value: float,
+        *,
+        form: str,
+        namespace: str = "us-gaap",
+        unit: str = "USD",
+    ) -> XbrlFact:
+        annual = form == "10-K"
+        return XbrlFact(
+            concept=concept,
+            namespace=namespace,
+            unit=unit,
+            value=value,
+            period_start=None,
+            period_end=date(2025, 5, 31) if annual else date(2026, 2, 28),
+            filed=date(2025, 7, 22) if annual else date(2026, 4, 1),
+            form=form,
+            fiscal_year=2025 if annual else 2026,
+            fiscal_period="FY" if annual else "Q3",
+            accession_number="acc-10k" if annual else "acc-10q",
+        )
+
+    def _fetcher(self, tmp_path: Path, *facts: XbrlFact) -> FundamentalsFetcher:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("CALM", list(facts))
+        return FundamentalsFetcher(cache=cache, client=None)
+
+    def test_newer_10q_balance_sheet_beats_older_10k(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant("Assets", 3_084_619_000.0, form="10-K"),
+            self._instant("Assets", 3_139_261_000.0, form="10-Q"),
+        )
+
+        fact = f.get_field("CALM", "total_assets", self.AS_OF)
+
+        assert fact is not None
+        assert fact.value == 3_139_261_000.0
+        assert fact.accession_number == "acc-10q"
+
+    def test_concept_tagged_only_in_the_10k_still_resolves(
+        self, tmp_path: Path
+    ) -> None:
+        """Failure mode: a 10-Q that omits a line must not blank it."""
+        f = self._fetcher(
+            tmp_path,
+            self._instant("Goodwill", 44_000_000.0, form="10-K"),
+            self._instant("Assets", 3_139_261_000.0, form="10-Q"),
+        )
+
+        fact = f.get_field("CALM", "goodwill", self.AS_OF)
+
+        assert fact is not None
+        assert fact.value == 44_000_000.0
+
+    def test_10q_not_yet_filed_is_not_seen(self, tmp_path: Path) -> None:
+        """Failure mode: preferring the newer filing must stay point-in-time."""
+        f = self._fetcher(
+            tmp_path,
+            self._instant("Assets", 3_084_619_000.0, form="10-K"),
+            self._instant("Assets", 3_139_261_000.0, form="10-Q"),
+        )
+
+        fact = f.get_field("CALM", "total_assets", date(2026, 3, 31))
+
+        assert fact is not None
+        assert fact.value == 3_084_619_000.0
+
+    def test_debt_follows_the_same_balance_sheet(self, tmp_path: Path) -> None:
+        """total_debt must not come from an older balance sheet than equity."""
+        f = self._fetcher(
+            tmp_path,
+            self._instant("LongTermDebt", 900.0, form="10-K"),
+            self._instant("LongTermDebt", 400.0, form="10-Q"),
+            self._instant("Assets", 3_139_261_000.0, form="10-Q"),
+        )
+
+        total, source = f._compute_total_debt("CALM", self.AS_OF)
+
+        assert total == 400.0
+        assert source == "rollup"
+
+    def test_cover_count_follows_the_newest_filing(self, tmp_path: Path) -> None:
+        f = self._fetcher(
+            tmp_path,
+            self._instant(
+                "EntityCommonStockSharesOutstanding", 48_497_480.0,
+                form="10-K", namespace="dei", unit="shares",
+            ),
+            self._instant(
+                "EntityCommonStockSharesOutstanding", 47_376_588.0,
+                form="10-Q", namespace="dei", unit="shares",
+            ),
+        )
+
+        fact = f.get_field("CALM", "shares_outstanding", self.AS_OF)
+
+        assert fact is not None
+        assert fact.value == 47_376_588.0
+
+
+class TestPeriodOfReport:
+    """Audit FUND-6: ``period_of_report`` was whichever row came first.
+
+    ``list_filings`` took the first row of each accession, which for CALM
+    was a cover-page fact: its 10-Q reported a period of 2026-04-01 (the
+    share-count date) and its 10-K 2024-11-29 (the public-float date).
+    """
+
+    @staticmethod
+    def _f(
+        concept: str,
+        period_end: date,
+        *,
+        namespace: str = "us-gaap",
+        accession: str = "acc-10q",
+        filed: date = date(2026, 4, 1),
+        form: str = "10-Q",
+    ) -> XbrlFact:
+        return XbrlFact(
+            concept=concept,
+            namespace=namespace,
+            unit="shares" if namespace == "dei" else "USD",
+            value=1.0,
+            period_start=None,
+            period_end=period_end,
+            filed=filed,
+            form=form,
+            fiscal_year=period_end.year,
+            fiscal_period="Q3",
+            accession_number=accession,
+        )
+
+    def _listed(self, tmp_path: Path, facts: list[XbrlFact]) -> dict[str, date | None]:
+        cache = EdgarCache(cache_dir=tmp_path)
+        cache.save_facts("CALM", facts)
+        adapter = CachedEdgarAdapter(
+            fetcher=FundamentalsFetcher(cache=cache, client=None)
+        )
+        return {
+            f.accession_number: f.period_of_report
+            for f in adapter.list_filings("CALM", form_types=("10-K", "10-Q"))
+        }
+
+    def test_cover_date_is_not_the_period(self, tmp_path: Path) -> None:
+        q3, ye = date(2026, 2, 28), date(2025, 5, 31)
+        listed = self._listed(
+            tmp_path,
+            [
+                self._f("EntityCommonStockSharesOutstanding", date(2026, 4, 1), namespace="dei"),
+                self._f("Assets", ye),
+                self._f("Liabilities", ye),
+                self._f("Assets", q3),
+                self._f("Liabilities", q3),
+                self._f("StockholdersEquity", q3),
+            ],
+        )
+
+        assert listed == {"acc-10q": q3}
+
+    def test_a_subsequent_event_fact_does_not_move_the_period(
+        self, tmp_path: Path
+    ) -> None:
+        """Edge: one fact dated after quarter-end, before filing.
+
+        Measured over 12,067 cached 10-K/10-Q accessions, the latest
+        us-gaap period end was a subsequent-event date in some filings
+        (XELB, NMHI, CNTM); a lone fact cannot outvote the statements.
+        """
+        q3 = date(2026, 2, 28)
+        listed = self._listed(
+            tmp_path,
+            [
+                self._f("Assets", q3),
+                self._f("Liabilities", q3),
+                self._f("StockholdersEquity", q3),
+                self._f("DebtInstrumentFaceAmount", date(2026, 3, 15)),
+            ],
+        )
+
+        assert listed == {"acc-10q": q3}
+
+    def test_10k_period_is_the_current_year_not_the_larger_comparative(
+        self, tmp_path: Path
+    ) -> None:
+        """Edge: a 10-K can tag a prior year slightly more often (VERI,
+        SEGG, KANP); the most common period alone picks the comparative."""
+        fy25, fy24 = date(2025, 5, 31), date(2024, 6, 1)
+
+        def k(concept: str, period_end: date) -> XbrlFact:
+            return self._f(
+                concept, period_end, accession="acc-10k", filed=date(2025, 7, 22), form="10-K"
+            )
+
+        listed = self._listed(
+            tmp_path,
+            [
+                k("Assets", fy24),
+                k("Liabilities", fy24),
+                k("StockholdersEquity", fy24),
+                k("Assets", fy25),
+                k("Liabilities", fy25),
+            ],
+        )
+
+        assert listed == {"acc-10k": fy25}
+
+    def test_filing_with_only_cover_facts_keeps_its_latest_date(
+        self, tmp_path: Path
+    ) -> None:
+        listed = self._listed(
+            tmp_path,
+            [self._f("EntityCommonStockSharesOutstanding", date(2026, 4, 1), namespace="dei")],
+        )
+
+        assert listed == {"acc-10q": date(2026, 4, 1)}
