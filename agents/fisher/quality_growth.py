@@ -37,11 +37,13 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict
 from core.llm.concurrency import analyze_all
 from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
+from . import exits as fisher_exits
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
@@ -123,6 +125,11 @@ class PhilipFisher(Strategy):
         self.decision_logger = decision_logger
         self.selection_history: list[FisherSelection] = []
         self.last_memos: list[FisherMemo] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.fisher.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -136,6 +143,15 @@ class PhilipFisher(Strategy):
         logger.info(
             f"{as_of}: starting Fisher quality-growth scan over "
             f"{len(universe)} candidates"
+        )
+        # First, so it is published even when nothing qualifies today —
+        # an empty screen is when a held name's verdict matters most.
+        self.last_exit_decisions = fisher_exits.verdicts(
+            held,
+            fundamentals,
+            cache=self.edgar_cache,
+            as_of=as_of,
+            max_de=self.max_de,
         )
 
         triples: list[
