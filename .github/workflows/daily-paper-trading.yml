@@ -500,8 +500,16 @@ jobs:
           # it, so a cloud build had no position price charts and no
           # sector donut. Everything here is small: 209 price series are
           # 2.4M in total and sectors.json is 4K.
+          # trades/ is the ledger: every executed sale with its price,
+          # realised P&L and, since the entry fields shipped, the date
+          # and cost of the position it closed. The runner has written
+          # it on every trading day since 2026-09-03 and this step never
+          # staged it, so not one executed row ever reached the repo —
+          # the only rows in data/trades are reconstructions and one
+          # hand-run catch-up. A dashboard built from this tree could
+          # not say which sale made what.
           git add data/portfolios data/decisions data/snapshots data/cron_logs \
-                  data/prices data/sectors.json data/council
+                  data/prices data/sectors.json data/council data/trades
           if git diff --cached --quiet; then
             echo "no data changes — nothing to commit"
             exit 0

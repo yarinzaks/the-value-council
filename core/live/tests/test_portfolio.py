@@ -155,6 +155,32 @@ class TestSell:
         assert p.cash == pytest.approx(cash_before_sell + gross - gross * DEFAULT_COST_BPS)
         assert len(p.positions) == 0
 
+    def test_a_sale_says_what_it_closed(self) -> None:
+        """The entry date and cost travel with the sale.
+
+        A sale that carries only its own price and profit has no
+        beginning: the ledger could say what a name made and never how
+        long it was held, so no page could draw it from entry to exit.
+        """
+        p = LivePortfolio(agent="test", cash=10_000)
+        bought = p.buy(
+            "AAPL", target_dollars=2_000, price=100, entry_date="2026-04-29",
+            why_en="", why_he="",
+        )
+        assert bought.entry_date is None and bought.entry_price is None
+        trade = p.sell("AAPL", price=110.0)
+        assert trade.entry_date == "2026-04-29"
+        assert trade.entry_price == pytest.approx(100.0)
+
+    def test_a_trim_keeps_the_original_entry(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        p.buy("AAPL", target_dollars=2_000, price=100, entry_date="2026-04-29",
+              why_en="", why_he="")
+        trade = p.sell("AAPL", price=110.0, shares=5)
+        assert trade.entry_date == "2026-04-29"
+        assert trade.entry_price == pytest.approx(100.0)
+        assert p.positions[0].entry_date == "2026-04-29"
+
     def test_sell_unknown_ticker_raises(self) -> None:
         p = LivePortfolio(agent="test")
         with pytest.raises(LivePortfolioError):

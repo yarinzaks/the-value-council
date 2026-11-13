@@ -17,6 +17,7 @@ import { LivePositionsTable } from "@/components/LivePositionsTable";
 import { ActionLog } from "@/components/ActionLog";
 import { buildActionLog } from "@/lib/action-log";
 import { AgentPerformanceChart } from "@/components/AgentPerformanceChart";
+import { buildClosedPositions, soldTickers } from "@/lib/past-positions";
 import { Term } from "@/components/Term";
 import {
   loadAgentLatest,
@@ -129,11 +130,15 @@ export default async function AgentDrillPage({
   // sector trends below already read, so the only new reads are the
   // benchmarks.
   const compareSeries = await (async () => {
+    // The names the ledger sold join the held ones: the past-positions
+    // view draws a closing from its entry past its exit, and the daily
+    // run publishes a series for every sold name since 2026-11-13.
     const tickers = [
       ...new Set([
         "SPY",
         "QQQ",
         ...(live?.positions ?? []).map((p) => p.ticker),
+        ...soldTickers(ledger),
       ]),
     ];
     const loaded = await Promise.all(
@@ -255,6 +260,7 @@ export default async function AgentDrillPage({
                 agentName={meta.display}
                 series={compareSeries}
                 holdings={(live?.positions ?? []).map((p) => p.ticker)}
+                closed={buildClosedPositions(ledger, live?.positions ?? [], compareSeries)}
               />
             </div>
           )}

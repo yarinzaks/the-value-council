@@ -27,6 +27,16 @@ Writing them as ordinary price files fixes that with the machinery
 already here, and the year-wide window means the comparison arrives
 with history behind it rather than starting from the day it shipped.
 
+The names an agent used to hold
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every ticker the ledger records a sale of is written too, so a closed
+position can be drawn from entry to exit and on past it — "what did it
+do after we sold" is the question a reader of that page asks first.
+The window opens a week before the earliest entry the ledger knows
+for that name when that is older than a year, so the holding itself
+is never cut off at the left edge.
+
 What it deliberately does not do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -47,12 +57,14 @@ chart line and nothing else.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
 
 from core.backtest.data_loader import PriceDataLoader
 from core.live.portfolio import LivePortfolio
+from core.live.trade_ledger import read_ledger
 from core.logger import get_logger
 from core.paths import DATA_ROOT
 
@@ -64,6 +76,20 @@ PRICES_DIR: Path = DATA_ROOT / "prices"
 #: range Schloss's entry condition speaks in, and keeps each file to a
 #: few hundred points.
 DEFAULT_WINDOW_DAYS: int = 365
+
+#: A ticker as the exchanges write one. The ledger is this project's own
+#: file, but a symbol from it becomes a filename below and an argument
+#: to a price fetch, and neither should accept whatever a file says.
+_TICKER = re.compile(r"[A-Z0-9][A-Z0-9.\-]{0,11}")
+
+#: The furthest back a sold name's window may open, whatever entry the
+#: ledger claims for it. Five years is longer than any book here.
+MAX_WINDOW_DAYS: int = 5 * 365
+
+#: How far before a closed position's entry its series starts, so the
+#: first days of the holding are drawn with a little context behind
+#: them rather than beginning at the left edge.
+ENTRY_LEAD_DAYS: int = 7
 
 #: Written alongside the held names so the performance chart can draw
 #: a comparison. SPY tracks the S&P 500 and QQQ the Nasdaq-100.
@@ -84,8 +110,14 @@ def export_prices(
     window_days: int = DEFAULT_WINDOW_DAYS,
     root: Path = PRICES_DIR,
     benchmarks: Sequence[str] = DEFAULT_BENCHMARKS,
+    ledger_dir: Path | None = None,
 ) -> int:
-    """Write ``{TICKER}.json`` for every held ticker, and the benchmarks.
+    """Write ``{TICKER}.json`` for every held or sold ticker, and the benchmarks.
+
+    ``ledger_dir`` is where the trade ledger lives; the names it records
+    a sale of are written beside the held ones. ``None`` means held
+    names only, which is what every caller before the closed-positions
+    page meant.
 
     Returns the number of files written. Each file is::
 
@@ -98,16 +130,34 @@ def export_prices(
     price_loader = loader or PriceDataLoader()
     held = {p.ticker for portfolio in portfolios for p in portfolio.positions}
     wanted_benchmarks = {b.upper() for b in benchmarks}
-    # A union, so a benchmark an agent happens to hold is fetched once.
-    tickers = sorted(held | wanted_benchmarks)
+    former = former_names(
+        [portfolio.agent for portfolio in portfolios], ledger_dir
+    )
+    # A union, so a name held by one agent and sold by another, or a
+    # benchmark an agent happens to hold, is fetched once.
+    tickers = sorted(held | wanted_benchmarks | set(former))
     if not tickers:
         return 0
 
     root.mkdir(parents=True, exist_ok=True)
-    start = as_of - timedelta(days=window_days)
+    default_start = as_of - timedelta(days=window_days)
+    floor = as_of - timedelta(days=MAX_WINDOW_DAYS)
+    # Only a name the daily run already cached is read for a sold
+    # position. A held name is cached by the run that holds it; a sold
+    # one may be delisted, and asking the network for a year of a dead
+    # symbol every day is the one thing this export promised not to do.
+    cached_range = getattr(price_loader, "cached_range", None)
     written = 0
     for ticker in tickers:
         is_benchmark = ticker in wanted_benchmarks
+        only_former = ticker in former and ticker not in held and not is_benchmark
+        if only_former and cached_range is not None and cached_range(ticker) is None:
+            logger.debug(f"price export {ticker}: sold, not cached; skipped")
+            continue
+        start = default_start
+        earliest = former.get(ticker)
+        if earliest is not None:
+            start = max(floor, min(start, earliest - timedelta(days=ENTRY_LEAD_DAYS)))
         try:
             df = price_loader.get_history(ticker, start=start, end=as_of)
         except Exception as exc:
@@ -141,9 +191,50 @@ def export_prices(
 
     logger.info(
         f"{as_of}: exported price series for {written}/{len(tickers)} tickers "
-        f"({len(held)} held, {len(benchmarks)} benchmark)"
+        f"({len(held)} held, {len(former)} formerly held, "
+        f"{len(benchmarks)} benchmark)"
     )
     return written
 
 
-__all__ = ["DEFAULT_WINDOW_DAYS", "PRICES_DIR", "export_prices"]
+def former_names(
+    agents: Sequence[str], ledger_dir: Path | None
+) -> dict[str, date | None]:
+    """Every ticker the ledgers record a sale of, with its earliest known
+    entry date — ``None`` when no row carries one, as the rows written
+    before the entry fields existed do not."""
+    if ledger_dir is None:
+        return {}
+    out: dict[str, date | None] = {}
+    for agent in agents:
+        for row in read_ledger(agent, directory=ledger_dir):
+            if row.side != "SELL":
+                continue
+            ticker = row.ticker.upper()
+            if not _TICKER.fullmatch(ticker):
+                logger.warning(f"ledger {agent}: ignoring symbol {row.ticker!r}")
+                continue
+            entered: date | None = None
+            if row.entry_date:
+                try:
+                    entered = date.fromisoformat(row.entry_date)
+                except ValueError:
+                    entered = None
+                # An entry after the sale is a corrupt row, not a date.
+                if entered is not None and entered > date.fromisoformat(row.date):
+                    entered = None
+            known = out.get(ticker)
+            if ticker not in out or (
+                entered is not None and (known is None or entered < known)
+            ):
+                out[ticker] = entered
+    return out
+
+
+__all__ = [
+    "DEFAULT_WINDOW_DAYS",
+    "ENTRY_LEAD_DAYS",
+    "PRICES_DIR",
+    "export_prices",
+    "former_names",
+]

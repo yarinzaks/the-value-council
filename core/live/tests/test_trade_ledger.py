@@ -28,12 +28,50 @@ AS_OF = date(2026, 8, 7)
 
 
 def _trade(ticker: str, side: str, *, shares: float = 10.0, price: float = 20.0,
-           realized: float = 0.0) -> TradeRecord:
+           realized: float = 0.0, entry_date: str | None = None,
+           entry_price: float | None = None) -> TradeRecord:
     return TradeRecord(
         ticker=ticker, side=side, shares=shares, price=price,
         gross_value=shares * price, cost_paid=shares * price * 0.001,
-        realized_pnl_usd=realized,
+        realized_pnl_usd=realized, entry_date=entry_date, entry_price=entry_price,
     )
+
+
+class TestASaleRemembersItsEntry:
+    """A sale without its entry has no beginning: the ledger could say
+    what a name made and never how long it was held or what it was
+    bought for, so no page could draw the position from entry to exit."""
+
+    def test_the_entry_survives_the_round_trip(self, tmp_path: Path) -> None:
+        record_day("g", AS_OF, [_trade("TASK", "SELL", price=32.72, realized=280.8,
+                                       entry_date="2026-05-12", entry_price=21.02)],
+                   directory=tmp_path)
+        (got,) = read_ledger("g", directory=tmp_path)
+        assert got.entry_date == "2026-05-12"
+        assert got.entry_price == pytest.approx(21.02)
+
+    def test_a_buy_carries_none_and_writes_none(self, tmp_path: Path) -> None:
+        record_day("g", AS_OF, [_trade("TASK", "BUY")], directory=tmp_path)
+        raw = json.loads(next((tmp_path / "g").glob("*.json")).read_text())
+        assert "entry_date" not in raw[0] and "entry_price" not in raw[0]
+        (got,) = read_ledger("g", directory=tmp_path)
+        assert got.entry_date is None and got.entry_price is None
+
+    def test_a_row_written_before_the_field_existed_reads_as_unknown(self) -> None:
+        """Not as "bought the same day"."""
+        old = LedgerEntry.from_dict({
+            "date": "2026-05-06", "agent": "g", "ticker": "RIGL", "side": "SELL",
+            "shares": 19, "price": 28.09, "gross_value": 533.71, "cost_paid": 0,
+            "realized_pnl_usd": 0, "source": "reconstructed",
+        })
+        assert old.entry_date is None and old.entry_price is None
+
+    def test_a_zero_entry_price_is_kept_not_dropped(self) -> None:
+        """Zero is a value; only None is unknown."""
+        e = LedgerEntry(date="2026-05-06", agent="g", ticker="X", side="SELL",
+                        shares=1, price=1, gross_value=1, cost_paid=0,
+                        realized_pnl_usd=1, entry_date="2026-05-01", entry_price=0.0)
+        assert LedgerEntry.from_dict(e.to_dict()).entry_price == 0.0
 
 
 class TestRecordingADay:

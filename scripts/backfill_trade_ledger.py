@@ -25,7 +25,10 @@ two differently. A reconstruction presented as a record would be worse
 than no reconstruction, because it would look complete.
 
 Recorded days are never overwritten. Once the runner has written a day,
-that day is exact and this script leaves it alone.
+that day is exact and this script leaves it alone. A day this script
+wrote earlier is its own to rewrite, and ``--refresh-reconstructed``
+does so — the first reconstruction predates the ledger's entry fields,
+so every row it left is a sale with no beginning.
 """
 
 from __future__ import annotations
@@ -104,16 +107,56 @@ def reconstruct(agent: str) -> dict[str, list[LedgerEntry]]:
                             cost_paid=0.0,
                             realized_pnl_usd=(exit_price - held["entry_price"]) * sold,
                             source="reconstructed",
+                            # The book knew when and at what cost it
+                            # opened the line; a reconstruction can
+                            # carry that even though it cannot carry
+                            # the execution price.
+                            entry_date=held.get("entry_date") or None,
+                            entry_price=held.get("entry_price"),
                         )
                     )
         previous = book
     return by_day
 
 
+def _all_reconstructed(path) -> bool:
+    """Whether every row in a ledger day is this script's own work."""
+    try:
+        rows = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    return bool(rows) and all(r.get("source") == "reconstructed" for r in rows)
+
+
+def write_days(root, agent: str, by_day: dict[str, list[LedgerEntry]],
+               *, refresh_reconstructed: bool = False) -> tuple[int, int]:
+    """Write the reconstructed days. Returns (written, kept).
+
+    A day the runner recorded is exact and is never touched. A day this
+    script wrote before is overwritten only when asked, because the
+    first reconstruction predates the entry fields.
+    """
+    written = kept = 0
+    for day, entries in sorted(by_day.items()):
+        path = root / agent / f"{day}.json"
+        if path.exists() and not (
+            refresh_reconstructed and _all_reconstructed(path)
+        ):
+            kept += 1
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps([e.to_dict() for e in entries], indent=1))
+        written += 1
+    return written, kept
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true",
                         help="Write the files. Without it, nothing is written.")
+    parser.add_argument("--refresh-reconstructed", action="store_true",
+                        help="Rewrite days this script wrote before; recorded "
+                             "days are still kept.")
     parser.add_argument("--agent", action="append", default=None,
                         help="Limit to one agent; repeatable.")
     args = parser.parse_args(argv)
@@ -133,17 +176,10 @@ def main(argv: list[str] | None = None) -> int:
         grand += realized
         written = skipped = 0
         if args.apply:
-            for day, entries in sorted(by_day.items()):
-                path = root / agent / f"{day}.json"
-                if path.exists():
-                    # Recorded by the runner: exact, and not ours to touch.
-                    skipped += 1
-                    continue
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(
-                    json.dumps([e.to_dict() for e in entries], indent=1)
-                )
-                written += 1
+            written, skipped = write_days(
+                root, agent, by_day,
+                refresh_reconstructed=args.refresh_reconstructed,
+            )
         status = (
             f"wrote {written}, kept {skipped} recorded" if args.apply else "dry run"
         )

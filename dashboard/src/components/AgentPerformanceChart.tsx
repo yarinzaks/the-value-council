@@ -38,6 +38,8 @@ import {
   type SeriesPoint,
 } from "@/lib/compare-series";
 import { useUI } from "./Providers";
+import { PastPositionsPanel } from "./PastPositionsPanel";
+import type { ClosedPosition } from "@/lib/past-positions";
 import type { DailySnapshot, NavRow } from "@/lib/types";
 
 // ---- types --------------------------------------------------------------
@@ -52,7 +54,7 @@ type Period = "1W" | "1M" | "3M" | "ALL";
  *  an axis, and the answer to "did this beat the market, and which
  *  name carried it".
  */
-type Mode = "nav" | "compare";
+type Mode = "nav" | "compare" | "past";
 
 /** The book's own line in the comparison view. Not a ticker, so it
  *  cannot collide with one. */
@@ -91,6 +93,9 @@ interface Props {
   /** Held tickers in book order, so the selector reads like the
    *  position table above it rather than alphabetically. */
   holdings?: string[];
+  /** The positions the agent sold, newest exit first, for the third
+   *  view. See lib/past-positions. */
+  closed?: ClosedPosition[];
 }
 
 // ---- helpers ------------------------------------------------------------
@@ -117,6 +122,7 @@ export function AgentPerformanceChart({
   agentName,
   series = {},
   holdings = [],
+  closed = [],
 }: Props) {
   const { locale, t } = useUI();
   const [period, setPeriod] = useState<Period>("1M");
@@ -285,7 +291,7 @@ export function AgentPerformanceChart({
         </h3>
         <div className="flex items-center gap-2 flex-wrap">
         <div className="flex gap-1 bg-council-100 dark:bg-council-800 rounded-full p-1">
-          {(["nav", "compare"] as Mode[]).map((m) => (
+          {(["nav", "compare", "past"] as Mode[]).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
@@ -300,12 +306,17 @@ export function AgentPerformanceChart({
                 ? locale === "he"
                   ? "שווי"
                   : "Value"
-                : locale === "he"
-                  ? "השוואה"
-                  : "Compare"}
+                : m === "compare"
+                  ? locale === "he"
+                    ? "השוואה"
+                    : "Compare"
+                  : t("past_mode")}
             </button>
           ))}
         </div>
+        {/* A closed position sets its own window — entry to today — so
+            the period pills have nothing to choose. */}
+        {mode !== "past" && (
         <div className="flex gap-1 bg-council-100 dark:bg-council-800 rounded-full p-1">
           {periods.map((p) => (
             <button
@@ -322,6 +333,7 @@ export function AgentPerformanceChart({
             </button>
           ))}
         </div>
+        )}
         </div>
       </div>
 
@@ -400,7 +412,15 @@ export function AgentPerformanceChart({
       )}
 
       {/* Chart */}
-      {mode === "compare" ? (
+      {mode === "past" ? (
+        <PastPositionsPanel
+          closed={closed}
+          series={series}
+          snapshots={snapshots}
+          agentColor={agentColor}
+          agentName={agentName}
+        />
+      ) : mode === "compare" ? (
         <div className="h-72 w-full" dir="ltr">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
