@@ -24,6 +24,7 @@ from typing import Any
 
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
+from core.market_calendar import next_trading_day, sessions_between
 
 logger = get_logger("core.live.portfolio")
 
@@ -47,6 +48,13 @@ DEFAULT_COST_BPS: float = 0.0
 #: already persists, so a round-trip through JSON is lossless. Six
 #: places on a $10,000 book is sub-cent precision.
 SHARE_PRECISION: int = 6
+
+#: Sessions a held name may go without a bar before it is flagged
+#: unpriced. Five matches the price loader's carry-forward bound
+#: (``MAX_CARRY_FORWARD_DAYS``): past it the loader already refuses to
+#: quote the name, so the mark is the last close and nothing newer.
+#: Counted in sessions so a long weekend never trips it.
+UNPRICED_AFTER_SESSIONS: int = 5
 
 from core.paths import portfolios_dir as _portfolios_dir
 
@@ -74,6 +82,20 @@ class Position:
     weight_pct: float = 0.0
     why_en: str = ""
     why_he: str = ""
+    #: The first session this name had no bar, as an ISO date, once it
+    #: has gone more than :data:`UNPRICED_AFTER_SESSIONS` without one.
+    #: Empty while the name is priced.
+    #:
+    #: ``current_price`` keeps the last close when no bar arrives, which
+    #: is right for NAV over a halt and wrong as a silent state: LEG was
+    #: acquired on 2026-08-26 and sat in Klarman's book at its last
+    #: close for 78 days with nothing saying the number referred to a
+    #: listing that no longer existed (audit CE-1a). The runner sets
+    #: this and logs at ERROR every run it stays set; the dashboard
+    #: shows it; the post-run verifier fails a run that leaves an
+    #: unpriced holding without it. It does not change NAV — what the
+    #: holding is worth is a decision about evidence, not a default.
+    unpriced_since: str = ""
 
     @property
     def market_value(self) -> float:
@@ -593,6 +615,7 @@ class LivePortfolio:
                 weight_pct=float(p.get("weight_pct", 0.0)),
                 why_en=str(p.get("why_en", "")),
                 why_he=str(p.get("why_he", "")),
+                unpriced_since=str(p.get("unpriced_since", "")),
             )
             for p in data.get("positions", [])
         ]
@@ -733,11 +756,35 @@ def today_iso() -> str:
     return date.today().isoformat()
 
 
+def unpriced_since_for(
+    last_bar: date | None, *, as_of: date, entry_date: str
+) -> str:
+    """When a holding became unpriced, or ``""`` while it still prices.
+
+    ``last_bar`` is the newest bar the price cache holds for the name,
+    ``None`` when it holds none. Unpriced means more than
+    :data:`UNPRICED_AFTER_SESSIONS` sessions after that bar up to and
+    including ``as_of``; the answer is then the first session with no
+    bar. A name with no bar at all has never been priced from the cache
+    and is unpriced since it was bought (or since ``as_of`` when even
+    the entry date is missing).
+
+    One function, so the runner that sets the flag and the verifier
+    that checks for it apply the same rule.
+    """
+    if last_bar is None:
+        return entry_date or as_of.isoformat()
+    if sessions_between(last_bar, as_of) <= UNPRICED_AFTER_SESSIONS:
+        return ""
+    return next_trading_day(last_bar).isoformat()
+
+
 __all__ = [
     "DEFAULT_COMMISSION_USD",
     "DEFAULT_COST_BPS",
     "DEFAULT_INITIAL_CASH",
     "DEFAULT_PORTFOLIO_DIR",
+    "UNPRICED_AFTER_SESSIONS",
     "LivePortfolio",
     "LivePortfolioError",
     "Position",
@@ -745,4 +792,5 @@ __all__ = [
     "WatchEntry",
     "now_iso",
     "today_iso",
+    "unpriced_since_for",
 ]

@@ -18,8 +18,10 @@ from core.market_calendar import (
     easter_sunday,
     half_days,
     is_trading_day,
+    next_trading_day,
     observed,
     previous_trading_day,
+    sessions_between,
     why_closed,
 )
 
@@ -169,3 +171,39 @@ class TestPreviousTradingDay:
 
     def test_thanksgiving_falls_back_to_the_wednesday(self) -> None:
         assert previous_trading_day(date(2026, 11, 26)) == date(2026, 11, 25)
+
+
+class TestSessionsBetween:
+    """How many sessions a held name has gone without a bar.
+
+    Counted in sessions, not calendar days, because the unpriced flag
+    (audit CE-1a) must not fire across a long weekend and must fire
+    after a week of trading with no print.
+    """
+
+    def test_it_counts_sessions_after_the_bar_through_the_day(self) -> None:
+        # Bar on Tue 28 July; Wed 29 through Wed 5 August is six sessions.
+        assert sessions_between(date(2026, 7, 28), date(2026, 8, 5)) == 6
+
+    def test_a_holiday_is_not_a_session(self) -> None:
+        # Thu 2 July to Tue 7 July: Fri 3 July is shut, so Mon and Tue.
+        assert sessions_between(date(2026, 7, 2), date(2026, 7, 7)) == 2
+
+    def test_the_same_day_is_zero(self) -> None:
+        assert sessions_between(date(2026, 8, 5), date(2026, 8, 5)) == 0
+
+    def test_a_bar_after_the_day_is_zero_not_negative(self) -> None:
+        assert sessions_between(date(2026, 8, 6), date(2026, 8, 5)) == 0
+
+
+class TestNextTradingDay:
+    def test_it_steps_over_a_holiday_and_a_weekend(self) -> None:
+        # Fri 3 July 2026 is shut, then the weekend.
+        assert next_trading_day(date(2026, 7, 2)) == date(2026, 7, 6)
+
+    def test_it_is_strictly_after(self) -> None:
+        assert next_trading_day(date(2026, 10, 28)) == date(2026, 10, 29)
+
+    def test_from_a_sunday(self) -> None:
+        # LEG's recorded entry date, 2026-08-16, is a Sunday.
+        assert next_trading_day(date(2026, 8, 16)) == date(2026, 8, 17)

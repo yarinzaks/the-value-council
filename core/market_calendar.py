@@ -212,6 +212,32 @@ def previous_trading_day(day: date) -> date:
     raise ValueError(f"no trading day in the fortnight before {day}")
 
 
+def next_trading_day(day: date) -> date:
+    """The first session strictly after ``day``."""
+    probe = day + timedelta(days=1)
+    for _ in range(14):
+        if is_trading_day(probe):
+            return probe
+        probe += timedelta(days=1)
+    raise ValueError(f"no trading day in the fortnight after {day}")
+
+
+def sessions_between(after: date, through: date) -> int:
+    """Sessions strictly after ``after`` up to and including ``through``.
+
+    Zero when ``through`` is not later than ``after``. Counts sessions
+    rather than calendar days so that "how long has this holding gone
+    without a bar" does not grow over a long weekend.
+    """
+    count = 0
+    probe = after + timedelta(days=1)
+    while probe <= through:
+        if is_trading_day(probe):
+            count += 1
+        probe += timedelta(days=1)
+    return count
+
+
 __all__ = [
     "EARLY_CLOSE_HOUR",
     "REGULAR_CLOSE",
@@ -222,8 +248,10 @@ __all__ = [
     "half_days",
     "is_trading_day",
     "last_weekday",
+    "next_trading_day",
     "nth_weekday",
     "observed",
     "previous_trading_day",
+    "sessions_between",
     "why_closed",
 ]

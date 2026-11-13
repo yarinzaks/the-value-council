@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -10,11 +11,13 @@ import pytest
 from core.live.portfolio import (
     DEFAULT_COMMISSION_USD,
     DEFAULT_INITIAL_CASH,
+    UNPRICED_AFTER_SESSIONS,
     LivePortfolio,
     LivePortfolioError,
     Position,
     WatchEntry,
     now_iso,
+    unpriced_since_for,
 )
 
 
@@ -701,3 +704,95 @@ class TestConsolidate:
         p.consolidate("X")
 
         assert p.total_nav == pytest.approx(before)
+
+
+# ---------------------------------------------------------------------------
+# Unpriced holdings (audit CE-1a / PD-09 / SF-X4)
+# ---------------------------------------------------------------------------
+class TestUnpricedSince:
+    """When a held name has gone long enough without a bar to be flagged.
+
+    LEG sat in Klarman's book at its 26 August close for 78 days, marked
+    every run, with nothing anywhere saying the number referred to a
+    company that no longer listed. The rule is one place so the runner
+    that sets the flag and the verifier that checks it cannot disagree.
+    """
+
+    AS_OF = date(2026, 8, 5)  # a Wednesday
+
+    def test_the_threshold_is_five_sessions(self) -> None:
+        assert UNPRICED_AFTER_SESSIONS == 5
+
+    def test_six_sessions_without_a_bar_is_unpriced_from_the_first_missing_one(
+        self,
+    ) -> None:
+        # Last bar Tue 28 July; 29 July is the first session with none.
+        assert (
+            unpriced_since_for(
+                date(2026, 7, 28), as_of=self.AS_OF, entry_date="2026-07-01"
+            )
+            == "2026-07-29"
+        )
+
+    def test_five_sessions_is_not_yet_unpriced(self) -> None:
+        # A long weekend plus a vendor hiccup must not raise the alarm.
+        assert (
+            unpriced_since_for(
+                date(2026, 7, 29), as_of=self.AS_OF, entry_date="2026-07-01"
+            )
+            == ""
+        )
+
+    def test_no_bar_ever_is_unpriced_since_entry(self) -> None:
+        assert (
+            unpriced_since_for(None, as_of=self.AS_OF, entry_date="2026-07-01")
+            == "2026-07-01"
+        )
+
+    def test_no_bar_and_no_entry_date_falls_back_to_the_run_date(self) -> None:
+        assert (
+            unpriced_since_for(None, as_of=self.AS_OF, entry_date="")
+            == "2026-08-05"
+        )
+
+
+class TestUnpricedPersistence:
+    def test_the_flag_round_trips(self, tmp_path: Path) -> None:
+        p = LivePortfolio(agent="seth_klarman")
+        p.positions.append(
+            Position(
+                ticker="LEG",
+                shares=17.0,
+                entry_price=9.66,
+                entry_date="2026-08-16",
+                current_price=9.2,
+                unpriced_since="2026-08-27",
+            )
+        )
+        p.save(directory=tmp_path)
+
+        raw = json.loads((tmp_path / "seth_klarman.json").read_text())
+        assert raw["positions"][0]["unpriced_since"] == "2026-08-27"
+        loaded = LivePortfolio.load_or_seed("seth_klarman", directory=tmp_path)
+        assert loaded.positions[0].unpriced_since == "2026-08-27"
+
+    def test_a_book_written_before_the_flag_reads_as_priced(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "old.json").write_text(
+            json.dumps(
+                {
+                    "agent": "old",
+                    "positions": [
+                        {
+                            "ticker": "KO",
+                            "shares": 1,
+                            "entry_price": 60.0,
+                            "entry_date": "2026-05-05",
+                        }
+                    ],
+                }
+            )
+        )
+        loaded = LivePortfolio.load_or_seed("old", directory=tmp_path)
+        assert loaded.positions[0].unpriced_since == ""

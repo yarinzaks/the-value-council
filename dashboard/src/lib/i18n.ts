@@ -393,6 +393,12 @@ const en: Dict = {
   mark_stale: "Last traded",
   mark_stale_help:
     "This price comes from the last bar the market produced for this symbol, not from today's run. The symbol may have been renamed, delisted or suspended — check before acting on the quote.",
+  unpriced: "Unpriced since",
+  unpriced_help:
+    "No market price for over five sessions. The value shown is the last close, carried forward; the holding cannot be sold without a price and stays in the book until it is settled from the company's filings.",
+  unpriced_banner_title: "Unpriced holdings",
+  unpriced_banner_body:
+    "{n} holding(s) have had no market price for over five sessions and are counted in NAV at their last close ({value}). That number may no longer refer to anything tradable.",
   days_ago: "{n} days ago",
   stale_warning:
     "⚠️ Data not refreshed in over 24 hours — check the daily runner.",
@@ -781,6 +787,12 @@ const he: Dict = {
   mark_stale: "נסחר לאחרונה",
   mark_stale_help:
     "המחיר הזה מגיע מהנר האחרון שהשוק ייצר לסימבול הזה, לא מהריצה של היום. ייתכן שהסימבול שונה, נמחק מהמסחר או הושעה — בדוק לפני שאתה פועל לפי הציטוט.",
+  unpriced: "ללא מחיר מאז",
+  unpriced_help:
+    "אין מחיר שוק כבר יותר מחמישה ימי מסחר. הערך המוצג הוא סגירת המסחר האחרונה, שנגררת קדימה; אי אפשר למכור את האחזקה בלי מחיר, והיא נשארת בתיק עד שתסולק לפי הדיווחים של החברה.",
+  unpriced_banner_title: "אחזקות ללא מחיר",
+  unpriced_banner_body:
+    "ל-{n} אחזקות אין מחיר שוק כבר יותר מחמישה ימי מסחר, והן נספרות בשווי התיק לפי סגירת המסחר האחרונה ({value}). ייתכן שהמספר הזה כבר לא מתייחס לשום דבר סחיר.",
   days_ago: "לפני {n} ימים",
   stale_warning:
     "⚠️ נתונים לא מעודכנים מעל 24 שעות — בדוק את הסריקה היומית.",

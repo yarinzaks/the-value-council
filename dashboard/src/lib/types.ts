@@ -171,6 +171,11 @@ export interface LivePosition {
   weight_pct: number;
   why_en: string;
   why_he: string;
+  /** First session with no bar, once the name has gone more than five
+   *  sessions without one; empty while it prices. The mark is then the
+   *  last close and nothing newer (audit CE-1a). Optional: absent from
+   *  every file written before the field existed. */
+  unpriced_since?: string;
 }
 
 export interface LiveWatchEntry {

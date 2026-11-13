@@ -8,6 +8,7 @@ that no longer existed.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -62,8 +63,14 @@ class _StubPriceLoader:
     asks for a settled close rather than re-reading the morning quote.
     """
 
-    def __init__(self, prices: dict[str, float | None]) -> None:
+    def __init__(
+        self,
+        prices: dict[str, float | None],
+        *,
+        last_bars: dict[str, date] | None = None,
+    ) -> None:
         self._prices = prices
+        self._last_bars = last_bars or {}
         self.calls: list[tuple[str, date, bool]] = []
 
     def get_price_on(
@@ -71,6 +78,14 @@ class _StubPriceLoader:
     ) -> float | None:
         self.calls.append((ticker, as_of, force_refresh))
         return self._prices.get(ticker)
+
+    def cached_range(self, ticker: str) -> tuple[date, date] | None:
+        """The newest cached bar, as the real loader reports it.
+
+        None — no history at all — unless the test names a last bar.
+        """
+        last = self._last_bars.get(ticker)
+        return None if last is None else (date(2020, 1, 2), last)
 
 
 def _target(ticker: str, *, weight: float = 0.5, rank: int = 1) -> LiveTarget:
@@ -2610,3 +2625,144 @@ class TestARebalanceIsRecorded:
         assert stated_shares == pytest.approx(ledger[0].shares)
         assert stated_price == pytest.approx(ledger[0].price)
         assert ledger[0].shares == pytest.approx(result.trades[0].shares)
+
+
+# ---------------------------------------------------------------------------
+# Unpriced holdings (audit CE-1a / PD-09 / SF-X4)
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def errors() -> Iterator[list[str]]:
+    """Every ERROR-level message the runner logs while the test runs.
+
+    The project logs through loguru, which pytest's caplog never sees.
+    """
+    from loguru import logger as loguru_logger
+
+    seen: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: seen.append(m.record["message"]), level="ERROR"
+    )
+    try:
+        yield seen
+    finally:
+        loguru_logger.remove(sink_id)
+
+
+class TestUnpricedHoldingsAreFlagged:
+    """A held name with no bar for more than five sessions is flagged.
+
+    LEG was acquired on 26 August 2026 and stopped printing. The runner
+    refused, correctly, to sell it at a dead quote, and mark_to_market
+    kept its last close — so for 78 days the book carried it at $9.20,
+    priced every run, with nothing on the position, in the log or on the
+    dashboard saying the number referred to nothing.
+    """
+
+    def test_held_name_without_bar_for_6_sessions_is_flagged_not_marked(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "LEG", entry_price=9.66, current_price=9.20
+        )
+        # Last bar Tue 28 July; AS_OF Wed 5 August is the sixth session
+        # without one.
+        runner.price_loader = _StubPriceLoader(  # type: ignore[assignment]
+            {"LEG": None}, last_bars={"LEG": date(2026, 7, 28)}
+        )
+        adapter = _StubAdapter("stub_agent", [])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["LEG"],
+            {"LEG": None},
+            {"LEG": None},
+        )
+
+        pos = result.portfolio.positions[0]
+        assert pos.unpriced_since == "2026-07-29"
+        # Not re-marked: the last close stays, and is now labelled.
+        assert pos.current_price == pytest.approx(9.20)
+        assert any("LEG" in m for m in errors)
+        # And the flag is what reaches disk, where the dashboard reads it.
+        saved = LivePortfolio.load_or_seed(
+            "stub_agent", directory=runner.portfolio_dir
+        )
+        assert saved.positions[0].unpriced_since == "2026-07-29"
+
+    def test_five_sessions_without_a_bar_is_not_yet_flagged(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "LATE", entry_price=50.0, current_price=50.0
+        )
+        runner.price_loader = _StubPriceLoader(  # type: ignore[assignment]
+            {"LATE": None}, last_bars={"LATE": date(2026, 7, 29)}
+        )
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", []),  # type: ignore[arg-type]
+            AS_OF,
+            ["LATE"],
+            {"LATE": None},
+            {"LATE": None},
+        )
+
+        assert result.portfolio.positions[0].unpriced_since == ""
+        assert errors == []
+
+    def test_a_fresh_price_clears_the_flag(self, runner: DailyRunner) -> None:
+        p = _seed_holding(
+            runner, "stub_agent", "BACK", entry_price=50.0, current_price=50.0
+        )
+        p.positions[0].unpriced_since = "2026-07-20"
+        p.save(directory=runner.portfolio_dir)
+        runner.price_loader = _StubPriceLoader({"BACK": 52.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", []),  # type: ignore[arg-type]
+            AS_OF,
+            ["BACK"],
+            {"BACK": 52.0},
+            {"BACK": None},
+        )
+
+        pos = result.portfolio.positions[0]
+        assert pos.unpriced_since == ""
+        assert pos.current_price == pytest.approx(52.0)
+
+    def test_a_name_with_no_history_at_all_is_flagged_from_entry(
+        self, runner: DailyRunner
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "GHOST", entry_price=5.0, current_price=5.0
+        )
+        runner.price_loader = _StubPriceLoader({"GHOST": None})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", []),  # type: ignore[arg-type]
+            AS_OF,
+            ["GHOST"],
+            {"GHOST": None},
+            {"GHOST": None},
+        )
+
+        assert result.portfolio.positions[0].unpriced_since == "2026-07-01"
+
+    def test_the_close_mark_flags_too(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "LEG", entry_price=9.66, current_price=9.20
+        )
+        runner.price_loader = _StubPriceLoader(  # type: ignore[assignment]
+            {"LEG": None}, last_bars={"LEG": date(2026, 7, 28)}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        pos = results[0].portfolio.positions[0]
+        assert pos.unpriced_since == "2026-07-29"
+        assert pos.current_price == pytest.approx(9.20)
+        assert any("LEG" in m for m in errors)

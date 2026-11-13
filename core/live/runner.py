@@ -101,6 +101,7 @@ from core.live.portfolio import (
     TradeRecord,
     WatchEntry,
     now_iso,
+    unpriced_since_for,
 )
 from core.live.price_export import export_prices
 from core.live.sector_export import export_sectors
@@ -858,6 +859,7 @@ class DailyRunner:
                         )
                         fresh[t] = None
                 portfolio.mark_to_market(fresh)
+                self._flag_unpriced(portfolio, fresh, as_of)
                 stamp = now_iso()
                 portfolio.last_updated = stamp
                 portfolio.last_close_run = stamp
@@ -1050,6 +1052,7 @@ class DailyRunner:
                     pos.ticker, as_of
                 )
         portfolio.mark_to_market(held_prices)
+        self._flag_unpriced(portfolio, held_prices, as_of)
 
         # The agent sees what it owns. Without this every doctrine
         # inherited the same exit rule — "sold because you left today's
@@ -1698,6 +1701,52 @@ class DailyRunner:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _flag_unpriced(
+        self,
+        portfolio: LivePortfolio,
+        prices: dict[str, float | None],
+        as_of: date,
+    ) -> None:
+        """Flag every holding that has gone too long without a bar.
+
+        ``mark_to_market`` keeps the last close when no price arrives,
+        and the sell loop refuses to sell without one, both correctly.
+        Together they left LEG — acquired 2026-08-26 — in Klarman's book
+        at its last close for 78 days with nothing anywhere saying so
+        (audit CE-1a). Now the position carries ``unpriced_since`` and
+        the run says so at ERROR, every run, until a bar returns or the
+        holding is settled by hand. NAV is not touched: what a holding
+        with no market is worth needs evidence, not a default.
+
+        A fresh price clears the flag. The bar date comes from the
+        price cache, which is what the post-run verifier reads too.
+        """
+        for pos in portfolio.positions:
+            price = prices.get(pos.ticker)
+            if price is not None and price > 0:
+                if pos.unpriced_since:
+                    logger.info(
+                        f"{as_of}: {portfolio.agent} {pos.ticker} priced again "
+                        f"after being unpriced since {pos.unpriced_since}"
+                    )
+                pos.unpriced_since = ""
+                continue
+            cached = self.price_loader.cached_range(pos.ticker)
+            last_bar = cached[1] if cached is not None else None
+            since = unpriced_since_for(
+                last_bar, as_of=as_of, entry_date=pos.entry_date
+            )
+            if not since:
+                continue
+            pos.unpriced_since = since
+            logger.error(
+                f"{as_of}: {portfolio.agent} holds {pos.ticker} UNPRICED since "
+                f"{since} (last bar {last_bar or 'never'}); carried at its last "
+                f"mark ${pos.current_price:.2f} x {pos.shares:g} sh. It cannot "
+                f"be sold without a price - settle it from the filings "
+                f"(scripts/settle_cash_merger.py for a cash deal)."
+            )
+
     def _fetch_prices(
         self, tickers: list[str], as_of: date
     ) -> dict[str, float | None]:
