@@ -30,6 +30,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from types import ModuleType
 
 import numpy as np
 import pandas as pd
@@ -127,6 +128,21 @@ MIN_BASIS_OVERLAP = 3
 #: quarterly dividend under ~0.1% of the price is below it and ignored.
 BASIS_RTOL = 1e-3
 
+#: Key under which :meth:`PriceDataLoader._fetch_yfinance` attaches the
+#: ticker's full dividend history to the price frame's ``attrs``.
+#:
+#: Audit CE-3c. Dividends used to come only from the ``Dividends`` column
+#: of a price fetch, so an ex-date reached the table only if some fetch
+#: window happened to contain it, and bars already cached are never
+#: refetched. That left permanent holes — ACN had no row between
+#: 2025-07-10 and 2026-04-09, AGO none between 2025-05-16 and 2026-03-06
+#: — and a hole inside a holding window is a payment the live book never
+#: receives. The full history is one extra request, read at most once a
+#: calendar day per ticker (the ``dividend_history_sync`` table), and it
+#: is on the vendor's current basis, the same basis
+#: :meth:`PriceDataLoader._restate_basis` puts the cached prices on.
+DIVIDEND_HISTORY_ATTR = "dividend_history"
+
 
 class PriceDataError(ValueCouncilError):
     """Raised when price data cannot be retrieved."""
@@ -176,6 +192,13 @@ CREATE TABLE IF NOT EXISTS dividends (
     PRIMARY KEY (ticker, ex_date)
 );
 CREATE INDEX IF NOT EXISTS idx_dividends_ticker ON dividends(ticker);
+
+-- The last calendar day each ticker's full dividend history was read,
+-- so the extra request is made at most once a day per ticker.
+CREATE TABLE IF NOT EXISTS dividend_history_sync (
+    ticker      TEXT PRIMARY KEY,
+    synced_on   TEXT NOT NULL    -- ISO YYYY-MM-DD
+);
 
 -- Symbols yfinance has no series for, so a screen stops re-asking.
 -- ``through`` is the end of the window that came back empty: a hit only
@@ -290,29 +313,67 @@ class PriceDataLoader:
         df.index.name = "date"
         return df
 
+    @staticmethod
+    def _today() -> date:
+        """Today's date; a method so tests can pin it."""
+        return date.today()
+
+    def _dividend_history_synced(self, ticker: str) -> bool:
+        """Has ``ticker``'s full dividend history been read today?"""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT synced_on FROM dividend_history_sync WHERE ticker = ?",
+                (ticker.upper(),),
+            ).fetchone()
+        return row is not None and row[0] == self._today().isoformat()
+
     def _write_dividends(self, ticker: str, df: pd.DataFrame) -> int:
-        """Persist any non-zero Dividends column rows from a fetch."""
-        if df.empty or "Dividends" not in df.columns:
+        """Persist a fetch's dividends: its window and its full history.
+
+        The ``Dividends`` column covers only the fetched window. When
+        :meth:`_fetch_yfinance` also attached the ticker's full history
+        (``df.attrs[DIVIDEND_HISTORY_ATTR]``), every ex-date in it is
+        written too, and replaces a window row for the same date — both
+        are the vendor's figure on its current basis. Zero and missing
+        amounts are skipped in both.
+        """
+        if df.empty:
             return 0
         ticker = ticker.upper()
-        rows = []
-        for idx, value in df["Dividends"].items():
-            amount = _f(value)
-            if amount is None or amount <= 0:
-                continue
-            d = idx.date() if isinstance(idx, pd.Timestamp) else idx
-            rows.append((ticker, d.isoformat(), amount))
-        if not rows:
-            return 0
+        by_date: dict[str, float] = {}
+        sources: list[pd.Series] = []
+        if "Dividends" in df.columns:
+            sources.append(df["Dividends"])
+        history = df.attrs.get(DIVIDEND_HISTORY_ATTR)
+        if isinstance(history, pd.Series):
+            sources.append(history)
+        for series in sources:
+            for idx, value in series.items():
+                amount = _f(value)
+                if amount is None or amount <= 0:
+                    continue
+                # A tz-aware stamp (midnight New York) keeps its local
+                # calendar date; .date() does not convert to UTC.
+                d = idx.date() if isinstance(idx, pd.Timestamp) else idx
+                by_date[d.isoformat()] = amount
         with self._connect() as conn:
-            conn.executemany(
-                """
-                INSERT OR REPLACE INTO dividends (ticker, ex_date, amount)
-                VALUES (?, ?, ?)
-                """,
-                rows,
-            )
-        return len(rows)
+            if by_date:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO dividends (ticker, ex_date, amount)
+                    VALUES (?, ?, ?)
+                    """,
+                    [(ticker, d, a) for d, a in by_date.items()],
+                )
+            if isinstance(history, pd.Series):
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO dividend_history_sync (ticker, synced_on)
+                    VALUES (?, ?)
+                    """,
+                    (ticker, self._today().isoformat()),
+                )
+        return len(by_date)
 
     def dividends_between(
         self,
@@ -1007,7 +1068,40 @@ class PriceDataLoader:
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
 
+        # The window's Dividends column misses every ex-date outside it;
+        # attach the full history so _write_dividends can fill the
+        # table regardless of which windows were ever fetched (CE-3c).
+        if not self._dividend_history_synced(ticker):
+            history = self._fetch_dividend_history(yf, ticker)
+            if history is not None:
+                df.attrs[DIVIDEND_HISTORY_ATTR] = history
+
         return df
+
+    @staticmethod
+    def _fetch_dividend_history(yf: ModuleType, ticker: str) -> pd.Series | None:
+        """The ticker's full cash-dividend history, or None if unavailable.
+
+        A failure here never fails the price fetch: the window's own
+        ``Dividends`` column is still written, and because nothing is
+        recorded as synced the history is asked for again on the next
+        fetch.
+        """
+        try:
+            series = yf.Ticker(ticker).dividends
+        except Exception as exc:  # yfinance raises network, HTTP and parse errors alike
+            logger.warning(
+                f"{ticker}: full dividend history unavailable ({exc}) — "
+                f"only the dividends inside the fetched window are recorded"
+            )
+            return None
+        if not isinstance(series, pd.Series):
+            logger.warning(
+                f"{ticker}: dividend history came back as "
+                f"{type(series).__name__}, not a series — ignored"
+            )
+            return None
+        return series
 
 
 def _f(value: object) -> float | None:

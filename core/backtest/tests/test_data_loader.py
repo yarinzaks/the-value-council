@@ -7,9 +7,12 @@ file. Live yfinance fetches are tested separately with the
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 from datetime import date, timedelta
+from itertools import pairwise
 from pathlib import Path
+from typing import ClassVar
 
 import pandas as pd
 import pytest
@@ -1042,3 +1045,186 @@ class TestOneAdjustmentBasisPerTicker:
         bar = self._row(loader, "2025-06-04")
         assert bar["close"] == pytest.approx(71.0)
         assert bar["volume"] == 1000
+
+
+class TestFullDividendHistory:
+    """Audit CE-3c: the dividend table must not depend on fetch windows.
+
+    Dividends were only ever written from the ``Dividends`` column of a
+    price fetch, so an ex-date was recorded only if some fetch window
+    happened to contain it. Bars cached without their dividends leave a
+    permanent hole: ACN had none between 2025-07-10 and 2026-04-09, AGO
+    none between 2025-05-16 and 2026-03-06, and nothing refetches bars
+    the cache already covers. A hole inside a holding window is a
+    payment the live book never receives.
+
+    These tests stub the ``yfinance`` module itself rather than
+    ``_fetch_yfinance``, because the fix lives in that method.
+    """
+
+    EX_DATES = ("2025-11-14", "2026-02-13", "2026-05-15", "2026-08-14", "2026-11-06")
+    AMOUNT = 0.40
+    ENTRY = date(2026, 2, 2)
+    AS_OF = date(2026, 11, 10)
+
+    class _Ticker:
+        """Stands in for ``yfinance.Ticker``; counts history requests."""
+
+        calls: ClassVar[list[str]] = []
+        dividends_value: ClassVar[object] = None
+        error: ClassVar[Exception | None] = None
+
+        def __init__(self, ticker: str) -> None:
+            self._ticker = ticker
+
+        @property
+        def dividends(self) -> object:
+            cls = type(self)
+            cls.calls.append(self._ticker)
+            error = cls.error
+            if error is not None:
+                raise error
+            return cls.dividends_value
+
+    @classmethod
+    def _schedule(cls) -> pd.Series:
+        # yfinance returns ex-dates at midnight New York time.
+        index = pd.DatetimeIndex(list(cls.EX_DATES)).tz_localize("America/New_York")
+        return pd.Series([cls.AMOUNT] * len(cls.EX_DATES), index=index, name="Dividends")
+
+    @classmethod
+    def _download(cls, ticker: str, start: str, end: str, **_: object) -> pd.DataFrame:
+        # ``end`` is exclusive, as in yfinance.
+        days = pd.bdate_range(start, pd.Timestamp(end) - pd.Timedelta(days=1))
+        ex = {pd.Timestamp(d) for d in cls.EX_DATES}
+        return pd.DataFrame(
+            {
+                "Open": 50.0,
+                "High": 50.5,
+                "Low": 49.5,
+                "Close": 50.0,
+                "Adj Close": 50.0,
+                "Volume": 1000,
+                "Dividends": [cls.AMOUNT if d in ex else 0.0 for d in days],
+            },
+            index=days,
+        )
+
+    @pytest.fixture
+    def vendor(self, monkeypatch: pytest.MonkeyPatch) -> type[_Ticker]:
+        import yfinance
+
+        ticker_cls = self._Ticker
+        monkeypatch.setattr(ticker_cls, "calls", [])
+        monkeypatch.setattr(ticker_cls, "dividends_value", self._schedule())
+        monkeypatch.setattr(ticker_cls, "error", None)
+        monkeypatch.setattr(yfinance, "download", self._download)
+        monkeypatch.setattr(yfinance, "Ticker", ticker_cls)
+        return ticker_cls
+
+    @staticmethod
+    def _cache_without_dividends(loader: PriceDataLoader) -> None:
+        # Bars already cached with no dividend rows — the ACN/AGO state.
+        days = pd.bdate_range("2026-01-02", "2026-10-30")
+        loader._write_cache(
+            "QTR",
+            pd.DataFrame(
+                {
+                    "Open": 50.0, "High": 50.5, "Low": 49.5, "Close": 50.0,
+                    "Adj Close": 50.0, "Volume": 1000,
+                },
+                index=days,
+            ),
+        )
+
+    def test_quarterly_payer_has_no_gap_over_110_days_in_holding_window(
+        self, tmp_path: Path, vendor: type[_Ticker]
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        self._cache_without_dividends(loader)
+
+        # The live close-of-day mark: a short refresh window.
+        loader.get_price_on("QTR", self.AS_OF, force_refresh=True)
+
+        paid = loader.dividends_between("QTR", self.ENTRY, self.AS_OF)
+        edges = [self.ENTRY] + [d for d, _ in paid] + [self.AS_OF]
+        gaps = [(b - a).days for a, b in pairwise(edges)]
+        assert max(gaps) <= 110, (paid, gaps)
+        assert [d.isoformat() for d, _ in paid] == list(self.EX_DATES[1:])
+        assert all(a == pytest.approx(self.AMOUNT) for _, a in paid)
+
+    def test_ex_dates_keep_their_new_york_calendar_date(
+        self, tmp_path: Path, vendor: type[_Ticker]
+    ) -> None:
+        # Converting the midnight-New-York stamps through UTC would still
+        # land on the same day; converting them to naive UTC-minus-anything
+        # would move every ex-date back one day and break idempotency
+        # against the window column's rows.
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+
+        loader.get_history("QTR", date(2026, 11, 2), date(2026, 11, 10))
+
+        with sqlite3.connect(tmp_path / "p.sqlite") as conn:
+            rows = conn.execute(
+                "SELECT ex_date FROM dividends WHERE ticker = 'QTR' ORDER BY ex_date"
+            ).fetchall()
+        assert [r[0] for r in rows] == list(self.EX_DATES)
+
+    def test_history_endpoint_failure_keeps_the_price_fetch_and_window_dividend(
+        self, tmp_path: Path, vendor: type[_Ticker], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        vendor.error = RuntimeError("429 Too Many Requests")
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+
+        df = loader.get_history("QTR", date(2026, 11, 2), date(2026, 11, 10))
+
+        assert not df.empty
+        paid = loader.dividends_between("QTR", date(2025, 1, 1), self.AS_OF)
+        assert [d for d, _ in paid] == [date(2026, 11, 6)]
+        assert paid[0][1] == pytest.approx(self.AMOUNT)
+        # Not recorded as synced, so the next fetch asks again.
+        loader.get_history("QTR", date(2026, 11, 2), date(2026, 11, 10), force_refresh=True)
+        assert len(vendor.calls) == 2
+
+    def test_a_non_series_answer_is_ignored(
+        self, tmp_path: Path, vendor: type[_Ticker]
+    ) -> None:
+        vendor.dividends_value = None
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+
+        loader.get_history("QTR", date(2026, 11, 2), date(2026, 11, 10))
+
+        paid = loader.dividends_between("QTR", date(2025, 1, 1), self.AS_OF)
+        assert [d for d, _ in paid] == [date(2026, 11, 6)]
+        assert paid[0][1] == pytest.approx(self.AMOUNT)
+
+    def test_history_is_read_at_most_once_a_day_per_ticker(
+        self, tmp_path: Path, vendor: type[_Ticker], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+        today = [date(2026, 11, 10)]
+        monkeypatch.setattr(loader, "_today", lambda: today[0])
+
+        for _ in range(3):
+            loader.get_history(
+                "QTR", date(2026, 11, 2), date(2026, 11, 10), force_refresh=True
+            )
+        assert len(vendor.calls) == 1
+
+        today[0] = date(2026, 11, 11)
+        loader.get_history("QTR", date(2026, 11, 2), date(2026, 11, 10), force_refresh=True)
+        assert len(vendor.calls) == 2
+
+    def test_zero_and_missing_amounts_in_the_history_are_skipped(
+        self, tmp_path: Path, vendor: type[_Ticker]
+    ) -> None:
+        schedule = self._schedule()
+        schedule.iloc[0] = 0.0
+        schedule.iloc[1] = float("nan")
+        vendor.dividends_value = schedule
+        loader = PriceDataLoader(cache_path=tmp_path / "p.sqlite")
+
+        loader.get_history("QTR", date(2026, 11, 2), date(2026, 11, 10))
+
+        paid = loader.dividends_between("QTR", date(2025, 1, 1), self.AS_OF)
+        assert [d.isoformat() for d, _ in paid] == list(self.EX_DATES[2:])
