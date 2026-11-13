@@ -71,6 +71,7 @@ from core.data.fundamentals_fetcher import (
 )
 from core.data.news_service import NewsService
 from core.live.agent_adapter import (
+    RUNNER_BAND,
     AgentAdapter,
     BuffettLive,
     DremanLive,
@@ -168,11 +169,75 @@ def pos_age_days(pos: Position, as_of: date) -> int | None:
     return max(0, (as_of - entry).days)
 
 
+def band_for(adapter: object, *, default: float) -> float | None:
+    """The rebalance band ``adapter``'s doctrine declares.
+
+    An adapter that declares none, or declares :data:`RUNNER_BAND`,
+    gets ``default`` — the runner's band. ``None`` is passed through: a
+    doctrine that never trims to rebalance (audit SF-X3). Anything else
+    must be a non-negative number; a malformed declaration raises
+    rather than trading on a band nobody meant.
+    """
+    band = getattr(adapter, "rebalance_band", RUNNER_BAND)
+    if band is None:
+        return None
+    if isinstance(band, str) and band == RUNNER_BAND:
+        return default
+    if isinstance(band, bool) or not isinstance(band, int | float) or not band >= 0:
+        raise ValueError(
+            f"{getattr(adapter, 'name', adapter)!r}: rebalance_band must be "
+            f"None, {RUNNER_BAND!r} or a number >= 0; got {band!r}"
+        )
+    return float(band)
+
+
+def max_weight_for(adapter: object) -> float | None:
+    """``adapter``'s per-name cap as a fraction of the book, or ``None``.
+
+    Declared in percent (``max_position_pct``, as the playbooks state
+    it); returned as a weight. A cap outside (0, 100] raises.
+    """
+    pct = getattr(adapter, "max_position_pct", None)
+    if pct is None:
+        return None
+    if isinstance(pct, bool) or not isinstance(pct, int | float) or not 0 < pct <= 100:
+        raise ValueError(
+            f"{getattr(adapter, 'name', adapter)!r}: max_position_pct must be "
+            f"in (0, 100]; got {pct!r}"
+        )
+    return float(pct) / 100.0
+
+
+def _check_max_weight(max_weight: float | None) -> None:
+    if max_weight is not None and not 0.0 < max_weight <= 1.0:
+        raise ValueError(f"max_weight must be in (0, 1]; got {max_weight}")
+
+
+def _capped(
+    targets: list[LiveTarget], max_weight: float | None
+) -> list[LiveTarget]:
+    """``targets`` with every weight above ``max_weight`` lowered to it."""
+    if max_weight is None:
+        return targets
+    out: list[LiveTarget] = []
+    for t in targets:
+        if t.weight > max_weight:
+            logger.info(
+                f"{t.ticker} capped at {max_weight:.1%} of the book from "
+                f"{t.weight:.1%}; the difference stays cash"
+            )
+            t = replace(t, weight=max_weight)
+        out.append(t)
+    return out
+
+
 def reachable_targets(
     targets: Sequence[LiveTarget],
     prices: dict[str, float | None],
     nav: float,
     held: frozenset[str] = frozenset(),
+    *,
+    max_weight: float | None = None,
 ) -> list[LiveTarget]:
     """``targets`` reduced to the names this book can hold a share of.
 
@@ -203,11 +268,20 @@ def reachable_targets(
     stays in cash. That is the honest outcome for a small book pointed
     at a list of expensive names, and the agents it happens to should
     show it rather than have it modelled away.
+
+    ``max_weight`` is the doctrine's largest single name (audit SF-X5).
+    No weight leaves this function above it — neither the strategy's
+    own nor one lifted by a drop — and the excess stays cash: Graham
+    told he may hold 10% of a name does not hold 20% because only five
+    names passed. Reach is judged against the capped slot, so a share
+    the cap cannot hold is dropped rather than kept on the list as a
+    buy that never happens.
     """
+    _check_max_weight(max_weight)
     priced = [t for t in targets if (prices.get(t.ticker) or 0.0) > 0.0]
     invested = sum(t.weight for t in priced)
     if not priced or nav <= 0 or invested <= 0:
-        return list(priced)
+        return _capped(list(priced), max_weight)
 
     kept = list(priced)
     while True:
@@ -220,7 +294,10 @@ def reachable_targets(
             if t.ticker in held:
                 continue
             price = prices[t.ticker] or 0.0
-            slot = nav * t.weight * scale
+            weight = t.weight * scale
+            if max_weight is not None:
+                weight = min(weight, max_weight)
+            slot = nav * weight
             if slot <= 0 or price <= slot:
                 continue
             ratio = price / slot
@@ -240,8 +317,8 @@ def reachable_targets(
 
     scale = invested / sum(t.weight for t in kept)
     if scale == 1.0:
-        return kept
-    return [replace(t, weight=t.weight * scale) for t in kept]
+        return _capped(kept, max_weight)
+    return _capped([replace(t, weight=t.weight * scale) for t in kept], max_weight)
 
 
 def commission_dominates(trade_value: float, *, commission: float) -> bool:
@@ -303,6 +380,7 @@ def plan_whole_share_buys(
     cost_bps: float,
     commission: float,
     band: float,
+    max_weight: float | None = None,
 ) -> dict[str, int]:
     """How many whole shares of each target to buy, decided in one pass.
 
@@ -335,7 +413,12 @@ def plan_whole_share_buys(
     share. Each slot carries its own commission, and the plan as a whole
     never spends more than ``cash``: every trade it implies can be
     placed in full, in any order.
+
+    ``max_weight`` is the doctrine's per-name cap (audit SF-X5). Slots
+    are no larger than it and a top-up may not carry a name past it,
+    however much band is left.
     """
+    _check_max_weight(max_weight)
     per_share: dict[str, float] = {}
     for t in targets:
         price = prices.get(t.ticker) or 0.0
@@ -344,8 +427,14 @@ def plan_whole_share_buys(
     if not per_share or nav <= 0 or cash <= 0:
         return {}
 
-    slots = {t.ticker: nav * t.weight for t in targets if t.ticker in per_share}
+    slots = {
+        t.ticker: nav * (t.weight if max_weight is None else min(t.weight, max_weight))
+        for t in targets
+        if t.ticker in per_share
+    }
     ceiling = {tk: slot * (1.0 + band) for tk, slot in slots.items()}
+    if max_weight is not None:
+        ceiling = {tk: min(c, nav * max_weight) for tk, c in ceiling.items()}
 
     shares: dict[str, int] = {}
     spent = 0.0
@@ -1334,11 +1423,19 @@ class DailyRunner:
         # feeds the rebalance pass — sizing and the band have to agree
         # on what a target weight is, or the band spends every run
         # trimming a position the sizing pass deliberately widened.
+        #
+        # The doctrine's own band and per-name cap (audit SF-X3, SF-X5).
+        # A doctrine that never trims still sizes its entries against
+        # the runner's band: overshooting a slot it will never trim back
+        # would be permanent.
+        band = band_for(adapter, default=self.rebalance_band)
+        max_weight = max_weight_for(adapter)
         scan.targets = reachable_targets(
             scan.targets,
             prices,
             nav_after_sells,
             held=frozenset(pos.ticker for pos in portfolio.positions),
+            max_weight=max_weight,
         )
         # Then decide the share count for every new name together, so
         # the remainder one slot cannot round up becomes a share in the
@@ -1357,7 +1454,8 @@ class DailyRunner:
             ),
             cost_bps=self.cost_bps,
             commission=self.commission,
-            band=self.rebalance_band,
+            band=self.rebalance_band if band is None else band,
+            max_weight=max_weight,
         )
         for target in scan.targets:
             if portfolio.has(target.ticker):
@@ -1413,7 +1511,9 @@ class DailyRunner:
 
         # ---- REBALANCE: pull drifted holdings back toward target ------
         trades.extend(
-            self._rebalance(portfolio, scan.targets, prices, as_of, adapter.name)
+            self._rebalance(
+                portfolio, scan.targets, prices, as_of, adapter.name, band=band
+            )
         )
 
         # Re-mark after trades and refresh weights.
@@ -1659,6 +1759,8 @@ class DailyRunner:
         prices: dict[str, float | None],
         as_of: date,
         agent: str,
+        *,
+        band: float | None,
     ) -> list[TradeRecord]:
         """Pull holdings that drifted outside the band back to target.
 
@@ -1672,11 +1774,17 @@ class DailyRunner:
         that left is handled by the exit path. Trims are executed before
         adds so the cash from a trim is available to fund an add in the
         same pass.
+
+        ``band`` is the doctrine's (see :func:`band_for`). ``None`` never
+        trims: an overweight name is left to run, and an underweight one
+        is still topped up at the runner's band (audit SF-X3).
         """
         if not targets:
             return []
 
-        band = self.rebalance_band
+        trims_allowed = band is not None
+        if band is None:
+            band = self.rebalance_band
         nav = portfolio.total_nav
         if nav <= 0:
             return []
@@ -1703,6 +1811,9 @@ class DailyRunner:
             if delta < MIN_TRADE_USD:
                 continue
             if drift > 0:
+                if not trims_allowed:
+                    # The doctrine lets a winner run (Lynch §6.4).
+                    continue
                 if delta < price:
                     # Less than one share of drift. Trimming would need a
                     # fraction, and leaving it is what a real book does.

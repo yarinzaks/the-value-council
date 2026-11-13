@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any
+from typing import Any, Final, Literal
 
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
@@ -55,6 +55,10 @@ logger = get_logger("core.live.agent_adapter")
 
 # Default watchlist size — names ranked just below the buy threshold.
 DEFAULT_WATCHLIST_SIZE: int = 30
+
+#: An adapter whose ``rebalance_band`` is this takes the band the runner
+#: was built with. Distinct from ``None``, which means "never trim".
+RUNNER_BAND: Final = "runner"
 
 
 @dataclass(frozen=True)
@@ -140,6 +144,26 @@ class AgentAdapter:
     #: run type that may not open, which would be a doctrine change
     #: wearing the clothes of a bug fix.
     honours_run_types: bool = False
+
+    #: How far a held name may drift above or below its target weight,
+    #: as a fraction of the target, before the runner resizes it.
+    #:
+    #: :data:`RUNNER_BAND` (the default) is the runner's one band for
+    #: everyone. ``None`` is a doctrine that never trims a position to
+    #: rebalance: the runner leaves an overweight name alone and still
+    #: tops up an underweight one at its own band. Audit SF-X3 — Lynch's
+    #: playbook forbids the trim, and the runner-wide 25% band cut his
+    #: EXEL winner while the book held fifteen losers.
+    rebalance_band: float | Literal["runner"] | None = RUNNER_BAND
+
+    #: The doctrine's largest single name, in percent of the book.
+    #:
+    #: ``None`` is no cap beyond the weights the strategy states. A cap
+    #: lowers any target weight above it — the strategy's own or one the
+    #: whole-share pass would lift — and the excess stays cash. Audit
+    #: SF-X5 — with no cap, Graham held five names at 15.8-20.9% and
+    #: Schloss five at 11.7-25.9%.
+    max_position_pct: float | None = None
 
     def __init__(
         self,
@@ -281,6 +305,9 @@ class GreenblattLive(AgentAdapter):
 class SchlossLive(AgentAdapter):
     name = "walter_schloss"
 
+    #: Playbook §6.3: "Never more than 5% in any single name".
+    max_position_pct = 5.0
+
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
         self.entry_trigger = "P/B drops into Schloss bargain range"
@@ -333,6 +360,10 @@ class SchlossLive(AgentAdapter):
 # --------------------------------------------------------------------------
 class GrahamLive(AgentAdapter):
     name = "benjamin_graham"
+
+    #: Playbook §6.1: "No single position exceeds 10% of portfolio
+    #: value". Inherited by the second cohort, which is the same class.
+    max_position_pct = 10.0
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
@@ -561,6 +592,10 @@ class BuffettLive(AgentAdapter):
 
 class LynchLive(AgentAdapter):
     name = "peter_lynch"
+
+    #: Playbook §6.4: a winner whose thesis is playing out is not
+    #: trimmed "to rebalance" — "let it run".
+    rebalance_band = None
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
@@ -814,6 +849,7 @@ class PabraiLive(AgentAdapter):
 
 
 __all__ = [
+    "RUNNER_BAND",
     "AgentAdapter",
     "BuffettLive",
     "DremanLive",

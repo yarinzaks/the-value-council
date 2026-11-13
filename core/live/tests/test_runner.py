@@ -3064,3 +3064,232 @@ class TestFundamentalsFreshnessGate:
         runner.run_mark_to_market(as_of=AS_OF)
 
         assert snaps[0].fundamentals_stale is None  # type: ignore[attr-defined]
+
+
+class _DoctrineAdapter(_StubAdapter):
+    """A stub that declares the doctrine's band and per-name cap, the
+    way the real adapters do (audit SF-X3 / SF-X5)."""
+
+    def __init__(
+        self,
+        name: str,
+        targets: list[LiveTarget],
+        *,
+        rebalance_band: float | str | None = "runner",
+        max_position_pct: float | None = None,
+    ) -> None:
+        super().__init__(name, targets)
+        self.rebalance_band = rebalance_band
+        self.max_position_pct = max_position_pct
+
+
+class TestTheDoctrineOwnsTheBandAndTheCap:
+    """Audit SF-X3: the 25% band trimmed Lynch's EXEL winner while the
+    book held fifteen losers, against playbook §6.4. Audit SF-X5:
+    ``reachable_targets`` handed unreachable weight to the survivors
+    until Graham held five names at 15.8-20.9% (cap 10%) and Schloss
+    five at 11.7-25.9% (cap 5%)."""
+
+    def _winner_book(self, runner: DailyRunner, *, price: float) -> None:
+        # 50 shares bought at $100, $5,000 cash beside them.
+        p = LivePortfolio(agent="stub_agent", cash=5_000.0)
+        p.last_rebalance_date = "2026-08-03"
+        p.positions.append(
+            Position(
+                ticker="EXEL",
+                shares=50.0,
+                entry_price=100.0,
+                entry_date="2026-07-01",
+                current_price=price,
+            )
+        )
+        p.save(directory=runner.portfolio_dir)
+
+    def _run_lynch(self, runner: DailyRunner, price: float) -> AgentRunResult:
+        from core.live.agent_adapter import LynchLive
+
+        adapter = _DoctrineAdapter(
+            "stub_agent",
+            [_target("EXEL", weight=0.5)],
+            rebalance_band=LynchLive.rebalance_band,
+        )
+        runner.price_loader = _StubPriceLoader({"EXEL": price})  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["EXEL"],
+            {"EXEL": price},
+            {"EXEL": None},
+        )
+
+    def test_lynch_winner_is_not_trimmed_by_band(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 x $300 = $15,000 of a $20,000 book against a 50% target:
+        # +50% drift, which the runner-wide band trims by 16 shares.
+        self._winner_book(runner, price=300.0)
+
+        result = self._run_lynch(runner, 300.0)
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.positions[0].shares == 50.0
+
+    def test_a_band_of_none_still_tops_up_an_underweight_name(
+        self, runner: DailyRunner
+    ) -> None:
+        """``None`` forbids the trim and nothing else: an underweight
+        position is still added to at the runner's band."""
+        # 50 x $20 = $1,000 against $5,000 cash: -67% drift.
+        self._winner_book(runner, price=20.0)
+
+        result = self._run_lynch(runner, 20.0)
+
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert len(buys) == 1 and buys[0].ticker == "EXEL"
+
+    def test_graham_with_5_reachable_names_holds_50_percent_cash_not_20_percent_each(
+        self, runner: DailyRunner
+    ) -> None:
+        # Graham's equal weights over five names are 20% each; his
+        # playbook allows 10%. The other half stays cash.
+        tickers = ["G1", "G2", "G3", "G4", "G5"]
+        prices: dict[str, float | None] = dict.fromkeys(tickers, 45.0)
+        adapter = _DoctrineAdapter(
+            "stub_agent",
+            [_target(t, weight=0.2, rank=i + 1) for i, t in enumerate(tickers)],
+            max_position_pct=10.0,
+        )
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        runner_book = _not_a_rebalance_book()
+        runner_book.save(directory=runner.portfolio_dir)
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            tickers,
+            prices,
+            dict.fromkeys(tickers),
+        )
+
+        book = result.portfolio
+        assert {p.ticker for p in book.positions} == set(tickers)
+        for pos in book.positions:
+            assert pos.weight_pct <= 10.0, f"{pos.ticker} at {pos.weight_pct:.2f}%"
+        assert book.cash / book.total_nav * 100.0 >= 50.0
+
+    def test_a_held_name_above_the_cap_is_trimmed_toward_it(
+        self, runner: DailyRunner
+    ) -> None:
+        """The live consequence: Graham's existing 20% positions are
+        trimmed to the cap, and the proceeds stay in cash."""
+        p = LivePortfolio(agent="stub_agent", cash=6_000.0)
+        p.last_rebalance_date = "2026-08-03"
+        for ticker in ("G1", "G2"):
+            p.positions.append(
+                Position(
+                    ticker=ticker,
+                    shares=40.0,
+                    entry_price=50.0,
+                    entry_date="2026-07-01",
+                    current_price=50.0,
+                )
+            )
+        p.save(directory=runner.portfolio_dir)
+        prices: dict[str, float | None] = {"G1": 50.0, "G2": 50.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        adapter = _DoctrineAdapter(
+            "stub_agent",
+            [_target("G1", weight=0.5), _target("G2", weight=0.5, rank=2)],
+            max_position_pct=10.0,
+        )
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["G1", "G2"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        sells = sorted(t.ticker for t in result.trades if t.side == "SELL")
+        assert sells == ["G1", "G2"]
+        assert [t for t in result.trades if t.side == "BUY"] == []
+        book = result.portfolio
+        one_share_pct = 50.0 / book.total_nav * 100.0
+        for pos in book.positions:
+            assert pos.weight_pct == pytest.approx(10.0, abs=one_share_pct)
+        assert book.cash / book.total_nav * 100.0 >= 79.0
+
+    def test_a_cap_lowers_a_weight_the_drop_would_lift(self) -> None:
+        """The excess of a redistributed weight stays cash."""
+        targets = [_target("A", weight=0.08), _target("DEAR", weight=0.08, rank=2)]
+        kept = reachable_targets(
+            targets, {"A": 10.0, "DEAR": 5_000.0}, nav=10_000.0, max_weight=0.10
+        )
+        assert [t.ticker for t in kept] == ["A"]
+        assert kept[0].weight == pytest.approx(0.10)
+
+    def test_a_cap_lowers_the_strategys_own_weight(self) -> None:
+        targets = [_target("A", weight=0.2), _target("B", weight=0.2, rank=2)]
+        kept = reachable_targets(
+            targets, {"A": 10.0, "B": 10.0}, nav=10_000.0, max_weight=0.05
+        )
+        assert [t.weight for t in kept] == pytest.approx([0.05, 0.05])
+
+    def test_a_name_the_capped_slot_cannot_hold_is_dropped(self) -> None:
+        """Reach is judged against the capped slot. Uncapped, a 50% slot
+        of $10,000 holds a $1,500 share; at Graham's 10% it cannot, and
+        keeping the name would reserve posture for a buy that never
+        happens."""
+        targets = [_target("A", weight=0.5), _target("DEAR", weight=0.5, rank=2)]
+        kept = reachable_targets(
+            targets, {"A": 10.0, "DEAR": 1_500.0}, nav=10_000.0, max_weight=0.10
+        )
+        assert [t.ticker for t in kept] == ["A"]
+        assert kept[0].weight == pytest.approx(0.10)
+
+    def test_a_cap_outside_zero_to_one_is_refused(self) -> None:
+        targets = [_target("A", weight=0.5)]
+        for bad in (0.0, -0.1, 1.5):
+            with pytest.raises(ValueError, match="max_weight"):
+                reachable_targets(
+                    targets, {"A": 10.0}, nav=10_000.0, max_weight=bad
+                )
+
+    def test_a_top_up_never_carries_a_position_past_the_cap(self) -> None:
+        """The residue pass may top a slot up by the band, but not past
+        the doctrine's cap: 12 x $40 fills a $500 slot, and a 13th share
+        ($520) would be 5.2% of a 5% name."""
+        from core.live.runner import plan_whole_share_buys
+
+        kwargs = {
+            "nav": 10_000.0,
+            "cash": 10_000.0,
+            "cost_bps": 0.0,
+            "commission": 2.50,
+            "band": 0.25,
+        }
+        targets = [_target("X", weight=0.05)]
+        uncapped = plan_whole_share_buys(targets, {"X": 40.0}, **kwargs)
+        capped = plan_whole_share_buys(
+            targets, {"X": 40.0}, max_weight=0.05, **kwargs
+        )
+        assert uncapped == {"X": 13}
+        assert capped == {"X": 12}
+
+    def test_an_adapter_band_or_cap_out_of_range_is_refused(self) -> None:
+        from core.live.runner import band_for, max_weight_for
+
+        assert band_for(_DoctrineAdapter("a", []), default=0.25) == 0.25
+        assert band_for(_StubAdapter("a", []), default=0.25) == 0.25
+        assert band_for(_DoctrineAdapter("a", [], rebalance_band=None), default=0.25) is None
+        assert band_for(_DoctrineAdapter("a", [], rebalance_band=0.1), default=0.25) == 0.1
+        assert max_weight_for(_StubAdapter("a", [])) is None
+        assert max_weight_for(_DoctrineAdapter("a", [], max_position_pct=5.0)) == 0.05
+        with pytest.raises(ValueError, match="rebalance_band"):
+            band_for(_DoctrineAdapter("a", [], rebalance_band=-0.1), default=0.25)
+        with pytest.raises(ValueError, match="rebalance_band"):
+            band_for(_DoctrineAdapter("a", [], rebalance_band="wide"), default=0.25)
+        for bad in (0.0, 150.0):
+            with pytest.raises(ValueError, match="max_position_pct"):
+                max_weight_for(_DoctrineAdapter("a", [], max_position_pct=bad))
