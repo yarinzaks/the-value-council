@@ -272,6 +272,30 @@ class GreenblattLive(AgentAdapter):
                     score=s,
                 )
             )
+        # A holding inside the one-year hold that no longer scores today
+        # (no filing, no price, filtered out) still owns its slot in
+        # ``weights``. Dropped here, the runner read it as having left
+        # the list and sold it — CRMD, 177 days in (audit item 17).
+        emitted = {t.ticker for t in out}
+        for ticker, weight in weights.items():
+            if ticker in emitted:
+                continue
+            out.append(
+                LiveTarget(
+                    ticker=ticker,
+                    weight=weight,
+                    rank=len(out) + 1,
+                    why_en=(
+                        "Inside Greenblatt's one-year holding period; no Magic "
+                        "Formula score today, so the position is held, not re-ranked."
+                    ),
+                    why_he=(
+                        "בתוך תקופת ההחזקה של שנה לפי גרינבלט; אין היום ציון "
+                        "בפורמולה הקסומה, ולכן הפוזיציה מוחזקת ולא מדורגת מחדש."
+                    ),
+                    score=None,
+                )
+            )
         return out
 
     def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:

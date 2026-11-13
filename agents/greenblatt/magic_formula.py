@@ -197,9 +197,18 @@ class MagicFormula(Strategy):
         )
         if self.decision_logger is not None:
             self._log_decisions(as_of, top, scores, prices)
+        # ``top`` is empty when every chosen slot is a protected holding
+        # that did not score; indexing it raised IndexError and cost the
+        # agent the run (audit RK-08, 2026-11-12).
+        best = (
+            f"top combined rank: {top[0].combined_rank}, "
+            f"top EY: {top[0].earnings_yield:.4f}"
+            if top
+            else "none scored today"
+        )
         logger.info(
-            f"{as_of}: selected {len(top)} stocks "
-            f"(top combined rank: {top[0].combined_rank}, top EY: {top[0].earnings_yield:.4f})"
+            f"{as_of}: selected {len(top)} scored + {len(unscored)} protected "
+            f"unscored stocks ({best})"
         )
         return weights
 
