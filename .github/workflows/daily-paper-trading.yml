@@ -402,7 +402,7 @@ jobs:
           pip install -e '.[dev]'
 
       - name: Prepare data directories
-        run: mkdir -p data/portfolios data/decisions data/doctrine_exits data/snapshots data/cache data/cron_logs data/fundamentals_cache
+        run: mkdir -p data/portfolios data/decisions data/doctrine_exits data/snapshots data/cache data/cron_logs data/fundamentals_cache data/memos
 
       - name: Download EDGAR cache from release (US runs only)
         # TASE runs don't need the EDGAR cache — the Israeli scanner
@@ -516,8 +516,12 @@ jobs:
           # its held names beside what the engine did (audit SF-X1). In
           # shadow it is the only record those verdicts exist; created
           # by the mkdir above so the pathspec always matches.
+          # memos/ is the analyst layer's output (core.paths.memos_dir),
+          # written on every LLM run and never staged, so it was thrown
+          # away with the runner (audit RK-09). Created by the mkdir
+          # above for the same reason as doctrine_exits/.
           git add data/portfolios data/decisions data/doctrine_exits \
-                  data/snapshots data/cron_logs \
+                  data/snapshots data/cron_logs data/memos \
                   data/prices data/sectors.json data/council data/trades
           if git diff --cached --quiet; then
             echo "no data changes — nothing to commit"
@@ -525,7 +529,27 @@ jobs:
           fi
           STAMP=$(date -u +%Y-%m-%dT%H:%MZ)
           git commit -m "auto: paper-trading run ${MARKET} ${MODE} ${STAMP}"
-          git pull --rebase origin "$TARGET_REF" || true
+          # A failed rebase fails the run (audit RK-09). This used to end
+          # in `|| true`, and a rebase stopped on a conflict leaves HEAD
+          # detached on the remote tip — so the push below reported
+          # "Everything up-to-date", the job went green, and the run's
+          # commit was discarded with the runner. The concurrency group
+          # keeps two runs of this workflow apart, so a conflict means
+          # something else wrote the same files; which side wins is a
+          # human's call, not this script's. Abort so the tree is clean,
+          # name the files, and fail.
+          if ! git pull --rebase origin "$TARGET_REF"; then
+            # One line: an ::error:: annotation ends at the first newline.
+            conflicted=$(git diff --name-only --diff-filter=U | paste -sd ' ' -)
+            for state in rebase-merge rebase-apply; do
+              if [ -e "$(git rev-parse --git-path "$state")" ]; then
+                git rebase --abort
+                break
+              fi
+            done
+            echo "::error::could not rebase this run's commit onto origin/${TARGET_REF}; nothing was pushed. Conflicting files: ${conflicted:-none (the pull itself failed)}"
+            exit 1
+          fi
           git push origin "HEAD:${TARGET_REF}"
 
       - name: Upload run logs as artifact

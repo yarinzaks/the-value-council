@@ -326,8 +326,14 @@ def write_days(root, agent: str, by_day: dict[str, list[LedgerEntry]],
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--apply", action="store_true",
-                        help="Write the files. Without it, nothing is written.")
+    # --dry-run is the default spelled out, as the usage above has always
+    # shown it (audit RK-12: argparse used to reject it). Exclusive with
+    # --apply so asking for both is an error rather than a guess.
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--apply", action="store_true",
+                      help="Write the files. Without it, nothing is written.")
+    mode.add_argument("--dry-run", action="store_true",
+                      help="Report only and write nothing (the default).")
     parser.add_argument("--refresh-reconstructed", action="store_true",
                         help="Rewrite days this script wrote before; recorded "
                              "days are still kept.")

@@ -15,6 +15,7 @@ Schema (a single table)::
         close       REAL,
         adj_close   REAL,
         volume      INTEGER,
+        fetched_at  TEXT,            -- UTC ISO-8601 of the write; NULL before it was kept
         PRIMARY KEY (ticker, trade_date)
     );
 
@@ -28,7 +29,7 @@ import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 
@@ -172,6 +173,7 @@ CREATE TABLE IF NOT EXISTS prices (
     close       REAL,
     adj_close   REAL,
     volume      INTEGER,
+    fetched_at  TEXT,
     PRIMARY KEY (ticker, trade_date)
 );
 CREATE INDEX IF NOT EXISTS idx_prices_ticker ON prices(ticker);
@@ -225,6 +227,39 @@ CREATE TABLE IF NOT EXISTS no_price_data (
 );
 """
 
+#: Columns added to an existing table after it was first created, as
+#: (table, column, declaration). ``CREATE TABLE IF NOT EXISTS`` leaves a
+#: cache written by an older version untouched, so each of these is
+#: added on open when missing. Nullable and without a default, so the
+#: ALTER is a schema-only change that does not rewrite existing rows.
+#:
+#: ``prices.fetched_at`` is when the row was written from the vendor, in
+#: UTC (audit PD-08). Without it a bar cached from an intraday quote
+#: could not be told from a settled close. Rows written before the
+#: column existed read NULL: unknown, not a time.
+_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("prices", "fetched_at", "TEXT"),
+)
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    """Bring an existing cache's tables up to :data:`_ADDED_COLUMNS`.
+
+    Safe to run on every open: a column already present is left alone.
+    Two processes opening the same old cache at once can both see it
+    missing; the loser's ALTER fails with "duplicate column name", which
+    means the column now exists and is not an error.
+    """
+    for table, column, decl in _ADDED_COLUMNS:
+        present = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column in present:
+            continue
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc):
+                raise
+
 
 class PriceDataLoader:
     """Cached price loader backed by yfinance + SQLite.
@@ -239,6 +274,7 @@ class PriceDataLoader:
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
+            _add_missing_columns(conn)
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -331,6 +367,11 @@ class PriceDataLoader:
     def _today() -> date:
         """Today's date; a method so tests can pin it."""
         return date.today()
+
+    @staticmethod
+    def _now() -> datetime:
+        """The current UTC time, for ``prices.fetched_at``; pinnable in tests."""
+        return datetime.now(UTC)
 
     def _dividend_history_synced(self, ticker: str) -> bool:
         """Has ``ticker``'s full dividend history been read today?"""
@@ -478,6 +519,7 @@ class PriceDataLoader:
         if df.empty:
             return 0
         ticker = ticker.upper()
+        fetched_at = self._now().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         rows = []
         for idx, row in df.iterrows():
             d = idx.date() if isinstance(idx, pd.Timestamp) else idx
@@ -491,14 +533,16 @@ class PriceDataLoader:
                     _f(row.get("Close")),
                     _f(row.get("Adj Close", row.get("Close"))),
                     _i(row.get("Volume")),
+                    fetched_at,
                 )
             )
         with self._connect() as conn:
             conn.executemany(
                 """
                 INSERT OR REPLACE INTO prices
-                    (ticker, trade_date, open, high, low, close, adj_close, volume)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (ticker, trade_date, open, high, low, close, adj_close, volume,
+                     fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 rows,
             )

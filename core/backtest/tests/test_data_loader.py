@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 from typing import ClassVar
@@ -1324,3 +1324,112 @@ class TestFullDividendHistory:
 
         paid = loader.dividends_between("QTR", date(2025, 1, 1), self.AS_OF)
         assert [d.isoformat() for d, _ in paid] == list(self.EX_DATES[2:])
+
+
+class TestFetchedAt:
+    """Every cached bar says when it was written (audit PD-08).
+
+    Without it a cached close cannot be told from one fetched intraday
+    and never refreshed: the row carried a trade date and nothing else.
+    Caches written before the column existed are migrated in place on
+    open — the column is added, the bars already there keep their
+    values and read ``NULL``, which means "written before we recorded
+    it", not a time.
+    """
+
+    STAMP = datetime(2026, 11, 13, 21, 35, 7, tzinfo=UTC)
+
+    @staticmethod
+    def _bar(day: str, price: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            {"Open": [price], "High": [price], "Low": [price], "Close": [price],
+             "Adj Close": [price], "Volume": [1000]},
+            index=pd.DatetimeIndex([day]),
+        )
+
+    @staticmethod
+    def _columns(path: Path) -> list[str]:
+        with sqlite3.connect(path) as conn:
+            return [r[1] for r in conn.execute("PRAGMA table_info(prices)")]
+
+    @staticmethod
+    def _rows(path: Path) -> list[tuple[object, ...]]:
+        with sqlite3.connect(path) as conn:
+            return conn.execute(
+                "SELECT ticker, trade_date, close, fetched_at FROM prices "
+                "ORDER BY ticker, trade_date"
+            ).fetchall()
+
+    def _old_cache(self, path: Path) -> None:
+        """The schema as it stood before the column, with one bar in it."""
+        with sqlite3.connect(path) as conn:
+            conn.executescript(
+                """
+                CREATE TABLE prices (
+                    ticker TEXT NOT NULL, trade_date TEXT NOT NULL,
+                    open REAL, high REAL, low REAL, close REAL,
+                    adj_close REAL, volume INTEGER,
+                    PRIMARY KEY (ticker, trade_date)
+                );
+                INSERT INTO prices VALUES
+                    ('AAPL', '2026-11-12', 1, 1, 1, 230.5, 230.5, 10);
+                """
+            )
+
+    def test_a_new_cache_has_the_column(self, tmp_path: Path) -> None:
+        path = tmp_path / "p.sqlite"
+        PriceDataLoader(cache_path=path)
+        assert "fetched_at" in self._columns(path)
+
+    def test_a_write_is_stamped_in_utc(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = tmp_path / "p.sqlite"
+        loader = PriceDataLoader(cache_path=path)
+        monkeypatch.setattr(loader, "_now", lambda: self.STAMP)
+        loader._write_cache("AAPL", self._bar("2026-11-13", 231.0))
+        assert self._rows(path) == [
+            ("AAPL", "2026-11-13", 231.0, "2026-11-13T21:35:07Z"),
+        ]
+
+    def test_a_rewrite_moves_the_stamp(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The settled close replacing an intraday bar carries its own time."""
+        path = tmp_path / "p.sqlite"
+        loader = PriceDataLoader(cache_path=path)
+        clock = [self.STAMP - timedelta(hours=6)]
+        monkeypatch.setattr(loader, "_now", lambda: clock[0])
+        loader._write_cache("AAPL", self._bar("2026-11-13", 229.0))
+        clock[0] = self.STAMP
+        loader._write_cache("AAPL", self._bar("2026-11-13", 231.0))
+        assert self._rows(path) == [
+            ("AAPL", "2026-11-13", 231.0, "2026-11-13T21:35:07Z"),
+        ]
+
+    def test_an_existing_cache_is_migrated_without_losing_a_bar(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = tmp_path / "p.sqlite"
+        self._old_cache(path)
+        assert "fetched_at" not in self._columns(path)
+
+        loader = PriceDataLoader(cache_path=path)
+        monkeypatch.setattr(loader, "_now", lambda: self.STAMP)
+        loader._write_cache("AAPL", self._bar("2026-11-13", 231.0))
+
+        assert self._columns(path)[-1] == "fetched_at"
+        assert self._rows(path) == [
+            ("AAPL", "2026-11-12", 230.5, None),
+            ("AAPL", "2026-11-13", 231.0, "2026-11-13T21:35:07Z"),
+        ]
+        cached = loader._read_cached("AAPL", date(2026, 11, 1), date(2026, 11, 30))
+        assert list(cached["close"]) == [230.5, 231.0]
+
+    def test_reopening_a_migrated_cache_is_a_no_op(self, tmp_path: Path) -> None:
+        path = tmp_path / "p.sqlite"
+        self._old_cache(path)
+        PriceDataLoader(cache_path=path)
+        PriceDataLoader(cache_path=path)
+        assert self._columns(path).count("fetched_at") == 1
+        assert self._rows(path) == [("AAPL", "2026-11-12", 230.5, None)]

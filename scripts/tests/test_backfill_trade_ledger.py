@@ -411,3 +411,54 @@ class TestClosedSession:
         }
         (row,) = _run(monkeypatch, books)[day]
         assert ("closed-session" in row.tags) is tagged
+
+
+class TestCommandLine:
+    """``--dry-run`` exists, as the module docstring's usage says (audit RK-12).
+
+    It was documented and never parsed: argparse rejected it with
+    "unrecognized arguments". It is the default made explicit, so it
+    writes nothing, and asking for it alongside ``--apply`` is refused
+    rather than resolved silently one way or the other.
+    """
+
+    @pytest.fixture
+    def ledger(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        root = tmp_path / "ledger"
+        entry = LedgerEntry(date="2026-05-12", agent="g", ticker="X", side="SELL",
+                            shares=1, price=1, gross_value=1, cost_paid=0,
+                            realized_pnl_usd=0, source="reconstructed")
+        monkeypatch.setattr(bf, "trade_ledger_dir", lambda: root)
+        monkeypatch.setattr(bf, "reconstruct", lambda agent: {"2026-05-12": [entry]})
+        return root
+
+    def test_dry_run_is_accepted_and_writes_nothing(
+        self, ledger: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert bf.main(["--dry-run", "--agent", "g"]) == 0
+        out = capsys.readouterr().out
+        assert "dry run" in out
+        assert "Nothing written" in out
+        assert not ledger.exists()
+
+    def test_dry_run_is_the_default(
+        self, ledger: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        bf.main(["--dry-run", "--agent", "g"])
+        explicit = capsys.readouterr().out
+        bf.main(["--agent", "g"])
+        assert capsys.readouterr().out == explicit
+        assert not ledger.exists()
+
+    def test_dry_run_and_apply_together_are_refused(
+        self, ledger: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with pytest.raises(SystemExit) as exc:
+            bf.main(["--dry-run", "--apply", "--agent", "g"])
+        assert exc.value.code == 2
+        assert "not allowed with" in capsys.readouterr().err
+        assert not ledger.exists()
+
+    def test_apply_still_writes(self, ledger: Path) -> None:
+        assert bf.main(["--apply", "--agent", "g"]) == 0
+        assert (ledger / "g" / "2026-05-12.json").exists()
