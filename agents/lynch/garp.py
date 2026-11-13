@@ -55,6 +55,7 @@ from .filters import (
     DEFAULT_MIN_MARKET_CAP_USD,
     apply_quality_gates,
 )
+from .peg import GROWTH_WINDOW_YEARS
 from .ranking import LynchScore, score_candidates
 
 logger = get_logger("agents.lynch.garp")
@@ -231,10 +232,14 @@ class PeterLynch(Strategy):
         )
 
         # Stage 2: PEG-based scoring + category classification.
+        # Held names are measured so a 5-year base rolling onto a loss
+        # year does not drop them (audit item 18) — see
+        # :func:`.peg.retention_eps_cagr_pct`.
         scores = score_candidates(
             survivors,
             as_of=as_of,
             edgar_cache=self.edgar_cache,
+            held=frozenset(held or ()),
         )
         # Stage 2b: what we already own keeps its slot unless the story
         # broke. Without this the top-N is recomputed from scratch every
@@ -244,7 +249,14 @@ class PeterLynch(Strategy):
         self.last_exits = exit_decisions
         kept_tickers = {s.ticker for s in keep}
         room = max(0, self.portfolio_size - len(keep))
-        newcomers = [s for s in scores if s.ticker not in kept_tickers][:room]
+        # A score on a shortened window is a retention measure only; it
+        # never qualifies a name as a new buy.
+        newcomers = [
+            s
+            for s in scores
+            if s.ticker not in kept_tickers
+            and s.growth_window_years == GROWTH_WINDOW_YEARS
+        ][:room]
         top = keep + newcomers
         top.sort(
             key=lambda s: s.pegy if s.lynch_category == "Slow Grower" else s.peg
@@ -427,7 +439,8 @@ class PeterLynch(Strategy):
                             f"{s.lynch_category}",
                             f"PEG {s.peg:.2f}",
                             f"PEGY {s.pegy:.2f}",
-                            f"5yr EPS CAGR {s.growth_rate_5yr_pct:.1f}%",
+                            f"{s.growth_window_years}yr EPS CAGR "
+                            f"{s.growth_rate_5yr_pct:.1f}%",
                             f"P/E {s.pe:.2f}",
                             f"yield {s.dividend_yield_pct:.1f}%",
                             f"D/E {s.debt_to_equity:.2f}",
@@ -436,6 +449,7 @@ class PeterLynch(Strategy):
                             "lynch_category": s.lynch_category,
                             "pe": round(s.pe, 4),
                             "growth_rate_5yr_pct": round(s.growth_rate_5yr_pct, 4),
+                            "growth_window_years": s.growth_window_years,
                             "growth_rate_3yr_pct": (
                                 round(s.growth_rate_3yr_pct, 4)
                                 if s.growth_rate_3yr_pct is not None
@@ -476,7 +490,8 @@ class PeterLynch(Strategy):
                             if memo is not None
                             else (
                                 f"Lynch {s.lynch_category}: PEG {s.peg:.2f}, "
-                                f"5yr CAGR {s.growth_rate_5yr_pct:.1f}%, "
+                                f"{s.growth_window_years}yr CAGR "
+                                f"{s.growth_rate_5yr_pct:.1f}%, "
                                 f"P/E {s.pe:.2f}, yield {s.dividend_yield_pct:.1f}%"
                             )
                         ),

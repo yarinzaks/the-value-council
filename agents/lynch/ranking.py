@@ -10,6 +10,7 @@ strategy layer's responsibility is just orchestration.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 
@@ -23,12 +24,14 @@ from .category_classifier import (
 )
 from .filters import debt_to_equity, dividend_yield_pct
 from .peg import (
+    GROWTH_WINDOW_YEARS,
     PEG_BUY,
     PEG_FLOOR,
     PEG_HOLD,
     acceleration_pct,
     peg_buy_zone,
     peg_for,
+    retention_eps_cagr_pct,
     trailing_eps_cagr_pct,
 )
 
@@ -69,6 +72,10 @@ class LynchScore:
     lynch_category: LynchCategory
     peg_zone: str  # "strong_buy" | "buy" | "hold" | "avoid"
     suggested_position_size_pct: float
+    #: Years ``growth_rate_5yr_pct`` actually spans. 5 except for a held
+    #: name whose 5-year base rolled onto a loss year, which is measured
+    #: over the shorter window :func:`retention_eps_cagr_pct` found.
+    growth_window_years: int = GROWTH_WINDOW_YEARS
 
 
 # ---- Per-category position sizing (playbook §6 + §12.1 step 7) ------------
@@ -111,9 +118,15 @@ def score_candidates(
     *,
     as_of: date,
     edgar_cache: EdgarCache,
+    held: Collection[str] = frozenset(),
 ) -> list[LynchScore]:
     """Compute PEG, classify into category (heuristic), apply
     category-specific PEG ceiling, return survivors sorted by PEG asc.
+
+    ``held`` names are measured with :func:`retention_eps_cagr_pct`, so
+    a 5-year base that rolls onto a loss year does not, by itself,
+    drop a name already owned (audit item 18). Entry is unchanged:
+    a name not held still needs a defined 5-year CAGR.
     """
     if not candidates:
         return []
@@ -123,7 +136,16 @@ def score_candidates(
         pe = _pe(price, fin)
         if pe is None:
             continue
-        g5 = trailing_eps_cagr_pct(edgar_cache, fin.ticker, as_of, years=5)
+        window = GROWTH_WINDOW_YEARS
+        g5: float | None = None
+        if fin.ticker in held:
+            measured = retention_eps_cagr_pct(edgar_cache, fin.ticker, as_of)
+            if measured is not None:
+                g5, window = measured
+        else:
+            g5 = trailing_eps_cagr_pct(
+                edgar_cache, fin.ticker, as_of, years=GROWTH_WINDOW_YEARS
+            )
         if g5 is None or g5 <= PEG_FLOOR:
             continue
         g3 = trailing_eps_cagr_pct(edgar_cache, fin.ticker, as_of, years=3)
@@ -174,6 +196,7 @@ def score_candidates(
                 lynch_category=category,
                 peg_zone=peg_buy_zone(relevant_peg),
                 suggested_position_size_pct=_position_size_for(category),
+                growth_window_years=window,
             )
         )
 

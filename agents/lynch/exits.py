@@ -49,6 +49,16 @@ SELL, which it always could.
 A held name that no longer appears in the scored set at all has failed
 the quality gates outright. That is a thesis break rather than a
 ranking wobble, and it is sold.
+
+**A rolling window is not a thesis break** (audit item 18). The 5-year
+EPS CAGR anchors its base at ``as_of - 5 years``; the day that base
+rolls onto a filed loss year the CAGR is undefined and the name used to
+drop out of the scored set — CRS on 2026-08-19, EPS 7.42 up from 1.14,
+sold because FY2021 printed -4.76. Held names are therefore scored with
+:func:`agents.lynch.peg.retention_eps_cagr_pct`, which skips a loss-year
+base down to the playbook's 3-year cross-check. Losses on every base
+through three years, or a missing base, still leave the name unscored,
+and it is still sold.
 """
 
 from __future__ import annotations
