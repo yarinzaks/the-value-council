@@ -25,6 +25,7 @@ the shortest of them two days.
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
@@ -90,6 +91,7 @@ from core.live.agent_adapter import (
 )
 from core.live.notify import notify_run
 from core.live.portfolio import (
+    DEFAULT_COMMISSION_USD,
     DEFAULT_COST_BPS,
     DEFAULT_INITIAL_CASH,
     DEFAULT_PORTFOLIO_DIR,
@@ -115,6 +117,17 @@ logger = get_logger("core.live.runner")
 #: Smallest notional worth executing. Below this the transaction cost
 #: dominates and the position is noise in the weight table.
 MIN_TRADE_USD: float = 1.0
+
+#: The most of a rebalance trade the commission may eat, as a fraction
+#: of the trade's value. Above it the trim or add is skipped and the
+#: drift stays until a run where correcting it is worth the fee.
+#:
+#: 1% means $2.50 needs a trade of at least $250. A $10,000 book of 30
+#: names has $333 slots, and the 25% band first triggers at a drift of
+#: about $83 — a correction on which $2.50 is 3%, paid again when the
+#: drift reverses. Applies only to rebalancing: an entry or exit is a
+#: doctrine decision and pays what it costs.
+MAX_REBALANCE_COMMISSION_FRACTION: float = 0.01
 
 #: How far a position may drift from its target weight before the
 #: rebalance pass corrects it, as a fraction of the target. 0.25 means a
@@ -228,6 +241,18 @@ def reachable_targets(
     return [replace(t, weight=t.weight * scale) for t in kept]
 
 
+def commission_dominates(trade_value: float, *, commission: float) -> bool:
+    """True when ``commission`` is too large a share of ``trade_value``.
+
+    The line is :data:`MAX_REBALANCE_COMMISSION_FRACTION`, inclusive: a
+    $250 trade at $2.50 is exactly 1% and is placed. A free order is
+    never dominated.
+    """
+    if commission <= 0:
+        return False
+    return commission > trade_value * MAX_REBALANCE_COMMISSION_FRACTION
+
+
 def plan_whole_share_buys(
     targets: Sequence[LiveTarget],
     prices: dict[str, float | None],
@@ -235,6 +260,7 @@ def plan_whole_share_buys(
     cash: float,
     *,
     cost_bps: float,
+    commission: float,
     band: float,
 ) -> dict[str, int]:
     """How many whole shares of each target to buy, decided in one pass.
@@ -262,6 +288,12 @@ def plan_whole_share_buys(
     irreducible rather than zero: a $331 share in a $370 slot cannot
     take a second one without reaching 179% of its target, so its $40
     stays in cash — visibly, which is the point.
+
+    ``commission`` is per order, so each name pays it once — on its
+    first share — and a top-up of a name already planned pays only the
+    share. Each slot carries its own commission, and the plan as a whole
+    never spends more than ``cash``: every trade it implies can be
+    placed in full, in any order.
     """
     per_share: dict[str, float] = {}
     for t in targets:
@@ -277,9 +309,14 @@ def plan_whole_share_buys(
     shares: dict[str, int] = {}
     spent = 0.0
     for tk, slot in slots.items():
-        n = int(min(slot, cash) // per_share[tk])
+        # Against what is left, not the whole of the cash: slots that
+        # add up to more than the book holds must not plan to spend it
+        # twice.
+        budget = min(slot, cash - spent) - commission
+        n = int(budget // per_share[tk]) if budget > 0 else 0
         shares[tk] = n
-        spent += n * per_share[tk]
+        if n > 0:
+            spent += n * per_share[tk] + commission
 
     # The pooled remainder, one share at a time, to the biggest gap.
     while True:
@@ -287,7 +324,9 @@ def plan_whole_share_buys(
         best: tuple[float, str] | None = None
         for tk, slot in slots.items():
             outlay = per_share[tk]
-            if outlay > remaining:
+            # A name with no share yet is a new order and pays its fee.
+            fee = commission if shares[tk] == 0 else 0.0
+            if outlay + fee > remaining:
                 continue
             held_value = (shares[tk] + 1) * outlay
             if held_value > ceiling[tk]:
@@ -299,6 +338,8 @@ def plan_whole_share_buys(
                 best = (gap, tk)
         if best is None:
             return {tk: n for tk, n in shares.items() if n > 0}
+        if shares[best[1]] == 0:
+            spent += commission
         shares[best[1]] += 1
         spent += per_share[best[1]]
 
@@ -635,7 +676,11 @@ class DailyRunner:
             quant-only path; LLM analyzers are not invoked in live mode
             here (see ``build_default_adapters`` docstring).
         portfolio_dir: Where to persist portfolio JSON.
-        cost_bps: Per-trade cost (default 10 bps).
+        cost_bps: Proportional cost per order on top of the commission,
+            as a fraction of the gross (default 0 — the broker charges
+            none).
+        commission: Flat cost per order, buy or sell (default $2.50,
+            the broker's).
         initial_cash: Seed cash for first run (default $10,000).
         only_agents: Restrict the run to these agent slugs. ``None``
             (default) runs everyone. An unknown slug raises rather than
@@ -653,6 +698,7 @@ class DailyRunner:
         published_dir: Path | None = None,
         ledger_dir: Path | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
+        commission: float = DEFAULT_COMMISSION_USD,
         initial_cash: float = DEFAULT_INITIAL_CASH,
         rebalance_band: float = DEFAULT_REBALANCE_BAND,
         min_holding_days: int = DEFAULT_MIN_HOLDING_DAYS,
@@ -688,6 +734,7 @@ class DailyRunner:
         self.published_dir = published_dir or council_published_dir()
         self.ledger_dir = ledger_dir or trade_ledger_dir()
         self.cost_bps = cost_bps
+        self.commission = commission
         self.initial_cash = initial_cash
         self.rebalance_band = rebalance_band
         self.min_holding_days = min_holding_days
@@ -1144,7 +1191,10 @@ class DailyRunner:
                     continue
                 try:
                     trade = portfolio.sell(
-                        pos.ticker, price=price, cost_bps=self.cost_bps
+                        pos.ticker,
+                        price=price,
+                        cost_bps=self.cost_bps,
+                        commission=self.commission,
                     )
                     trades.append(trade)
                     self._log_sell(adapter.name, pos, price, as_of)
@@ -1177,6 +1227,7 @@ class DailyRunner:
             nav_after_sells,
             portfolio.cash,
             cost_bps=self.cost_bps,
+            commission=self.commission,
             band=self.rebalance_band,
         )
         for target in scan.targets:
@@ -1200,11 +1251,13 @@ class DailyRunner:
                 # allocator has already said so and said why; repeating
                 # it per ticker here would log the same fact twice.
                 continue
-            # The plan is in shares; buy() takes dollars. One cent of
-            # headroom absorbs the float error in price × shares × cost
-            # without being able to buy an extra share of anything that
-            # trades above a cent.
-            target_dollars = want_shares * price * (1.0 + self.cost_bps) + 0.01
+            # The plan is in shares; buy() takes dollars, commission
+            # included. One cent of headroom absorbs the float error in
+            # price × shares × cost without being able to buy an extra
+            # share of anything that trades above a cent.
+            target_dollars = (
+                want_shares * price * (1.0 + self.cost_bps) + self.commission + 0.01
+            )
             if target_dollars > portfolio.cash:
                 target_dollars = portfolio.cash
             if target_dollars < MIN_TRADE_USD:
@@ -1222,6 +1275,7 @@ class DailyRunner:
                     why_en=target.why_en,
                     why_he=target.why_he,
                     cost_bps=self.cost_bps,
+                    commission=self.commission,
                 )
                 trades.append(trade)
                 self._log_buy(adapter.name, target, price, as_of)
@@ -1520,9 +1574,23 @@ class DailyRunner:
 
         out: list[TradeRecord] = []
         for ticker, price, shares in trims:
+            # sell() floors the same way, so this is the value it would
+            # trade, judged before the order rather than after it.
+            value = math.floor(shares) * price
+            if commission_dominates(value, commission=self.commission):
+                logger.info(
+                    f"{as_of}: {agent} leaving {ticker} over target — a "
+                    f"${value:,.2f} trim does not carry a "
+                    f"${self.commission:.2f} commission"
+                )
+                continue
             try:
                 fill = portfolio.sell(
-                    ticker, price=price, shares=shares, cost_bps=self.cost_bps
+                    ticker,
+                    price=price,
+                    shares=shares,
+                    cost_bps=self.cost_bps,
+                    commission=self.commission,
                 )
                 out.append(fill)
                 logger.info(f"{as_of}: {agent} trimmed {ticker} back to target")
@@ -1531,11 +1599,26 @@ class DailyRunner:
                 logger.warning(f"{as_of}: trim of {ticker} failed: {exc}")
 
         for ticker, price, dollars in adds:
-            spend = min(dollars, portfolio.cash * 0.99)
-            if spend < MIN_TRADE_USD or spend < price:
+            # The shortfall in position value plus the order's fee, so
+            # the commission does not come out of the shares that close
+            # the gap.
+            spend = min(dollars + self.commission, portfolio.cash * 0.99)
+            # buy() floors the same way; this is the stock it would get.
+            add_shares = math.floor(
+                max(spend - self.commission, 0.0) / (price * (1.0 + self.cost_bps))
+            )
+            if spend < MIN_TRADE_USD or add_shares < 1:
                 # Under a share's price there is no trade to make, and
                 # the drift stays until the next run — which is correct:
                 # a band cannot be closed with less than one share.
+                continue
+            value = add_shares * price
+            if commission_dominates(value, commission=self.commission):
+                logger.info(
+                    f"{as_of}: {agent} leaving {ticker} under target — a "
+                    f"${value:,.2f} add does not carry a "
+                    f"${self.commission:.2f} commission"
+                )
                 continue
             try:
                 fill = portfolio.buy(
@@ -1546,6 +1629,7 @@ class DailyRunner:
                     why_en="",
                     why_he="",
                     cost_bps=self.cost_bps,
+                    commission=self.commission,
                 )
                 out.append(fill)
                 logger.info(f"{as_of}: {agent} added to {ticker} back to target")

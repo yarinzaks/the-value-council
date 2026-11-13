@@ -28,7 +28,20 @@ from core.logger import get_logger
 logger = get_logger("core.live.portfolio")
 
 DEFAULT_INITIAL_CASH: float = 10_000.0
-DEFAULT_COST_BPS: float = 0.001  # 0.1% per trade
+
+#: The broker's commission: a flat $2.50 per order, buy or sell, whatever
+#: its size. These books exist to be copied into that account, so the
+#: cost they charge is the one it charges. Until audit ENG-2 the book
+#: charged 0.1% of the gross instead — 48c on a typical $480 order where
+#: the broker takes $2.50 — and understated its costs about six-fold.
+DEFAULT_COMMISSION_USD: float = 2.50
+
+#: A proportional cost charged on top of the commission, as a fraction of
+#: the gross. Zero in the live book: the broker charges no such thing.
+#: Kept as a parameter so a caller that wants to model slippage still
+#: can. Research and backtest code carry their own cost model and do not
+#: read this.
+DEFAULT_COST_BPS: float = 0.0
 
 #: Decimal places share counts are rounded to. Matches what ``to_dict``
 #: already persists, so a round-trip through JSON is lossless. Six
@@ -225,6 +238,7 @@ class LivePortfolio:
         price: float,
         shares: float | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
+        commission: float = DEFAULT_COMMISSION_USD,
     ) -> TradeRecord:
         """Sell ``shares`` of ``ticker`` at ``price``; all of it by default.
 
@@ -233,10 +247,15 @@ class LivePortfolio:
         so the reported P&L on the residual stays honest. Selling the
         whole line, or more than is held, closes it.
 
+        The order pays ``commission`` once, plus ``cost_bps`` of the
+        gross. Pass ``commission=0.0`` for a conversion that is not an
+        order, such as a merger cash-out.
+
         Raises LivePortfolioError if no such position exists.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive sell price for {ticker}: {price}")
+        _check_commission(ticker, commission)
         idx = self._index_of(ticker)
         if idx is None:
             raise LivePortfolioError(f"{ticker} not in portfolio")
@@ -272,7 +291,7 @@ class LivePortfolio:
             pos.shares = remaining
 
         gross = sold * price
-        cost = gross * cost_bps
+        cost = commission + gross * cost_bps
         self.cash += gross - cost
         self.cumulative_costs += cost
         return TradeRecord(
@@ -415,6 +434,7 @@ class LivePortfolio:
         why_en: str,
         why_he: str,
         cost_bps: float = DEFAULT_COST_BPS,
+        commission: float = DEFAULT_COMMISSION_USD,
     ) -> TradeRecord:
         """Buy whole shares of ``ticker`` for at most ``target_dollars``.
 
@@ -437,10 +457,13 @@ class LivePortfolio:
         not have opened.
 
         Costs are taken on top of notional, so ``target_dollars`` is the
-        limit including fees.
+        limit including fees: one ``commission`` for the order plus
+        ``cost_bps`` of the gross. A target that cannot cover the
+        commission and one share buys nothing.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive buy price for {ticker}: {price}")
+        _check_commission(ticker, commission)
         if target_dollars <= 0:
             raise LivePortfolioError(
                 f"non-positive target dollars for {ticker}: {target_dollars}"
@@ -450,8 +473,9 @@ class LivePortfolio:
                 f"insufficient cash for {ticker}: target ${target_dollars:.2f}, "
                 f"cash ${self.cash:.2f}"
             )
-        # Solve: notional + notional*cost_bps <= target_dollars  →  notional max.
-        max_notional = target_dollars / (1.0 + cost_bps)
+        # Solve: commission + notional*(1 + cost_bps) <= target_dollars
+        # for the largest notional.
+        max_notional = max(target_dollars - commission, 0.0) / (1.0 + cost_bps)
         # Floor, never round: rounding up buys a share the cash does not
         # cover, and the check below would then reject the whole trade
         # for an off-by-one the caller could not have anticipated.
@@ -459,10 +483,10 @@ class LivePortfolio:
         if shares_bought <= 0:
             raise LivePortfolioError(
                 f"${target_dollars:.2f} target on {ticker} at ${price:.2f} "
-                f"buys no whole share"
+                f"buys no whole share after the ${commission:.2f} commission"
             )
         gross = shares_bought * price
-        cost = gross * cost_bps
+        cost = commission + gross * cost_bps
         spend = gross + cost
         if spend > self.cash + 1e-9:
             raise LivePortfolioError(
@@ -677,6 +701,16 @@ class TradeRecord:
         return asdict(self)
 
 
+def _check_commission(ticker: str, commission: float) -> None:
+    """Refuse a commission the broker could not have charged.
+
+    A negative one would pay the book for trading. ``not >= 0`` rather
+    than ``< 0`` so a NaN is refused too instead of poisoning the cash.
+    """
+    if not commission >= 0.0:
+        raise LivePortfolioError(f"invalid commission for {ticker}: {commission}")
+
+
 def _round_position(p: Position) -> dict[str, Any]:
     d = asdict(p)
     for k in ("entry_price", "current_price"):
@@ -700,6 +734,7 @@ def today_iso() -> str:
 
 
 __all__ = [
+    "DEFAULT_COMMISSION_USD",
     "DEFAULT_COST_BPS",
     "DEFAULT_INITIAL_CASH",
     "DEFAULT_PORTFOLIO_DIR",

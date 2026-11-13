@@ -24,6 +24,7 @@ from core.live.agent_adapter import AgentAdapter, LiveTarget, LiveWatch, ScanRes
 from core.live.portfolio import LivePortfolio, Position, WatchEntry
 from core.live.runner import (
     DEFAULT_MIN_HOLDING_DAYS,
+    AgentRunResult,
     DailyRunner,
     _filter_adapters,
     pos_age_days,
@@ -686,6 +687,160 @@ class TestRebalanceBand:
         assert result.portfolio.positions[0].weight_pct == pytest.approx(
             50.0, abs=1.0
         )
+
+
+class TestTheBrokerCommission:
+    """Every order the runner places pays the broker's flat $2.50.
+
+    Audit ENG-2: the runner charged 0.1% of the gross, so 2,260 share
+    changes cost the books $877 where the broker would have taken
+    $5,650.
+    """
+
+    BROKER = 2.50
+
+    def _single(
+        self, runner: DailyRunner, *, shares: float, price: float, cash: float
+    ) -> AgentRunResult:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFT",
+                shares=shares,
+                entry_price=price,
+                entry_date="2026-07-01",
+                current_price=price,
+            )
+        )
+        p.cash = cash
+        p.save(directory=runner.portfolio_dir)
+        adapter = _StubAdapter("stub_agent", [_target("DRIFT", weight=0.5)])
+        runner.price_loader = _StubPriceLoader({"DRIFT": price})  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DRIFT"],
+            {"DRIFT": price},
+            {"DRIFT": None},
+        )
+
+    def test_every_opening_buy_pays_the_flat_commission(
+        self, runner: DailyRunner
+    ) -> None:
+        n = 27
+        prices: dict[str, float | None] = {
+            f"T{i:02d}": 37.0 + i * 11.3 for i in range(n)
+        }
+        targets = [
+            _target(t, weight=1.0 / n, rank=i + 1)
+            for i, t in enumerate(sorted(prices))
+        ]
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        result = runner._run_one(
+            _StubAdapter("stub_agent", targets),  # type: ignore[arg-type]
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert buys
+        for trade in buys:
+            assert trade.cost_paid == pytest.approx(self.BROKER), trade.ticker
+        p = result.portfolio
+        assert p.cumulative_costs == pytest.approx(self.BROKER * len(result.trades))
+        assert p.cash >= 0
+
+    def test_the_runner_passes_its_own_commission_to_every_order(
+        self, runner: DailyRunner
+    ) -> None:
+        # Not the portfolio's default: a runner told $1 charges $1, on
+        # the trim as on the buy, so the setting is the one in force.
+        runner.commission = 1.0
+        result = self._single(runner, shares=50.0, price=300.0, cash=5_000.0)
+        assert result.trades
+        for trade in result.trades:
+            assert trade.cost_paid == pytest.approx(1.0)
+
+    def test_the_plan_never_spends_more_than_the_cash(self) -> None:
+        """Commissions included, the planned outlay fits the book.
+
+        One name at $100 against $1,000 of cash and a 100% slot: ten
+        shares is $1,000 of stock and $2.50 the book does not have.
+        """
+        from core.live.runner import plan_whole_share_buys
+
+        plan = plan_whole_share_buys(
+            [_target("X", weight=1.0)],
+            {"X": 100.0},
+            nav=1_000.0,
+            cash=1_000.0,
+            cost_bps=0.0,
+            commission=self.BROKER,
+            band=0.25,
+        )
+        assert plan == {"X": 9}
+
+    def test_the_plan_charges_one_commission_per_name(self) -> None:
+        """Each name pays one commission, not one per share.
+
+        Three names, $500 of cash, $100 shares: the slots are $166.67,
+        so the first pass places one share of each for $307.50 — three
+        orders. The $192.50 left tops one of them up by a share; that
+        is the same order, so it costs $100, not $102.50. The book ends
+        with four shares and three commissions, inside its cash.
+        """
+        from core.live.runner import plan_whole_share_buys
+
+        targets = [_target(t, weight=1 / 3) for t in ("A", "B", "C")]
+        prices: dict[str, float | None] = {"A": 100.0, "B": 100.0, "C": 100.0}
+        plan = plan_whole_share_buys(
+            targets, prices, nav=500.0, cash=500.0,
+            cost_bps=0.0, commission=self.BROKER, band=0.25,
+        )
+        outlay = sum(n * 100.0 + self.BROKER for n in plan.values())
+        assert outlay <= 500.0
+        assert sum(plan.values()) == 4
+
+    def test_a_trim_too_small_to_carry_the_commission_is_skipped(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at $8 = $400 against $200 cash: NAV 600, target 300,
+        # drift +33% — outside the band. The trim is 12 shares, $96, on
+        # which $2.50 is 2.6%: more than the 1% the book will pay to
+        # rebalance. Left alone.
+        result = self._single(runner, shares=50.0, price=8.0, cash=200.0)
+        assert result.trades == []
+        assert result.portfolio.positions[0].shares == 50.0
+        assert result.portfolio.cumulative_costs == 0.0
+
+    def test_an_add_too_small_to_carry_the_commission_is_skipped(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at $4 = $200 against $400 cash: NAV 600, target 300,
+        # drift -33%. The add is ~$100, on which $2.50 is 2.5%.
+        result = self._single(runner, shares=50.0, price=4.0, cash=400.0)
+        assert result.trades == []
+        assert result.portfolio.cash == pytest.approx(400.0)
+
+    def test_a_rebalance_large_enough_still_trades(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at $300 = $15,000 against $5,000 cash: the trim is
+        # 16 shares, $4,800, on which $2.50 is 0.05%.
+        result = self._single(runner, shares=50.0, price=300.0, cash=5_000.0)
+        sells = [t for t in result.trades if t.side == "SELL"]
+        assert len(sells) == 1
+        assert sells[0].cost_paid == pytest.approx(self.BROKER)
+
+    def test_the_threshold_is_inclusive_at_one_percent(self) -> None:
+        from core.live.runner import commission_dominates
+
+        # $2.50 is exactly 1% of $250: that trade is worth placing.
+        assert commission_dominates(250.0, commission=2.50) is False
+        assert commission_dominates(249.99, commission=2.50) is True
+        # A free order is never dominated, however small.
+        assert commission_dominates(0.01, commission=0.0) is False
 
 
 # ---------------------------------------------------------------------------
@@ -2385,8 +2540,9 @@ class TestARebalanceIsRecorded:
         This test is named after the share count and so was the one
         before it — which never asserted the count, and so passed
         against a row that overstated it. ``buy`` floors what is left
-        of the spend after the commission, so a $5,000 add at $100
-        moves 49 shares and not 50. The row said 50.0000 until the
+        of the spend after the commission, so the fill can be fewer
+        shares than the request — under the old 0.1% cost a $5,000 add
+        at $100 moved 49 shares and not 50. The row said 50.0000 until the
         number came from the fill rather than from the request, and the
         journal is the only store the dashboard reads.
         """

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from core.live.portfolio import (
-    DEFAULT_COST_BPS,
+    DEFAULT_COMMISSION_USD,
     DEFAULT_INITIAL_CASH,
     LivePortfolio,
     LivePortfolioError,
@@ -50,14 +50,14 @@ class TestBuy:
             entry_date="2026-04-29",
             why_en="value", why_he="ערך",
         )
-        # 5000 / (1 + 0.001) = 4995.005 max notional, / 200 = 24.98
-        # shares, floored to 24. The $195 that cannot buy a 25th share
+        # (5000 - 2.50 commission) / 200 = 24.99 shares, floored to 24.
+        # The $197.50 that cannot buy a 25th share
         # stays in cash, because the broker this book is copied into
         # sells whole shares.
         assert trade.shares == 24.0
         assert trade.gross_value == pytest.approx(24 * 200.0)
-        assert trade.cost_paid == pytest.approx(24 * 200.0 * DEFAULT_COST_BPS)
-        assert p.cash == pytest.approx(10_000.0 - 4_800.0 - 4.8, abs=0.01)
+        assert trade.cost_paid == pytest.approx(DEFAULT_COMMISSION_USD)
+        assert p.cash == pytest.approx(10_000.0 - 4_800.0 - 2.50, abs=0.01)
         assert p.cumulative_costs == pytest.approx(trade.cost_paid)
         assert len(p.positions) == 1
 
@@ -98,8 +98,9 @@ class TestBuy:
             )
 
     def test_a_target_of_exactly_one_share_still_fails_on_cost(self) -> None:
-        # $100 buys one $100 share and 10c of commission it cannot pay,
-        # so the floor takes it to zero. The slot has to carry the fee.
+        # $100 buys one $100 share and $2.50 of commission it cannot
+        # pay, so the floor takes it to zero. The slot has to carry the
+        # fee.
         p = LivePortfolio(agent="test", cash=10_000)
         with pytest.raises(LivePortfolioError, match="whole share"):
             p.buy(
@@ -107,7 +108,7 @@ class TestBuy:
                 why_en="", why_he="",
             )
         trade = p.buy(
-            "X", target_dollars=100.2, price=100, entry_date="x",
+            "X", target_dollars=102.5, price=100, entry_date="x",
             why_en="", why_he="",
         )
         assert trade.shares == 1.0
@@ -129,8 +130,8 @@ class TestBuy:
         p.buy("AAPL", target_dollars=2_000, price=100, entry_date="2026-04-29", why_en="", why_he="")
         p.buy("AAPL", target_dollars=2_000, price=120, entry_date="2026-04-30", why_en="", why_he="")
         assert len(p.positions) == 1
-        # Two whole-share lots: 2000/1.001/100 = 19.98 floors to 19 at
-        # 100, then 2000/1.001/120 = 16.65 floors to 16 at 120.
+        # Two whole-share lots: (2000-2.50)/100 = 19.98 floors to 19 at
+        # 100, then (2000-2.50)/120 = 16.65 floors to 16 at 120.
         lot1, lot2 = 19.0, 16.0
         avg = (lot1 * 100 + lot2 * 120) / (lot1 + lot2)
         assert p.positions[0].entry_price == pytest.approx(avg, rel=1e-6)
@@ -150,9 +151,11 @@ class TestSell:
         trade = p.sell("AAPL", price=110.0)
         assert trade.shares == shares
         assert trade.realized_pnl_usd == pytest.approx(shares * (110 - 100))
-        # Cash should be cash_before_sell + proceeds - cost
+        # Cash should be cash_before_sell + proceeds - the commission
         gross = shares * 110.0
-        assert p.cash == pytest.approx(cash_before_sell + gross - gross * DEFAULT_COST_BPS)
+        assert p.cash == pytest.approx(
+            cash_before_sell + gross - DEFAULT_COMMISSION_USD
+        )
         assert len(p.positions) == 0
 
     def test_a_sale_says_what_it_closed(self) -> None:
@@ -194,14 +197,131 @@ class TestSell:
 
 
 # ---------------------------------------------------------------------------
+# Commission — the broker's, not a model of one
+# ---------------------------------------------------------------------------
+class TestFlatCommission:
+    """The owner's broker charges $2.50 an order, whatever its size.
+
+    The book charged 0.1% of the gross instead: 48c on a typical $480
+    order where the broker takes $2.50, so every book understated its
+    costs about six-fold (audit ENG-2).
+    """
+
+    BROKER = 2.50
+
+    def test_a_buy_pays_one_flat_commission(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        trade = p.buy(
+            "AAPL", target_dollars=5_000, price=200.0, entry_date="d",
+            why_en="", why_he="",
+        )
+        # (5000 - 2.50) / 200 = 24.99 shares, floored to 24.
+        assert trade.shares == 24.0
+        assert trade.cost_paid == pytest.approx(self.BROKER)
+        assert p.cash == pytest.approx(10_000.0 - 24 * 200.0 - self.BROKER)
+        assert p.cumulative_costs == pytest.approx(self.BROKER)
+
+    def test_the_commission_does_not_scale_with_the_order(self) -> None:
+        p = LivePortfolio(agent="test", cash=100_000)
+        small = p.buy(
+            "A", target_dollars=110, price=100.0, entry_date="d",
+            why_en="", why_he="",
+        )
+        large = p.buy(
+            "B", target_dollars=50_000, price=100.0, entry_date="d",
+            why_en="", why_he="",
+        )
+        assert small.cost_paid == pytest.approx(self.BROKER)
+        assert large.cost_paid == pytest.approx(self.BROKER)
+
+    def test_a_sale_pays_one_flat_commission(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        p.buy("AAPL", target_dollars=2_000, price=100, entry_date="d",
+              why_en="", why_he="")
+        before = p.cash
+        trade = p.sell("AAPL", price=110.0)
+        assert trade.cost_paid == pytest.approx(self.BROKER)
+        assert p.cash == pytest.approx(before + trade.gross_value - self.BROKER)
+        assert p.cumulative_costs == pytest.approx(2 * self.BROKER)
+
+    def test_a_trim_pays_one_flat_commission(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        p.buy("AAPL", target_dollars=2_000, price=100, entry_date="d",
+              why_en="", why_he="")
+        trade = p.sell("AAPL", price=100.0, shares=5)
+        assert trade.cost_paid == pytest.approx(self.BROKER)
+
+    def test_the_target_must_carry_the_commission(self) -> None:
+        # One $100 share costs $102.50 at this broker. A $102.49 target
+        # cannot place it; the floor takes it to zero shares.
+        p = LivePortfolio(agent="test", cash=10_000)
+        with pytest.raises(LivePortfolioError, match="whole share"):
+            p.buy("X", target_dollars=102.49, price=100, entry_date="d",
+                  why_en="", why_he="")
+        trade = p.buy("X", target_dollars=102.50, price=100, entry_date="d",
+                      why_en="", why_he="")
+        assert trade.shares == 1.0
+
+    def test_a_target_smaller_than_the_commission_buys_nothing(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        with pytest.raises(LivePortfolioError, match="whole share"):
+            p.buy("PENNY", target_dollars=2.0, price=0.01, entry_date="d",
+                  why_en="", why_he="")
+        assert p.cash == pytest.approx(10_000.0)
+        assert p.cumulative_costs == 0.0
+
+    def test_a_buy_never_overdraws_cash(self) -> None:
+        # Spending the whole of the cash on a name that divides it
+        # exactly: the commission has to come out of the shares.
+        p = LivePortfolio(agent="test", cash=1_000)
+        trade = p.buy("X", target_dollars=1_000, price=100, entry_date="d",
+                      why_en="", why_he="")
+        assert trade.shares == 9.0
+        assert p.cash == pytest.approx(1_000 - 900 - self.BROKER)
+        assert p.cash >= 0
+
+    def test_a_negative_commission_is_refused(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        with pytest.raises(LivePortfolioError, match="commission"):
+            p.buy("X", target_dollars=500, price=100, entry_date="d",
+                  why_en="", why_he="", commission=-1.0)
+        p.buy("X", target_dollars=500, price=100, entry_date="d",
+              why_en="", why_he="")
+        with pytest.raises(LivePortfolioError, match="commission"):
+            p.sell("X", price=100, commission=-1.0)
+
+    def test_a_zero_commission_is_honoured(self) -> None:
+        # A merger cash-out is not an order and pays nothing; the
+        # settlement script relies on being able to say so.
+        p = LivePortfolio(agent="test", cash=10_000)
+        p.buy("X", target_dollars=500, price=100, entry_date="d",
+              why_en="", why_he="")
+        costs = p.cumulative_costs
+        trade = p.sell("X", price=100, commission=0.0)
+        assert trade.cost_paid == 0.0
+        assert p.cumulative_costs == pytest.approx(costs)
+
+    def test_a_proportional_cost_is_still_available(self) -> None:
+        # Kept for a caller that wants to model slippage on top of the
+        # commission. Off by default in the live book.
+        p = LivePortfolio(agent="test", cash=10_000)
+        trade = p.buy("X", target_dollars=1_000, price=100, entry_date="d",
+                      why_en="", why_he="", commission=0.0, cost_bps=0.01)
+        # 1000 / 1.01 / 100 = 9.9 → 9 shares, cost 1% of $900.
+        assert trade.shares == 9.0
+        assert trade.cost_paid == pytest.approx(9.0)
+
+
+# ---------------------------------------------------------------------------
 # NAV / mark-to-market
 # ---------------------------------------------------------------------------
 class TestMarkToMarket:
     def test_total_nav_with_positions(self) -> None:
         p = LivePortfolio(agent="test", cash=10_000)
         p.buy("AAPL", target_dollars=2_000, price=100, entry_date="d", why_en="", why_he="")
-        # 2000/1.001/100 = 19.98 shares, floored to 19 at 100 = $1,900
-        # (cost $1.90), leaving $98.10 of the slot in cash. Mark to 120.
+        # (2000-2.50)/100 = 19.98 shares, floored to 19 at 100 = $1,900
+        # (commission $2.50), leaving $97.50 of the slot in cash. Mark
+        # to 120.
         shares = 19.0
         p.mark_to_market({"AAPL": 120.0})
         assert p.invested == pytest.approx(shares * 120.0, rel=1e-6)
@@ -374,7 +494,7 @@ class TestCumulativeReturn:
         p = LivePortfolio(agent="x", cash=10_000, initial_cash=10_000)
         p.buy("X", target_dollars=2_000, price=100, entry_date="d", why_en="", why_he="")
         p.mark_to_market({"X": 200})
-        # initial 10k → now ~ (cash 8098.10) + (19*200) = 11898 — ~+19% return
+        # initial 10k → now ~ (cash 8097.50) + (19*200) = 11897 — ~+19% return
         assert p.cumulative_return_pct > 15.0
 
 
