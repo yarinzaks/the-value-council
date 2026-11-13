@@ -859,6 +859,9 @@ class DailyRunner:
                 [r.portfolio for r in results if r.portfolio is not None],
                 as_of=as_of,
                 loader=self.price_loader,
+                # So the names the ledger records a sale of get a series
+                # too, and a closed position can be drawn past its exit.
+                ledger_dir=self.ledger_dir,
             )
         except Exception as exc:  # presentation only; never fails a run
             logger.warning(f"{as_of}: price export failed: {exc}")
@@ -936,6 +939,9 @@ class DailyRunner:
                 [r.portfolio for r in results if r.portfolio is not None],
                 as_of=as_of,
                 loader=self.price_loader,
+                # So the names the ledger records a sale of get a series
+                # too, and a closed position can be drawn past its exit.
+                ledger_dir=self.ledger_dir,
             )
         except Exception as exc:  # presentation only; never fails a run
             logger.warning(f"{as_of}: price export failed: {exc}")

@@ -319,3 +319,90 @@ class TestBenchmarks:
         )
 
         assert loader.asked == ["AAPL"]
+
+
+class TestTheNamesAnAgentUsedToHold:
+    """A closed position is drawn from entry to exit and on past it.
+
+    "What did it do after we sold" is the first question a reader of
+    that page asks, and it needs the series of a name nobody holds.
+    """
+
+    def _ledger(self, tmp_path: Path, agent: str, rows: list[dict]) -> Path:
+        d = tmp_path / "trades" / agent
+        d.mkdir(parents=True)
+        (d / "2026-08-07.json").write_text(json.dumps(rows))
+        return tmp_path / "trades"
+
+    def _sell(self, ticker: str, entry_date: str | None = None, **extra: object) -> dict:
+        row = {"date": "2026-08-07", "agent": "g", "ticker": ticker, "side": "SELL",
+               "shares": 10, "price": 12.0, "gross_value": 120.0, "cost_paid": 0.0,
+               "realized_pnl_usd": 0.0, "source": "executed"}
+        if entry_date:
+            row["entry_date"] = entry_date
+        row.update(extra)
+        return row
+
+    def test_a_sold_name_is_written_beside_the_held_ones(self, tmp_path: Path) -> None:
+        loader = _StubLoader({
+            "HELD": [("2026-08-06", 1.0)], "GONE": [("2026-08-06", 2.0)],
+        })
+        ledger = self._ledger(tmp_path, "g", [self._sell("GONE")])
+        out = tmp_path / "prices"
+        n = export_prices([_portfolio("g", ["HELD"])], as_of=AS_OF, loader=loader,
+                          root=out, benchmarks=(), ledger_dir=ledger)
+        assert n == 2
+        assert (out / "GONE.json").exists()
+
+    def test_without_a_ledger_dir_only_held_names_are_written(self, tmp_path: Path) -> None:
+        loader = _StubLoader({"HELD": [("2026-08-06", 1.0)], "GONE": [("2026-08-06", 2.0)]})
+        self._ledger(tmp_path, "g", [self._sell("GONE")])
+        n = export_prices([_portfolio("g", ["HELD"])], as_of=AS_OF, loader=loader,
+                          root=tmp_path / "prices", benchmarks=())
+        assert n == 1 and loader.asked == ["HELD"]
+
+    def test_a_name_sold_and_still_held_is_fetched_once(self, tmp_path: Path) -> None:
+        loader = _StubLoader({"BOTH": [("2026-08-06", 1.0)]})
+        ledger = self._ledger(tmp_path, "g", [self._sell("BOTH")])
+        export_prices([_portfolio("g", ["BOTH"])], as_of=AS_OF, loader=loader,
+                      root=tmp_path / "prices", benchmarks=(), ledger_dir=ledger)
+        assert loader.asked == ["BOTH"]
+
+    def test_an_old_entry_widens_the_window_so_the_holding_is_whole(
+        self, tmp_path: Path
+    ) -> None:
+        """A year back from 2026-08-07 is 2025-08-07; a line opened on
+        2025-03-02 must start a week before that, not in August."""
+
+        class Recording(_StubLoader):
+            def __init__(self) -> None:
+                super().__init__({"OLD": [("2026-08-06", 1.0)]})
+                self.starts: dict[str, date] = {}
+
+            def get_history(self, ticker: str, *, start: date, end: date) -> pd.DataFrame:
+                self.starts[ticker] = start
+                return super().get_history(ticker, start=start, end=end)
+
+        loader = Recording()
+        ledger = self._ledger(tmp_path, "g", [self._sell("OLD", entry_date="2025-03-02")])
+        export_prices([_portfolio("g", [])], as_of=AS_OF, loader=loader,
+                      root=tmp_path / "prices", benchmarks=(), ledger_dir=ledger)
+        assert loader.starts["OLD"] == date(2025, 2, 23)
+
+    def test_a_row_with_no_entry_keeps_the_default_window(self, tmp_path: Path) -> None:
+        from core.live.price_export import former_names
+
+        ledger = self._ledger(tmp_path, "g", [
+            self._sell("X"), self._sell("X", entry_date="2026-01-05"),
+            self._sell("Y", entry_date="not a date"),
+            {**self._sell("Z"), "side": "BUY"},
+        ])
+        got = former_names(["g"], ledger)
+        assert got == {"X": date(2026, 1, 5), "Y": None}
+
+    def test_a_sold_name_with_no_cached_history_is_skipped(self, tmp_path: Path) -> None:
+        loader = _StubLoader({})
+        ledger = self._ledger(tmp_path, "g", [self._sell("DELISTED")])
+        n = export_prices([_portfolio("g", [])], as_of=AS_OF, loader=loader,
+                          root=tmp_path / "prices", benchmarks=(), ledger_dir=ledger)
+        assert n == 0 and not (tmp_path / "prices" / "DELISTED.json").exists()
