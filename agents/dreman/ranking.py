@@ -19,6 +19,8 @@ Then the strategy takes the top ``portfolio_size`` (typically 20-30).
 
 from __future__ import annotations
 
+import statistics
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from core.backtest.point_in_time import PointInTimeFinancials
@@ -56,6 +58,22 @@ class DremanScore:
     net_income: float
 
 
+@dataclass(frozen=True)
+class MarketPE:
+    """The market P/E one day's screen measured candidates against.
+
+    The median trailing P/E of every candidate handed to
+    :func:`score_candidates` that has one — the population the P/E
+    quintile cut is taken from. ``median_pe`` is None when none had a
+    positive P/E. Published so Dreman's exit rules
+    (:mod:`agents.dreman.exits`) judge a held name against the same
+    market the entry screen used.
+    """
+
+    peer_count: int
+    median_pe: float | None
+
+
 def _percentile_rank(value: float, sorted_values: list[float]) -> float:
     """Fraction of population strictly below ``value``. 0.0 = lowest, 1.0 = highest."""
     n = len(sorted_values)
@@ -77,11 +95,16 @@ def score_candidates(
     *,
     min_qualifying_metrics: int = DEFAULT_MIN_QUALIFYING_METRICS,
     quintile: float = DEFAULT_QUINTILE,
+    on_market: Callable[[MarketPE], None] | None = None,
 ) -> list[DremanScore]:
     """Compute population-aware Dreman scores.
 
     Returns only candidates qualifying on >= ``min_qualifying_metrics``,
     sorted by (qualifying_metrics desc, composite_rank asc).
+
+    ``on_market``, when given, receives the population's
+    :class:`MarketPE` once the metrics are computed. It is not called
+    when there are no candidates.
     """
     if not candidates:
         return []
@@ -109,6 +132,14 @@ def score_candidates(
             pb_pop.append(pb)
         if yld is not None:
             yld_pop.append(yld)
+
+    if on_market is not None:
+        on_market(
+            MarketPE(
+                peer_count=len(pe_pop),
+                median_pe=statistics.median(pe_pop) if pe_pop else None,
+            )
+        )
 
     # Quintile thresholds. For P/E, P/CF, P/B: bottom quintile (cheap).
     # For yield: top quintile (high). quintile_thresholds returns
@@ -181,4 +212,4 @@ def select_top_n(scores: list[DremanScore], n: int) -> list[DremanScore]:
     return scores[:n]
 
 
-__all__ = ["DremanScore", "score_candidates", "select_top_n"]
+__all__ = ["DremanScore", "MarketPE", "score_candidates", "select_top_n"]
