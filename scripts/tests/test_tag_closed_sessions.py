@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import pytest
 
 from core.live.snapshots import load_snapshots
 from core.live.trade_ledger import read_ledger
+from core.market_calendar import why_closed
 from scripts import tag_closed_sessions as mod
 
 REPO_DATA = Path(__file__).resolve().parents[2] / "data"
@@ -159,3 +161,18 @@ class TestTheCommittedData:
         assert report.snapshots == []
         assert report.ledger_rows == 0
 
+    def test_the_misdated_2026_08_06_is_restored(self) -> None:
+        # 2026-08-06 was filed as 2026-08-07 by the 00:51Z close run of
+        # 8ac0c8bf and then overwritten; it is restored from that commit.
+        root = REPO_DATA / "snapshots"
+        restored = sorted(root.glob("*/2026-08-06.json"))
+
+        assert why_closed(date(2026, 8, 6)) is None  # a real session
+        assert len(restored) == 10
+        for path in restored:
+            data = json.loads(path.read_text())
+            assert data["date"] == "2026-08-06"
+            assert str(data["restored_from"]).startswith("8ac0c8bf")
+            # And every reader still sees the day.
+            days = [s.date for s in load_snapshots(path.parent.name, root=root)]
+            assert "2026-08-06" in days
