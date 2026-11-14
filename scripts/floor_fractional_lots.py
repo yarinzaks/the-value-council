@@ -125,11 +125,23 @@ def floor_one(portfolio: LivePortfolio) -> tuple[float, list[tuple[str, float, f
     # it.
     portfolio.cash += floored
     for pos in closing:
-        # No commission and no cost: there is no counterparty, and
-        # charging one would take real money out of the book for a
-        # trade nobody made. `sell()` credits shares x mark to cash,
-        # which is the same value the fraction is counted at above.
-        portfolio.sell(pos.ticker, price=pos.current_price, commission=0.0, cost_bps=0.0)
+        # Closed by identity, not through `sell(ticker)`: `sell` acts on
+        # the first line of a ticker, so with two lines in one name it
+        # closed the wrong one (follow-up L1). No commission and no cost:
+        # there is no counterparty, and charging one would take real
+        # money out of the book for a trade nobody made. Shares x mark
+        # is the same value the fraction is counted at above.
+        idx = next(i for i, p in enumerate(portfolio.positions) if p is pos)
+        portfolio.positions.pop(idx)
+        portfolio.cash += pos.shares * pos.current_price
+        key = pos.ticker.upper()
+        if not any(p.ticker.upper() == key for p in portfolio.positions):
+            # The name's dividend and split history ends only with its
+            # last line; a remaining line still needs it to stop a
+            # second payment.
+            portfolio.paid_dividends.pop(key, None)
+            portfolio.applied_splits.pop(key, None)
+            portfolio.applied_split_ratios.pop(key, None)
     return freed, changes
 
 

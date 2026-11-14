@@ -207,3 +207,42 @@ class TestAClosedLotTakesItsHistoryWithIt:
         [(ticker, before, after, cash)] = changes
         assert (ticker, before, after) == ("SEB", 0.4, 0.0)
         assert cash == pytest.approx(0.4 * 4_283.0)
+
+
+class TestTwoLinesInOneName:
+    """Follow-up L1. A name can hold two lines (see `consolidate`). The
+    close went through `sell(ticker)`, which acts on the *first* line of
+    that ticker — so a sub-share second line closed the whole first line
+    instead, and the close dropped the name's dividend records although
+    a line of it was still held."""
+
+    def test_the_sub_share_line_closes_not_the_first_line(self) -> None:
+        first = _pos("A", 5.0, 10.0, entry=8.0)
+        stub = _pos("A", 0.4, 10.0, entry=9.0)
+        book = _book([first, stub], cash=100.0)
+        book.paid_dividends = {"A": ["2026-09-01"]}
+        book.applied_splits = {"A": ["2026-07-01"]}
+        before = book.total_nav
+
+        freed, _ = floor_one(book)
+        book.mark_to_market({p.ticker: p.current_price for p in book.positions})
+
+        assert len(book.positions) == 1
+        assert book.positions[0].shares == 5.0
+        assert book.positions[0].entry_price == 8.0
+        assert freed == pytest.approx(4.0)
+        assert book.cash == pytest.approx(104.0)
+        assert book.total_nav == pytest.approx(before, abs=1e-9)
+        assert book.paid_dividends == {"A": ["2026-09-01"]}
+        assert book.applied_splits == {"A": ["2026-07-01"]}
+
+    def test_both_lines_under_one_share_close_and_drop_the_history(self) -> None:
+        book = _book([_pos("A", 0.4, 10.0), _pos("A", 0.3, 10.0)], cash=0.0)
+        book.paid_dividends = {"A": ["2026-09-01"]}
+
+        freed, _ = floor_one(book)
+
+        assert book.positions == []
+        assert freed == pytest.approx(7.0)
+        assert book.cash == pytest.approx(7.0)
+        assert book.paid_dividends == {}
