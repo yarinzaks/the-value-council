@@ -146,6 +146,11 @@ def save_snapshot(snap: DailySnapshot, *, root: Path = SNAPSHOTS_DIR) -> Path:
     The fundamentals-freshness fields follow the same rule: only the
     open scan reads filings, so a save that did not measure them
     (``fundamentals_stale is None``) keeps what the day already had.
+
+    The ``closed_session`` and ``restored_from`` markers describe the
+    day, not the run, and no run sets them; ``to_dict`` drops them when
+    unset. So a True ``closed_session`` and a non-null ``restored_from``
+    in the prior file are sticky, whatever the new save carries.
     """
     agent_dir = root / snap.agent
     agent_dir.mkdir(parents=True, exist_ok=True)
@@ -153,7 +158,7 @@ def save_snapshot(snap: DailySnapshot, *, root: Path = SNAPSHOTS_DIR) -> Path:
 
     keeps_trades = not snap.trade_count
     keeps_freshness = snap.fundamentals_stale is None
-    if (keeps_trades or keeps_freshness) and path.exists():
+    if path.exists():
         try:
             prior = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
@@ -172,6 +177,10 @@ def save_snapshot(snap: DailySnapshot, *, root: Path = SNAPSHOTS_DIR) -> Path:
                     fundamentals_newest_filed=prior.get("fundamentals_newest_filed"),
                     fundamentals_stale=bool(prior["fundamentals_stale"]),
                 )
+            if prior.get("closed_session") is True and not snap.closed_session:
+                snap = replace(snap, closed_session=True)
+            if prior.get("restored_from") is not None and snap.restored_from is None:
+                snap = replace(snap, restored_from=str(prior["restored_from"]))
 
     path.write_text(json.dumps(snap.to_dict(), indent=2))
     return path

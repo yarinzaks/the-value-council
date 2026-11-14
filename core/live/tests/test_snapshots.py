@@ -258,3 +258,65 @@ class TestProvenanceMarkers:
 
         assert "closed_session" not in written
         assert "restored_from" not in written
+
+    def test_a_close_mark_keeps_the_closed_session_tag(
+        self, tmp_path: Path
+    ) -> None:
+        # The day was tagged; a later trade-less close-of-day save
+        # rebuilds the snapshot from the book, which knows nothing of
+        # the tag, and ``to_dict`` drops a False marker.
+        self._write(tmp_path, {"closed_session": True})
+        book = LivePortfolio(agent="a", cash=100.0)
+
+        path = save_snapshot(
+            make_snapshot(book, as_of=date(2026, 9, 7)), root=tmp_path
+        )
+
+        assert json.loads(path.read_text())["closed_session"] is True
+        (snap,) = load_snapshots("a", root=tmp_path)
+        assert snap.closed_session is True
+
+    def test_a_close_mark_keeps_the_restoration_provenance(
+        self, tmp_path: Path
+    ) -> None:
+        self._write(tmp_path, {"restored_from": "8ac0c8bf"})
+        book = LivePortfolio(agent="a", cash=100.0)
+
+        path = save_snapshot(
+            make_snapshot(book, as_of=date(2026, 9, 7)), root=tmp_path
+        )
+
+        assert json.loads(path.read_text())["restored_from"] == "8ac0c8bf"
+        (snap,) = load_snapshots("a", root=tmp_path)
+        assert snap.restored_from == "8ac0c8bf"
+
+    def test_a_save_that_carries_trades_and_freshness_keeps_both(
+        self, tmp_path: Path
+    ) -> None:
+        # A re-run scan replaces trades and freshness outright, so it
+        # had no reason to read the prior file at all; the markers are
+        # about the day, not the run, and must survive it too.
+        self._write(
+            tmp_path, {"closed_session": True, "restored_from": "8ac0c8bf"}
+        )
+        book = LivePortfolio(agent="a", cash=100.0)
+        trade = TradeRecord(
+            ticker="AAA", side="BUY", shares=1.0, price=10.0,
+            gross_value=10.0, cost_paid=0.01, realized_pnl_usd=0.0,
+        )
+
+        path = save_snapshot(
+            make_snapshot(
+                book,
+                as_of=date(2026, 9, 7),
+                trades=[trade],
+                fundamentals_newest_filed="2026-08-01",
+                fundamentals_stale=False,
+            ),
+            root=tmp_path,
+        )
+
+        written = json.loads(path.read_text())
+        assert written["trade_count"] == 1
+        assert written["closed_session"] is True
+        assert written["restored_from"] == "8ac0c8bf"
