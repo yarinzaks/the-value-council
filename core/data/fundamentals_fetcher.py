@@ -262,33 +262,50 @@ def _instrument_family(
 # Families are grouped by overlap. NotesPayable is defined as all notes
 # payable, which includes senior notes and convertible notes, so a filer
 # tagging NotesPayable beside SeniorNotes may be reporting one borrowing
-# twice; the groups take the largest family in each and sum across
-# groups. Loans and credit lines are distinct instruments.
+# twice. Senior and convertible notes are separate borrowings of each
+# other, though. Each group is a set of alternative readings, each
+# reading a sum of families; the group contributes its largest reading
+# — max(NotesPayable, senior + convertible) — and the groups are summed.
+# Loans and credit lines are distinct instruments.
 _DebtShapes = tuple[tuple[str, tuple[str, ...]], ...]
-_INSTRUMENT_DEBT_GROUPS: tuple[tuple[_DebtShapes, ...], ...] = (
+_INSTRUMENT_DEBT_GROUPS: tuple[tuple[tuple[_DebtShapes, ...], ...], ...] = (
     (
         (
-            ("convertible_rollup", ("ConvertibleDebt",)),
-            ("convertible_notes_rollup", ("ConvertibleNotesPayable",)),
-            ("convertible_split", ("ConvertibleDebtNoncurrent", "ConvertibleDebtCurrent")),
             (
-                "convertible_notes_split",
-                ("ConvertibleLongTermNotesPayable", "ConvertibleNotesPayableCurrent"),
+                ("convertible_rollup", ("ConvertibleDebt",)),
+                ("convertible_notes_rollup", ("ConvertibleNotesPayable",)),
+                ("convertible_split", ("ConvertibleDebtNoncurrent", "ConvertibleDebtCurrent")),
+                (
+                    "convertible_notes_split",
+                    ("ConvertibleLongTermNotesPayable", "ConvertibleNotesPayableCurrent"),
+                ),
+                ("convertible_noncurrent_only", ("ConvertibleDebtNoncurrent",)),
+                ("convertible_notes_noncurrent_only", ("ConvertibleLongTermNotesPayable",)),
+                ("convertible_current_only", ("ConvertibleDebtCurrent",)),
+                ("convertible_notes_current_only", ("ConvertibleNotesPayableCurrent",)),
             ),
-            ("convertible_noncurrent_only", ("ConvertibleDebtNoncurrent",)),
-            ("convertible_notes_noncurrent_only", ("ConvertibleLongTermNotesPayable",)),
-            ("convertible_current_only", ("ConvertibleDebtCurrent",)),
-            ("convertible_notes_current_only", ("ConvertibleNotesPayableCurrent",)),
+            _instrument_family(
+                "senior_notes", "SeniorNotes", "SeniorLongTermNotes", "SeniorNotesCurrent"
+            ),
         ),
-        _instrument_family(
-            "senior_notes", "SeniorNotes", "SeniorLongTermNotes", "SeniorNotesCurrent"
+        (
+            _instrument_family(
+                "notes", "NotesPayable", "LongTermNotesPayable", "NotesPayableCurrent"
+            ),
         ),
-        _instrument_family("notes", "NotesPayable", "LongTermNotesPayable", "NotesPayableCurrent"),
     ),
-    (_instrument_family("loans", "LoansPayable", "LongTermLoansPayable", "LoansPayableCurrent"),),
     (
-        _instrument_family(
-            "line_of_credit", "LineOfCredit", "LongTermLineOfCredit", "LinesOfCreditCurrent"
+        (
+            _instrument_family(
+                "loans", "LoansPayable", "LongTermLoansPayable", "LoansPayableCurrent"
+            ),
+        ),
+    ),
+    (
+        (
+            _instrument_family(
+                "line_of_credit", "LineOfCredit", "LongTermLineOfCredit", "LinesOfCreditCurrent"
+            ),
         ),
     ),
 )
@@ -608,17 +625,20 @@ class FundamentalsFetcher:
         split) beats a one-sided one (label ending ``_only``) whatever
         their dates: a 10-Q that re-tags only the noncurrent half would
         otherwise displace the 10-K roll-up and drop the current
-        maturities. Within the same completeness the shape describing
-        the newest balance sheet wins (a shape is as old as its oldest
-        component), and on a tie the earlier shape wins — so a roll-up is
-        never added to its own split.
+        maturities. The one exception keeps that rule from understating
+        debt in the other direction: a one-sided shape that is newer AND
+        larger than the best complete one wins, since debt has grown past
+        the stale total. Within the same completeness the shape
+        describing the newest balance sheet wins (a shape is as old as its
+        oldest component), and on a tie the earlier shape wins — so a
+        roll-up is never added to its own split.
 
         Returns ``(value, period_end, label)``, or ``None`` when no shape
         has every component within the age bound.
         """
         cache: dict[str, XbrlFact | None] = {}
-        best: tuple[float, date, str] | None = None
-        best_rank: tuple[bool, date] = (False, date.min)
+        complete: tuple[float, date, str] | None = None
+        one_sided: tuple[float, date, str] | None = None
         for label, concepts in shapes:
             facts: list[XbrlFact] = []
             for concept in concepts:
@@ -630,11 +650,21 @@ class FundamentalsFetcher:
                 facts.append(fact)
             else:
                 period_end = min(f.period_end for f in facts)
-                rank = (not label.endswith("_only"), period_end)
-                if best is None or rank > best_rank:
-                    best = (sum(f.value for f in facts), period_end, label)
-                    best_rank = rank
-        return best
+                found = (sum(f.value for f in facts), period_end, label)
+                if label.endswith("_only"):
+                    if one_sided is None or period_end > one_sided[1]:
+                        one_sided = found
+                elif complete is None or period_end > complete[1]:
+                    complete = found
+        if complete is None:
+            return one_sided
+        if (
+            one_sided is not None
+            and one_sided[1] > complete[1]
+            and one_sided[0] > complete[0]
+        ):
+            return one_sided
+        return complete
 
     def _instrument_debt(
         self, ticker: str, as_of: date | datetime
@@ -645,21 +675,26 @@ class FundamentalsFetcher:
         borrowing on its own balance-sheet line: RPD's convertible, ALRM's
         senior notes, COLL's term loan beside its convertible, GOLD's
         revolver. Each family is resolved roll-up-or-split on its own;
-        within an overlap group the largest family is taken, and the
-        groups are summed (see :data:`_INSTRUMENT_DEBT_GROUPS`). Only
-        reached when no long-term total exists or it reads zero, because
-        a total already contains these lines.
+        within an overlap group each alternative reading sums its
+        families, the largest reading is taken, and the groups are summed
+        (see :data:`_INSTRUMENT_DEBT_GROUPS`). Only reached when no
+        long-term total exists or it reads zero, because a total already
+        contains these lines.
         """
         found: list[float] = []
         for group in _INSTRUMENT_DEBT_GROUPS:
-            values = [
-                resolved[0]
-                for family in group
-                if (resolved := self._resolve_debt_shapes(ticker, as_of, family))
-                is not None
-            ]
-            if values:
-                found.append(max(values))
+            readings: list[float] = []
+            for alternative in group:
+                values = [
+                    resolved[0]
+                    for family in alternative
+                    if (resolved := self._resolve_debt_shapes(ticker, as_of, family))
+                    is not None
+                ]
+                if values:
+                    readings.append(sum(values))
+            if readings:
+                found.append(max(readings))
         return sum(found) if found else None
 
     def _compute_total_debt(
@@ -728,9 +763,10 @@ class FundamentalsFetcher:
             not used or lease[1] > max(f.period_end for f in used)
         ):
             long_term, _lease_end, source = lease
-            if source == "debt_and_lease_total":
+            if source == "debt_and_lease_total" and long_term:
                 # Defined as short- AND long-term debt: adding the
-                # short-term tags on top would count them twice.
+                # short-term tags on top would count them twice. A zero
+                # still goes through the instrument fallback below.
                 return long_term, source
 
         if not long_term:  # None, or a zero beside instrument lines
@@ -738,6 +774,10 @@ class FundamentalsFetcher:
             if instruments is not None and (long_term is None or instruments > long_term):
                 long_term = instruments
                 source = "instruments"
+        if source == "debt_and_lease_total":
+            # A zero total the instruments did not beat: still a total
+            # of short- and long-term debt, so not topped up either.
+            return long_term, source
 
         if long_term is None and short_term is None:
             return None, "absent"

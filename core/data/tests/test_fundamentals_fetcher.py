@@ -1043,12 +1043,74 @@ class TestDebtRollupsAndInstruments:
         # convertible notes included: one figure per overlap group.
         total, source = self._total(
             tmp_path,
-            self._at("SeniorNotes", 990.0),
+            self._at("SeniorNotes", 600.0),
             self._at("NotesPayable", 1_000.0),
             self._at("ConvertibleNotesPayable", 400.0),
         )
         assert total == 1_000.0
         assert source == "instruments"
+
+    def test_distinct_senior_and_convertible_notes_are_summed(
+        self, tmp_path: Path
+    ) -> None:
+        # Senior and convertible notes are separate borrowings; only a
+        # NotesPayable total can contain both.
+        total, source = self._total(
+            tmp_path,
+            self._at("SeniorNotes", 990.0),
+            self._at("ConvertibleDebt", 400.0),
+        )
+        assert total == 1_390.0
+        assert source == "instruments"
+
+    def test_notes_total_smaller_than_its_parts_does_not_cap_them(
+        self, tmp_path: Path
+    ) -> None:
+        # A NotesPayable below senior + convertible cannot contain both;
+        # the larger reading is kept so debt is never understated.
+        total, _ = self._total(
+            tmp_path,
+            self._at("SeniorNotes", 990.0),
+            self._at("NotesPayable", 1_000.0),
+            self._at("ConvertibleNotesPayable", 400.0),
+        )
+        assert total == 1_390.0
+
+    def test_zero_debt_and_lease_total_falls_back_to_instruments(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("DebtAndCapitalLeaseObligations", 0.0),
+            self._at("SeniorNotes", 990.0),
+        )
+        assert total == 990.0
+        assert source == "instruments"
+
+    def test_zero_debt_and_lease_total_with_no_instruments_stays_zero(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("DebtAndCapitalLeaseObligations", 0.0),
+            self._at("ShortTermBorrowings", 50.0),
+        )
+        assert total == 0.0
+        assert source == "debt_and_lease_total"
+
+    def test_newer_larger_one_sided_shape_beats_an_older_complete_one(
+        self, tmp_path: Path
+    ) -> None:
+        # Completeness guards against a newer one-sided reading dropping
+        # current maturities; it must not let a stale roll-up hide debt
+        # that has since grown past it.
+        total, _ = self._total(
+            tmp_path,
+            self._at("SeniorNotes", 500.0),
+            self._at("SeniorLongTermNotes", 2_000.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 2_000.0
 
     def test_overlap_group_is_still_summed_with_loans_and_credit_lines(
         self, tmp_path: Path

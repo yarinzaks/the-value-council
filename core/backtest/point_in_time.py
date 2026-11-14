@@ -373,7 +373,11 @@ CREATE TABLE IF NOT EXISTS financials (
 # 6: total_debt prefers complete debt shapes over newer one-sided ones,
 #    reads instrument lines when long-term debt is zero, and takes one
 #    figure per overlapping notes group; v5 rows can hold a lower total.
-_PAYLOAD_VERSION = 6
+# 7: senior and convertible notes are summed against NotesPayable rather
+#    than capped by the larger family, a zero DebtAndCapitalLeaseObligations
+#    reaches the instrument fallback, and a newer larger one-sided shape
+#    beats an older complete one; v6 rows can hold a lower total.
+_PAYLOAD_VERSION = 7
 _VERSION_KEY = "_payload_version"
 
 
