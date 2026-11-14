@@ -543,6 +543,25 @@ class TestDeterioration:
         cache = _cache(tmp_path, X=_facts("X"))
         assert _decide(cache, _fin("X", eps=-0.5, net_income=-50e6), 5.0) is None
 
+    @pytest.mark.parametrize(
+        ("with_fin", "price"),
+        [(False, 5.0), (True, None), (True, 0.0), (False, None)],
+        ids=["no-fundamentals", "no-price", "zero-price", "neither"],
+    )
+    def test_it_fires_without_fundamentals_or_a_price(
+        self, tmp_path: Path, with_fin: bool, price: float | None
+    ) -> None:
+        """Trigger 3 reads only the 10-K revenue in the cache: a missing
+        price or snapshot cannot hide a sale "at any price"."""
+        cache = _cache(
+            tmp_path,
+            X=_facts("X", revenue={2022: 1.4e9, 2023: 1.3e9}),
+        )
+        v = _decide(cache, _fin("X") if with_fin else None, price)
+        assert v is not None and v.sell is True
+        assert v.ticker == "X"
+        assert v.reason.startswith("fundamental deterioration:")
+
 
 # ---------------------------------------------------------------------------
 # What does not produce a verdict at all

@@ -212,12 +212,14 @@ def decide(
 ) -> ExitVerdict | None:
     """Keep or sell one held name, or None when it cannot be judged."""
     ticker = position.ticker
-    if fin is None or price is None or price <= 0:
-        return None
-
+    # Trigger 3 reads only the cached 10-K revenue, so it runs before
+    # the fundamentals/price guard: a missing quote must not hide it.
     broken = deterioration(ticker, cache=cache, as_of=as_of)
     if broken is not None:
         return ExitVerdict(ticker, sell=True, reason=broken)
+
+    if fin is None or price is None or price <= 0:
+        return None
 
     pe = pe_ratio(price, fin)
     if pe is None:
