@@ -26,6 +26,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -614,32 +615,42 @@ class TestAdapterReadsVerdicts:
 # ---------------------------------------------------------------------------
 # A failing shadow verdict does not cost the agent its day (audit L3)
 # ---------------------------------------------------------------------------
-def _strategies(cache_dir: Path) -> list[tuple[str, Any, Any]]:
+def _strategies(cache_dir: Path) -> list[tuple[ModuleType, Any, str]]:
     """Every strategy that computes verdicts inside ``select``.
 
     (exits module whose ``verdicts`` is patched, the strategy, the
-    agent slug the error must name.)
+    agent slug the error must name.) The exits modules are imported
+    directly: each strategy binds the same module object under an alias,
+    so patching ``verdicts`` here is what its ``select`` calls.
     """
-    from agents.buffett import wonderful_business
-    from agents.dreman import contrarian
-    from agents.fisher import quality_growth
-    from agents.graham import net_net
-    from agents.klarman import margin_of_safety
-    from agents.marks import cycle_value
-    from agents.neff import total_return
-    from agents.schloss import deep_value
+    from agents.buffett import exits as buffett_exits
+    from agents.buffett.wonderful_business import WarrenBuffett
+    from agents.dreman import exits as dreman_exits
+    from agents.dreman.contrarian import DavidDreman
+    from agents.fisher import exits as fisher_exits
+    from agents.fisher.quality_growth import PhilipFisher
+    from agents.graham import exits as graham_exits
+    from agents.graham.net_net import BenjaminGraham
+    from agents.klarman import exits as klarman_exits
+    from agents.klarman.margin_of_safety import SethKlarman
+    from agents.marks import exits as marks_exits
+    from agents.marks.cycle_value import HowardMarks
+    from agents.neff import exits as neff_exits
+    from agents.neff.total_return import JohnNeff
+    from agents.schloss import exits as schloss_exits
+    from agents.schloss.deep_value import WalterSchloss
     from core.data.edgar_cache import EdgarCache
 
     cache = EdgarCache(cache_dir=cache_dir)
     return [
-        (wonderful_business.buffett_exits, wonderful_business.WarrenBuffett(edgar_cache=cache), "warren_buffett"),
-        (contrarian.dreman_exits, contrarian.DavidDreman(edgar_cache=cache), "david_dreman"),
-        (quality_growth.fisher_exits, quality_growth.PhilipFisher(edgar_cache=cache), "philip_fisher"),
-        (net_net.graham_exits, net_net.BenjaminGraham(edgar_cache=cache), "benjamin_graham"),
-        (margin_of_safety.klarman_exits, margin_of_safety.SethKlarman(edgar_cache=cache), "seth_klarman"),
-        (cycle_value.marks_exits, cycle_value.HowardMarks(edgar_cache=cache), "howard_marks"),
-        (total_return.neff_exits, total_return.JohnNeff(edgar_cache=cache), "john_neff"),
-        (deep_value.schloss_exits, deep_value.WalterSchloss(edgar_cache=cache), "walter_schloss"),
+        (buffett_exits, WarrenBuffett(edgar_cache=cache), "warren_buffett"),
+        (dreman_exits, DavidDreman(edgar_cache=cache), "david_dreman"),
+        (fisher_exits, PhilipFisher(edgar_cache=cache), "philip_fisher"),
+        (graham_exits, BenjaminGraham(edgar_cache=cache), "benjamin_graham"),
+        (klarman_exits, SethKlarman(edgar_cache=cache), "seth_klarman"),
+        (marks_exits, HowardMarks(edgar_cache=cache), "howard_marks"),
+        (neff_exits, JohnNeff(edgar_cache=cache), "john_neff"),
+        (schloss_exits, WalterSchloss(edgar_cache=cache), "walter_schloss"),
     ]
 
 
