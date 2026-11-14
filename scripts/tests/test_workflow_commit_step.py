@@ -110,6 +110,10 @@ class Repo:
         self.remote = root / "remote.git"
         self.work = root / "runner"
         self.other = root / "other"
+        # Actions' RUNNER_TEMP. Always set, so a step that falls back to
+        # /tmp without it never writes outside the test's directory.
+        self.runner_temp = root / "runner-temp"
+        self.runner_temp.mkdir()
         _git(root, self.env, "init", "--bare", "-b", BRANCH, str(self.remote))
         _git(root, self.env, "clone", str(self.remote), str(self.work))
         _seed(self.work)
@@ -128,11 +132,14 @@ class Repo:
         _git(self.other, self.env, "push", "origin", f"HEAD:{BRANCH}")
         return _git(self.other, self.env, "rev-parse", "HEAD")
 
-    def run_step(self) -> subprocess.CompletedProcess[str]:
-        env = dict(self.env, MODE="open", MARKET="US", TARGET_REF=BRANCH)
+    def run_step(self, script: str = SCRIPT) -> subprocess.CompletedProcess[str]:
+        env = dict(
+            self.env, MODE="open", MARKET="US", TARGET_REF=BRANCH,
+            RUNNER_TEMP=str(self.runner_temp),
+        )
         # `bash -e {0}` is what Actions runs a step with no `shell:` under.
         return subprocess.run(
-            ["bash", "-e", "-c", SCRIPT], cwd=self.work, env=env,
+            ["bash", "-e", "-c", script], cwd=self.work, env=env,
             capture_output=True, text=True,
         )
 
@@ -238,3 +245,133 @@ def test_an_unreachable_remote_fails_the_job(repo: Repo) -> None:
     assert result.returncode != 0
     assert "the pull itself failed" in result.stdout
     assert not repo.rebase_in_progress()
+
+
+# ------------------------------------------------- a lost commit is kept
+#
+# Run 43449460656 (2026-11-13, US close) is the case. Its rebase
+# conflicted add/add on data/snapshots/*/2026-11-13.json with the open
+# run's 935ff0f7, and its commit went away with the runner. Failing the
+# job (above) makes that visible; these keep the commit itself.
+
+PATCH_DIR = "unpushed-commits"
+
+
+def test_a_rebase_conflict_keeps_the_runs_commit_as_a_patch(repo: Repo) -> None:
+    """The commit that could not be pushed is written out, and it applies."""
+    seed = repo.remote_head()
+    (repo.work / "data/sectors.json").write_text('{"X": "ours"}\n')
+    repo.push_from_other("data/sectors.json", '{"X": "theirs"}\n')
+
+    result = repo.run_step()
+
+    assert result.returncode != 0
+    patches = sorted((repo.runner_temp / PATCH_DIR).glob("*.patch"))
+    assert len(patches) == 1, result.stdout + result.stderr
+    text = patches[0].read_text()
+    assert "auto: paper-trading run US open" in text
+    assert '+{"X": "ours"}' in text
+    # Recoverable: the patch applies onto the tree the run started from.
+    _git(repo.other, repo.env, "checkout", "--detach", seed)
+    _git(repo.other, repo.env, "am", str(patches[0]))
+    assert (repo.other / "data/sectors.json").read_text() == '{"X": "ours"}\n'
+
+
+def test_a_successful_push_writes_no_patch(repo: Repo) -> None:
+    (repo.work / "data/portfolios/graham.json").write_text('{"cash": 2}\n')
+
+    result = repo.run_step()
+
+    assert result.returncode == 0, result.stderr
+    assert not (repo.runner_temp / PATCH_DIR).exists()
+
+
+def test_the_patches_are_uploaded_when_the_job_fails() -> None:
+    """Written to the runner's temp dir, they still die with it unless uploaded."""
+    lines = DAILY.read_text().splitlines()
+    start = next(
+        i for i, line in enumerate(lines)
+        if line.strip() == "- name: Upload unpushed commits as artifact"
+    )
+    block: list[str] = []
+    for line in lines[start + 1 :]:
+        if line.strip().startswith("- name:"):
+            break
+        block.append(line.strip())
+    assert "if: failure()" in block
+    assert "uses: actions/upload-artifact@v4" in block
+    assert f"path: ${{{{ runner.temp }}}}/{PATCH_DIR}/" in block
+    # The step also runs when the job failed for another reason, with
+    # nothing to upload; that must not add a second error.
+    assert "if-no-files-found: ignore" in block
+
+
+# ------------------------------------------- the root cause: a stale tree
+#
+# The lock did keep the two runs apart. The close run's `wait` job was
+# created at 15:07Z and held until its 17:00Z anchor; the open run had
+# pushed at 15:52Z. But `actions/checkout` with no `ref:` checks out
+# `github.sha`, the commit the event fired on — main as it stood at
+# 15:07Z, without 935ff0f7. So the close run built its state on a tree
+# that predated the open run, wrote 2026-11-13 snapshots the open run
+# had already created, and its rebase met them as add/add.
+
+SYNC_STEP = "Move to the branch tip, inside the lock"
+SNAPSHOT = "data/snapshots/benjamin_graham/2026-11-13.json"
+
+
+def _scan_step_names() -> list[str]:
+    text = DAILY.read_text()
+    scan = text[text.index("\n  scan:\n") :]
+    return [
+        line.strip().removeprefix("- name: ")
+        for line in scan.splitlines()
+        if line.strip().startswith("- name: ")
+    ]
+
+
+def test_a_stale_checkout_reproduces_the_lost_commit(repo: Repo) -> None:
+    """Without the sync, the 2026-11-13 failure, as it happened.
+
+    The runner's tree predates the other run's push; both create the
+    same day's snapshot; the rebase stops on it.
+    """
+    repo.push_from_other(SNAPSHOT, '{"run": "open"}\n')
+    (repo.work / SNAPSHOT).parent.mkdir(parents=True, exist_ok=True)
+    (repo.work / SNAPSHOT).write_text('{"run": "close"}\n')
+
+    result = repo.run_step()
+
+    assert result.returncode != 0
+    assert SNAPSHOT in result.stdout
+
+
+def test_the_sync_moves_a_stale_checkout_to_the_tip(repo: Repo) -> None:
+    """After the sync the run writes on top of the other run, and pushes."""
+    theirs = repo.push_from_other(SNAPSHOT, '{"run": "open"}\n')
+    sync = _step_script(DAILY.read_text(), SYNC_STEP)
+
+    synced = repo.run_step(sync)
+
+    assert synced.returncode == 0, synced.stderr
+    assert _git(repo.work, repo.env, "rev-parse", "HEAD") == theirs
+    assert (repo.work / SNAPSHOT).read_text() == '{"run": "open"}\n'
+
+    (repo.work / SNAPSHOT).write_text('{"run": "close"}\n')
+    result = repo.run_step()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert repo.remote_file(SNAPSHOT) == '{"run": "close"}\n'
+    assert theirs in _git(repo.remote, repo.env, "rev-list", BRANCH).split()
+
+
+def test_the_sync_runs_inside_the_lock_before_anything_writes() -> None:
+    """Right after checkout, in the job that holds the concurrency group.
+
+    Before checkout it has no repo; after a step that writes, a reset
+    would throw that step's work away.
+    """
+    names = _scan_step_names()
+    assert SYNC_STEP in names, names
+    assert names.index(SYNC_STEP) == names.index("Checkout repository") + 1
+    assert names.index(SYNC_STEP) < names.index("Prepare data directories")

@@ -390,6 +390,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Move to the branch tip, inside the lock
+        # The lock serialises runs; it does not refresh what they read.
+        # With no `ref:`, actions/checkout checks out github.sha — the
+        # commit the event fired on, not the branch as it stands when
+        # this job finally gets the lock. On 2026-11-13 the 15:00 cron
+        # fired at 15:07Z, held until 17:00Z, and checked out main as of
+        # 15:07Z, without the open run's 935ff0f7 pushed at 15:52Z. It
+        # built the close on a book that predated the open, wrote the
+        # day's snapshots the open had already created, and its rebase
+        # stopped on them add/add (run 43449460656).
+        #
+        # Resetting here loses nothing: it is the first step after
+        # checkout, the lock is already held, and nothing has written to
+        # the tree yet. The scripts that run are then the tip's too,
+        # which is what a run that starts now should execute.
+        run: |
+          git fetch --no-tags origin "$TARGET_REF"
+          checked_out=$(git rev-parse HEAD)
+          git reset --hard FETCH_HEAD
+          tip=$(git rev-parse HEAD)
+          if [ "$checked_out" != "$tip" ]; then
+            echo "::notice::moved from ${checked_out} (the triggering commit) to ${tip} (origin/${TARGET_REF})"
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -547,10 +571,30 @@ jobs:
                 break
               fi
             done
+            # The abort put HEAD back on this run's commit. Keep it: the
+            # runner is thrown away with the job, and so was 2026-11-13's
+            # close. The step below uploads the directory.
+            patches="${RUNNER_TEMP:-/tmp}/unpushed-commits"
+            if git format-patch --output-directory "$patches" "origin/${TARGET_REF}..HEAD" >/dev/null; then
+              echo "::notice::this run's unpushed commit is saved as the unpushed-commits artifact; apply it with git am"
+            else
+              echo "::warning::could not save this run's commit as a patch"
+            fi
             echo "::error::could not rebase this run's commit onto origin/${TARGET_REF}; nothing was pushed. Conflicting files: ${conflicted:-none (the pull itself failed)}"
             exit 1
           fi
           git push origin "HEAD:${TARGET_REF}"
+
+      - name: Upload unpushed commits as artifact
+        # Only the rebase failure above writes the directory; any other
+        # failure finds it empty, hence `ignore`.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unpushed-commits-${{ needs.wait.outputs.market }}-${{ needs.wait.outputs.mode }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/unpushed-commits/
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload run logs as artifact
         if: always()
