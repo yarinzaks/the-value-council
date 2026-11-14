@@ -36,7 +36,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
-from core.live.doctrine_exits import ExitVerdict
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.logger import get_logger
 
 from . import exits as neff_exits
@@ -151,14 +151,17 @@ class JohnNeff(Strategy):
         # Before the empty-screen return, so it is published even when
         # nothing qualifies today — when a held name's verdict matters
         # most. Judged against the market this screen just measured.
-        self.last_exit_decisions = neff_exits.verdicts(
-            held,
-            prices,
-            fundamentals,
-            market[0] if market else None,
-            cache=self.edgar_cache,
-            market_cap=lambda t, fin, price: self._market_cap(t, as_of, fin, price),
-            as_of=as_of,
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: neff_exits.verdicts(
+                held,
+                prices,
+                fundamentals,
+                market[0] if market else None,
+                cache=self.edgar_cache,
+                market_cap=lambda t, fin, price: self._market_cap(t, as_of, fin, price),
+                as_of=as_of,
+            ),
         )
 
         if not top:

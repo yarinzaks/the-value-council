@@ -612,6 +612,104 @@ class TestAdapterReadsVerdicts:
 
 
 # ---------------------------------------------------------------------------
+# A failing shadow verdict does not cost the agent its day (audit L3)
+# ---------------------------------------------------------------------------
+def _strategies(cache_dir: Path) -> list[tuple[str, Any, Any]]:
+    """Every strategy that computes verdicts inside ``select``.
+
+    (exits module whose ``verdicts`` is patched, the strategy, the
+    agent slug the error must name.)
+    """
+    from agents.buffett import wonderful_business
+    from agents.dreman import contrarian
+    from agents.fisher import quality_growth
+    from agents.graham import net_net
+    from agents.klarman import margin_of_safety
+    from agents.marks import cycle_value
+    from agents.neff import total_return
+    from agents.schloss import deep_value
+    from core.data.edgar_cache import EdgarCache
+
+    cache = EdgarCache(cache_dir=cache_dir)
+    return [
+        (wonderful_business.buffett_exits, wonderful_business.WarrenBuffett(edgar_cache=cache), "warren_buffett"),
+        (contrarian.dreman_exits, contrarian.DavidDreman(edgar_cache=cache), "david_dreman"),
+        (quality_growth.fisher_exits, quality_growth.PhilipFisher(edgar_cache=cache), "philip_fisher"),
+        (net_net.graham_exits, net_net.BenjaminGraham(edgar_cache=cache), "benjamin_graham"),
+        (margin_of_safety.klarman_exits, margin_of_safety.SethKlarman(edgar_cache=cache), "seth_klarman"),
+        (cycle_value.marks_exits, cycle_value.HowardMarks(edgar_cache=cache), "howard_marks"),
+        (total_return.neff_exits, total_return.JohnNeff(edgar_cache=cache), "john_neff"),
+        (deep_value.schloss_exits, deep_value.WalterSchloss(edgar_cache=cache), "walter_schloss"),
+    ]
+
+
+_STRATEGY_IDS = [
+    "warren_buffett",
+    "david_dreman",
+    "philip_fisher",
+    "benjamin_graham",
+    "seth_klarman",
+    "howard_marks",
+    "john_neff",
+    "walter_schloss",
+]
+
+
+class _NoFundamentals:
+    def get(self, ticker: str) -> None:
+        return None
+
+
+class _NoPrices:
+    def get(self, ticker: str) -> None:
+        return None
+
+
+def _boom(*args: object, **kwargs: object) -> list[ExitVerdict]:
+    raise RuntimeError("verdict exploded")
+
+
+class TestShadowVerdictGuard:
+    @pytest.mark.parametrize("index", range(8), ids=_STRATEGY_IDS)
+    def test_a_raising_shadow_verdict_still_returns_the_days_weights(
+        self, index: int, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        exits_module, strategy, agent = _strategies(tmp_path)[index]
+        monkeypatch.setattr(exits_module, "verdicts", _boom)
+        strategy.last_exit_decisions = [ExitVerdict("OLD", True, "yesterday")]
+
+        with _logged("ERROR") as errors:
+            weights = strategy.select(
+                AS_OF, [], _NoPrices(), _NoFundamentals(), held={}
+            )
+
+        assert weights == {}
+        # Yesterday's verdicts are not passed off as today's.
+        assert strategy.last_exit_decisions == []
+        (message,) = errors
+        assert agent in message
+        assert "verdict exploded" in message
+        assert "Traceback" in message
+
+    def test_an_enforcing_agent_still_stops(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from types import MappingProxyType
+
+        monkeypatch.setattr(
+            doctrine_exits,
+            "DOCTRINE_EXIT_MODES",
+            MappingProxyType({"howard_marks": "enforce"}),
+        )
+        with pytest.raises(RuntimeError, match="verdict exploded"):
+            doctrine_exits.guarded_verdicts("howard_marks", _boom)
+
+    def test_a_working_verdict_passes_through(self) -> None:
+        verdicts = [ExitVerdict("AAA", False, "still cheap")]
+        assert doctrine_exits.guarded_verdicts("howard_marks", lambda: verdicts) == verdicts
+
+
+# ---------------------------------------------------------------------------
 # The playbooks say what runs
 # ---------------------------------------------------------------------------
 _PLAYBOOKS = sorted((REPO / "agents").glob("*/playbook.md"))

@@ -40,7 +40,7 @@ from core.backtest.strategy_runner import (
 )
 from core.data.edgar_cache import EdgarCache
 from core.day_files import canonical_day_files
-from core.live.doctrine_exits import ExitVerdict
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.llm.concurrency import analyze_all
 from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
@@ -205,13 +205,16 @@ class HowardMarks(Strategy):
         # Judged against the cycle just measured; an empty measurable
         # universe defaults to Neutral without reading anything, which
         # is no posture to value a name against.
-        self.last_exit_decisions = marks_exits.verdicts(
-            held,
-            prices,
-            fundamentals,
-            temperature.posture if temperature.signals.universe_size else None,
-            as_of=as_of,
-            max_de=self.max_de,
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: marks_exits.verdicts(
+                held,
+                prices,
+                fundamentals,
+                temperature.posture if temperature.signals.universe_size else None,
+                as_of=as_of,
+                max_de=self.max_de,
+            ),
         )
 
         # Stage 2: quality gates, now that the posture is known.

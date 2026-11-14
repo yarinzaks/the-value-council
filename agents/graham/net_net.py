@@ -34,7 +34,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
-from core.live.doctrine_exits import ExitVerdict
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.logger import get_logger
 from core.watchlist import WatchCandidate
 
@@ -175,8 +175,11 @@ class BenjaminGraham(Strategy):
         )
         # First, so it is published even when nothing qualifies today —
         # an empty screen is when a held name's verdict matters most.
-        self.last_exit_decisions = graham_exits.verdicts(
-            held, prices, fundamentals, as_of=as_of, max_p_ncav=self.max_p_ncav
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: graham_exits.verdicts(
+                held, prices, fundamentals, as_of=as_of, max_p_ncav=self.max_p_ncav
+            ),
         )
 
         triples: list[

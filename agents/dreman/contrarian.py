@@ -31,7 +31,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
-from core.live.doctrine_exits import ExitVerdict
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.logger import get_logger
 
 from . import exits as dreman_exits
@@ -196,14 +196,17 @@ class DavidDreman(Strategy):
         # Before the empty-screen return, so it is published even when
         # nothing qualifies today — when a held name's verdict matters
         # most. Judged against the market this screen just measured.
-        self.last_exit_decisions = dreman_exits.verdicts(
-            held,
-            prices,
-            fundamentals,
-            market[0] if market else None,
-            cache=self.edgar_cache,
-            as_of=as_of,
-            max_de=self.max_de,
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: dreman_exits.verdicts(
+                held,
+                prices,
+                fundamentals,
+                market[0] if market else None,
+                cache=self.edgar_cache,
+                as_of=as_of,
+                max_de=self.max_de,
+            ),
         )
         # Rule 18: 20-30 names across 15+ industries, none above 15% of
         # the book. Taking the top N by rank alone produced 25 holdings

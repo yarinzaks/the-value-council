@@ -28,10 +28,14 @@ what the engine did, not instructions to a $10,000 book.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, cast
+
+from core.logger import get_logger
+
+logger = get_logger("core.live.doctrine_exits")
 
 ExitMode = Literal["shadow", "enforce"]
 
@@ -89,6 +93,33 @@ def exit_mode_for(agent: str) -> ExitMode:
     return parse_exit_mode(DOCTRINE_EXIT_MODES.get(agent, DEFAULT_EXIT_MODE))
 
 
+def guarded_verdicts(
+    agent: str, compute: Callable[[], list[ExitVerdict]]
+) -> list[ExitVerdict]:
+    """``compute()``, unless it raises while ``agent``'s exits are in shadow.
+
+    Each strategy computes its verdicts inside ``select``, so an
+    exception there would take the whole day's selection with it. In
+    shadow the verdicts only journal, so the error is logged at ERROR
+    with the agent and the traceback, the day gets no verdicts, and
+    trading proceeds. An enforcing agent re-raises: there the verdict
+    trades, and a day without it is not a day to trade on.
+
+    The mode is the configured one (:func:`exit_mode_for`); a strategy
+    does not see an adapter constructed with an explicit override.
+    """
+    try:
+        return compute()
+    except Exception:
+        if exit_mode_for(agent) == "enforce":
+            raise
+        logger.opt(exception=True).error(
+            f"{agent}: shadow exit verdicts failed; none journaled today, "
+            "trading proceeds"
+        )
+        return []
+
+
 __all__ = [
     "DEFAULT_EXIT_MODE",
     "DOCTRINE_EXIT_MODES",
@@ -96,5 +127,6 @@ __all__ = [
     "ExitMode",
     "ExitVerdict",
     "exit_mode_for",
+    "guarded_verdicts",
     "parse_exit_mode",
 ]

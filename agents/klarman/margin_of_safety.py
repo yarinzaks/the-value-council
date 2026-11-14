@@ -40,7 +40,7 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
-from core.live.doctrine_exits import ExitVerdict
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.llm.concurrency import analyze_all
 from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
@@ -187,14 +187,17 @@ class SethKlarman(Strategy):
         )
         # First, so it is published even when nothing qualifies today —
         # an empty screen is when a held name's verdict matters most.
-        self.last_exit_decisions = klarman_exits.verdicts(
-            held,
-            prices,
-            fundamentals,
-            cache=self.edgar_cache,
-            market_cap=lambda t, fin, price: self._market_cap(t, as_of, fin, price),
-            as_of=as_of,
-            max_de=self.max_de,
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: klarman_exits.verdicts(
+                held,
+                prices,
+                fundamentals,
+                cache=self.edgar_cache,
+                market_cap=lambda t, fin, price: self._market_cap(t, as_of, fin, price),
+                as_of=as_of,
+                max_de=self.max_de,
+            ),
         )
 
         triples: list[
