@@ -34,8 +34,13 @@ adapter, we fall back to that source for missing fields.
 
 from __future__ import annotations
 
+import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Literal
+
+import pandas as pd
 
 from core.backtest.point_in_time import (
     EdgarAdapter,
@@ -207,6 +212,337 @@ _STOCK_CONCEPTS: frozenset[str] = frozenset(
     ]
 )
 
+# Debt tags read by ``_compute_total_debt`` beyond the LongTermDebt
+# family (audit FUND-4). Ten holdings were scored D/E 0.00 because their
+# debt sat only in these elements. Each entry is ``(label, concepts)``;
+# the concepts are summed, and see ``_resolve_debt_shapes`` for how one
+# shape is chosen over another.
+#
+# Lease-inclusive totals. Measured in the cache at FY2025: FISV tags
+# DebtAndCapitalLeaseObligations ($28,997M); APH, SIRI, HRI and WH tag
+# LongTermDebtAndCapitalLeaseObligations (noncurrent) with its Current
+# counterpart, and APH/SIRI/HRI/WH also the IncludingCurrentMaturities
+# roll-up. DebtAndCapitalLeaseObligations is defined as short- AND
+# long-term debt, so it is never topped up with short-term tags.
+_LEASE_INCLUSIVE_DEBT_SHAPES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "lease_rollup",
+        ("LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",),
+    ),
+    ("debt_and_lease_total", ("DebtAndCapitalLeaseObligations",)),
+    (
+        "lease_split",
+        (
+            "LongTermDebtAndCapitalLeaseObligations",
+            "LongTermDebtAndCapitalLeaseObligationsCurrent",
+        ),
+    ),
+    ("lease_noncurrent_only", ("LongTermDebtAndCapitalLeaseObligations",)),
+    ("lease_current_only", ("LongTermDebtAndCapitalLeaseObligationsCurrent",)),
+)
+
+
+def _instrument_family(
+    name: str, rollup: str, noncurrent: str, current: str
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return (
+        (f"{name}_rollup", (rollup,)),
+        (f"{name}_split", (noncurrent, current)),
+        (f"{name}_noncurrent_only", (noncurrent,)),
+        (f"{name}_current_only", (current,)),
+    )
+
+
+# Per-instrument balance-sheet lines, read only when no total exists.
+# Measured in the cache at FY2025: RPD ConvertibleDebtNoncurrent
+# ($892M); COLL ConvertibleLongTermNotesPayable ($238M) beside
+# LongTermLoansPayable + LoansPayableCurrent ($571M); ALRM
+# SeniorLongTermNotes + SeniorNotesCurrent ($990M); GOLD
+# LongTermLineOfCredit ($300M) + LongTermNotesPayable/NotesPayableCurrent;
+# CRTO NotesPayableCurrent ($37M). The two convertible element sets
+# describe the same instrument, so they are one family, not two.
+#
+# Families are grouped by overlap. NotesPayable is defined as all notes
+# payable, which includes senior notes and convertible notes, so a filer
+# tagging NotesPayable beside SeniorNotes may be reporting one borrowing
+# twice. Senior and convertible notes are separate borrowings of each
+# other, though. Each group is a set of alternative readings, each
+# reading a sum of families; the group contributes its largest reading
+# — max(NotesPayable, senior + convertible) — and the groups are summed.
+# Loans and credit lines are distinct instruments.
+_DebtShapes = tuple[tuple[str, tuple[str, ...]], ...]
+_INSTRUMENT_DEBT_GROUPS: tuple[tuple[tuple[_DebtShapes, ...], ...], ...] = (
+    (
+        (
+            (
+                ("convertible_rollup", ("ConvertibleDebt",)),
+                ("convertible_notes_rollup", ("ConvertibleNotesPayable",)),
+                ("convertible_split", ("ConvertibleDebtNoncurrent", "ConvertibleDebtCurrent")),
+                (
+                    "convertible_notes_split",
+                    ("ConvertibleLongTermNotesPayable", "ConvertibleNotesPayableCurrent"),
+                ),
+                ("convertible_noncurrent_only", ("ConvertibleDebtNoncurrent",)),
+                ("convertible_notes_noncurrent_only", ("ConvertibleLongTermNotesPayable",)),
+                ("convertible_current_only", ("ConvertibleDebtCurrent",)),
+                ("convertible_notes_current_only", ("ConvertibleNotesPayableCurrent",)),
+            ),
+            _instrument_family(
+                "senior_notes", "SeniorNotes", "SeniorLongTermNotes", "SeniorNotesCurrent"
+            ),
+        ),
+        (
+            _instrument_family(
+                "notes", "NotesPayable", "LongTermNotesPayable", "NotesPayableCurrent"
+            ),
+        ),
+    ),
+    (
+        (
+            _instrument_family(
+                "loans", "LoansPayable", "LongTermLoansPayable", "LoansPayableCurrent"
+            ),
+        ),
+    ),
+    (
+        (
+            _instrument_family(
+                "line_of_credit", "LineOfCredit", "LongTermLineOfCredit", "LinesOfCreditCurrent"
+            ),
+        ),
+    ),
+)
+
+
+# Which part of the balance sheet a debt reading covers. A roll-up or a
+# split is "complete"; a one-sided shape covers only its "noncurrent" or
+# "current" half. Amounts are combined half by half (see
+# ``_overlap_total``): only a noncurrent and a current amount are disjoint.
+_DebtHalf = Literal["complete", "noncurrent", "current"]
+
+
+def _debt_half(label: str) -> _DebtHalf:
+    """The half a shape label covers (``*_noncurrent_only`` before
+    ``*_current_only``, since the first also ends with the second)."""
+    if label.endswith("noncurrent_only"):
+        return "noncurrent"
+    if label.endswith("current_only"):
+        return "current"
+    return "complete"
+
+
+_SidedHalf = Literal["noncurrent", "current"]
+
+
+@dataclass(frozen=True)
+class _DebtParts:
+    """A debt reading broken down by the half each amount covers.
+
+    A split contributes its noncurrent and current components, a
+    one-sided shape its one half, and a roll-up goes to ``whole``: it
+    covers both halves in proportions the filing does not state.
+    """
+
+    noncurrent: float = 0.0
+    current: float = 0.0
+    whole: float = 0.0
+
+    def __add__(self, other: _DebtParts) -> _DebtParts:
+        return _DebtParts(
+            self.noncurrent + other.noncurrent,
+            self.current + other.current,
+            self.whole + other.whole,
+        )
+
+    @property
+    def total(self) -> float:
+        return self.noncurrent + self.current + self.whole
+
+
+def _debt_parts(facts: Sequence[XbrlFact], label: str) -> _DebtParts:
+    """The parts of one resolved shape. Every split shape lists its
+    noncurrent concept before its current one."""
+    half = _debt_half(label)
+    value = sum(f.value for f in facts)
+    if half == "noncurrent":
+        return _DebtParts(noncurrent=value)
+    if half == "current":
+        return _DebtParts(current=value)
+    if len(facts) == 2:
+        return _DebtParts(noncurrent=facts[0].value, current=facts[1].value)
+    return _DebtParts(whole=value)
+
+
+def _debt_reading(facts: Sequence[XbrlFact], label: str) -> tuple[float, date, str]:
+    """``(value, period_end, label)`` for a sum of debt facts.
+
+    A sum is only as current as its oldest component, so it is dated by
+    the earliest period end. Every debt family is dated through here so
+    the LongTermDebt and lease-inclusive readings cannot drift apart.
+    """
+    return (sum(f.value for f in facts), min(f.period_end for f in facts), label)
+
+
+_SIDED_HALVES: tuple[_SidedHalf, ...] = ("noncurrent", "current")
+
+
+def _half_amount(parts: _DebtParts, half: _SidedHalf) -> float:
+    return parts.noncurrent if half == "noncurrent" else parts.current
+
+
+def _overlap_total(first: _DebtParts, second: _DebtParts) -> float:
+    """The smallest total consistent with two readings that may overlap.
+
+    Either reading may already contain the other, so neither is added
+    outright. The result is at least each reading's own total, and at
+    least the larger noncurrent figure plus the larger current figure:
+    those two halves are disjoint whichever reading supplied them, while
+    a roll-up (``whole``) may sit in either. Raising any part of either
+    reading never lowers the result.
+    """
+    return max(
+        first.total,
+        second.total,
+        max(first.noncurrent, second.noncurrent)
+        + max(first.current, second.current),
+    )
+
+
+@dataclass(frozen=True)
+class _DebtReading:
+    """One debt family resolved to a single shape.
+
+    ``period_end`` is the balance sheet the shape describes, its oldest
+    component's (see :func:`_debt_reading`); ``covers`` holds the halves
+    the shape states as separate figures: both for a split, one for a
+    one-sided shape, none for a roll-up.
+    """
+
+    label: str
+    period_end: date
+    parts: _DebtParts
+    covers: frozenset[_SidedHalf]
+
+    @property
+    def complete(self) -> bool:
+        return not self.label.endswith("_only")
+
+
+def _family_reading(facts: Sequence[XbrlFact], label: str) -> _DebtReading:
+    """The :class:`_DebtReading` of one resolved shape."""
+    half = _debt_half(label)
+    covers: frozenset[_SidedHalf]
+    if half == "noncurrent":
+        covers = frozenset({"noncurrent"})
+    elif half == "current":
+        covers = frozenset({"current"})
+    elif len(facts) == 2:
+        covers = frozenset(_SIDED_HALVES)
+    else:
+        covers = frozenset()
+    return _DebtReading(
+        label, _debt_reading(facts, label)[1], _debt_parts(facts, label), covers
+    )
+
+
+@dataclass(frozen=True)
+class _MergedDebt:
+    """The LongTermDebt and lease-inclusive families combined.
+
+    ``parts`` keeps the combined amount broken down by half, so the
+    instrument lines can later be combined half by half (see
+    :func:`_overlap_total`); ``sources`` are the readings whose amounts
+    the total uses.
+    """
+
+    parts: _DebtParts
+    label: str
+    sources: tuple[_DebtReading, ...]
+
+
+def _sole(reading: _DebtReading) -> _MergedDebt:
+    return _MergedDebt(reading.parts, reading.label, (reading,))
+
+
+def _merge_debt_families(
+    ltd: _DebtReading | None, lease: _DebtReading | None
+) -> _MergedDebt | None:
+    """Combine the LongTermDebt reading with the lease-inclusive one.
+
+    The lease-inclusive elements contain the LongTermDebt ones, so the
+    two families describe overlapping amounts and are never summed
+    outright. Recency decides first, as within a family: a newer complete
+    reading replaces an older one of either family (debt repaid since),
+    and of two one-sided readings of the same half the newer is kept.
+
+    Otherwise — the same balance sheet, or a newer one-sided reading
+    beside an older complete one, or one-sided readings of opposite
+    halves — the readings are combined half by half (see
+    :func:`_overlap_total`): each half takes the larger figure stated for
+    it, the halves are added, and a roll-up larger than that sum is the
+    total. So a complete reading never hides a larger one-sided reading
+    of the same balance sheet, a one-sided reading never drops the other
+    half a split states, and opposite one-sided halves are summed.
+    """
+    if ltd is None or lease is None:
+        only = ltd if lease is None else lease
+        return None if only is None else _sole(only)
+    if ltd.period_end != lease.period_end:
+        newer, older = (ltd, lease) if ltd.period_end > lease.period_end else (lease, ltd)
+        if newer.complete or (not older.complete and newer.covers == older.covers):
+            return _sole(newer)
+    return _overlap_readings(ltd, lease)
+
+
+def _overlap_readings(ltd: _DebtReading, lease: _DebtReading) -> _MergedDebt:
+    """:func:`_merge_debt_families` for two readings combined half by half.
+
+    The label names what the total is made of: the reading's own label
+    when it supplies every half it states, or ``<half>_only`` (prefixed
+    ``lease_`` for the lease family) when it supplies only one half of a
+    split. On a tie the LongTermDebt reading is credited.
+    """
+    readings = (ltd, lease)
+    noncurrent = max(ltd.parts.noncurrent, lease.parts.noncurrent)
+    current = max(ltd.parts.current, lease.parts.current)
+    separate = noncurrent + current
+    total = _overlap_total(ltd.parts, lease.parts)
+    rollups = [r for r in readings if r.parts.whole > 0 and r.parts.total == total]
+    if rollups:
+        # A roll-up at least as large as both halves together is the
+        # figure; the halves beside it only say where part of it sits.
+        return _MergedDebt(
+            _DebtParts(noncurrent, current, total - separate),
+            rollups[0].label,
+            (rollups[0],),
+        )
+    supplied: tuple[list[_SidedHalf], list[_SidedHalf]] = ([], [])
+    for half in _SIDED_HALVES:
+        holders = [i for i, r in enumerate(readings) if half in r.covers]
+        if holders:
+            winner = max(
+                holders, key=lambda i: _half_amount(readings[i].parts, half)
+            )
+            supplied[winner].append(half)
+    sources: list[_DebtReading] = []
+    labels: list[str] = []
+    for i, (reading, prefix) in enumerate(zip(readings, ("", "lease_"), strict=True)):
+        halves = supplied[i]
+        if sum(_half_amount(reading.parts, h) for h in halves) <= 0:
+            continue
+        sources.append(reading)
+        labels.append(
+            reading.label
+            if frozenset(halves) == reading.covers
+            else f"{prefix}{halves[0]}_only"
+        )
+    if not sources:
+        return _sole(ltd)
+    return _MergedDebt(
+        _DebtParts(noncurrent, current), "+".join(labels), tuple(sources)
+    )
+
+
 # Concepts that flow over time (income/cash flow). We prefer the most
 # recent annual (10-K) filing for these unless a fresher 10-Q exists.
 _FLOW_CONCEPTS: frozenset[str] = frozenset(
@@ -328,7 +664,13 @@ class FundamentalsFetcher:
             raise FundamentalsError(f"unknown field {field!r}")
         if not self.cache.has_ticker(ticker) and self.config.populate_cache_on_miss:
             self.ensure_cached(ticker)
-        prefer_annual = field in _STOCK_CONCEPTS  # balance sheet stocks
+        # Balance-sheet stocks take the newest instant, whichever form
+        # carried it. They used to prefer 10-K facts whenever any existed,
+        # so a 10-Q's balance sheet never won: 50 of 182 holdings were read
+        # from one older than the cache held, CALM's by three quarters
+        # (audit FUND-6). Flow concepts are kept annual by the duration
+        # window below, not by the form.
+        #
         # Flow concepts must come from a full-year period. Without this,
         # the highest period_end wins and a 10-Q's year-to-date figure
         # beats the last 10-K's annual one, so revenue, EBIT and net
@@ -352,7 +694,6 @@ class FundamentalsFetcher:
                 as_of,
                 namespace=namespace,
                 forms=("10-K", "10-Q"),
-                prefer_annual=prefer_annual,
                 duration_days=duration_days,
                 units=expected_units(field),
             )
@@ -480,13 +821,21 @@ class FundamentalsFetcher:
     def _debt_component(
         self, ticker: str, concept: str, as_of: date | datetime
     ) -> float | None:
+        fact = self._debt_fact(ticker, concept, as_of)
+        return None if fact is None else fact.value
+
+    def _debt_fact(
+        self, ticker: str, concept: str, as_of: date | datetime
+    ) -> XbrlFact | None:
+        # Newest instant, like every other balance-sheet field (audit
+        # FUND-6): debt from the last 10-K beside equity from a later
+        # 10-Q would price leverage off two different balance sheets.
         fact = self.cache.latest_value_at(
             ticker,
             concept,
             as_of,
             namespace="us-gaap",
             forms=("10-K", "10-Q"),
-            prefer_annual=True,
             units=("USD",),
         )
         if fact is None:
@@ -494,7 +843,117 @@ class FundamentalsFetcher:
         as_of_d = as_of.date() if isinstance(as_of, datetime) else as_of
         if fact.period_end < as_of_d - timedelta(days=MAX_FACT_AGE_DAYS):
             return None
-        return fact.value
+        return fact
+
+    def _resolve_debt_shapes(
+        self,
+        ticker: str,
+        as_of: date | datetime,
+        shapes: tuple[tuple[str, tuple[str, ...]], ...],
+    ) -> tuple[float, date, str] | None:
+        """Resolve one family of alternative debt tags to a single figure.
+
+        Each shape is ``(label, concepts)``: the concepts are summed and
+        all of them must be present. A complete shape (a roll-up or a
+        split) beats a one-sided one (label ending ``_only``) whatever
+        their dates: a 10-Q that re-tags only the noncurrent half would
+        otherwise displace the 10-K roll-up and drop the current
+        maturities. The one exception keeps that rule from understating
+        debt in the other direction: a one-sided shape that is newer AND
+        larger than the best complete one wins, since debt has grown past
+        the stale total. Within the same completeness the shape
+        describing the newest balance sheet wins (a shape is as old as its
+        oldest component), and on a tie the earlier shape wins — so a
+        roll-up is never added to its own split.
+
+        Returns ``(value, period_end, label)``, or ``None`` when no shape
+        has every component within the age bound.
+        """
+        resolved = self._resolve_debt_parts(ticker, as_of, shapes)
+        if resolved is None:
+            return None
+        return (resolved.parts.total, resolved.period_end, resolved.label)
+
+    def _resolve_debt_parts(
+        self,
+        ticker: str,
+        as_of: date | datetime,
+        shapes: tuple[tuple[str, tuple[str, ...]], ...],
+    ) -> _DebtReading | None:
+        """:meth:`_resolve_debt_shapes`, as a :class:`_DebtReading` so the
+        chosen shape's parts by half travel with it."""
+        cache: dict[str, XbrlFact | None] = {}
+        complete: _DebtReading | None = None
+        one_sided: _DebtReading | None = None
+        for label, concepts in shapes:
+            facts: list[XbrlFact] = []
+            for concept in concepts:
+                if concept not in cache:
+                    cache[concept] = self._debt_fact(ticker, concept, as_of)
+                fact = cache[concept]
+                if fact is None:
+                    break
+                facts.append(fact)
+            else:
+                found = _family_reading(facts, label)
+                if not found.complete:
+                    if one_sided is None or found.period_end > one_sided.period_end:
+                        one_sided = found
+                elif complete is None or found.period_end > complete.period_end:
+                    complete = found
+        if complete is None:
+            return one_sided
+        if (
+            one_sided is not None
+            and one_sided.period_end > complete.period_end
+            and one_sided.parts.total > complete.parts.total
+        ):
+            return one_sided
+        return complete
+
+    def _instrument_debt(
+        self, ticker: str, as_of: date | datetime
+    ) -> list[_DebtParts] | None:
+        """Candidate readings of debt summed from per-instrument tags.
+
+        Some filers never tag a long-term-debt total at all and put each
+        borrowing on its own balance-sheet line: RPD's convertible, ALRM's
+        senior notes, COLL's term loan beside its convertible, GOLD's
+        revolver. Each family is resolved roll-up-or-split on its own;
+        within an overlap group each alternative reading sums its
+        families, and the groups are summed (see
+        :data:`_INSTRUMENT_DEBT_GROUPS`).
+
+        Reached when no long-term total exists, it reads zero, or a
+        reading behind it is one-sided. One candidate is returned per
+        choice of alternative in each overlap group, each as
+        :class:`_DebtParts`, so the caller can pick the choice whose
+        combination with the total is largest: an amount on a half the
+        total states may already be inside it, an amount on a half it
+        leaves empty is not (see :func:`_overlap_total`). Picking the
+        larger alternative by its own sum first would let 40 of
+        noncurrent notes that vanish into a noncurrent total beat 37 of
+        current notes that add to it. With no total, the largest
+        candidate is the largest reading per group, summed. ``None`` when
+        no instrument family is tagged.
+        """
+        groups: list[list[_DebtParts]] = []
+        for group in _INSTRUMENT_DEBT_GROUPS:
+            readings: list[_DebtParts] = []
+            for alternative in group:
+                resolved_families = [
+                    resolved.parts
+                    for family in alternative
+                    if (resolved := self._resolve_debt_parts(ticker, as_of, family))
+                    is not None
+                ]
+                if resolved_families:
+                    readings.append(sum(resolved_families, _DebtParts()))
+            if readings:
+                groups.append(readings)
+        if not groups:
+            return None
+        return [sum(choice, _DebtParts()) for choice in itertools.product(*groups)]
 
     def _compute_total_debt(
         self, ticker: str, as_of: date | datetime
@@ -515,30 +974,106 @@ class FundamentalsFetcher:
         maturities, so it is never added to the split components —
         that is the double-count guard.
 
-        Finance leases are deliberately excluded. They are debt-like, but
-        ASC 842 capitalised them in 2019 and including them would make
-        leverage incomparable across the history these agents screen on.
+        Finance leases are deliberately excluded from the primary
+        ``LongTermDebt`` reading. They are debt-like, but ASC 842
+        capitalised them in 2019 and including them would make leverage
+        incomparable across the history these agents screen on. The
+        lease-inclusive elements contain the LongTermDebt ones, so the two
+        families are combined, never summed outright (see
+        :func:`_merge_debt_families` and
+        :data:`_LEASE_INCLUSIVE_DEBT_SHAPES`). The newer complete reading
+        wins; otherwise each half takes the larger figure either family
+        states for it. So a lease-inclusive figure is used only where the
+        LongTermDebt family is absent, older, one-sided, or smaller than a
+        lease-inclusive amount it cannot contain: a figure that carries a
+        few percent of leases beats reading a levered balance sheet as
+        debt-free (audit FUND-4).
+
+        When neither total exists, the long-term figure is zero, or a
+        reading behind it is one-sided (only the noncurrent or only the
+        current half), per-instrument tags are read (see
+        :meth:`_instrument_debt`) and combined with the total half by half
+        (see :func:`_overlap_total`): an instrument amount on a half the
+        total leaves empty is added, while amounts on a half it states, and
+        roll-ups, are kept as the larger of them and the total — never
+        both, since the total may already contain those lines. The total is
+        kept broken down by half through both steps, so neither step loses
+        a half that one reading states and the other leaves empty. Which
+        shape each family resolves to is decided before that, by the rules
+        within the family, and the instrument lines are not read beside a
+        total whose readings are all complete.
         """
-        ltd_noncurrent = self._debt_component(ticker, "LongTermDebtNoncurrent", as_of)
-        ltd_current = self._debt_component(ticker, "LongTermDebtCurrent", as_of)
-        ltd_rollup = self._debt_component(ticker, "LongTermDebt", as_of)
+        ltd_noncurrent = self._debt_fact(ticker, "LongTermDebtNoncurrent", as_of)
+        ltd_current = self._debt_fact(ticker, "LongTermDebtCurrent", as_of)
+        ltd_rollup = self._debt_fact(ticker, "LongTermDebt", as_of)
         short_term, short_source = self._short_term_debt(ticker, as_of)
 
+        used: list[XbrlFact]
         if ltd_noncurrent is not None and ltd_current is not None:
-            long_term: float | None = ltd_noncurrent + ltd_current
+            used = [ltd_noncurrent, ltd_current]
             source = "split"
         elif ltd_rollup is not None:
-            long_term = ltd_rollup  # already includes current maturities
+            used = [ltd_rollup]  # already includes current maturities
             source = "rollup"
         elif ltd_noncurrent is not None:
-            long_term = ltd_noncurrent
+            used = [ltd_noncurrent]
             source = "noncurrent_only"
         elif ltd_current is not None:
-            long_term = ltd_current
+            used = [ltd_current]
             source = "current_only"
         else:
-            long_term = None
+            used = []
             source = "absent"
+
+        # Audit FUND-4: the lease-inclusive elements. A filer that tags
+        # its debt only here (FISV, APH, SIRI, HRI, WH) read as debt-free.
+        # Both families are dated by their oldest component, and combined
+        # by recency first, then half by half (see _merge_debt_families).
+        ltd = _family_reading(used, source) if used else None
+        lease = self._resolve_debt_parts(ticker, as_of, _LEASE_INCLUSIVE_DEBT_SHAPES)
+        merged = _merge_debt_families(ltd, lease)
+        long_term: float | None = None
+        if merged is not None:
+            long_term = merged.parts.total
+            source = merged.label
+            if source == "debt_and_lease_total" and long_term:
+                # Defined as short- AND long-term debt: adding the
+                # short-term tags on top would count them twice. A zero
+                # still goes through the instrument fallback below.
+                return long_term, source
+
+        # None, a zero beside instrument lines, or a one-sided reading
+        # (CRTO's $37M of current maturities beside $990M of senior
+        # notes): the instrument lines are read. Gated on the
+        # LongTermDebt family's own reading too, so a lease win cannot
+        # mask a one-sided LongTermDebt reading. They are combined with
+        # the total half by half (see _overlap_total), so an instrument
+        # line on a half the total leaves empty is added, and one on a
+        # half it states is kept only if larger.
+        one_sided = (ltd is not None and not ltd.complete) or (
+            merged is not None and any(not r.complete for r in merged.sources)
+        )
+        if not long_term or one_sided:
+            candidates = self._instrument_debt(ticker, as_of)
+            if candidates is not None:
+                if merged is None:
+                    long_term = max(parts.total for parts in candidates)
+                    source = "instruments"
+                else:
+                    base = merged.parts
+                    best = max(candidates, key=lambda parts: _overlap_total(base, parts))
+                    combined = _overlap_total(base, best)
+                    if combined > base.total:
+                        long_term = combined
+                        source = (
+                            "instruments"
+                            if combined == best.total
+                            else f"{source}+instruments"
+                        )
+        if source == "debt_and_lease_total":
+            # A zero total the instruments did not beat: still a total
+            # of short- and long-term debt, so not topped up either.
+            return long_term, source
 
         if long_term is None and short_term is None:
             return None, "absent"
@@ -621,6 +1156,35 @@ class FundamentalsFetcher:
         return values, meta
 
 
+def _report_periods(df: pd.DataFrame) -> dict[str, date]:
+    """The period each accession reports, keyed by accession number.
+
+    A filing's facts span its own period, the comparatives it reprints,
+    and cover-page dates. ``list_filings`` used to take whichever row came
+    first, so CALM's 10-Q reported 2026-04-01 (its share-count date) and
+    its 10-K 2024-11-29 (its public-float date) (audit FUND-6).
+
+    The answer is the latest us-gaap period end carrying at least half as
+    many facts as the most common one. The most common alone picks a
+    prior-year comparative in 10-Ks that tag the prior year slightly more
+    often (147 of 12,067 cached accessions: VERI, SEGG, KANP); the latest
+    alone picks a subsequent-event date (XELB, NMHI, CNTM), which carries
+    one to three facts. Neither failure survived the half-count rule in
+    that sample. An accession with no us-gaap facts keeps its latest date.
+    """
+    latest = df.groupby("accession_number")["period_end"].max()
+    periods: dict[str, date] = {
+        str(acc): pe.date() for acc, pe in latest.items()
+    }
+    gaap = df[df["namespace"] == "us-gaap"]
+    counts = gaap.groupby(["accession_number", "period_end"]).size()
+    for acc, per_period in counts.groupby(level="accession_number"):
+        by_end = per_period.droplevel("accession_number")
+        qualifying = by_end[by_end * 2 >= by_end.max()]
+        periods[str(acc)] = max(qualifying.index).date()
+    return periods
+
+
 # ----------------------------------------------------------------------
 # EdgarAdapter implementation backed by the cache
 # ----------------------------------------------------------------------
@@ -632,6 +1196,12 @@ class CachedEdgarAdapter(EdgarAdapter):
     :meth:`parse_financials` to extract numbers. Both come straight
     from the local Parquet cache.
     """
+
+    #: Listing is a local parquet read, so PointInTimeLoader asks this
+    #: adapter rather than replaying the list it stored on an earlier
+    #: run — which is how the live run kept reading April's filings from
+    #: a parquet refreshed every week (audit FUND-2).
+    lists_locally = True
 
     def __init__(self, fetcher: FundamentalsFetcher | None = None) -> None:
         self.fetcher = fetcher or FundamentalsFetcher()
@@ -649,6 +1219,7 @@ class CachedEdgarAdapter(EdgarAdapter):
         df = df[df["form"].isin(form_types)]
         if df.empty:
             return []
+        periods = _report_periods(df)
         unique = df.drop_duplicates(subset=["accession_number"]).sort_values(
             "filed", ascending=False
         )
@@ -661,7 +1232,7 @@ class CachedEdgarAdapter(EdgarAdapter):
                         cik=None,
                         form_type=str(row["form"]),
                         filing_date=row["filed"].date(),
-                        period_of_report=row["period_end"].date(),
+                        period_of_report=periods[str(row["accession_number"])],
                         accession_number=str(row["accession_number"]),
                     )
                 )

@@ -18,6 +18,7 @@ import { ActionLog } from "@/components/ActionLog";
 import { buildActionLog } from "@/lib/action-log";
 import { AgentPerformanceChart } from "@/components/AgentPerformanceChart";
 import { buildClosedPositions, soldTickers } from "@/lib/past-positions";
+import { unpricedHoldings } from "@/lib/unpriced";
 import { Term } from "@/components/Term";
 import {
   loadAgentLatest,
@@ -90,6 +91,9 @@ export default async function AgentDrillPage({
   const markFreshness = live
     ? await loadMarkFreshness(live.positions.map((p) => p.ticker))
     : {};
+
+  // Holdings the runner flagged as having no market price.
+  const unpriced = unpricedHoldings(live?.positions ?? []);
 
   // Weighted by market value, not by count: three 8% positions are a
   // bigger bet than five 1% ones, and a donut sized by name count would
@@ -245,6 +249,45 @@ export default async function AgentDrillPage({
               )}
             </Card>
           </div>
+
+          {/* Directly under the NAV it inflates. A holding with no
+              market for over five sessions is carried at its last close,
+              and LEG sat that way for 78 days with nothing here saying
+              so (audit CE-1a). */}
+          {unpriced.length > 0 && (
+            <div
+              role="alert"
+              className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+            >
+              <div className="font-semibold mb-1">⚠ {t("unpriced_banner_title")}</div>
+              <p className="text-xs mb-2">
+                {t("unpriced_banner_body")
+                  .replace("{n}", String(unpriced.length))
+                  .replace(
+                    "{value}",
+                    `$${unpriced
+                      .reduce((sum, u) => sum + u.value, 0)
+                      .toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`,
+                  )}
+              </p>
+              <ul className="text-xs space-y-0.5">
+                {unpriced.map((u) => (
+                  <li key={u.ticker}>
+                    <Link
+                      href={`/agents/${slug}/positions/${u.ticker}`}
+                      className="font-mono font-medium hover:underline"
+                    >
+                      {u.ticker}
+                    </Link>{" "}
+                    — {t("unpriced")} {u.since}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Yahoo-Finance-style performance chart with period selector. */}
           {snapshots.length > 0 && (

@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from agents.market_core.shares import market_cap_at
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -30,8 +31,10 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.logger import get_logger
 
+from . import exits as dreman_exits
 from .diversification import (
     DEFAULT_MAX_INDUSTRY_WEIGHT_PCT,
     DEFAULT_MIN_INDUSTRIES,
@@ -45,7 +48,7 @@ from .filters import (
     DEFAULT_QUINTILE,
     apply_quality_gates,
 )
-from .ranking import DremanScore, score_candidates
+from .ranking import DremanScore, MarketPE, score_candidates
 from .strength import assess_strength, is_deteriorating
 
 logger = get_logger("agents.dreman.contrarian")
@@ -122,6 +125,11 @@ class DavidDreman(Strategy):
         self.decision_logger = decision_logger
         self.selection_history: list[DremanSelection] = []
         self.last_diversification: DiversificationReport | None = None
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.dreman.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -142,7 +150,7 @@ class DavidDreman(Strategy):
         for ticker in universe:
             fin = fundamentals.get(ticker)
             price = prices.get(ticker)
-            mcap = self._market_cap(fin, price)
+            mcap = self._market_cap(ticker, as_of, fin, price)
             triples.append((fin, mcap, price))
 
         with_data = sum(1 for fin, _, _ in triples if fin is not None)
@@ -178,10 +186,27 @@ class DavidDreman(Strategy):
             survivors = kept
 
         # Stage 2: population-aware quintile screen + ranking.
+        market: list[MarketPE] = []
         scores = score_candidates(
             survivors,
             min_qualifying_metrics=self.min_qualifying_metrics,
             quintile=self.quintile,
+            on_market=market.append,
+        )
+        # Before the empty-screen return, so it is published even when
+        # nothing qualifies today — when a held name's verdict matters
+        # most. Judged against the market this screen just measured.
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: dreman_exits.verdicts(
+                held,
+                prices,
+                fundamentals,
+                market[0] if market else None,
+                cache=self.edgar_cache,
+                as_of=as_of,
+                max_de=self.max_de,
+            ),
         )
         # Rule 18: 20-30 names across 15+ industries, none above 15% of
         # the book. Taking the top N by rank alone produced 25 holdings
@@ -226,15 +251,23 @@ class DavidDreman(Strategy):
         )
         return weights
 
-    @staticmethod
     def _market_cap(
-        fin: PointInTimeFinancials | None, price: float | None
+        self,
+        ticker: str,
+        as_of: date,
+        fin: PointInTimeFinancials | None,
+        price: float | None,
     ) -> float | None:
-        if fin is None or fin.shares_outstanding is None:
+        """Price times the newest split-adjusted share count (audit FUND-5).
+
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
+        """
+        if fin is None:
             return None
-        if price is None or price <= 0:
-            return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _record(
         self,

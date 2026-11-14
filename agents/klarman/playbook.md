@@ -335,6 +335,10 @@ Sizing tiers:
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Klarman's verdict (`agents/klarman/exits.py`) is computed for every held name against the entry screen's own conservative DCF and balance-sheet gates, in this order: trigger 2, the thesis is broken — book equity no longer positive, D/E above the screen's 0.7 ceiling (unreported debt is not a breach), or free cash flow the DCF can no longer project on a record of three or more 10-Ks (negative in the latest year, negative on average, or shrinking faster than 20%/yr) — sells at any price; trigger 1, price at or past 110% of intrinsic value, sells. From 80% up to 110% of value the verdict is a keep whose reason names the scale-out zone: the 25-50% trim is not executed, because a verdict is keep or sell. Anything else is a keep, even off the day's list; a price decline of any size or a loss year is never a sell. Not computed: trigger 3 (a better opportunity weighs a candidate against a holding, not one holding), trigger 4 (the book has no redemptions), "catalysts complete", and thesis breaks read from text rather than filings.
+
 Klarman's exit framework is **gradual scaling, not discrete events** — different from Graham (sell at fair value), Buffett (forever), Greenblatt (12 months mechanical).
 
 ### 7.1 The scaling-out approach

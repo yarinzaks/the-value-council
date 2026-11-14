@@ -276,6 +276,10 @@ Buffett holds substantial cash when opportunities are scarce. Berkshire's cash h
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Buffett's verdict (`agents/buffett/exits.py`) is computed for every held name, each trigger measured as the entry screen measures it, in this order: trigger 1, moat erosion — the franchise test (`agents/buffett/moat.py`: ROE >= 15% in at least 80% of up to ten fiscal years) now fails — sells; trigger 2, management failure, by §4.1 #4's proxy — a reported negative annual operating cash flow among the newest five fiscal years — sells; trigger 4, price above 1.5x the owner-earnings DCF intrinsic value, sells on the day's quote. Anything else is a keep, even off the day's list; reaching fair value or a price decline of any size is never a sell. Not computed: trigger 3 (a better opportunity weighs a candidate against a holding, not one holding), whether the overvaluation gap is persistent (one day's quote is all a verdict sees; the journal keeps each day's), and moat or management judged from text rather than filings.
+
 Buffett's exit framework is the **opposite** of Graham's. Where Graham sold at fair value, Buffett's "favorite holding period is forever."
 
 ### 7.1 The four legitimate sell triggers

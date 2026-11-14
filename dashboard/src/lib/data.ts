@@ -449,6 +449,28 @@ export async function loadAgentDelta(slug: AgentSlug): Promise<AgentDailyDelta |
   return { today, prev, nav_change_usd, nav_change_pct };
 }
 
+/** One agent's newest snapshot, reading that file alone.
+ *
+ *  The root layout calls this for every book on every page, so it must
+ *  not parse a whole history the way loadSnapshots does. Null when the
+ *  agent has none or the file is unreadable. */
+export async function loadLatestSnapshot(slug: AgentSlug): Promise<DailySnapshot | null> {
+  let files: string[];
+  try {
+    files = await fs.readdir(path.join(SNAPSHOTS_DIR, slug));
+  } catch {
+    return null;
+  }
+  const days = canonicalDayFiles(files);
+  const last = days[days.length - 1];
+  if (!last) return null;
+  try {
+    return await readJson<DailySnapshot>(path.join(SNAPSHOTS_DIR, slug, last));
+  } catch {
+    return null;
+  }
+}
+
 /** Load only the most recent N snapshots for an agent. */
 export async function loadRecentSnapshots(
   slug: AgentSlug,

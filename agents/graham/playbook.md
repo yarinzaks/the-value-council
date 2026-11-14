@@ -254,6 +254,10 @@ If a stock the agent already holds drops further (without fundamental deteriorat
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Graham's verdict (`agents/graham/exits.py`) computes triggers 1-3 for every held name: Graham Number (Defensive) or 100% of NCAV (Net-Net); a Net-Net held 730 days below NCAV; and deterioration — earnings no longer positive, and for Defensive also book value gone, current ratio below 1.5, or a dividend reported as zero. A held name with none of these is a keep, even off the day's list. The cohort is inferred (entry at or under ⅔ of today's NCAV = Net-Net). Trigger 4 (better opportunity) is not computed: it is the rank rotation the engine already does.
+
 Graham was explicit about when to sell. Unlike Buffett, who developed a "forever" mentality later, Graham was clear: a stock has a value, and when the market grants you that value, you sell.
 
 ### 7.1 The four sell triggers

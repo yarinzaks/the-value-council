@@ -183,6 +183,18 @@ _WEIGHTS_BY_POSTURE: dict[Posture, _Weights] = {
 }
 
 
+def earnings_yield_floor_pct(posture: Posture) -> float:
+    """The lowest earnings yield, in %, the screen ranks at ``posture``.
+
+    Below it :func:`score_candidates` drops a name before scoring, so
+    ``100 / floor`` is the highest P/E the day's screen still calls
+    value. Marks's exit rules (:mod:`agents.marks.exits`) read it as
+    fair value: a held name is at fair value when the screen that
+    bought it would no longer rank it.
+    """
+    return _WEIGHTS_BY_POSTURE[posture].quality_floor_eyld_pct
+
+
 def score_candidates(
     candidates: list[tuple[PointInTimeFinancials, float, float]],
     *,
@@ -265,6 +277,7 @@ def select_top_n(scores: list[MarksScore], n: int) -> list[MarksScore]:
 
 __all__ = [
     "MarksScore",
+    "earnings_yield_floor_pct",
     "score_candidates",
     "select_top_n",
 ]

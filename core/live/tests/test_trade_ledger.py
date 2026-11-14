@@ -74,6 +74,30 @@ class TestASaleRemembersItsEntry:
         assert LedgerEntry.from_dict(e.to_dict()).entry_price == 0.0
 
 
+class TestTags:
+    """What a reconstruction knows is wrong with its own row (CE-1b)."""
+
+    def _entry(self, tags: tuple[str, ...]) -> LedgerEntry:
+        return LedgerEntry(date="2026-08-07", agent="peter_lynch", ticker="THR",
+                           side="SELL", shares=4, price=63.89, gross_value=255.56,
+                           cost_paid=0, realized_pnl_usd=-21.6,
+                           source="reconstructed", tags=tags)
+
+    def test_tags_survive_the_round_trip(self) -> None:
+        e = self._entry(("cash-merger", "fractional-era"))
+        assert e.to_dict()["tags"] == ["cash-merger", "fractional-era"]
+        assert LedgerEntry.from_dict(e.to_dict()).tags == ("cash-merger",
+                                                           "fractional-era")
+
+    def test_an_untagged_row_writes_no_key(self) -> None:
+        """Every executed row stays byte-identical to what it was."""
+        assert "tags" not in self._entry(()).to_dict()
+
+    def test_a_row_written_before_the_field_existed_has_no_tags(self) -> None:
+        old = {k: v for k, v in self._entry(()).to_dict().items()}
+        assert LedgerEntry.from_dict(old).tags == ()
+
+
 class TestRecordingADay:
     def test_a_sale_keeps_the_number_that_used_to_be_thrown_away(
         self, tmp_path: Path
@@ -230,3 +254,33 @@ class TestDecomposeReturn:
             "initial_cash", "realized", "unrealized", "dividends",
             "costs", "nav", "return_pct", "attributed", "unattributed",
         }
+
+
+class TestSyncCollisionCopies:
+    """macOS file sync keeps both sides of a write collision and renames
+    one "<day> 2.json". 122 such copies sat beside data/trades on the
+    Mac and read_ledger globbed "*.json", so david_dreman read 139 rows
+    where the ledger held 106 (audit RK-03, ENG-7)."""
+
+    def test_icloud_collision_copies_are_ignored(self, tmp_path: Path) -> None:
+        path = record_day("g", AS_OF, [_trade("A", "SELL", realized=10.0)],
+                          directory=tmp_path)
+        assert path is not None
+        (path.parent / "2026-08-07 2.json").write_text(path.read_text())
+
+        got = read_ledger("g", directory=tmp_path)
+
+        assert [(e.ticker, e.realized_pnl_usd) for e in got] == [("A", 10.0)]
+
+    def test_a_differing_copy_does_not_add_its_rows(self, tmp_path: Path) -> None:
+        # The original is what the runner wrote last; the copy is the
+        # losing side of the collision.
+        path = record_day("g", AS_OF, [_trade("A", "SELL", realized=10.0)],
+                          directory=tmp_path)
+        assert path is not None
+        record_day("h", AS_OF, [_trade("B", "SELL", realized=5.0)],
+                   directory=tmp_path)
+        other = (tmp_path / "h" / "2026-08-07.json").read_text()
+        (path.parent / "2026-08-07 2.json").write_text(other)
+
+        assert [e.ticker for e in read_ledger("g", directory=tmp_path)] == ["A"]

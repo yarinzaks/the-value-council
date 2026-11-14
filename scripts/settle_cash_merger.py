@@ -27,7 +27,8 @@ Two consequences follow, and both are the reason this is a script and
 not a flag on ``sell``:
 
 * **No transaction cost.** The holder does not trade and no broker is
-  involved, so charging the usual 10bp would invent a cost nobody paid.
+  involved, so charging the usual $2.50 commission would invent a cost
+  nobody paid.
 * **The price is an input, not a lookup.** It comes from the filing.
   Nothing in the price cache knows it, and nothing ever will.
 
@@ -68,6 +69,8 @@ logger = get_logger("scripts.settle_cash_merger")
 #: A merger cash-out carries no commission: there is no trade and no
 #: broker, only a conversion the acquirer performs.
 MERGER_COST_BPS = 0.0
+#: Nor the broker's flat per-order fee, which ``sell`` charges by default.
+MERGER_COMMISSION_USD = 0.0
 
 
 class StillTradingError(Exception):
@@ -148,7 +151,10 @@ def settle(
             continue
 
         record = portfolio.sell(
-            held.ticker, price=cash_per_share, cost_bps=MERGER_COST_BPS
+            held.ticker,
+            price=cash_per_share,
+            cost_bps=MERGER_COST_BPS,
+            commission=MERGER_COMMISSION_USD,
         )
         settled.append(
             Settlement(

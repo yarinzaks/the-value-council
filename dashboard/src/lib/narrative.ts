@@ -269,6 +269,9 @@ export function decisionLabel(
         return "הוקטנה";
       case "ADD":
         return "הוגדלה";
+      // A corporate action the runner applied, not a decision.
+      case "SPLIT":
+        return "פיצול מניות";
       default:
         return decision;
     }
@@ -282,6 +285,8 @@ export function decisionLabel(
       return "TRIMMED";
     case "ADD":
       return "ADDED";
+    case "SPLIT":
+      return "SPLIT";
     default:
       return decision;
   }

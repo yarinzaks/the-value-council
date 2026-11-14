@@ -62,6 +62,7 @@ Total: max 70. Default qualifying threshold: 35 (50%).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 
@@ -164,6 +165,23 @@ class _IndustryStats:
     median_pe: float | None
     median_yield_pct: float | None
     median_roe_pct: float | None
+    median_tr_pe: float | None
+
+
+@dataclass(frozen=True)
+class MarketBenchmarks:
+    """The market-wide medians one day's screen measured candidates against.
+
+    The universe-fallback bucket of :func:`score_candidates`: every
+    quality-gate survivor, P/E restricted to (0, 100). ``median_pe`` is
+    the market P/E the hard gate rejects at; ``median_tr_pe`` the
+    market's Total-Return/PE. Either is None when no survivor had it.
+    Published so Neff's exit rules (:mod:`agents.neff.exits`) judge a
+    held name against the same market the entry screen used.
+    """
+
+    peer_count: int
+    median_pe: float | None
     median_tr_pe: float | None
 
 
@@ -359,6 +377,7 @@ def score_candidates(
     min_total_score: float = DEFAULT_MIN_TOTAL_SCORE,
     require_dividend: bool = True,
     max_pe_frac_of_market: float = DEFAULT_MAX_PE_FRAC_OF_MARKET,
+    on_market: Callable[[MarketBenchmarks], None] | None = None,
 ) -> list[NeffScore]:
     """Soft-score Neff's 7 criteria; return survivors above
     ``min_total_score`` sorted by total score descending.
@@ -366,6 +385,11 @@ def score_candidates(
     Industry-relative semantics: each candidate is scored against its
     own SIC2 industry's medians when ≥ ``min_industry_peers`` peers
     exist; else against the universe median.
+
+    ``on_market``, when given, receives the universe-wide
+    :class:`MarketBenchmarks` as soon as they are computed — including
+    on a day the medians are too incomplete to score anyone. It is not
+    called when there are no candidates.
     """
     if not candidates:
         return []
@@ -374,6 +398,14 @@ def score_candidates(
     industry_stats, universe_stats = _build_industry_stats(
         metrics, min_peers=min_industry_peers
     )
+    if on_market is not None:
+        on_market(
+            MarketBenchmarks(
+                peer_count=universe_stats.peer_count,
+                median_pe=universe_stats.median_pe,
+                median_tr_pe=universe_stats.median_tr_pe,
+            )
+        )
 
     if (
         universe_stats.median_pe is None
@@ -538,6 +570,7 @@ __all__ = [
     "DEFAULT_MIN_TOTAL_SCORE",
     "MAX_TOTAL_SCORE",
     "MIN_INDUSTRY_PEERS",
+    "MarketBenchmarks",
     "NeffScore",
     "score_candidates",
     "select_top_n",

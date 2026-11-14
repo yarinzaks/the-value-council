@@ -298,3 +298,39 @@ test("an exit is proof of ownership too", () => {
     ["reopened", "exited"],
   );
 });
+
+// Audit item 22: the runner journals a stock split as a SPLIT row. It
+// records nobody's view, so it must not read as one.
+test("a split is its own event, not a change of view", () => {
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-09-04", "HOLD"),
+    row("2026-09-05", "SPLIT"),
+    row("2026-09-08", "HOLD"),
+  ]);
+  const kinds = movements(s).map((x) => x.kind);
+  assert.ok(kinds.includes("split"), kinds.join(", "));
+  // HOLD -> SPLIT -> HOLD is one answer restated around a corporate
+  // action; only the BUY -> HOLD step is a change.
+  assert.equal(kinds.filter((k) => k === "changed").length, 1, kinds.join(", "));
+});
+
+test("a split neither opens, closes nor breaks the unbroken run", () => {
+  const s = storyFor([
+    row("2026-09-03", "BUY"),
+    row("2026-09-05", "SPLIT"),
+    row("2026-09-08", "BUY"),
+  ]);
+  assert.equal(s.lifecycle, "held");
+  assert.equal(s.daysHeldUnbroken, 2);
+});
+
+test("the card's criteria come from the agent's last verdict, not the split", () => {
+  const verdict = { ...row("2026-09-03", "BUY"), criteria_met: ["P/E=7.3 (≤ 15)"] };
+  const split = { ...row("2026-09-05", "SPLIT"), criteria_met: ["2-for-1 split, ex 2026-09-05"] };
+  const s = storyFor([verdict, split]);
+  assert.deepEqual(s.criteriaMet, ["P/E=7.3 (≤ 15)"]);
+  assert.equal(s.lastFlagged, "2026-09-03");
+  // The timeline still carries the row.
+  assert.equal(s.timeline.length, 2);
+});

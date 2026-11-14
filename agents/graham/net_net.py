@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from agents.market_core.shares import market_cap_at
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -32,9 +33,12 @@ from core.backtest.strategy_runner import (
     PriceLookup,
     Strategy,
 )
+from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.logger import get_logger
 from core.watchlist import WatchCandidate
 
+from . import exits as graham_exits
 from .filters import (
     DEFAULT_DEFENSIVE_MAX_PB,
     DEFAULT_DEFENSIVE_MAX_PE,
@@ -94,6 +98,9 @@ class BenjaminGraham(Strategy):
             playbook.
         max_de: D/E ceiling. Default 1.0.
         min_market_cap: Market-cap floor in USD.
+        edgar_cache: EDGAR XBRL cache the market cap's share count is
+            read from, restated into the split-adjusted price's units.
+            Without it the filed count is used as-is (audit FUND-5).
     """
 
     name = "benjamin_graham"
@@ -111,6 +118,7 @@ class BenjaminGraham(Strategy):
         defensive_max_pe: float = DEFAULT_DEFENSIVE_MAX_PE,
         defensive_max_pb: float = DEFAULT_DEFENSIVE_MAX_PB,
         defensive_min_current_ratio: float = DEFAULT_DEFENSIVE_MIN_CURRENT_RATIO,
+        edgar_cache: EdgarCache | None = None,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -139,6 +147,7 @@ class BenjaminGraham(Strategy):
         self.max_p_ncav = max_p_ncav
         self.max_de = max_de
         self.min_market_cap = min_market_cap
+        self.edgar_cache = edgar_cache
         self.enable_defensive_fallback = enable_defensive_fallback
         self.net_net_fallback_threshold = net_net_fallback_threshold
         self.defensive_max_pe = defensive_max_pe
@@ -146,6 +155,11 @@ class BenjaminGraham(Strategy):
         self.defensive_min_current_ratio = defensive_min_current_ratio
         self.decision_logger = decision_logger
         self.selection_history: list[GrahamSelection] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.graham.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -159,6 +173,14 @@ class BenjaminGraham(Strategy):
         logger.info(
             f"{as_of}: starting Graham selection over {len(universe)} candidates"
         )
+        # First, so it is published even when nothing qualifies today —
+        # an empty screen is when a held name's verdict matters most.
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: graham_exits.verdicts(
+                held, prices, fundamentals, as_of=as_of, max_p_ncav=self.max_p_ncav
+            ),
+        )
 
         triples: list[
             tuple[PointInTimeFinancials | None, float | None, float | None]
@@ -166,7 +188,7 @@ class BenjaminGraham(Strategy):
         for ticker in universe:
             fin = fundamentals.get(ticker)
             price = prices.get(ticker)
-            mcap = self._market_cap(fin, price)
+            mcap = self._market_cap(ticker, as_of, fin, price)
             triples.append((fin, mcap, price))
 
         with_data = sum(1 for fin, _, _ in triples if fin is not None)
@@ -279,15 +301,23 @@ class BenjaminGraham(Strategy):
         logger.info(f"{as_of}: selected {len(all_selected_tickers)} stocks ({mode_summary})")
         return weights
 
-    @staticmethod
     def _market_cap(
-        fin: PointInTimeFinancials | None, price: float | None
+        self,
+        ticker: str,
+        as_of: date,
+        fin: PointInTimeFinancials | None,
+        price: float | None,
     ) -> float | None:
-        if fin is None or fin.shares_outstanding is None:
+        """Price times the newest split-adjusted share count (audit FUND-5).
+
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
+        """
+        if fin is None:
             return None
-        if price is None or price <= 0:
-            return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _record(
         self,

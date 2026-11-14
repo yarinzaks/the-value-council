@@ -94,6 +94,7 @@ from agents.composite.factor_scores import (
     operating_profitability,
 )
 from agents.dreman.diversification import diversify
+from agents.market_core.shares import market_cap_at
 from core.backtest.data_loader import PriceDataLoader
 from core.backtest.decision_logger import Decision, DecisionLogger
 from core.backtest.point_in_time import PointInTimeFinancials
@@ -103,6 +104,7 @@ from core.backtest.strategy_runner import (
     PriceLookup,
     Strategy,
 )
+from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
 
 logger = get_logger("agents.composite.composite")
@@ -191,6 +193,7 @@ class FactorComposite(Strategy):
         price_loader: PriceDataLoader,
         portfolio_size: int = DEFAULT_PORTFOLIO_SIZE,
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
+        edgar_cache: EdgarCache | None = None,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -200,16 +203,30 @@ class FactorComposite(Strategy):
         self.price_loader = price_loader
         self.portfolio_size = portfolio_size
         self.min_market_cap = min_market_cap
+        # Share counts for the market cap, restated into the adjusted
+        # price's units; without it the filed count is used (FUND-5).
+        self.edgar_cache = edgar_cache
         self.decision_logger = decision_logger
         self.last_picks: list[CompositePick] = []
 
     # ------------------------------------------------------------------
     def _market_cap(
-        self, fin: PointInTimeFinancials, price: float
+        self,
+        ticker: str,
+        as_of: date,
+        fin: PointInTimeFinancials | None,
+        price: float | None,
     ) -> float | None:
-        if fin.shares_outstanding is None or fin.shares_outstanding <= 0:
+        """Price times the newest split-adjusted share count (audit FUND-5).
+
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
+        """
+        if fin is None:
             return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _measure(
         self,
@@ -231,7 +248,7 @@ class FactorComposite(Strategy):
             if fin is None:
                 no_fund += 1
                 continue
-            cap = self._market_cap(fin, price)
+            cap = self._market_cap(ticker, as_of, fin, price)
             if cap is None or cap < self.min_market_cap:
                 below_cap += 1
                 continue

@@ -33,6 +33,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from core.day_files import canonical_day_files
 from core.live.portfolio import LivePortfolio, TradeRecord
 from core.logger import get_logger
 
@@ -62,8 +63,9 @@ class LedgerEntry:
     #: trade and is exact. ``reconstructed`` was inferred afterwards
     #: by diffing committed books, and is not: a name bought and
     #: sold between two commits leaves no trace, and the exit is
-    #: valued at the last mark the book carried rather than at the
-    #: price the sale actually got. The two must stay distinguishable
+    #: valued at the decision journal's recorded exit when one exists
+    #: and otherwise at the last mark the book carried — ``tags`` says
+    #: which. The two must stay distinguishable
     #: on the page as well as in the file — a reconstruction shown as
     #: a record is worse than no reconstruction.
     #:
@@ -85,6 +87,13 @@ class LedgerEntry:
     #: not as "bought the same day".
     entry_date: str | None = None
     entry_price: float | None = None
+    #: What is known to be wrong with this row, or where its price came
+    #: from — written by the reconstruction, absent on executed rows.
+    #: ``exit-from-journal`` / ``exit-at-last-mark`` say which price the
+    #: exit carries; ``cash-merger``, ``rename``, ``frozen-price`` and
+    #: ``fractional-era`` name the history that makes it unlike a fill.
+    #: See ``scripts.backfill_trade_ledger`` for each rule.
+    tags: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -105,6 +114,7 @@ class LedgerEntry:
                 if self.entry_price is not None
                 else {}
             ),
+            **({"tags": list(self.tags)} if self.tags else {}),
         }
 
     @classmethod
@@ -129,6 +139,7 @@ class LedgerEntry:
                 if data.get("entry_price") is not None
                 else None
             ),
+            tags=tuple(str(t) for t in data.get("tags") or ()),
         )
 
 
@@ -199,7 +210,8 @@ def read_ledger(agent: str, *, directory: Path) -> list[LedgerEntry]:
     if not folder.is_dir():
         return []
     out: list[LedgerEntry] = []
-    for path in sorted(folder.glob("*.json")):
+    # One file per day: a "<day> 2.json" sync copy is not more trades.
+    for path in canonical_day_files(folder.glob("*.json")):
         try:
             rows = json.loads(path.read_text())
             out.extend(LedgerEntry.from_dict(r) for r in rows)

@@ -21,11 +21,15 @@ framework.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+import json
+import math
+from collections.abc import Hashable, Mapping
+from dataclasses import dataclass, field, replace
 from datetime import date
-from typing import Any
+from pathlib import Path
+from typing import Any, get_args
 
+from agents.market_core.shares import market_cap_at
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -35,11 +39,14 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.day_files import canonical_day_files
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.llm.concurrency import analyze_all
 from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
+from . import exits as marks_exits
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
@@ -48,10 +55,13 @@ from .filters import (
 from .ranking import MarksScore, score_candidates, select_top_n
 from .second_level import MarksMemo, SecondLevelAnalyzer
 from .temperature import (
+    POSTURE_PERSISTENCE_SESSIONS,
     Posture,
+    PostureReading,
     TemperatureAssessment,
     assess_market_temperature,
     profile_for,
+    settle_posture,
 )
 
 logger = get_logger("agents.marks.cycle_value")
@@ -86,6 +96,13 @@ class HowardMarks(Strategy):
             When provided (live mode), each top candidate is sent
             for a second-level memo; REJECT verdicts veto the buy.
         decision_logger: Optional audit trail.
+        posture_from_journal: Read the posture held in past sessions
+            from ``decision_logger``'s journal rather than from this
+            instance's ``selection_history`` (audit item 21). The live
+            agent is a fresh process every day, so its memory of the
+            cycle is the journal; a backtest keeps one instance and must
+            not read a journal another run wrote. Requires
+            ``decision_logger``.
     """
 
     name = "howard_marks"
@@ -99,7 +116,13 @@ class HowardMarks(Strategy):
         second_level_analyzer: SecondLevelAnalyzer | None = None,
         llm_mode: LLMMode = LLMMode.ENFORCE,
         decision_logger: DecisionLogger | None = None,
+        posture_from_journal: bool = False,
     ) -> None:
+        if posture_from_journal and decision_logger is None:
+            raise ValueError(
+                "posture_from_journal reads the journal and needs a "
+                "decision_logger"
+            )
         if min_market_cap <= 0:
             raise ValueError(f"min_market_cap must be positive; got {min_market_cap}")
         if max_de <= 0:
@@ -112,9 +135,15 @@ class HowardMarks(Strategy):
         self.second_level_analyzer = second_level_analyzer
         self.llm_mode = llm_mode
         self.decision_logger = decision_logger
+        self.posture_from_journal = posture_from_journal
         self.selection_history: list[MarksSelection] = []
         self.last_temperature: TemperatureAssessment | None = None
         self.last_memos: list[MarksMemo] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.marks.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -135,7 +164,7 @@ class HowardMarks(Strategy):
         for ticker in universe:
             fin = fundamentals.get(ticker)
             price = prices.get(ticker)
-            mcap = self._market_cap(fin, price)
+            mcap = self._market_cap(ticker, as_of, fin, price)
             triples.append((fin, mcap, price))
 
         with_data = sum(1 for fin, _, _ in triples if fin is not None)
@@ -165,9 +194,28 @@ class HowardMarks(Strategy):
             for fin, mcap, price in triples
             if fin is not None and mcap is not None and price is not None
         ]
-        temperature = assess_market_temperature(measurable, as_of=as_of)
+        temperature = self._settled(
+            assess_market_temperature(measurable, as_of=as_of)
+        )
         self.last_temperature = temperature
         profile = profile_for(temperature.posture)
+
+        # Before any return, so it is published even when nothing
+        # qualifies today — when a held name's verdict matters most.
+        # Judged against the cycle just measured; an empty measurable
+        # universe defaults to Neutral without reading anything, which
+        # is no posture to value a name against.
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: marks_exits.verdicts(
+                held,
+                prices,
+                fundamentals,
+                temperature.posture if temperature.signals.universe_size else None,
+                as_of=as_of,
+                max_de=self.max_de,
+            ),
+        )
 
         # Stage 2: quality gates, now that the posture is known.
         survivors = apply_quality_gates(
@@ -249,15 +297,88 @@ class HowardMarks(Strategy):
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
-    @staticmethod
+    def _settled(self, measured: TemperatureAssessment) -> TemperatureAssessment:
+        """Hold the previous posture until a new one persists (audit item 21).
+
+        An empty measurable universe is returned as measured: its
+        Neutral is a default, not a reading, and the exit verdicts
+        already refuse to judge against it.
+        """
+        if not measured.signals.universe_size:
+            return measured
+        history = (
+            self._journal_readings(measured.as_of)
+            if self.posture_from_journal
+            else [
+                PostureReading(sel.as_of, sel.temperature_score, sel.posture)
+                for sel in self.selection_history
+            ]
+        )
+        posture = settle_posture(measured.posture, measured.as_of, history)
+        if posture == measured.posture:
+            return measured
+        logger.info(
+            f"{measured.as_of}: score {measured.score:+.1f} reads "
+            f"{measured.posture}; holding {posture} until that persists "
+            f"{POSTURE_PERSISTENCE_SESSIONS} sessions"
+        )
+        return replace(
+            measured, posture=posture, measured_posture=measured.posture
+        )
+
+    def _journal_readings(self, as_of: date) -> list[PostureReading]:
+        """The latest past sessions' postures, from this agent's journal.
+
+        Each day's reading is the last row whose ``criteria_values``
+        carry both a known posture and a finite ``temperature_score`` —
+        the BUY/WATCH rows :meth:`_log_decisions` writes. Rows the
+        runner writes for the same agent carry neither and are skipped.
+        A day that cannot be read is skipped with a warning; it is one
+        session fewer, which can only delay a posture change.
+        """
+        assert self.decision_logger is not None
+        agent_dir = self.decision_logger.root / self.name
+        if not agent_dir.is_dir():
+            return []
+        days: list[tuple[date, Path]] = []
+        for path in canonical_day_files(agent_dir.glob("*.json")):
+            try:
+                day = date.fromisoformat(path.name[:10])
+            except ValueError:
+                continue
+            if day < as_of:
+                days.append((day, path))
+        found: list[PostureReading] = []
+        for day, path in reversed(days):
+            try:
+                rows = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError) as exc:
+                logger.warning(f"posture history: skipping {path}: {exc}")
+                continue
+            reading = _reading_from_rows(day, rows, path)
+            if reading is not None:
+                found.append(reading)
+                if len(found) >= POSTURE_PERSISTENCE_SESSIONS:
+                    break
+        return list(reversed(found))
+
     def _market_cap(
-        fin: PointInTimeFinancials | None, price: float | None
+        self,
+        ticker: str,
+        as_of: date,
+        fin: PointInTimeFinancials | None,
+        price: float | None,
     ) -> float | None:
-        if fin is None or fin.shares_outstanding is None:
+        """Price times the newest split-adjusted share count (audit FUND-5).
+
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
+        """
+        if fin is None:
             return None
-        if price is None or price <= 0:
-            return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _llm_filter(
         self,
@@ -464,6 +585,49 @@ class HowardMarks(Strategy):
             }
             for sel in self.selection_history
         ]
+
+
+_KNOWN_POSTURES: dict[object, Posture] = {p: p for p in get_args(Posture)}
+
+
+def _reading_from_rows(
+    day: date, rows: object, source: Path
+) -> PostureReading | None:
+    """The day's last journaled posture reading, or None if it has none.
+
+    A posture that is not hashable (a list or dict in a hand-edited or
+    corrupted row) cannot be looked up; that row is skipped with a
+    warning naming ``source`` rather than raising out of ``select``.
+    """
+    if not isinstance(rows, list):
+        return None
+    reading: PostureReading | None = None
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        values = row.get("criteria_values")
+        if not isinstance(values, dict):
+            continue
+        raw_posture = values.get("posture")
+        if not isinstance(raw_posture, Hashable):
+            logger.warning(
+                f"posture history: skipping a row in {source}: posture "
+                f"{raw_posture!r} is a {type(raw_posture).__name__}, "
+                "not a posture name"
+            )
+            continue
+        posture = _KNOWN_POSTURES.get(raw_posture)
+        score = values.get("temperature_score")
+        if posture is None:
+            continue
+        if (
+            isinstance(score, bool)
+            or not isinstance(score, int | float)
+            or not math.isfinite(score)
+        ):
+            continue
+        reading = PostureReading(day, float(score), posture)
+    return reading
 
 
 __all__ = ["HowardMarks", "MarksSelection"]

@@ -7,7 +7,9 @@ that no longer existed.
 
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import Iterator
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -24,6 +26,7 @@ from core.live.agent_adapter import AgentAdapter, LiveTarget, LiveWatch, ScanRes
 from core.live.portfolio import LivePortfolio, Position, WatchEntry
 from core.live.runner import (
     DEFAULT_MIN_HOLDING_DAYS,
+    AgentRunResult,
     DailyRunner,
     _filter_adapters,
     pos_age_days,
@@ -61,8 +64,14 @@ class _StubPriceLoader:
     asks for a settled close rather than re-reading the morning quote.
     """
 
-    def __init__(self, prices: dict[str, float | None]) -> None:
+    def __init__(
+        self,
+        prices: dict[str, float | None],
+        *,
+        last_bars: dict[str, date] | None = None,
+    ) -> None:
         self._prices = prices
+        self._last_bars = last_bars or {}
         self.calls: list[tuple[str, date, bool]] = []
 
     def get_price_on(
@@ -70,6 +79,20 @@ class _StubPriceLoader:
     ) -> float | None:
         self.calls.append((ticker, as_of, force_refresh))
         return self._prices.get(ticker)
+
+    def cached_range(self, ticker: str) -> tuple[date, date] | None:
+        """The newest cached bar, as the real loader reports it.
+
+        None — no history at all — unless the test names a last bar.
+        """
+        last = self._last_bars.get(ticker)
+        return None if last is None else (date(2020, 1, 2), last)
+
+    def splits_between(
+        self, ticker: str, start: date, end: date
+    ) -> list[tuple[date, float]]:
+        """No splits. A failed lookup makes the name unpriced for the run."""
+        return []
 
 
 def _target(ticker: str, *, weight: float = 0.5, rank: int = 1) -> LiveTarget:
@@ -434,6 +457,40 @@ class TestExecutionLabels:
         assert exits[0]["ticker"] == "GONE"
         assert "left today's target list" in exits[0]["criteria_met"]
 
+    def _exit_rationale(self, runner: DailyRunner, shares: float) -> str:
+        _seed_holding(
+            runner, "stub_agent", "GONE", entry_price=50.0, current_price=55.0,
+            shares=shares,
+        )
+        runner.price_loader = _StubPriceLoader({"GONE": 55.0, "NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+        runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW", "GONE"],
+            {"NEW": 20.0, "GONE": 55.0},
+            {"NEW": None, "GONE": None},
+        )
+        exits = [r for r in self._records(runner) if r["decision"] == "EXIT"]
+        assert len(exits) == 1
+        return str(exits[0]["rationale"])
+
+    def test_an_exit_says_how_many_shares_it_sold(
+        self, runner: DailyRunner
+    ) -> None:
+        """Audit RK-05: ADD and TRIM rows name their shares, EXIT did not,
+        so the journal could not say how large a sale was."""
+        assert self._exit_rationale(runner, 10.0) == (
+            "Closed live position: entry $50.00, exit $55.00 (+10.00%), "
+            "sold 10 shares"
+        )
+
+    def test_a_legacy_fractional_line_reports_what_left_the_book(
+        self, runner: DailyRunner
+    ) -> None:
+        # A full exit sells the line entire, fraction and all.
+        assert self._exit_rationale(runner, 10.5).endswith(", sold 10.5 shares")
+
 
 # ---------------------------------------------------------------------------
 # Position sizing
@@ -593,12 +650,348 @@ class TestWholeShareSizing:
         assert [t.ticker for t in kept] == ["A"]
 
 
+class TestCashPosture:
+    """A doctrine that deploys less than the whole book means the rest
+    as cash.
+
+    Audit SF-X2: Klarman's list sums to 92% and his book ran at 99.96%
+    invested ($4.83 of cash); Marks at Neutral sums to 80% and his ran
+    at 0.08%. The whole-share residue pass pooled every dollar of cash,
+    and the rebalance ADD spent whatever was left.
+    """
+
+    @staticmethod
+    def _awkward_prices(n: int) -> dict[str, float | None]:
+        # The same deliberately awkward ladder the whole-share tests
+        # use: no price divides a slot, so the residue pass has work.
+        return {f"T{i:02d}": 37.0 + i * 11.3 for i in range(n)}
+
+    def _open(
+        self, runner: DailyRunner, n: int, deployed: float
+    ) -> AgentRunResult:
+        prices = self._awkward_prices(n)
+        targets = [
+            _target(t, weight=deployed / n, rank=i + 1)
+            for i, t in enumerate(sorted(prices))
+        ]
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        return runner._run_one(
+            _StubAdapter("stub_agent", targets),  # type: ignore[arg-type]
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+
+    def test_klarman_92_percent_deployment_leaves_8_percent_cash(
+        self, runner: DailyRunner
+    ) -> None:
+        from agents.klarman.margin_of_safety import _deployment_for
+
+        decision = _deployment_for(20)
+        assert decision.deployed_fraction == pytest.approx(0.92)
+        result = self._open(
+            runner, decision.portfolio_size, decision.deployed_fraction
+        )
+
+        p = result.portfolio
+        assert len(p.positions) == decision.portfolio_size
+        cash_pct = p.cash / p.total_nav * 100.0
+        # The doctrine's 8% is a floor the sizing may not dig into. The
+        # whole-share residue may leave a little more, never less.
+        assert cash_pct >= 8.0, f"{cash_pct:.2f}% cash against an 8% posture"
+        assert cash_pct < 12.0, f"{cash_pct:.2f}% cash — sizing left too much idle"
+
+    def test_marks_neutral_posture_holds_20_percent(
+        self, runner: DailyRunner
+    ) -> None:
+        from agents.marks.temperature import profile_for
+
+        neutral = profile_for("Neutral")
+        assert neutral.deployed_fraction == pytest.approx(0.80)
+        result = self._open(
+            runner, neutral.portfolio_size, neutral.deployed_fraction
+        )
+
+        p = result.portfolio
+        cash_pct = p.cash / p.total_nav * 100.0
+        assert cash_pct >= 20.0, f"{cash_pct:.2f}% cash against a 20% posture"
+        assert cash_pct < 24.0, f"{cash_pct:.2f}% cash — sizing left too much idle"
+
+    def test_a_rebalance_add_does_not_spend_the_posture_cash(
+        self, runner: DailyRunner
+    ) -> None:
+        """The second way the 8% went: an ADD that spent every dollar.
+
+        Two names at 46% each of a $10,000 book want $4,600 apiece. A
+        sits at $5,500 (+19.6%, inside the band) and B at $3,200 (-30.4%,
+        outside it), so the book is 87% invested. B's shortfall is
+        $1,400, but the doctrine's 92% leaves room for only $500 more.
+        """
+        p = LivePortfolio(agent="stub_agent", cash=1_300.0)
+        p.last_rebalance_date = "2026-08-03"
+        for ticker, shares, price in (("A", 55.0, 100.0), ("B", 32.0, 100.0)):
+            p.positions.append(
+                Position(
+                    ticker=ticker,
+                    shares=shares,
+                    entry_price=price,
+                    entry_date="2026-07-01",
+                    current_price=price,
+                )
+            )
+        p.save(directory=runner.portfolio_dir)
+        prices: dict[str, float | None] = {"A": 100.0, "B": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target("A", weight=0.46), _target("B", weight=0.46, rank=2)],
+            ),
+            AS_OF,
+            ["A", "B"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        adds = [t for t in result.trades if t.side == "BUY"]
+        # Still topped up — the posture limits the ADD, it does not
+        # forbid it — but by four shares, not twelve.
+        assert len(adds) == 1 and adds[0].ticker == "B"
+        assert adds[0].shares == pytest.approx(4.0)
+        book = result.portfolio
+        assert book.cash / book.total_nav * 100.0 >= 8.0
+
+    def test_a_held_name_outside_the_list_counts_against_the_posture(
+        self, runner: DailyRunner
+    ) -> None:
+        """Capital the floor keeps in a name is capital already invested.
+
+        OLD left the list four days after it was bought and the 30-day
+        floor holds it: $2,000 of a $10,000 book. The new list is one
+        name at 50%. The doctrine's half in cash is honoured only if
+        NEW gets $3,000, not $5,000.
+        """
+        p = LivePortfolio(agent="stub_agent", cash=8_000.0)
+        p.last_rebalance_date = "2026-08-03"
+        p.positions.append(
+            Position(
+                ticker="OLD",
+                shares=20.0,
+                entry_price=100.0,
+                entry_date="2026-08-01",
+                current_price=100.0,
+            )
+        )
+        p.save(directory=runner.portfolio_dir)
+        prices: dict[str, float | None] = {"OLD": 100.0, "NEW": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", [_target("NEW", weight=0.5)]),  # type: ignore[arg-type]
+            AS_OF,
+            ["OLD", "NEW"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        book = result.portfolio
+        assert book.has("OLD")
+        new = book.positions[book._index_of("NEW")]  # type: ignore[index]
+        assert new.shares == pytest.approx(29.0)
+        assert book.cash / book.total_nav * 100.0 >= 50.0
+
+    def test_a_fully_deployed_doctrine_may_spend_all_its_cash(self) -> None:
+        """Weights that sum to the whole book leave the cash uncapped."""
+        from core.live.runner import deployable_cash
+
+        targets = [_target(t, weight=1 / 3) for t in ("A", "B", "C")]
+        assert deployable_cash(
+            targets, nav=10_000.0, invested=4_000.0, cash=6_000.0
+        ) == pytest.approx(6_000.0)
+
+    def test_a_book_already_past_its_posture_deploys_nothing(self) -> None:
+        """Over the posture is not a reason to sell; it is a reason not
+        to buy. The cap floors at zero rather than going negative."""
+        from core.live.runner import deployable_cash
+
+        targets = [_target("A", weight=0.5)]
+        assert deployable_cash(
+            targets, nav=10_000.0, invested=7_000.0, cash=3_000.0
+        ) == pytest.approx(0.0)
+
+    def test_an_empty_list_deploys_nothing(self) -> None:
+        from core.live.runner import deployable_cash
+
+        assert deployable_cash(
+            [], nav=10_000.0, invested=0.0, cash=10_000.0
+        ) == pytest.approx(0.0)
+
+    @staticmethod
+    def _held(
+        runner: DailyRunner, cash: float, lines: list[tuple[str, float, float]]
+    ) -> None:
+        """Save a book holding ``(ticker, shares, mark)`` lines, all past
+        the holding floor."""
+        p = LivePortfolio(agent="stub_agent", cash=cash)
+        p.last_rebalance_date = "2026-08-03"
+        for ticker, shares, mark in lines:
+            p.positions.append(
+                Position(
+                    ticker=ticker,
+                    shares=shares,
+                    entry_price=mark,
+                    entry_date="2026-07-01",
+                    current_price=mark,
+                )
+            )
+        p.save(directory=runner.portfolio_dir)
+
+    def test_a_held_name_without_a_quote_keeps_its_place_in_the_posture(
+        self, runner: DailyRunner
+    ) -> None:
+        """Review of SF-X2: a held list name with no quote today left Σw
+        but stayed in ``invested`` at its last mark, so its slot was
+        counted twice and an equal-weight book could buy nothing.
+
+        Twenty names at 5%. T00..T18 are held at their $500 slot, T00
+        with no quote today; T19 is new at $50 and the book has $500.
+        The list sums to the whole book, so T19 gets its nine shares.
+        """
+        self._held(
+            runner, 500.0, [(f"T{i:02d}", 10.0, 50.0) for i in range(19)]
+        )
+        prices: dict[str, float | None] = {f"T{i:02d}": 50.0 for i in range(20)}
+        prices["T00"] = None
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target(f"T{i:02d}", weight=0.05, rank=i + 1) for i in range(20)],
+            ),
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        book = result.portfolio
+        assert book.has("T19")
+        new = book.positions[book._index_of("T19")]  # type: ignore[index]
+        assert new.shares == pytest.approx(9.0)
+
+    def test_an_unquoted_holding_does_not_starve_a_partial_posture(
+        self, runner: DailyRunner
+    ) -> None:
+        """The same gap on a 92% list. A ($4,600, 46%) has no quote; B
+        is new at $100. Room is $9,200 − $4,600 = $4,600, so B gets 45
+        shares ($4,500 + fees) and cash stays at or above 8%."""
+        self._held(runner, 5_400.0, [("A", 46.0, 100.0)])
+        prices: dict[str, float | None] = {"A": None, "B": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target("A", weight=0.46), _target("B", weight=0.46, rank=2)],
+            ),
+            AS_OF,
+            ["A", "B"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        book = result.portfolio
+        assert book.has("B")
+        b = book.positions[book._index_of("B")]  # type: ignore[index]
+        assert b.shares == pytest.approx(45.0)
+        assert book.cash / book.total_nav * 100.0 >= 8.0
+
+    def test_an_unquoted_holding_does_not_block_a_rebalance_add(
+        self, runner: DailyRunner
+    ) -> None:
+        """The zeroed room also blocked the day's ADDs. A ($4,600) has no
+        quote; B sits at $3,200 against a $4,600 slot (−30%). Room is
+        $9,200 − $7,800 = $1,400: thirteen shares after the fee."""
+        self._held(runner, 2_200.0, [("A", 46.0, 100.0), ("B", 32.0, 100.0)])
+        prices: dict[str, float | None] = {"A": None, "B": 100.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter(  # type: ignore[arg-type]
+                "stub_agent",
+                [_target("A", weight=0.46), _target("B", weight=0.46, rank=2)],
+            ),
+            AS_OF,
+            ["A", "B"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        adds = [t for t in result.trades if t.side == "BUY"]
+        assert len(adds) == 1 and adds[0].ticker == "B"
+        assert adds[0].shares == pytest.approx(13.0)
+        book = result.portfolio
+        assert book.cash / book.total_nav * 100.0 >= 8.0
+
+    def test_only_an_unquoted_holding_returns_to_the_posture(self) -> None:
+        """An unquoted name not held keeps its slot in cash, as before;
+        an unquoted held one is added back, at the per-name cap."""
+        from core.live.runner import posture_targets
+
+        listed = [
+            _target("HELD", weight=0.3),
+            _target("NEW", weight=0.3, rank=2),
+            _target("OK", weight=0.3, rank=3),
+        ]
+        prices: dict[str, float | None] = {"HELD": None, "NEW": None, "OK": 10.0}
+        reachable = reachable_targets(
+            listed, prices, nav=10_000.0, held=frozenset({"HELD"}), max_weight=0.25
+        )
+        assert [t.ticker for t in reachable] == ["OK"]
+
+        posture = posture_targets(
+            listed, reachable, prices, frozenset({"HELD"}), max_weight=0.25
+        )
+        assert {t.ticker: t.weight for t in posture} == pytest.approx(
+            {"OK": 0.25, "HELD": 0.25}
+        )
+
+    def test_a_non_finite_input_deploys_nothing(self) -> None:
+        """NaN fails every comparison, so ``min(cash, nan)`` was the
+        whole cash: a broken mark would have lifted the cap entirely."""
+        from core.live.runner import deployable_cash
+
+        targets = [_target("A", weight=0.5)]
+        for nav, invested in (
+            (float("nan"), 0.0),
+            (10_000.0, float("nan")),
+            (float("inf"), 0.0),
+        ):
+            assert deployable_cash(
+                targets, nav=nav, invested=invested, cash=3_000.0
+            ) == pytest.approx(0.0)
+        assert deployable_cash(
+            [_target("A", weight=float("inf"))],
+            nav=10_000.0,
+            invested=0.0,
+            cash=3_000.0,
+        ) == pytest.approx(0.0)
+
+
 class TestRebalanceBand:
     """Positions were sized once at entry and never touched again, so a
     name that doubled became twice its intended weight."""
 
     def _drifted(
-        self, runner: DailyRunner, *, entry: float, now: float
+        self,
+        runner: DailyRunner,
+        *,
+        entry: float,
+        now: float,
+        entry_date: str = "2026-07-01",
     ) -> DailyRunner:
         p = LivePortfolio(agent="stub_agent")
         p.positions.append(
@@ -606,7 +999,7 @@ class TestRebalanceBand:
                 ticker="DRIFT",
                 shares=50.0,
                 entry_price=entry,
-                entry_date="2026-07-01",
+                entry_date=entry_date,
                 current_price=now,
                 why_en="",
                 why_he="",
@@ -686,6 +1079,249 @@ class TestRebalanceBand:
         assert result.portfolio.positions[0].weight_pct == pytest.approx(
             50.0, abs=1.0
         )
+
+
+class TestTheHoldingFloorCoversTheTrim:
+    """Audit ENG-5: the 30-day floor guarded the exit path only.
+
+    ``_rebalance`` built trims from drift alone, so market_core cut BAC
+    at 7 days (4 -> 3 shares) and seth_klarman cut TTD at 11 days
+    (54 -> 42) — the same young-position selling the floor exists to
+    stop, arriving through the other door.
+    """
+
+    _band = TestRebalanceBand()
+
+    def _drifted(
+        self, runner: DailyRunner, *, entry: float, now: float, entry_date: str
+    ) -> DailyRunner:
+        return self._band._drifted(
+            runner, entry=entry, now=now, entry_date=entry_date
+        )
+
+    def _run(self, runner: DailyRunner, price: float) -> AgentRunResult:
+        result: AgentRunResult = self._band._run(runner, price)
+        return result
+
+    def test_a_7_day_old_overweight_position_is_not_trimmed(
+        self, runner: DailyRunner
+    ) -> None:
+        # +50% drift, which a seasoned line trims by 16 shares.
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-29")
+
+        result = self._run(runner, 300.0)
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.positions[0].shares == 50.0
+
+    def test_a_29_day_old_position_is_still_inside_the_floor(
+        self, runner: DailyRunner
+    ) -> None:
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-07")
+
+        result = self._run(runner, 300.0)
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+
+    def test_a_position_exactly_30_days_old_is_trimmed(
+        self, runner: DailyRunner
+    ) -> None:
+        # The exit path holds below the floor and sells at it; the trim
+        # path agrees, so one boundary governs every sale.
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-06")
+
+        result = self._run(runner, 300.0)
+
+        sells = [t for t in result.trades if t.side == "SELL"]
+        assert len(sells) == 1 and sells[0].ticker == "DRIFT"
+
+    def test_an_unreadable_entry_date_does_not_block_the_trim(
+        self, runner: DailyRunner
+    ) -> None:
+        # pos_age_days returns None for "cannot tell", and the exit path
+        # treats that as no floor. The trim path must not differ.
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="not-a-date")
+
+        result = self._run(runner, 300.0)
+
+        assert len([t for t in result.trades if t.side == "SELL"]) == 1
+
+    def test_a_young_underweight_position_is_still_topped_up(
+        self, runner: DailyRunner
+    ) -> None:
+        # The floor stops selling. Buying more of a 7-day-old name sells
+        # nothing, so the add path is unchanged.
+        self._drifted(runner, entry=100.0, now=20.0, entry_date="2026-07-29")
+
+        result = self._run(runner, 20.0)
+
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert len(buys) == 1 and buys[0].ticker == "DRIFT"
+
+    def test_a_runner_with_a_shorter_floor_trims_sooner(
+        self, runner: DailyRunner
+    ) -> None:
+        # The trim reads the runner's floor, not a second constant.
+        runner.min_holding_days = 5
+        self._drifted(runner, entry=100.0, now=300.0, entry_date="2026-07-29")
+
+        result = self._run(runner, 300.0)
+
+        assert len([t for t in result.trades if t.side == "SELL"]) == 1
+
+
+class TestTheBrokerCommission:
+    """Every order the runner places pays the broker's flat $2.50.
+
+    Audit ENG-2: the runner charged 0.1% of the gross, so 2,260 share
+    changes cost the books $877 where the broker would have taken
+    $5,650.
+    """
+
+    BROKER = 2.50
+
+    def _single(
+        self, runner: DailyRunner, *, shares: float, price: float, cash: float
+    ) -> AgentRunResult:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFT",
+                shares=shares,
+                entry_price=price,
+                entry_date="2026-07-01",
+                current_price=price,
+            )
+        )
+        p.cash = cash
+        p.save(directory=runner.portfolio_dir)
+        adapter = _StubAdapter("stub_agent", [_target("DRIFT", weight=0.5)])
+        runner.price_loader = _StubPriceLoader({"DRIFT": price})  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DRIFT"],
+            {"DRIFT": price},
+            {"DRIFT": None},
+        )
+
+    def test_every_opening_buy_pays_the_flat_commission(
+        self, runner: DailyRunner
+    ) -> None:
+        n = 27
+        prices: dict[str, float | None] = {
+            f"T{i:02d}": 37.0 + i * 11.3 for i in range(n)
+        }
+        targets = [
+            _target(t, weight=1.0 / n, rank=i + 1)
+            for i, t in enumerate(sorted(prices))
+        ]
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        result = runner._run_one(
+            _StubAdapter("stub_agent", targets),  # type: ignore[arg-type]
+            AS_OF,
+            sorted(prices),
+            prices,
+            dict.fromkeys(prices),
+        )
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert buys
+        for trade in buys:
+            assert trade.cost_paid == pytest.approx(self.BROKER), trade.ticker
+        p = result.portfolio
+        assert p.cumulative_costs == pytest.approx(self.BROKER * len(result.trades))
+        assert p.cash >= 0
+
+    def test_the_runner_passes_its_own_commission_to_every_order(
+        self, runner: DailyRunner
+    ) -> None:
+        # Not the portfolio's default: a runner told $1 charges $1, on
+        # the trim as on the buy, so the setting is the one in force.
+        runner.commission = 1.0
+        result = self._single(runner, shares=50.0, price=300.0, cash=5_000.0)
+        assert result.trades
+        for trade in result.trades:
+            assert trade.cost_paid == pytest.approx(1.0)
+
+    def test_the_plan_never_spends_more_than_the_cash(self) -> None:
+        """Commissions included, the planned outlay fits the book.
+
+        One name at $100 against $1,000 of cash and a 100% slot: ten
+        shares is $1,000 of stock and $2.50 the book does not have.
+        """
+        from core.live.runner import plan_whole_share_buys
+
+        plan = plan_whole_share_buys(
+            [_target("X", weight=1.0)],
+            {"X": 100.0},
+            nav=1_000.0,
+            cash=1_000.0,
+            cost_bps=0.0,
+            commission=self.BROKER,
+            band=0.25,
+        )
+        assert plan == {"X": 9}
+
+    def test_the_plan_charges_one_commission_per_name(self) -> None:
+        """Each name pays one commission, not one per share.
+
+        Three names, $500 of cash, $100 shares: the slots are $166.67,
+        so the first pass places one share of each for $307.50 — three
+        orders. The $192.50 left tops one of them up by a share; that
+        is the same order, so it costs $100, not $102.50. The book ends
+        with four shares and three commissions, inside its cash.
+        """
+        from core.live.runner import plan_whole_share_buys
+
+        targets = [_target(t, weight=1 / 3) for t in ("A", "B", "C")]
+        prices: dict[str, float | None] = {"A": 100.0, "B": 100.0, "C": 100.0}
+        plan = plan_whole_share_buys(
+            targets, prices, nav=500.0, cash=500.0,
+            cost_bps=0.0, commission=self.BROKER, band=0.25,
+        )
+        outlay = sum(n * 100.0 + self.BROKER for n in plan.values())
+        assert outlay <= 500.0
+        assert sum(plan.values()) == 4
+
+    def test_a_trim_too_small_to_carry_the_commission_is_skipped(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at $8 = $400 against $200 cash: NAV 600, target 300,
+        # drift +33% — outside the band. The trim is 12 shares, $96, on
+        # which $2.50 is 2.6%: more than the 1% the book will pay to
+        # rebalance. Left alone.
+        result = self._single(runner, shares=50.0, price=8.0, cash=200.0)
+        assert result.trades == []
+        assert result.portfolio.positions[0].shares == 50.0
+        assert result.portfolio.cumulative_costs == 0.0
+
+    def test_an_add_too_small_to_carry_the_commission_is_skipped(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at $4 = $200 against $400 cash: NAV 600, target 300,
+        # drift -33%. The add is ~$100, on which $2.50 is 2.5%.
+        result = self._single(runner, shares=50.0, price=4.0, cash=400.0)
+        assert result.trades == []
+        assert result.portfolio.cash == pytest.approx(400.0)
+
+    def test_a_rebalance_large_enough_still_trades(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 shares at $300 = $15,000 against $5,000 cash: the trim is
+        # 16 shares, $4,800, on which $2.50 is 0.05%.
+        result = self._single(runner, shares=50.0, price=300.0, cash=5_000.0)
+        sells = [t for t in result.trades if t.side == "SELL"]
+        assert len(sells) == 1
+        assert sells[0].cost_paid == pytest.approx(self.BROKER)
+
+    def test_the_threshold_is_inclusive_at_one_percent(self) -> None:
+        from core.live.runner import commission_dominates
+
+        # $2.50 is exactly 1% of $250: that trade is worth placing.
+        assert commission_dominates(250.0, commission=2.50) is False
+        assert commission_dominates(249.99, commission=2.50) is True
+        # A free order is never dominated, however small.
+        assert commission_dominates(0.01, commission=0.0) is False
 
 
 # ---------------------------------------------------------------------------
@@ -980,6 +1616,407 @@ class TestDividends:
         result = self._run(runner, loader)
 
         assert result.portfolio.cumulative_dividends == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Stock splits (audit item 22 / CE-5)
+# ---------------------------------------------------------------------------
+class _StubPriceLoaderWithSplits(_StubPriceLoader):
+    def __init__(
+        self,
+        prices: dict[str, float | None],
+        splits: dict[str, list[tuple[date, float]]] | None = None,
+    ) -> None:
+        super().__init__(prices)
+        self._splits = splits or {}
+        self.split_queries: list[tuple[str, date, date]] = []
+
+    def splits_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
+        from core.backtest.data_loader import _to_date
+
+        s, e = _to_date(start), _to_date(end)
+        self.split_queries.append((ticker, s, e))
+        return [(d, r) for d, r in self._splits.get(ticker, []) if s < d <= e]
+
+
+class TestSplitsAdjustTheBook:
+    """The cache is split-adjusted, so on an ex-date the quote halves
+    (2:1) while the book still held the old share count — the line's
+    value halved with nothing having happened to the investment."""
+
+    EX = AS_OF  # the split takes effect on the day being run
+
+    def _held(
+        self,
+        runner: DailyRunner,
+        *,
+        shares: float = 10.0,
+        entry_date: str = "2026-07-01",
+        last_close: str = "2026-08-04",
+    ) -> None:
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="NVDA",
+                shares=shares,
+                entry_price=100.0,
+                entry_date=entry_date,
+                current_price=120.0,  # yesterday's close, pre-split
+                why_en="",
+                why_he="",
+            )
+        )
+        p.cash = 1_000.0
+        p.last_close_date = last_close
+        p.last_open_date = last_close
+        p.last_rebalance_date = "2026-08-03"
+        p.save(directory=runner.portfolio_dir)
+
+    def _run(self, runner: DailyRunner, loader, *, weight: float = 0.55):  # type: ignore[no-untyped-def]
+        runner.price_loader = loader
+        # Keep NVDA a target at about the weight it already has, so the
+        # run neither sells nor rebalances it and NAV isolates the split.
+        adapter = _StubAdapter("stub_agent", [_target("NVDA", weight=weight)])
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA"],
+            {"NVDA": 60.0},
+            {"NVDA": None},
+        )
+
+    def test_two_for_one_split_leaves_nav_unchanged(
+        self, runner: DailyRunner
+    ) -> None:
+        self._held(runner)
+        nav_before = 1_000.0 + 10 * 120.0
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        book = result.portfolio
+        pos = book.positions[0]
+        assert pos.shares == 20.0
+        assert pos.shares == int(pos.shares)
+        assert pos.entry_price == pytest.approx(50.0)
+        assert result.trades == []
+        assert book.total_nav == pytest.approx(nav_before)
+        # And it is what was saved, not just what was returned.
+        saved = LivePortfolio.load_or_seed(
+            "stub_agent", directory=runner.portfolio_dir
+        )
+        assert saved.positions[0].shares == 20.0
+
+    def test_three_for_two_floors_with_cash_in_lieu(
+        self, runner: DailyRunner
+    ) -> None:
+        # 3 shares x 1.5 = 4.5 -> 4 shares and half a share in cash at
+        # the post-split price: $40.
+        self._held(runner, shares=3.0)
+        nav_before = 1_000.0 + 3 * 120.0
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 80.0}, {"NVDA": [(self.EX, 1.5)]}
+        )
+        # The stub duck-types PriceDataLoader; it is not a subclass.
+        runner.price_loader = loader  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NVDA", weight=0.25)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA"],
+            {"NVDA": 80.0},
+            {"NVDA": None},
+        )
+
+        book = result.portfolio
+        assert book.positions[0].shares == 4.0
+        assert book.cash == pytest.approx(1_040.0)
+        assert book.total_nav == pytest.approx(nav_before)
+
+    def test_the_split_is_journaled_as_a_corporate_action(
+        self, runner: DailyRunner, tmp_path: Path
+    ) -> None:
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        self._run(runner, loader)
+
+        rows = DecisionLogger(root=tmp_path / "decisions").read_day(
+            "stub_agent", AS_OF
+        )
+        splits = [r for r in rows if r.decision == "SPLIT"]
+        assert len(splits) == 1
+        row = splits[0]
+        assert row.ticker == "NVDA"
+        assert row.market_conditions["corporate_action"] == "split"
+        assert row.market_conditions["ratio"] == 2.0
+        assert row.market_conditions["shares_before"] == 10.0
+        assert row.market_conditions["shares_after"] == 20.0
+        assert row.market_conditions["cash_in_lieu"] == 0.0
+        assert row.entry_price == pytest.approx(50.0)
+        assert "2-for-1" in (row.rationale or "")
+
+    def test_a_second_run_does_not_split_again(self, runner: DailyRunner) -> None:
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+        self._run(runner, loader)
+
+        again = runner._run_one(
+            _StubAdapter("stub_agent", [_target("NVDA", weight=0.55)]),  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA"],
+            {"NVDA": 60.0},
+            {"NVDA": None},
+            force=True,
+        )
+
+        assert again.portfolio.positions[0].shares == 20.0
+
+    def test_a_split_on_the_entry_date_is_not_applied(
+        self, runner: DailyRunner
+    ) -> None:
+        # Bought on the ex-date means bought at the post-split price.
+        self._held(runner, entry_date=self.EX.isoformat())
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.positions[0].shares == 10.0
+
+    def test_the_floor_is_the_books_last_mark_and_older_splits_are_left(
+        self, runner: DailyRunner
+    ) -> None:
+        # A split from before this book was last marked is history the
+        # book already priced through (or an owner's decision to
+        # backfill), not today's event.
+        self._held(runner, last_close="2026-08-04")
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(date(2026, 8, 3), 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.split_floor_date == "2026-08-04"
+        assert result.portfolio.positions[0].shares == 10.0
+
+    def test_a_book_already_marked_today_still_takes_todays_split(
+        self, runner: DailyRunner
+    ) -> None:
+        # Deploy day: the open run (old code) marked the book today, and
+        # the close mark is the first run to stamp the floor. A floor of
+        # today would exclude today's ex-date for good.
+        self._held(runner, last_close="2026-08-04")
+        book = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)
+        book.last_open_date = AS_OF.isoformat()
+        book.save(directory=runner.portfolio_dir)
+        runner.price_loader = _StubPriceLoaderWithSplits(  # type: ignore[assignment]
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        assert results[0].portfolio.split_floor_date == "2026-08-04"
+        assert results[0].portfolio.positions[0].shares == 20.0
+
+    def test_a_split_only_day_passes_the_run_gate(
+        self, runner: DailyRunner, tmp_path: Path
+    ) -> None:
+        # The workflow's verify step fails a book whose holdings moved
+        # with no ledger day; a split places no order and writes none.
+        # Its SPLIT journal row is what puts the change on record.
+        from scripts.verify_run_state import check_portfolios
+
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+        assert result.trades == []
+
+        report = check_portfolios(
+            runner.portfolio_dir,
+            mode="open",
+            as_of=AS_OF,
+            previous=lambda path: {"NVDA": 10.0},
+            ledger_dir=tmp_path / "trades",
+            journal_dir=tmp_path / "decisions",
+        )
+
+        # Freshness is not asserted: the runner stamps the wall clock,
+        # not AS_OF. What matters here is the ledger check.
+        assert report.unledgered == []
+        assert report.unreadable == []
+        assert report.split_adjusted == ["stub_agent (NVDA 10→20)"]
+
+    def test_a_split_learned_a_day_late_is_still_applied(
+        self, runner: DailyRunner
+    ) -> None:
+        # The floor is stamped once and never moved, so an ex-date the
+        # cache records after the day it happened is still caught.
+        self._held(runner, last_close="2026-08-03")
+        book = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)
+        book.split_floor_date = "2026-08-03"
+        book.save(directory=runner.portfolio_dir)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(date(2026, 8, 4), 2.0)]}
+        )
+
+        result = self._run(runner, loader)
+
+        assert result.portfolio.positions[0].shares == 20.0
+
+    def test_a_failed_lookup_changes_nothing_and_is_said(
+        self, runner: DailyRunner
+    ) -> None:
+        # The project logs through loguru, which caplog never sees.
+        from loguru import logger as loguru_logger
+
+        self._held(runner)
+
+        class _Broken(_StubPriceLoader):
+            def splits_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
+                raise RuntimeError("sqlite is locked")
+
+        seen: list[str] = []
+        sink = loguru_logger.add(
+            lambda m: seen.append(m.record["message"]), level="WARNING"
+        )
+        try:
+            result = self._run(runner, _Broken({"NVDA": 60.0}))
+        finally:
+            loguru_logger.remove(sink)
+
+        assert result.portfolio.positions[0].shares == 10.0
+        assert any("split lookup NVDA failed" in m for m in seen)
+
+    def test_an_implausible_ratio_is_refused_at_error_level(
+        self, runner: DailyRunner
+    ) -> None:
+        # A 1000:1 from the vendor is a glitch, not a corporate action;
+        # refusing it must reach the ERROR log the owner reads, not sit
+        # among the warnings.
+        from loguru import logger as loguru_logger
+
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 1000.0)]}
+        )
+
+        seen: list[str] = []
+        sink = loguru_logger.add(
+            lambda m: seen.append(m.record["message"]), level="ERROR"
+        )
+        try:
+            result = self._run(runner, loader)
+        finally:
+            loguru_logger.remove(sink)
+
+        assert result.portfolio.positions[0].shares == 10.0
+        assert any("split of NVDA refused" in m for m in seen)
+
+    def _held_with_aapl(self, runner: DailyRunner) -> None:
+        self._held(runner)
+        book = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)
+        book.positions.append(
+            Position(
+                ticker="AAPL",
+                shares=10.0,
+                entry_price=100.0,
+                entry_date="2026-07-01",
+                current_price=100.0,  # yesterday's close, pre-split
+                why_en="",
+                why_he="",
+            )
+        )
+        book.save(directory=runner.portfolio_dir)
+
+    class _BrokenForNvda(_StubPriceLoaderWithSplits):
+        def splits_between(
+            self, ticker: str, start: date | str, end: date | str
+        ) -> list[tuple[date, float]]:
+            from core.backtest.data_loader import _to_date
+
+            if ticker == "NVDA":
+                raise RuntimeError("sqlite is locked")
+            s, e = _to_date(start), _to_date(end)
+            return [(d, r) for d, r in self._splits.get(ticker, []) if s < d <= e]
+
+    def test_a_failed_lookup_leaves_the_name_unmarked_and_untraded(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        # NVDA's quote of 60 may be on the post-split basis while its 10
+        # shares are not: marked, the line would read $600 instead of
+        # $1,200, and a 90% target would top it up on that wrong weight.
+        self._held_with_aapl(runner)
+        loader = self._BrokenForNvda(
+            {"NVDA": 60.0, "AAPL": 50.0}, {"AAPL": [(self.EX, 2.0)]}
+        )
+        runner.price_loader = loader  # type: ignore[assignment]
+        adapter = _StubAdapter(
+            "stub_agent",
+            [_target("NVDA", weight=0.9), _target("AAPL", weight=0.31, rank=2)],
+        )
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA", "AAPL"],
+            {"NVDA": 60.0, "AAPL": 50.0},
+            {"NVDA": None, "AAPL": None},
+        )
+
+        by_ticker = {p.ticker: p for p in result.portfolio.positions}
+        nvda = by_ticker["NVDA"]
+        assert nvda.shares == 10.0
+        assert nvda.current_price == 120.0
+        assert [t for t in result.trades if t.ticker == "NVDA"] == []
+        # The other holding is split and marked as normal.
+        assert by_ticker["AAPL"].shares == 20.0
+        assert by_ticker["AAPL"].current_price == 50.0
+        assert any("split lookup NVDA failed" in m for m in errors)
+
+    def test_a_failed_lookup_leaves_the_close_mark_alone(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        self._held_with_aapl(runner)
+        runner.price_loader = self._BrokenForNvda(  # type: ignore[assignment]
+            {"NVDA": 60.0, "AAPL": 50.0}, {"AAPL": [(self.EX, 2.0)]}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        by_ticker = {p.ticker: p for p in results[0].portfolio.positions}
+        assert by_ticker["NVDA"].shares == 10.0
+        assert by_ticker["NVDA"].current_price == 120.0
+        assert by_ticker["AAPL"].shares == 20.0
+        assert by_ticker["AAPL"].current_price == 50.0
+        assert any("split lookup NVDA failed" in m for m in errors)
+
+    def test_the_close_of_day_mark_applies_it(self, runner: DailyRunner) -> None:
+        self._held(runner)
+        nav_before = 1_000.0 + 10 * 120.0
+        runner.price_loader = _StubPriceLoaderWithSplits(  # type: ignore[assignment]
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 2.0)]}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        book = results[0].portfolio
+        assert book.positions[0].shares == 20.0
+        assert book.total_nav == pytest.approx(nav_before)
 
 
 # ---------------------------------------------------------------------------
@@ -2008,9 +3045,11 @@ class TestTheQuarterlyRebalanceTradesACooledOffList:
         assert result.error is None
         buys = [t for t in result.trades if t.side == "BUY"]
         assert [t.ticker for t in buys] == ["BOTH"]
-        # $10,000 at the published 25% is $2,500, which buys 50 shares
-        # at $50 — not the 100 that today's 50% weight would have.
-        assert buys[0].shares == 50.0
+        # $10,000 at the published 25% is $2,500 — about 50 shares at
+        # $50, not the 100 that today's 50% weight would have. Exactly
+        # 49: the list leaves 75% in cash, and the 50th share plus the
+        # $2.50 commission would take the book past that (audit SF-X2).
+        assert buys[0].shares == 49.0
 
     def test_the_rebalance_is_stamped_so_it_happens_once(
         self, runner: DailyRunner
@@ -2385,8 +3424,9 @@ class TestARebalanceIsRecorded:
         This test is named after the share count and so was the one
         before it — which never asserted the count, and so passed
         against a row that overstated it. ``buy`` floors what is left
-        of the spend after the commission, so a $5,000 add at $100
-        moves 49 shares and not 50. The row said 50.0000 until the
+        of the spend after the commission, so the fill can be fewer
+        shares than the request — under the old 0.1% cost a $5,000 add
+        at $100 moved 49 shares and not 50. The row said 50.0000 until the
         number came from the fill rather than from the request, and the
         journal is the only store the dashboard reads.
         """
@@ -2454,3 +3494,702 @@ class TestARebalanceIsRecorded:
         assert stated_shares == pytest.approx(ledger[0].shares)
         assert stated_price == pytest.approx(ledger[0].price)
         assert ledger[0].shares == pytest.approx(result.trades[0].shares)
+
+
+# ---------------------------------------------------------------------------
+# Unpriced holdings (audit CE-1a / PD-09 / SF-X4)
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def errors() -> Iterator[list[str]]:
+    """Every ERROR-level message the runner logs while the test runs.
+
+    The project logs through loguru, which pytest's caplog never sees.
+    """
+    from loguru import logger as loguru_logger
+
+    seen: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: seen.append(m.record["message"]), level="ERROR"
+    )
+    try:
+        yield seen
+    finally:
+        loguru_logger.remove(sink_id)
+
+
+class TestUnpricedHoldingsAreFlagged:
+    """A held name with no bar for more than five sessions is flagged.
+
+    LEG was acquired on 26 August 2026 and stopped printing. The runner
+    refused, correctly, to sell it at a dead quote, and mark_to_market
+    kept its last close — so for 78 days the book carried it at $9.20,
+    priced every run, with nothing on the position, in the log or on the
+    dashboard saying the number referred to nothing.
+    """
+
+    def test_held_name_without_bar_for_6_sessions_is_flagged_not_marked(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "LEG", entry_price=9.66, current_price=9.20
+        )
+        # Last bar Tue 28 July; AS_OF Wed 5 August is the sixth session
+        # without one.
+        runner.price_loader = _StubPriceLoader(  # type: ignore[assignment]
+            {"LEG": None}, last_bars={"LEG": date(2026, 7, 28)}
+        )
+        adapter = _StubAdapter("stub_agent", [])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["LEG"],
+            {"LEG": None},
+            {"LEG": None},
+        )
+
+        pos = result.portfolio.positions[0]
+        assert pos.unpriced_since == "2026-07-29"
+        # Not re-marked: the last close stays, and is now labelled.
+        assert pos.current_price == pytest.approx(9.20)
+        assert any("LEG" in m for m in errors)
+        # And the flag is what reaches disk, where the dashboard reads it.
+        saved = LivePortfolio.load_or_seed(
+            "stub_agent", directory=runner.portfolio_dir
+        )
+        assert saved.positions[0].unpriced_since == "2026-07-29"
+
+    def test_five_sessions_without_a_bar_is_not_yet_flagged(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "LATE", entry_price=50.0, current_price=50.0
+        )
+        runner.price_loader = _StubPriceLoader(  # type: ignore[assignment]
+            {"LATE": None}, last_bars={"LATE": date(2026, 7, 29)}
+        )
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", []),  # type: ignore[arg-type]
+            AS_OF,
+            ["LATE"],
+            {"LATE": None},
+            {"LATE": None},
+        )
+
+        assert result.portfolio.positions[0].unpriced_since == ""
+        assert errors == []
+
+    def test_a_fresh_price_clears_the_flag(self, runner: DailyRunner) -> None:
+        p = _seed_holding(
+            runner, "stub_agent", "BACK", entry_price=50.0, current_price=50.0
+        )
+        p.positions[0].unpriced_since = "2026-07-20"
+        p.save(directory=runner.portfolio_dir)
+        runner.price_loader = _StubPriceLoader({"BACK": 52.0})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", []),  # type: ignore[arg-type]
+            AS_OF,
+            ["BACK"],
+            {"BACK": 52.0},
+            {"BACK": None},
+        )
+
+        pos = result.portfolio.positions[0]
+        assert pos.unpriced_since == ""
+        assert pos.current_price == pytest.approx(52.0)
+
+    def test_a_name_with_no_history_at_all_is_flagged_from_entry(
+        self, runner: DailyRunner
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "GHOST", entry_price=5.0, current_price=5.0
+        )
+        runner.price_loader = _StubPriceLoader({"GHOST": None})  # type: ignore[assignment]
+
+        result = runner._run_one(
+            _StubAdapter("stub_agent", []),  # type: ignore[arg-type]
+            AS_OF,
+            ["GHOST"],
+            {"GHOST": None},
+            {"GHOST": None},
+        )
+
+        assert result.portfolio.positions[0].unpriced_since == "2026-07-01"
+
+    def test_the_close_mark_flags_too(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "LEG", entry_price=9.66, current_price=9.20
+        )
+        runner.price_loader = _StubPriceLoader(  # type: ignore[assignment]
+            {"LEG": None}, last_bars={"LEG": date(2026, 7, 28)}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        pos = results[0].portfolio.positions[0]
+        assert pos.unpriced_since == "2026-07-29"
+        assert pos.current_price == pytest.approx(9.20)
+        assert any("LEG" in m for m in errors)
+
+
+# ---------------------------------------------------------------------------
+# Fundamentals freshness (audit FUND-2)
+# ---------------------------------------------------------------------------
+class _StubUniverse:
+    def __init__(self, members: list[str]) -> None:
+        self._members = members
+
+    def _ensure_loaded(self) -> None:
+        return None
+
+    def constituents_at(self, as_of: date) -> list[str]:
+        return list(self._members)
+
+
+class _StubPitLoader:
+    """Hands back one filing per ticker, filed on the date the test names."""
+
+    def __init__(self, filed: dict[str, date]) -> None:
+        self._filed = filed
+
+    def get_financials(self, ticker: str, as_of: date):  # type: ignore[no-untyped-def]
+        from core.backtest.point_in_time import FilingMetadata, PointInTimeFinancials
+
+        filed = self._filed.get(ticker)
+        if filed is None:
+            return None
+        return PointInTimeFinancials(
+            ticker=ticker,
+            as_of=as_of,
+            source_filing=FilingMetadata(
+                ticker=ticker,
+                cik=None,
+                form_type="10-Q",
+                filing_date=filed,
+                period_of_report=None,
+                accession_number=f"ACC-{ticker}",
+            ),
+            net_income=1.0,
+        )
+
+
+class TestFundamentalsFreshnessGate:
+    """The scan says loudly when the filings it reads are old — and trades.
+
+    Every live decision since about May 2026 read filings frozen at
+    2026-04-28 with nothing in the log, the books or the dashboard
+    saying so. Halting on it would freeze every book the day the check
+    shipped, because the cache is stale today; whether a stale corpus
+    should ever halt trading is the owner's call, so the default warns.
+    """
+
+    @pytest.fixture
+    def snaps(
+        self, runner: DailyRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> list[object]:
+        saved: list[object] = []
+        monkeypatch.setattr("core.live.runner.save_snapshot", saved.append)
+        monkeypatch.setattr("core.live.runner.export_sectors", lambda *a, **k: None)
+        monkeypatch.setattr("core.live.runner.export_prices", lambda *a, **k: None)
+        monkeypatch.setattr("core.live.runner.notify_run", lambda *a, **k: None)
+        runner.universe = _StubUniverse(["KO"])  # type: ignore[assignment]
+        runner.price_loader = _StubPriceLoader({"KO": 60.0})  # type: ignore[assignment]
+        # The stub duck-types AgentAdapter; mypy reports the item's line.
+        runner.adapters = [
+            _StubAdapter("stub_agent", [_target("KO", weight=0.5)])  # type: ignore[list-item]
+        ]
+        _not_a_rebalance_book().save(directory=runner.portfolio_dir)
+        return saved
+
+    def test_stale_fundamentals_log_error_flag_snapshot_and_still_trade(
+        self, runner: DailyRunner, snaps: list[object], errors: list[str]
+    ) -> None:
+        # 126 days before AS_OF (2026-08-05).
+        runner.pit_loader = _StubPitLoader({"KO": date(2026, 4, 1)})  # type: ignore[assignment]
+
+        results = runner.run(as_of=AS_OF)
+
+        # Not halted: the book still trades.
+        assert [t.ticker for t in results[0].trades] == ["KO"]
+        assert any("fundamentals are stale" in m and "2026-04-01" in m for m in errors)
+        assert len(snaps) == 1
+        snap = snaps[0]
+        assert snap.fundamentals_stale is True  # type: ignore[attr-defined]
+        assert snap.fundamentals_newest_filed == "2026-04-01"  # type: ignore[attr-defined]
+
+    def test_fresh_fundamentals_flag_false_and_log_no_error(
+        self, runner: DailyRunner, snaps: list[object], errors: list[str]
+    ) -> None:
+        runner.pit_loader = _StubPitLoader({"KO": date(2026, 7, 28)})  # type: ignore[assignment]
+
+        runner.run(as_of=AS_OF)
+
+        assert not any("fundamentals" in m for m in errors)
+        snap = snaps[0]
+        assert snap.fundamentals_stale is False  # type: ignore[attr-defined]
+        assert snap.fundamentals_newest_filed == "2026-07-28"  # type: ignore[attr-defined]
+
+    def test_no_fundamentals_at_all_is_flagged(
+        self, runner: DailyRunner, snaps: list[object], errors: list[str]
+    ) -> None:
+        runner.pit_loader = _StubPitLoader({})  # type: ignore[assignment]
+
+        runner.run(as_of=AS_OF)
+
+        assert any("fundamentals are stale" in m for m in errors)
+        snap = snaps[0]
+        assert snap.fundamentals_stale is True  # type: ignore[attr-defined]
+        assert snap.fundamentals_newest_filed is None  # type: ignore[attr-defined]
+
+    def test_the_close_mark_does_not_measure(
+        self, runner: DailyRunner, snaps: list[object]
+    ) -> None:
+        """It reads no filings, so it leaves the morning's flag alone."""
+        runner.run_mark_to_market(as_of=AS_OF)
+
+        assert snaps[0].fundamentals_stale is None  # type: ignore[attr-defined]
+
+    def test_both_snapshots_say_the_session_was_open(
+        self, runner: DailyRunner, snaps: list[object]
+    ) -> None:
+        """The runner asked the calendar before writing, so it says so.
+
+        An explicit False is what clears a closed-session tag put on an
+        open day by mistake; None would leave it stuck.
+        """
+        runner.pit_loader = _StubPitLoader({"KO": date(2026, 7, 28)})  # type: ignore[assignment]
+
+        runner.run(as_of=AS_OF)
+        runner.run_mark_to_market(as_of=AS_OF)
+
+        assert [s.closed_session for s in snaps] == [False, False]  # type: ignore[attr-defined]
+
+    def test_the_close_mark_clears_a_stored_tag_on_an_open_day(
+        self,
+        runner: DailyRunner,
+        snaps: list[object],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """End to end: a wrong tag in the day's file does not survive.
+
+        The mark books no trades, so only the runner's explicit False can
+        clear the tag; a save that passed None would inherit it.
+        """
+        from core.live.snapshots import save_snapshot
+
+        root = tmp_path / "snapshots"
+        day = root / "stub_agent" / f"{AS_OF.isoformat()}.json"
+        day.parent.mkdir(parents=True)
+        day.write_text(json.dumps({"closed_session": True}))
+        monkeypatch.setattr(
+            "core.live.runner.save_snapshot", lambda s: save_snapshot(s, root=root)
+        )
+
+        runner.run_mark_to_market(as_of=AS_OF)
+
+        assert "closed_session" not in json.loads(day.read_text())
+
+
+class _DoctrineAdapter(_StubAdapter):
+    """A stub that declares the doctrine's band and per-name cap, the
+    way the real adapters do (audit SF-X3 / SF-X5)."""
+
+    def __init__(
+        self,
+        name: str,
+        targets: list[LiveTarget],
+        *,
+        rebalance_band: float | str | None = "runner",
+        max_position_pct: float | None = None,
+    ) -> None:
+        super().__init__(name, targets)
+        self.rebalance_band = rebalance_band
+        self.max_position_pct = max_position_pct
+
+
+class TestTheDoctrineOwnsTheBandAndTheCap:
+    """Audit SF-X3: the 25% band trimmed Lynch's EXEL winner while the
+    book held fifteen losers, against playbook §6.4. Audit SF-X5:
+    ``reachable_targets`` handed unreachable weight to the survivors
+    until Graham held five names at 15.8-20.9% (cap 10%) and Schloss
+    five at 11.7-25.9% (cap 5%)."""
+
+    def _winner_book(self, runner: DailyRunner, *, price: float) -> None:
+        # 50 shares bought at $100, $5,000 cash beside them.
+        p = LivePortfolio(agent="stub_agent", cash=5_000.0)
+        p.last_rebalance_date = "2026-08-03"
+        p.positions.append(
+            Position(
+                ticker="EXEL",
+                shares=50.0,
+                entry_price=100.0,
+                entry_date="2026-07-01",
+                current_price=price,
+            )
+        )
+        p.save(directory=runner.portfolio_dir)
+
+    def _run_lynch(self, runner: DailyRunner, price: float) -> AgentRunResult:
+        from core.live.agent_adapter import LynchLive
+
+        adapter = _DoctrineAdapter(
+            "stub_agent",
+            [_target("EXEL", weight=0.5)],
+            rebalance_band=LynchLive.rebalance_band,
+        )
+        runner.price_loader = _StubPriceLoader({"EXEL": price})  # type: ignore[assignment]
+        return runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["EXEL"],
+            {"EXEL": price},
+            {"EXEL": None},
+        )
+
+    def test_lynch_winner_is_not_trimmed_by_band(
+        self, runner: DailyRunner
+    ) -> None:
+        # 50 x $300 = $15,000 of a $20,000 book against a 50% target:
+        # +50% drift, which the runner-wide band trims by 16 shares.
+        self._winner_book(runner, price=300.0)
+
+        result = self._run_lynch(runner, 300.0)
+
+        assert [t for t in result.trades if t.side == "SELL"] == []
+        assert result.portfolio.positions[0].shares == 50.0
+
+    def test_a_band_of_none_still_tops_up_an_underweight_name(
+        self, runner: DailyRunner
+    ) -> None:
+        """``None`` forbids the trim and nothing else: an underweight
+        position is still added to at the runner's band."""
+        # 50 x $20 = $1,000 against $5,000 cash: -67% drift.
+        self._winner_book(runner, price=20.0)
+
+        result = self._run_lynch(runner, 20.0)
+
+        buys = [t for t in result.trades if t.side == "BUY"]
+        assert len(buys) == 1 and buys[0].ticker == "EXEL"
+
+    def test_graham_with_5_reachable_names_holds_50_percent_cash_not_20_percent_each(
+        self, runner: DailyRunner
+    ) -> None:
+        # Graham's equal weights over five names are 20% each; his
+        # playbook allows 10%. The other half stays cash.
+        tickers = ["G1", "G2", "G3", "G4", "G5"]
+        prices: dict[str, float | None] = dict.fromkeys(tickers, 45.0)
+        adapter = _DoctrineAdapter(
+            "stub_agent",
+            [_target(t, weight=0.2, rank=i + 1) for i, t in enumerate(tickers)],
+            max_position_pct=10.0,
+        )
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        runner_book = _not_a_rebalance_book()
+        runner_book.save(directory=runner.portfolio_dir)
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            tickers,
+            prices,
+            dict.fromkeys(tickers),
+        )
+
+        book = result.portfolio
+        assert {p.ticker for p in book.positions} == set(tickers)
+        for pos in book.positions:
+            assert pos.weight_pct <= 10.0, f"{pos.ticker} at {pos.weight_pct:.2f}%"
+        assert book.cash / book.total_nav * 100.0 >= 50.0
+
+    def test_a_held_name_above_the_cap_is_trimmed_toward_it(
+        self, runner: DailyRunner
+    ) -> None:
+        """The live consequence: Graham's existing 20% positions are
+        trimmed to the cap, and the proceeds stay in cash."""
+        p = LivePortfolio(agent="stub_agent", cash=6_000.0)
+        p.last_rebalance_date = "2026-08-03"
+        for ticker in ("G1", "G2"):
+            p.positions.append(
+                Position(
+                    ticker=ticker,
+                    shares=40.0,
+                    entry_price=50.0,
+                    entry_date="2026-07-01",
+                    current_price=50.0,
+                )
+            )
+        p.save(directory=runner.portfolio_dir)
+        prices: dict[str, float | None] = {"G1": 50.0, "G2": 50.0}
+        runner.price_loader = _StubPriceLoader(dict(prices))  # type: ignore[assignment]
+        adapter = _DoctrineAdapter(
+            "stub_agent",
+            [_target("G1", weight=0.5), _target("G2", weight=0.5, rank=2)],
+            max_position_pct=10.0,
+        )
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["G1", "G2"],
+            prices,
+            dict.fromkeys(prices),
+        )
+
+        sells = sorted(t.ticker for t in result.trades if t.side == "SELL")
+        assert sells == ["G1", "G2"]
+        assert [t for t in result.trades if t.side == "BUY"] == []
+        book = result.portfolio
+        one_share_pct = 50.0 / book.total_nav * 100.0
+        for pos in book.positions:
+            assert pos.weight_pct == pytest.approx(10.0, abs=one_share_pct)
+        assert book.cash / book.total_nav * 100.0 >= 79.0
+
+    def test_a_cap_lowers_a_weight_the_drop_would_lift(self) -> None:
+        """The excess of a redistributed weight stays cash."""
+        targets = [_target("A", weight=0.08), _target("DEAR", weight=0.08, rank=2)]
+        kept = reachable_targets(
+            targets, {"A": 10.0, "DEAR": 5_000.0}, nav=10_000.0, max_weight=0.10
+        )
+        assert [t.ticker for t in kept] == ["A"]
+        assert kept[0].weight == pytest.approx(0.10)
+
+    def test_a_cap_lowers_the_strategys_own_weight(self) -> None:
+        targets = [_target("A", weight=0.2), _target("B", weight=0.2, rank=2)]
+        kept = reachable_targets(
+            targets, {"A": 10.0, "B": 10.0}, nav=10_000.0, max_weight=0.05
+        )
+        assert [t.weight for t in kept] == pytest.approx([0.05, 0.05])
+
+    def test_a_name_the_capped_slot_cannot_hold_is_dropped(self) -> None:
+        """Reach is judged against the capped slot. Uncapped, a 50% slot
+        of $10,000 holds a $1,500 share; at Graham's 10% it cannot, and
+        keeping the name would reserve posture for a buy that never
+        happens."""
+        targets = [_target("A", weight=0.5), _target("DEAR", weight=0.5, rank=2)]
+        kept = reachable_targets(
+            targets, {"A": 10.0, "DEAR": 1_500.0}, nav=10_000.0, max_weight=0.10
+        )
+        assert [t.ticker for t in kept] == ["A"]
+        assert kept[0].weight == pytest.approx(0.10)
+
+    def test_a_cap_outside_zero_to_one_is_refused(self) -> None:
+        targets = [_target("A", weight=0.5)]
+        for bad in (0.0, -0.1, 1.5):
+            with pytest.raises(ValueError, match="max_weight"):
+                reachable_targets(
+                    targets, {"A": 10.0}, nav=10_000.0, max_weight=bad
+                )
+
+    def test_a_top_up_never_carries_a_position_past_the_cap(self) -> None:
+        """The residue pass may top a slot up by the band, but not past
+        the doctrine's cap: 12 x $40 fills a $500 slot, and a 13th share
+        ($520) would be 5.2% of a 5% name."""
+        from core.live.runner import plan_whole_share_buys
+
+        kwargs = {
+            "nav": 10_000.0,
+            "cash": 10_000.0,
+            "cost_bps": 0.0,
+            "commission": 2.50,
+            "band": 0.25,
+        }
+        targets = [_target("X", weight=0.05)]
+        uncapped = plan_whole_share_buys(targets, {"X": 40.0}, **kwargs)
+        capped = plan_whole_share_buys(
+            targets, {"X": 40.0}, max_weight=0.05, **kwargs
+        )
+        assert uncapped == {"X": 13}
+        assert capped == {"X": 12}
+
+    def test_an_adapter_band_or_cap_out_of_range_is_refused(self) -> None:
+        from core.live.runner import band_for, max_weight_for
+
+        assert band_for(_DoctrineAdapter("a", []), default=0.25) == 0.25
+        assert band_for(_StubAdapter("a", []), default=0.25) == 0.25
+        assert band_for(_DoctrineAdapter("a", [], rebalance_band=None), default=0.25) is None
+        assert band_for(_DoctrineAdapter("a", [], rebalance_band=0.1), default=0.25) == 0.1
+        assert max_weight_for(_StubAdapter("a", [])) is None
+        assert max_weight_for(_DoctrineAdapter("a", [], max_position_pct=5.0)) == 0.05
+        with pytest.raises(ValueError, match="rebalance_band"):
+            band_for(_DoctrineAdapter("a", [], rebalance_band=-0.1), default=0.25)
+        with pytest.raises(ValueError, match="rebalance_band"):
+            band_for(_DoctrineAdapter("a", [], rebalance_band="wide"), default=0.25)
+        for bad in (0.0, 150.0):
+            with pytest.raises(ValueError, match="max_position_pct"):
+                max_weight_for(_DoctrineAdapter("a", [], max_position_pct=bad))
+
+
+# ---------------------------------------------------------------------------
+# Journal write failures (audit RK-04)
+# ---------------------------------------------------------------------------
+class _BrokenJournal(DecisionLogger):
+    """A decision log whose every write fails, as a full disk would."""
+
+    def log(self, decision):  # type: ignore[no-untyped-def]
+        raise OSError("No space left on device")
+
+
+@pytest.fixture
+def warnings_seen() -> Iterator[list[str]]:
+    """Every WARNING-or-worse message logged while the test runs.
+
+    The project logs through loguru, which pytest's caplog never sees.
+    """
+    from loguru import logger as loguru_logger
+
+    seen: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: seen.append(m.record["message"]), level="WARNING"
+    )
+    try:
+        yield seen
+    finally:
+        loguru_logger.remove(sink_id)
+
+
+class TestJournalFailuresAreCounted:
+    """A trade whose journal row could not be written is said and counted.
+
+    The FILL, EXIT and rebalance rows were written under
+    ``except Exception: logger.debug`` — below every level the daily job
+    prints — so a journal that lost rows looked exactly like one that
+    had none to write. 103 book changes reached the repo with no journal
+    row (audit RK-04). The trade itself must still stand: the book is
+    the record of money, the journal the record of reasons.
+    """
+
+    def test_journal_write_failure_is_counted_not_swallowed(
+        self, runner: DailyRunner, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW"],
+            {"NEW": 20.0},
+            {"NEW": None},
+        )
+
+        assert result.portfolio.has("NEW")  # the trade stands
+        assert result.journal_failures == 1
+        assert any(
+            "NEW" in m and "journal" in m and "No space left" in m
+            for m in warnings_seen
+        ), warnings_seen
+
+    def test_a_lost_exit_row_is_counted(
+        self, runner: DailyRunner, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        _seed_holding(
+            runner, "stub_agent", "GONE", entry_price=50.0, current_price=55.0
+        )
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"GONE": 55.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("KEEP")])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["KEEP", "GONE"],
+            {"KEEP": None, "GONE": 55.0},
+            {"KEEP": None, "GONE": None},
+        )
+
+        assert not result.portfolio.has("GONE")
+        assert result.journal_failures == 1
+        assert any("EXIT GONE" in m for m in warnings_seen), warnings_seen
+
+    def test_a_lost_rebalance_row_is_counted(
+        self, runner: DailyRunner, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        # The TestRebalanceBand trim: 50 x $300 against $5,000 cash.
+        p = LivePortfolio(agent="stub_agent")
+        p.positions.append(
+            Position(
+                ticker="DRIFT", shares=50.0, entry_price=100.0,
+                entry_date="2026-07-01", current_price=300.0,
+                why_en="", why_he="",
+            )
+        )
+        p.cash = 5_000.0
+        p.save(directory=runner.portfolio_dir)
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"DRIFT": 300.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("DRIFT", weight=0.5)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["DRIFT"],
+            {"DRIFT": 300.0},
+            {"DRIFT": None},
+        )
+
+        assert [t.side for t in result.trades] == ["SELL"]
+        assert result.journal_failures == 1
+        assert any("TRIM DRIFT" in m for m in warnings_seen), warnings_seen
+
+    def test_a_healthy_journal_counts_nothing(self, runner: DailyRunner) -> None:
+        runner.price_loader = _StubPriceLoader({"NEW": 20.0})  # type: ignore[assignment]
+        adapter = _StubAdapter("stub_agent", [_target("NEW", weight=0.5)])
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NEW"],
+            {"NEW": 20.0},
+            {"NEW": None},
+        )
+
+        assert result.trades
+        assert result.journal_failures == 0
+
+    def test_the_count_is_per_agent_not_per_runner(
+        self, runner: DailyRunner, tmp_path: Path
+    ) -> None:
+        # One runner serves every agent in turn; the second agent must
+        # not report the first one's lost rows as its own.
+        runner.decision_logger = _BrokenJournal(root=tmp_path / "broken")
+        runner.price_loader = _StubPriceLoader({"NEW": 20.0})  # type: ignore[assignment]
+        first = runner._run_one(
+            _StubAdapter("agent_a", [_target("NEW", weight=0.5)]),  # type: ignore[arg-type]
+            AS_OF, ["NEW"], {"NEW": 20.0}, {"NEW": None},
+        )
+        runner.decision_logger = DecisionLogger(root=tmp_path / "ok")
+        second = runner._run_one(
+            _StubAdapter("agent_b", [_target("NEW", weight=0.5)]),  # type: ignore[arg-type]
+            AS_OF, ["NEW"], {"NEW": 20.0}, {"NEW": None},
+        )
+
+        assert first.journal_failures == 1
+        assert second.journal_failures == 0
+
+    def test_the_daily_report_prints_the_count(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from scripts.run_daily_paper_trading import print_report
+
+        lost = AgentRunResult(
+            agent="stub_agent",
+            portfolio=LivePortfolio(agent="stub_agent", cash=10_000),
+            journal_failures=2,
+        )
+        clean = AgentRunResult(
+            agent="other_agent",
+            portfolio=LivePortfolio(agent="other_agent", cash=10_000),
+        )
+
+        print_report([lost, clean])
+
+        out = capsys.readouterr().out
+        assert "2 journal row(s) NOT written" in out
+        assert out.count("NOT written") == 1

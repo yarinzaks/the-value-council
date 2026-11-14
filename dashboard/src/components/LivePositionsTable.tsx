@@ -7,6 +7,7 @@ import { Term } from "./Term";
 import type { LivePosition, MarkFreshness } from "@/lib/types";
 import { MAX_MARK_AGE_DAYS } from "@/lib/types";
 import { formatTimeOfDay } from "@/lib/timestamps";
+import { isUnpriced } from "@/lib/unpriced";
 
 const TERM_PATTERN = /\b(P\/E|P\/B|P\/CF|P\/NCAV|D\/E|EY|ROC|NCAV|EBIT|EV|yield)\b/g;
 const TERM_TO_KEY: Record<string, string> = {
@@ -131,7 +132,18 @@ export function LivePositionsTable({
                       The run did happen at priceHm; this price did not
                       come from it, and saying otherwise is the one thing
                       that would make a reader act on a dead quote. */}
-                  {stale && mark ? (
+                  {/* Unpriced outranks stale: the runner has said there
+                      is no market for this name at all, which is a
+                      stronger claim than an old bar, and the one a
+                      reader must not miss. */}
+                  {isUnpriced(p) ? (
+                    <span
+                      className="block text-[10px] mt-0.5 font-semibold text-red-700 dark:text-red-400"
+                      title={t("unpriced_help")}
+                    >
+                      ⚠ {t("unpriced")} {p.unpriced_since}
+                    </span>
+                  ) : stale && mark ? (
                     <span
                       className="block text-[10px] mt-0.5 text-amber-700 dark:text-amber-400"
                       title={t("mark_stale_help")}

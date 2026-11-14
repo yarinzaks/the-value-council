@@ -51,6 +51,27 @@ test("a closed-position rationale keeps its entry and exit price", () => {
   );
 });
 
+test("a closed-position rationale that names its shares keeps every figure", () => {
+  // Audit RK-05: the EXIT row now ends ", sold N shares". The old shape
+  // is still in the journal, so this one must render as whole as it.
+  const english =
+    "Closed live position: entry $101.53, exit $102.03 (+0.49%), sold 12 shares";
+  const hebrew = translateRationale(english, "he");
+  const old = translateRationale(
+    "Closed live position: entry $101.53, exit $102.03 (+0.49%)",
+    "he",
+  );
+
+  assert.notEqual(hebrew, english, "the rule did not fire at all");
+  for (const figure of ["$101.53", "$102.03", "+0.49%", "12 מניות"]) {
+    assert.ok(hebrew.includes(figure), `${figure} lost: ${JSON.stringify(hebrew)}`);
+  }
+  assert.ok(
+    hebrew.startsWith(old),
+    `worded unlike the rows before it: ${JSON.stringify(hebrew)} vs ${JSON.stringify(old)}`,
+  );
+});
+
 test("a net-net rationale keeps its NCAV per share", () => {
   const english =
     "P/NCAV 0.55 (≤ ⅔), NCAV/share $12.40. Classic Graham Net-Net.";

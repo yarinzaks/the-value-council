@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUI } from "./Providers";
 import { formatRelativeTime } from "../lib/timestamps";
+import type { FundamentalsStaleness } from "../lib/fundamentals-freshness";
 
 const NAV = [
   { href: "/", key: "nav_overview" },
@@ -108,6 +109,7 @@ export function AppShell({
   lastSyncIso = "",
   lastSyncAbsolute = "",
   stale = false,
+  staleFundamentals = null,
   nextUsLabel = "",
   nextTaseLabel = "",
 }: {
@@ -120,6 +122,9 @@ export function AppShell({
   /** True when most recent sync is older than 24h. Renders the
    *  red warning banner. */
   stale?: boolean;
+  /** Set when the latest scan read filings over 120 days old (audit
+   *  FUND-2). Renders its own warning banner; trading was not halted. */
+  staleFundamentals?: FundamentalsStaleness | null;
   /** Pre-formatted "next US update" label ("today 23:00", "tomorrow ..."). */
   nextUsLabel?: string;
   /** Pre-formatted "next TASE update" label. */
@@ -303,6 +308,34 @@ export function AppShell({
               <path d="M12 9v4m0 4h.01M10.3 3.9 2.4 17a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
             </svg>
             {t("stale_warning")}
+          </div>
+        </div>
+      )}
+
+      {/* Stale-fundamentals warning. Separate from the sync banner
+          above because it is a different failure: the run happened on
+          time and traded, on filings no newer than the date shown.
+          From about May 2026 every decision read a corpus frozen at
+          2026-04-28 and nothing on the site said so (audit FUND-2). */}
+      {staleFundamentals && (
+        <div role="alert" className="bg-loss/10 border-b border-loss/25 text-loss">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 px-4 sm:px-6 lg:px-8 py-2 text-center text-xs font-medium">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              className="h-3.5 w-3.5 shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M12 9v4m0 4h.01M10.3 3.9 2.4 17a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+            </svg>
+            {staleFundamentals.newestFiled
+              ? t("fundamentals_stale_warning")
+                  .replace("{filed}", staleFundamentals.newestFiled)
+                  .replace("{date}", staleFundamentals.date)
+              : t("fundamentals_missing_warning").replace("{date}", staleFundamentals.date)}
           </div>
         </div>
       )}

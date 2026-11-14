@@ -50,7 +50,7 @@ from core.data.fundamentals_fetcher import (
 )
 from core.logger import get_logger
 from core.paths import DATA_ROOT
-from core.research.splits import adjusted_shares
+from core.research.splits import COVER_CONCEPTS, split_adjusted_share_count
 
 logger = get_logger("core.research.fundamentals_panel")
 
@@ -74,10 +74,7 @@ FIELDS: tuple[str, ...] = (
 #: XBRL concepts carrying a share count, best first. The ``dei``
 #: cover-page fact is preferred: it is dated at the filing rather than
 #: at the period end, so it is the freshest count the filing contains.
-SHARE_CONCEPTS: tuple[str, ...] = (
-    "EntityCommonStockSharesOutstanding",
-    "CommonStockSharesOutstanding",
-)
+SHARE_CONCEPTS: tuple[str, ...] = COVER_CONCEPTS
 
 #: Fundamentals are sampled quarterly and forward-filled to the monthly
 #: rebalance grid. A company files four times a year, so sampling
@@ -117,26 +114,16 @@ def _share_history(cache: EdgarCache, ticker: str) -> pd.Series:
     if facts is None or len(facts) == 0:
         return pd.Series(dtype="float64")
 
-    rows = facts[facts["concept"].isin(SHARE_CONCEPTS)]
-    if len(rows) == 0:
-        return pd.Series(dtype="float64")
-
     # One count per filing date, and it has to be *that filing's* count.
     # A 10-K restates the same concept for every year in its comparative
     # columns — MSFT's 2015 filing tags CommonStockSharesOutstanding at
     # 8.38bn (2012), 8.33bn (2013), 8.24bn (2014) and 8.03bn (2015) —
-    # so taking the largest silently reaches three years into the past
-    # and reads a share count that was already stale when filed.
-    #
-    # The dei cover-page fact has no such problem: it is dated at the
-    # filing itself and there is exactly one. Prefer it, and fall back
-    # to the newest period_end only where it is absent.
-    preference = {name: i for i, name in enumerate(SHARE_CONCEPTS)}
-    ordered = rows.assign(_rank=rows["concept"].map(preference)).sort_values(
-        ["filed", "_rank", "period_end"], ascending=[True, False, True]
-    )
-    by_filing = ordered.groupby("filed")["value"].last()
-    return adjusted_shares(by_filing)
+    # so the dei cover fact is preferred, and otherwise the newest
+    # period_end. That selection, the sanity floor, the weighted-average
+    # fallback and the check of each split against the filer's restated
+    # comparatives (audit FUND-8) are shared with the live screens in
+    # core.research.splits.
+    return split_adjusted_share_count(facts)
 
 
 #: Tickers handed to a worker in one task.

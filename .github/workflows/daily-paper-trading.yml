@@ -390,6 +390,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Move to the branch tip, inside the lock
+        # The lock serialises runs; it does not refresh what they read.
+        # With no `ref:`, actions/checkout checks out github.sha — the
+        # commit the event fired on, not the branch as it stands when
+        # this job finally gets the lock. On 2026-11-13 the 15:00 cron
+        # fired at 15:07Z, held until 17:00Z, and checked out main as of
+        # 15:07Z, without the open run's 935ff0f7 pushed at 15:52Z. It
+        # built the close on a book that predated the open, wrote the
+        # day's snapshots the open had already created, and its rebase
+        # stopped on them add/add (run 43449460656).
+        #
+        # Resetting here loses nothing: it is the first step after
+        # checkout, the lock is already held, and nothing has written to
+        # the tree yet. The scripts that run are then the tip's too,
+        # which is what a run that starts now should execute.
+        run: |
+          git fetch --no-tags origin "$TARGET_REF"
+          checked_out=$(git rev-parse HEAD)
+          git reset --hard FETCH_HEAD
+          tip=$(git rev-parse HEAD)
+          if [ "$checked_out" != "$tip" ]; then
+            echo "::notice::moved from ${checked_out} (the triggering commit) to ${tip} (origin/${TARGET_REF})"
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -402,7 +426,7 @@ jobs:
           pip install -e '.[dev]'
 
       - name: Prepare data directories
-        run: mkdir -p data/portfolios data/decisions data/snapshots data/cache data/cron_logs data/fundamentals_cache
+        run: mkdir -p data/portfolios data/decisions data/doctrine_exits data/snapshots data/cache data/cron_logs data/fundamentals_cache data/memos
 
       - name: Download EDGAR cache from release (US runs only)
         # TASE runs don't need the EDGAR cache — the Israeli scanner
@@ -474,7 +498,11 @@ jobs:
         if: needs.wait.outputs.market != 'TASE'
         env:
           MODE: ${{ needs.wait.outputs.mode }}
-        run: python -m scripts.verify_run_state --mode "$MODE"
+        # --baseline-ref HEAD: the checkout is the books as they stood
+        # before this run, so a book whose holdings moved with no
+        # data/trades/<agent>/<day>.json fails here instead of reaching
+        # the repo as a share change nothing records (audit ENG-7).
+        run: python -m scripts.verify_run_state --mode "$MODE" --baseline-ref HEAD
 
       - name: Commit updated state back to the repo
         env:
@@ -508,7 +536,16 @@ jobs:
           # the only rows in data/trades are reconstructions and one
           # hand-run catch-up. A dashboard built from this tree could
           # not say which sale made what.
-          git add data/portfolios data/decisions data/snapshots data/cron_logs \
+          # doctrine_exits/ is each agent's own keep-or-sell verdict on
+          # its held names beside what the engine did (audit SF-X1). In
+          # shadow it is the only record those verdicts exist; created
+          # by the mkdir above so the pathspec always matches.
+          # memos/ is the analyst layer's output (core.paths.memos_dir),
+          # written on every LLM run and never staged, so it was thrown
+          # away with the runner (audit RK-09). Created by the mkdir
+          # above for the same reason as doctrine_exits/.
+          git add data/portfolios data/decisions data/doctrine_exits \
+                  data/snapshots data/cron_logs data/memos \
                   data/prices data/sectors.json data/council data/trades
           if git diff --cached --quiet; then
             echo "no data changes — nothing to commit"
@@ -516,8 +553,48 @@ jobs:
           fi
           STAMP=$(date -u +%Y-%m-%dT%H:%MZ)
           git commit -m "auto: paper-trading run ${MARKET} ${MODE} ${STAMP}"
-          git pull --rebase origin "$TARGET_REF" || true
+          # A failed rebase fails the run (audit RK-09). This used to end
+          # in `|| true`, and a rebase stopped on a conflict leaves HEAD
+          # detached on the remote tip — so the push below reported
+          # "Everything up-to-date", the job went green, and the run's
+          # commit was discarded with the runner. The concurrency group
+          # keeps two runs of this workflow apart, so a conflict means
+          # something else wrote the same files; which side wins is a
+          # human's call, not this script's. Abort so the tree is clean,
+          # name the files, and fail.
+          if ! git pull --rebase origin "$TARGET_REF"; then
+            # One line: an ::error:: annotation ends at the first newline.
+            conflicted=$(git diff --name-only --diff-filter=U | paste -sd ' ' -)
+            for state in rebase-merge rebase-apply; do
+              if [ -e "$(git rev-parse --git-path "$state")" ]; then
+                git rebase --abort
+                break
+              fi
+            done
+            # The abort put HEAD back on this run's commit. Keep it: the
+            # runner is thrown away with the job, and so was 2026-11-13's
+            # close. The step below uploads the directory.
+            patches="${RUNNER_TEMP:-/tmp}/unpushed-commits"
+            if git format-patch --output-directory "$patches" "origin/${TARGET_REF}..HEAD" >/dev/null; then
+              echo "::notice::this run's unpushed commit is saved as the unpushed-commits artifact; apply it with git am"
+            else
+              echo "::warning::could not save this run's commit as a patch"
+            fi
+            echo "::error::could not rebase this run's commit onto origin/${TARGET_REF}; nothing was pushed. Conflicting files: ${conflicted:-none (the pull itself failed)}"
+            exit 1
+          fi
           git push origin "HEAD:${TARGET_REF}"
+
+      - name: Upload unpushed commits as artifact
+        # Only the rebase failure above writes the directory; any other
+        # failure finds it empty, hence `ignore`.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unpushed-commits-${{ needs.wait.outputs.market }}-${{ needs.wait.outputs.mode }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/unpushed-commits/
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload run logs as artifact
         if: always()

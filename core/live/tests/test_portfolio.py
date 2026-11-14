@@ -3,19 +3,42 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import date
 from pathlib import Path
 
 import pytest
+from loguru import logger as loguru_logger
 
 from core.live.portfolio import (
-    DEFAULT_COST_BPS,
+    DEFAULT_COMMISSION_USD,
     DEFAULT_INITIAL_CASH,
+    UNPRICED_AFTER_SESSIONS,
     LivePortfolio,
     LivePortfolioError,
     Position,
     WatchEntry,
     now_iso,
+    unpriced_since_for,
 )
+
+
+@contextmanager
+def _logged(level: str) -> Iterator[list[str]]:
+    """What the project's loguru logger wrote at ``level`` or above.
+
+    ``caplog`` cannot see loguru, which does not propagate to stdlib
+    logging; a sink can.
+    """
+    messages: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: messages.append(m.record["message"]), level=level
+    )
+    try:
+        yield messages
+    finally:
+        loguru_logger.remove(sink_id)
 
 
 # ---------------------------------------------------------------------------
@@ -50,14 +73,14 @@ class TestBuy:
             entry_date="2026-04-29",
             why_en="value", why_he="ערך",
         )
-        # 5000 / (1 + 0.001) = 4995.005 max notional, / 200 = 24.98
-        # shares, floored to 24. The $195 that cannot buy a 25th share
+        # (5000 - 2.50 commission) / 200 = 24.99 shares, floored to 24.
+        # The $197.50 that cannot buy a 25th share
         # stays in cash, because the broker this book is copied into
         # sells whole shares.
         assert trade.shares == 24.0
         assert trade.gross_value == pytest.approx(24 * 200.0)
-        assert trade.cost_paid == pytest.approx(24 * 200.0 * DEFAULT_COST_BPS)
-        assert p.cash == pytest.approx(10_000.0 - 4_800.0 - 4.8, abs=0.01)
+        assert trade.cost_paid == pytest.approx(DEFAULT_COMMISSION_USD)
+        assert p.cash == pytest.approx(10_000.0 - 4_800.0 - 2.50, abs=0.01)
         assert p.cumulative_costs == pytest.approx(trade.cost_paid)
         assert len(p.positions) == 1
 
@@ -98,8 +121,9 @@ class TestBuy:
             )
 
     def test_a_target_of_exactly_one_share_still_fails_on_cost(self) -> None:
-        # $100 buys one $100 share and 10c of commission it cannot pay,
-        # so the floor takes it to zero. The slot has to carry the fee.
+        # $100 buys one $100 share and $2.50 of commission it cannot
+        # pay, so the floor takes it to zero. The slot has to carry the
+        # fee.
         p = LivePortfolio(agent="test", cash=10_000)
         with pytest.raises(LivePortfolioError, match="whole share"):
             p.buy(
@@ -107,7 +131,7 @@ class TestBuy:
                 why_en="", why_he="",
             )
         trade = p.buy(
-            "X", target_dollars=100.2, price=100, entry_date="x",
+            "X", target_dollars=102.5, price=100, entry_date="x",
             why_en="", why_he="",
         )
         assert trade.shares == 1.0
@@ -129,8 +153,8 @@ class TestBuy:
         p.buy("AAPL", target_dollars=2_000, price=100, entry_date="2026-04-29", why_en="", why_he="")
         p.buy("AAPL", target_dollars=2_000, price=120, entry_date="2026-04-30", why_en="", why_he="")
         assert len(p.positions) == 1
-        # Two whole-share lots: 2000/1.001/100 = 19.98 floors to 19 at
-        # 100, then 2000/1.001/120 = 16.65 floors to 16 at 120.
+        # Two whole-share lots: (2000-2.50)/100 = 19.98 floors to 19 at
+        # 100, then (2000-2.50)/120 = 16.65 floors to 16 at 120.
         lot1, lot2 = 19.0, 16.0
         avg = (lot1 * 100 + lot2 * 120) / (lot1 + lot2)
         assert p.positions[0].entry_price == pytest.approx(avg, rel=1e-6)
@@ -150,9 +174,11 @@ class TestSell:
         trade = p.sell("AAPL", price=110.0)
         assert trade.shares == shares
         assert trade.realized_pnl_usd == pytest.approx(shares * (110 - 100))
-        # Cash should be cash_before_sell + proceeds - cost
+        # Cash should be cash_before_sell + proceeds - the commission
         gross = shares * 110.0
-        assert p.cash == pytest.approx(cash_before_sell + gross - gross * DEFAULT_COST_BPS)
+        assert p.cash == pytest.approx(
+            cash_before_sell + gross - DEFAULT_COMMISSION_USD
+        )
         assert len(p.positions) == 0
 
     def test_a_sale_says_what_it_closed(self) -> None:
@@ -194,14 +220,131 @@ class TestSell:
 
 
 # ---------------------------------------------------------------------------
+# Commission — the broker's, not a model of one
+# ---------------------------------------------------------------------------
+class TestFlatCommission:
+    """The owner's broker charges $2.50 an order, whatever its size.
+
+    The book charged 0.1% of the gross instead: 48c on a typical $480
+    order where the broker takes $2.50, so every book understated its
+    costs about six-fold (audit ENG-2).
+    """
+
+    BROKER = 2.50
+
+    def test_a_buy_pays_one_flat_commission(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        trade = p.buy(
+            "AAPL", target_dollars=5_000, price=200.0, entry_date="d",
+            why_en="", why_he="",
+        )
+        # (5000 - 2.50) / 200 = 24.99 shares, floored to 24.
+        assert trade.shares == 24.0
+        assert trade.cost_paid == pytest.approx(self.BROKER)
+        assert p.cash == pytest.approx(10_000.0 - 24 * 200.0 - self.BROKER)
+        assert p.cumulative_costs == pytest.approx(self.BROKER)
+
+    def test_the_commission_does_not_scale_with_the_order(self) -> None:
+        p = LivePortfolio(agent="test", cash=100_000)
+        small = p.buy(
+            "A", target_dollars=110, price=100.0, entry_date="d",
+            why_en="", why_he="",
+        )
+        large = p.buy(
+            "B", target_dollars=50_000, price=100.0, entry_date="d",
+            why_en="", why_he="",
+        )
+        assert small.cost_paid == pytest.approx(self.BROKER)
+        assert large.cost_paid == pytest.approx(self.BROKER)
+
+    def test_a_sale_pays_one_flat_commission(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        p.buy("AAPL", target_dollars=2_000, price=100, entry_date="d",
+              why_en="", why_he="")
+        before = p.cash
+        trade = p.sell("AAPL", price=110.0)
+        assert trade.cost_paid == pytest.approx(self.BROKER)
+        assert p.cash == pytest.approx(before + trade.gross_value - self.BROKER)
+        assert p.cumulative_costs == pytest.approx(2 * self.BROKER)
+
+    def test_a_trim_pays_one_flat_commission(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        p.buy("AAPL", target_dollars=2_000, price=100, entry_date="d",
+              why_en="", why_he="")
+        trade = p.sell("AAPL", price=100.0, shares=5)
+        assert trade.cost_paid == pytest.approx(self.BROKER)
+
+    def test_the_target_must_carry_the_commission(self) -> None:
+        # One $100 share costs $102.50 at this broker. A $102.49 target
+        # cannot place it; the floor takes it to zero shares.
+        p = LivePortfolio(agent="test", cash=10_000)
+        with pytest.raises(LivePortfolioError, match="whole share"):
+            p.buy("X", target_dollars=102.49, price=100, entry_date="d",
+                  why_en="", why_he="")
+        trade = p.buy("X", target_dollars=102.50, price=100, entry_date="d",
+                      why_en="", why_he="")
+        assert trade.shares == 1.0
+
+    def test_a_target_smaller_than_the_commission_buys_nothing(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        with pytest.raises(LivePortfolioError, match="whole share"):
+            p.buy("PENNY", target_dollars=2.0, price=0.01, entry_date="d",
+                  why_en="", why_he="")
+        assert p.cash == pytest.approx(10_000.0)
+        assert p.cumulative_costs == 0.0
+
+    def test_a_buy_never_overdraws_cash(self) -> None:
+        # Spending the whole of the cash on a name that divides it
+        # exactly: the commission has to come out of the shares.
+        p = LivePortfolio(agent="test", cash=1_000)
+        trade = p.buy("X", target_dollars=1_000, price=100, entry_date="d",
+                      why_en="", why_he="")
+        assert trade.shares == 9.0
+        assert p.cash == pytest.approx(1_000 - 900 - self.BROKER)
+        assert p.cash >= 0
+
+    def test_a_negative_commission_is_refused(self) -> None:
+        p = LivePortfolio(agent="test", cash=10_000)
+        with pytest.raises(LivePortfolioError, match="commission"):
+            p.buy("X", target_dollars=500, price=100, entry_date="d",
+                  why_en="", why_he="", commission=-1.0)
+        p.buy("X", target_dollars=500, price=100, entry_date="d",
+              why_en="", why_he="")
+        with pytest.raises(LivePortfolioError, match="commission"):
+            p.sell("X", price=100, commission=-1.0)
+
+    def test_a_zero_commission_is_honoured(self) -> None:
+        # A merger cash-out is not an order and pays nothing; the
+        # settlement script relies on being able to say so.
+        p = LivePortfolio(agent="test", cash=10_000)
+        p.buy("X", target_dollars=500, price=100, entry_date="d",
+              why_en="", why_he="")
+        costs = p.cumulative_costs
+        trade = p.sell("X", price=100, commission=0.0)
+        assert trade.cost_paid == 0.0
+        assert p.cumulative_costs == pytest.approx(costs)
+
+    def test_a_proportional_cost_is_still_available(self) -> None:
+        # Kept for a caller that wants to model slippage on top of the
+        # commission. Off by default in the live book.
+        p = LivePortfolio(agent="test", cash=10_000)
+        trade = p.buy("X", target_dollars=1_000, price=100, entry_date="d",
+                      why_en="", why_he="", commission=0.0, cost_bps=0.01)
+        # 1000 / 1.01 / 100 = 9.9 → 9 shares, cost 1% of $900.
+        assert trade.shares == 9.0
+        assert trade.cost_paid == pytest.approx(9.0)
+
+
+# ---------------------------------------------------------------------------
 # NAV / mark-to-market
 # ---------------------------------------------------------------------------
 class TestMarkToMarket:
     def test_total_nav_with_positions(self) -> None:
         p = LivePortfolio(agent="test", cash=10_000)
         p.buy("AAPL", target_dollars=2_000, price=100, entry_date="d", why_en="", why_he="")
-        # 2000/1.001/100 = 19.98 shares, floored to 19 at 100 = $1,900
-        # (cost $1.90), leaving $98.10 of the slot in cash. Mark to 120.
+        # (2000-2.50)/100 = 19.98 shares, floored to 19 at 100 = $1,900
+        # (commission $2.50), leaving $97.50 of the slot in cash. Mark
+        # to 120.
         shares = 19.0
         p.mark_to_market({"AAPL": 120.0})
         assert p.invested == pytest.approx(shares * 120.0, rel=1e-6)
@@ -374,7 +517,7 @@ class TestCumulativeReturn:
         p = LivePortfolio(agent="x", cash=10_000, initial_cash=10_000)
         p.buy("X", target_dollars=2_000, price=100, entry_date="d", why_en="", why_he="")
         p.mark_to_market({"X": 200})
-        # initial 10k → now ~ (cash 8098.10) + (19*200) = 11898 — ~+19% return
+        # initial 10k → now ~ (cash 8097.50) + (19*200) = 11897 — ~+19% return
         assert p.cumulative_return_pct > 15.0
 
 
@@ -581,3 +724,436 @@ class TestConsolidate:
         p.consolidate("X")
 
         assert p.total_nav == pytest.approx(before)
+
+
+# ---------------------------------------------------------------------------
+# Unpriced holdings (audit CE-1a / PD-09 / SF-X4)
+# ---------------------------------------------------------------------------
+class TestUnpricedSince:
+    """When a held name has gone long enough without a bar to be flagged.
+
+    LEG sat in Klarman's book at its 26 August close for 78 days, marked
+    every run, with nothing anywhere saying the number referred to a
+    company that no longer listed. The rule is one place so the runner
+    that sets the flag and the verifier that checks it cannot disagree.
+    """
+
+    AS_OF = date(2026, 8, 5)  # a Wednesday
+
+    def test_the_threshold_is_five_sessions(self) -> None:
+        assert UNPRICED_AFTER_SESSIONS == 5
+
+    def test_six_sessions_without_a_bar_is_unpriced_from_the_first_missing_one(
+        self,
+    ) -> None:
+        # Last bar Tue 28 July; 29 July is the first session with none.
+        assert (
+            unpriced_since_for(
+                date(2026, 7, 28), as_of=self.AS_OF, entry_date="2026-07-01"
+            )
+            == "2026-07-29"
+        )
+
+    def test_five_sessions_is_not_yet_unpriced(self) -> None:
+        # A long weekend plus a vendor hiccup must not raise the alarm.
+        assert (
+            unpriced_since_for(
+                date(2026, 7, 29), as_of=self.AS_OF, entry_date="2026-07-01"
+            )
+            == ""
+        )
+
+    def test_no_bar_ever_is_unpriced_since_entry(self) -> None:
+        assert (
+            unpriced_since_for(None, as_of=self.AS_OF, entry_date="2026-07-01")
+            == "2026-07-01"
+        )
+
+    def test_no_bar_and_no_entry_date_falls_back_to_the_run_date(self) -> None:
+        assert (
+            unpriced_since_for(None, as_of=self.AS_OF, entry_date="")
+            == "2026-08-05"
+        )
+
+
+class TestUnpricedPersistence:
+    def test_the_flag_round_trips(self, tmp_path: Path) -> None:
+        p = LivePortfolio(agent="seth_klarman")
+        p.positions.append(
+            Position(
+                ticker="LEG",
+                shares=17.0,
+                entry_price=9.66,
+                entry_date="2026-08-16",
+                current_price=9.2,
+                unpriced_since="2026-08-27",
+            )
+        )
+        p.save(directory=tmp_path)
+
+        raw = json.loads((tmp_path / "seth_klarman.json").read_text())
+        assert raw["positions"][0]["unpriced_since"] == "2026-08-27"
+        loaded = LivePortfolio.load_or_seed("seth_klarman", directory=tmp_path)
+        assert loaded.positions[0].unpriced_since == "2026-08-27"
+
+    def test_a_book_written_before_the_flag_reads_as_priced(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "old.json").write_text(
+            json.dumps(
+                {
+                    "agent": "old",
+                    "positions": [
+                        {
+                            "ticker": "KO",
+                            "shares": 1,
+                            "entry_price": 60.0,
+                            "entry_date": "2026-05-05",
+                        }
+                    ],
+                }
+            )
+        )
+        loaded = LivePortfolio.load_or_seed("old", directory=tmp_path)
+        assert loaded.positions[0].unpriced_since == ""
+
+
+# ---------------------------------------------------------------------------
+# Stock splits (audit item 22 / CE-5)
+# ---------------------------------------------------------------------------
+class TestApplySplit:
+    """The price cache is split-adjusted, the book's share count was
+    not: the first split inside a holding window would have halved (or
+    doubled) that line's value with nothing having happened to it."""
+
+    @staticmethod
+    def _book(shares: float = 10.0, entry: float = 100.0, mark: float = 120.0) -> LivePortfolio:
+        p = LivePortfolio(agent="t", cash=500.0)
+        p.positions.append(
+            Position(
+                ticker="NVDA",
+                shares=shares,
+                entry_price=entry,
+                entry_date="2026-07-01",
+                current_price=mark,
+            )
+        )
+        return p
+
+    def test_two_for_one_doubles_whole_shares_and_keeps_nav(self) -> None:
+        p = self._book()
+        nav_before = p.total_nav  # 500 + 10 x 120
+
+        rec = p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+        p.mark_to_market({"NVDA": 60.0})
+
+        assert rec is not None
+        pos = p.positions[0]
+        assert pos.shares == 20.0
+        assert pos.entry_price == pytest.approx(50.0)
+        assert rec.cash_in_lieu == 0.0
+        assert p.total_nav == pytest.approx(nav_before)
+        # The cost basis is the same money, restated per share.
+        assert pos.cost_basis == pytest.approx(1_000.0)
+
+    def test_three_for_two_floors_and_pays_cash_in_lieu(self) -> None:
+        # 3 shares x 1.5 = 4.5: the broker holds whole shares, so 4
+        # stay and the half share is paid out at the post-split price.
+        p = self._book(shares=3.0, entry=90.0, mark=150.0)
+        nav_before = p.total_nav
+
+        rec = p.apply_split("NVDA", ratio=1.5, ex_date="2026-08-05", price=100.0)
+        p.mark_to_market({"NVDA": 100.0})
+
+        assert rec is not None
+        assert p.positions[0].shares == 4.0
+        assert p.positions[0].entry_price == pytest.approx(60.0)
+        assert rec.cash_in_lieu == pytest.approx(50.0)
+        assert p.cash == pytest.approx(550.0)
+        assert rec.realized_pnl_usd == pytest.approx((100.0 - 60.0) * 0.5)
+        assert p.total_nav == pytest.approx(nav_before)
+        # Cash in lieu is not an order: no commission is charged.
+        assert p.cumulative_costs == 0.0
+
+    def test_it_is_applied_once_per_ex_date(self) -> None:
+        p = self._book()
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+
+        again = p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+
+        assert again is None
+        assert p.positions[0].shares == 20.0
+
+    def test_without_a_fresh_price_the_mark_is_restated_too(self) -> None:
+        # If no post-split quote arrives today, mark_to_market keeps the
+        # last mark. That mark is pre-split, so it must be restated with
+        # the shares or the line's value doubles.
+        p = self._book()
+        nav_before = p.total_nav
+
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=None)
+        p.mark_to_market({})
+
+        assert p.positions[0].current_price == pytest.approx(60.0)
+        assert p.total_nav == pytest.approx(nav_before)
+
+    def test_a_reverse_split_below_one_share_closes_the_line_for_cash(self) -> None:
+        p = self._book(shares=5.0, entry=2.0, mark=3.0)
+        p.paid_dividends["NVDA"] = ["2026-07-15"]
+        nav_before = p.total_nav
+
+        rec = p.apply_split("NVDA", ratio=0.1, ex_date="2026-08-05", price=30.0)
+
+        assert rec is not None and rec.shares_after == 0.0
+        assert not p.has("NVDA")
+        assert "NVDA" not in p.paid_dividends
+        assert p.cash == pytest.approx(500.0 + 0.5 * 30.0)
+        assert p.total_nav == pytest.approx(nav_before)
+
+    def test_a_vendor_rounded_reverse_ratio_does_not_lose_a_share(self) -> None:
+        # yfinance reports 1-for-3 as 0.333333; 3 shares must become 1,
+        # not 0 shares and 0.999999 of a share in cash.
+        p = self._book(shares=3.0, entry=1.0, mark=1.0)
+
+        p.apply_split("NVDA", ratio=0.333333, ex_date="2026-08-05", price=3.0)
+
+        assert p.positions[0].shares == 1.0
+
+    @pytest.mark.parametrize(("shares", "expected"), [(300.0, 100.0), (600.0, 200.0)])
+    def test_a_vendor_rounded_reverse_ratio_keeps_every_share_of_a_large_line(
+        self, shares: float, expected: float
+    ) -> None:
+        # The vendor's rounding error grows with the line: 300 x 0.333333
+        # is 99.9999, outside an absolute snap of 1e-4. A real 1-for-3
+        # turns 300 shares into exactly 100, with no cash in lieu.
+        p = self._book(shares=shares, entry=1.0, mark=1.0)
+
+        record = p.apply_split("NVDA", ratio=0.333333, ex_date="2026-08-05", price=3.0)
+
+        assert p.positions[0].shares == expected
+        assert record is not None
+        assert record.cash_in_lieu == pytest.approx(0.0, abs=1e-9)
+
+    def test_an_absent_ticker_is_a_no_op(self) -> None:
+        p = self._book()
+
+        assert p.apply_split("AAPL", ratio=4.0, ex_date="2026-08-05", price=1.0) is None
+        assert p.cash == 500.0
+
+    @pytest.mark.parametrize("ratio", [0.0, -2.0, float("nan"), float("inf")])
+    def test_a_nonsense_ratio_is_refused(self, ratio: float) -> None:
+        p = self._book()
+
+        with pytest.raises(LivePortfolioError):
+            p.apply_split("NVDA", ratio=ratio, ex_date="2026-08-05", price=60.0)
+        assert p.positions[0].shares == 10.0
+
+    def test_the_record_survives_a_round_trip_and_a_full_sale_clears_it(
+        self, tmp_path: Path
+    ) -> None:
+        p = self._book()
+        p.split_floor_date = "2026-08-04"
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+        p.save(directory=tmp_path)
+
+        loaded = LivePortfolio.load_or_seed("t", directory=tmp_path)
+        assert loaded.applied_splits == {"NVDA": ["2026-08-05"]}
+        assert loaded.split_floor_date == "2026-08-04"
+
+        loaded.sell("NVDA", price=60.0)
+        assert loaded.applied_splits == {}
+
+    @pytest.mark.parametrize("ratio", [1000.0, 100.5, 0.0001, 1 / 600])
+    def test_an_implausible_ratio_is_refused_and_nothing_moves(
+        self, ratio: float
+    ) -> None:
+        # A vendor glitch of 1000:1 would rewrite the line for good: the
+        # next day's quote then "confirms" the inflated share count.
+        p = self._book()
+        before = p.to_dict()
+
+        with pytest.raises(LivePortfolioError, match="outside"):
+            p.apply_split("NVDA", ratio=ratio, ex_date="2026-08-05", price=60.0)
+
+        assert p.to_dict() == before
+        assert p.applied_splits == {}
+        assert p.applied_split_ratios == {}
+
+    @pytest.mark.parametrize("ratio", [100.0, 1 / 500])
+    def test_the_range_bounds_themselves_are_accepted(self, ratio: float) -> None:
+        p = self._book(shares=1_000.0)
+
+        rec = p.apply_split("NVDA", ratio=ratio, ex_date="2026-08-05", price=1.0)
+
+        assert rec is not None
+
+    def test_the_applied_ratio_is_recorded_and_round_trips(
+        self, tmp_path: Path
+    ) -> None:
+        p = self._book()
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+        assert p.applied_split_ratios == {"NVDA": {"2026-08-05": 2.0}}
+        p.save(directory=tmp_path)
+
+        loaded = LivePortfolio.load_or_seed("t", directory=tmp_path)
+        assert loaded.applied_split_ratios == {"NVDA": {"2026-08-05": 2.0}}
+
+        loaded.sell("NVDA", price=60.0)
+        assert loaded.applied_split_ratios == {}
+
+    def test_a_book_written_before_ratios_were_recorded_still_loads(self) -> None:
+        old = {
+            "agent": "t",
+            "cash": 500.0,
+            "positions": [
+                {
+                    "ticker": "NVDA",
+                    "shares": 20.0,
+                    "entry_price": 50.0,
+                    "entry_date": "2026-07-01",
+                    "current_price": 60.0,
+                }
+            ],
+            "split_floor_date": "2026-08-04",
+            "applied_splits": {"NVDA": ["2026-08-05"]},
+        }
+
+        book = LivePortfolio.from_dict(old)
+
+        assert book.applied_splits == {"NVDA": ["2026-08-05"]}
+        assert book.applied_split_ratios == {}
+        # An ex-date applied before ratios were kept is still applied once.
+        with _logged("ERROR") as errors:
+            again = book.apply_split(
+                "NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0
+            )
+        assert again is None
+        assert book.positions[0].shares == 20.0
+        assert errors == []
+
+    def test_a_revised_ratio_for_an_applied_ex_date_is_said_loudly(self) -> None:
+        # The vendor first said 2:1 and later 3:1 for the same ex-date.
+        # The book cannot be re-split safely, but staying quiet would
+        # leave a line that is wrong by a third with nothing pointing at it.
+        p = self._book()
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+
+        with _logged("ERROR") as errors:
+            again = p.apply_split(
+                "NVDA", ratio=3.0, ex_date="2026-08-05", price=40.0
+            )
+
+        assert again is None
+        assert p.positions[0].shares == 20.0
+        assert p.applied_split_ratios == {"NVDA": {"2026-08-05": 2.0}}
+        assert len(errors) == 1
+        assert "NVDA" in errors[0] and "2026-08-05" in errors[0]
+
+    def test_the_same_ratio_reported_again_is_quiet(self) -> None:
+        # A vendor-rounded repeat of the ratio applied is not a revision.
+        p = self._book(shares=300.0)
+        p.apply_split("NVDA", ratio=0.333333, ex_date="2026-08-05", price=3.0)
+
+        with _logged("ERROR") as errors:
+            again = p.apply_split(
+                "NVDA", ratio=0.3333333, ex_date="2026-08-05", price=3.0
+            )
+
+        assert again is None
+        assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# Pruning settled-event records the book can no longer use (audit CE-3b)
+# ---------------------------------------------------------------------------
+class TestPruneEventHistory:
+    """`paid_dividends` and `applied_splits` are meant to stay the size of
+    the book. A line closed without `sell()` left its keys behind — 13
+    of them across four committed books — and this is what removes
+    them."""
+
+    @staticmethod
+    def _book(*lines: tuple[str, str]) -> LivePortfolio:
+        p = LivePortfolio(agent="t", cash=1_000.0)
+        p.positions = [
+            Position(
+                ticker=t, shares=5.0, entry_price=10.0, entry_date=d,
+                current_price=10.0,
+            )
+            for t, d in lines
+        ]
+        return p
+
+    def test_a_key_for_a_name_not_held_is_removed(self) -> None:
+        p = self._book(("KEEP", "2026-05-06"))
+        p.paid_dividends = {"KEEP": ["2026-06-15"], "SEB": ["2026-08-14"]}
+        p.applied_splits = {"GONE": ["2026-07-01"]}
+
+        removed = p.prune_event_history()
+
+        assert p.paid_dividends == {"KEEP": ["2026-06-15"]}
+        assert p.applied_splits == {}
+        assert removed == {
+            "paid_dividends": {"SEB": ["2026-08-14"]},
+            "applied_splits": {"GONE": ["2026-07-01"]},
+        }
+
+    def test_an_ex_date_before_the_current_entry_is_removed(self) -> None:
+        """REPX paid 2026-10-28 on a lot the flooring closed, and the
+        name was bought back 2026-11-04. Settlement never looks before
+        the entry date, so the old date is dead weight."""
+        p = self._book(("REPX", "2026-11-04"))
+        p.paid_dividends = {"REPX": ["2026-10-28"]}
+
+        removed = p.prune_event_history()
+
+        assert p.paid_dividends == {}
+        assert removed["paid_dividends"] == {"REPX": ["2026-10-28"]}
+
+    def test_an_ex_date_on_or_after_the_entry_is_kept(self) -> None:
+        """Removing one of these would let settlement pay it a second
+        time: it is the record that makes re-scanning safe."""
+        p = self._book(("MRK", "2026-06-15T13:30:00+00:00"))
+        p.paid_dividends = {"MRK": ["2026-06-15", "2026-09-15"]}
+        p.applied_splits = {"MRK": ["2026-07-01"]}
+
+        removed = p.prune_event_history()
+
+        assert p.paid_dividends == {"MRK": ["2026-06-15", "2026-09-15"]}
+        assert p.applied_splits == {"MRK": ["2026-07-01"]}
+        assert removed == {"paid_dividends": {}, "applied_splits": {}}
+
+    def test_a_lower_case_ticker_on_the_line_still_counts_as_held(self) -> None:
+        # The maps are keyed upper-case; a line is not always.
+        p = self._book(("brk.b", "2026-05-06"))
+        p.paid_dividends = {"BRK.B": ["2026-06-15"]}
+
+        p.prune_event_history()
+
+        assert p.paid_dividends == {"BRK.B": ["2026-06-15"]}
+
+    def test_a_line_with_no_entry_date_keeps_every_date(self) -> None:
+        # No date to compare with is no evidence a payment is stale.
+        p = self._book(("OLD", ""))
+        p.paid_dividends = {"OLD": ["2026-06-15"]}
+
+        p.prune_event_history()
+
+        assert p.paid_dividends == {"OLD": ["2026-06-15"]}
+
+    def test_cash_and_nav_do_not_move(self) -> None:
+        p = self._book(("KEEP", "2026-11-04"))
+        p.paid_dividends = {"KEEP": ["2026-10-01"], "SEB": ["2026-08-14"]}
+        p.mark_to_market({})
+        before = (p.cash, p.total_nav, p.cumulative_dividends)
+
+        p.prune_event_history()
+
+        assert (p.cash, p.total_nav, p.cumulative_dividends) == before
+
+    def test_an_empty_book_is_not_an_error(self) -> None:
+        p = LivePortfolio(agent="t")
+
+        assert p.prune_event_history() == {
+            "paid_dividends": {}, "applied_splits": {},
+        }

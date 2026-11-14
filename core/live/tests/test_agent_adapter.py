@@ -165,3 +165,61 @@ class TestEmptyUniverse:
         assert result.targets == []
         assert result.watchlist == []
         assert result.universe_size == 0
+
+
+class TestDoctrineSizingDeclarations:
+    """Audit SF-X3 / SF-X5: the band and the per-name cap are the
+    doctrine's, declared on its adapter rather than one runner-wide
+    setting for every investor."""
+
+    def test_lynch_never_trims_to_rebalance(self) -> None:
+        # playbook §6.4: "do NOT trim it to 'rebalance' — let it run".
+        from core.live.agent_adapter import LynchLive
+
+        assert LynchLive.rebalance_band is None
+
+    def test_graham_caps_a_name_at_ten_percent(self) -> None:
+        # playbook §6.1: "No single position exceeds 10% of portfolio".
+        from core.live.agent_adapter import GrahamLive, GrahamSecondCohortLive
+
+        assert GrahamLive.max_position_pct == 10.0
+        # The control cohort is the same class by design.
+        assert GrahamSecondCohortLive.max_position_pct == 10.0
+
+    def test_schloss_caps_a_name_at_five_percent(self) -> None:
+        # playbook §6.3: "Never more than 5% in any single name".
+        from core.live.agent_adapter import SchlossLive
+
+        assert SchlossLive.max_position_pct == 5.0
+
+    def test_the_council_never_trims_to_rebalance(self) -> None:
+        # COUNCIL_SELECTION §6: trims are E5, E6 and E9 only, none of
+        # them a drift band; "Nothing else sells" (audit item 19).
+        from core.live.agent_adapter import PabraiLive
+
+        assert PabraiLive.rebalance_band is None
+        assert PabraiLive.max_position_pct is None
+
+    def test_every_other_adapter_keeps_the_runner_band_and_no_cap(self) -> None:
+        from core.live.agent_adapter import (
+            RUNNER_BAND,
+            BuffettLive,
+            FisherLive,
+            KlarmanLive,
+            MarketCoreLive,
+            MarksLive,
+            NeffLive,
+        )
+
+        for cls in (
+            GreenblattLive,
+            DremanLive,
+            NeffLive,
+            BuffettLive,
+            MarksLive,
+            KlarmanLive,
+            FisherLive,
+            MarketCoreLive,
+        ):
+            assert cls.rebalance_band == RUNNER_BAND, cls.__name__
+            assert cls.max_position_pct is None, cls.__name__

@@ -380,6 +380,10 @@ Position trimming or selling is restricted to **specific fundamental triggers** 
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Fisher's verdict (`agents/fisher/exits.py`) is computed for every held name by re-running the entry screen's own assessment, and reads no price. Trigger 2, the company no longer matches the original assessment, sells: book equity no longer positive, D/E above the screen's 0.6 ceiling (unreported debt is not a breach), or fewer than 4 of the 5 quant-checkable points (1, 3, 5, 6, 13 — the stand-in for "12+ of 15") can still pass on measured evidence; a point the filings cannot measure is unknown, never a failure. With at least 4 points measured passing the verdict is a keep, even off the day's list and even from Tier A down to Tier B. Never a sell, per §7.2 and §10: a price of any level (the P/E ceiling and market-cap floor price an entry), and a loss year (the positive-income gate is an entry proxy). Too few measurable points to tell gives no verdict. Not computed: trigger 1 (a qualitative misjudgement at purchase), trigger 3 (weighs a candidate against a holding), the ten qualitative points and Point 15.
+
 Fisher's exit framework is the most restrictive in the Council. The default is **never sell**.
 
 ### 7.1 The three legitimate sell triggers — and only these

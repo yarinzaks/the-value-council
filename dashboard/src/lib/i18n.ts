@@ -254,6 +254,7 @@ const en: Dict = {
   pos_event_changed: "Changed its view",
   pos_event_added: "Topped up to target weight",
   pos_event_trimmed: "Trimmed back to target weight",
+  pos_event_split: "Stock split: share count and entry price restated",
   // Where a story starts on a watchlist row rather than a purchase,
   // which is most of them: a name is screened before it is bought.
   pos_event_watched: "Put on the watchlist",
@@ -393,9 +394,19 @@ const en: Dict = {
   mark_stale: "Last traded",
   mark_stale_help:
     "This price comes from the last bar the market produced for this symbol, not from today's run. The symbol may have been renamed, delisted or suspended — check before acting on the quote.",
+  unpriced: "Unpriced since",
+  unpriced_help:
+    "No market price for over five sessions. The value shown is the last close, carried forward; the holding cannot be sold without a price and stays in the book until it is settled from the company's filings.",
+  unpriced_banner_title: "Unpriced holdings",
+  unpriced_banner_body:
+    "{n} holding(s) have had no market price for over five sessions and are counted in NAV at their last close ({value}). That number may no longer refer to anything tradable.",
   days_ago: "{n} days ago",
   stale_warning:
     "⚠️ Data not refreshed in over 24 hours — check the daily runner.",
+  fundamentals_stale_warning:
+    "The {date} scan traded on company filings no newer than {filed} — over 120 days old. Decisions are not using recent quarterly reports.",
+  fundamentals_missing_warning:
+    "The {date} scan traded without reading any company filings. Decisions are not using reported fundamentals.",
   next_us_update: "US",
   next_tase_update: "Israel",
   next_label: "next update",
@@ -646,6 +657,7 @@ const he: Dict = {
   pos_event_changed: "שינה את דעתו",
   pos_event_added: "הוסיף כדי לחזור למשקל היעד",
   pos_event_trimmed: "קיצץ כדי לחזור למשקל היעד",
+  pos_event_split: "פיצול מניות: כמות המניות ומחיר הכניסה עודכנו",
   pos_event_watched: "נכנסה למעקב",
   pos_still_held: "מוחזקת מאז ללא שינוי, לאורך {days} ימי מסחר.",
   market_was_closed: "השוק היה סגור",
@@ -781,9 +793,19 @@ const he: Dict = {
   mark_stale: "נסחר לאחרונה",
   mark_stale_help:
     "המחיר הזה מגיע מהנר האחרון שהשוק ייצר לסימבול הזה, לא מהריצה של היום. ייתכן שהסימבול שונה, נמחק מהמסחר או הושעה — בדוק לפני שאתה פועל לפי הציטוט.",
+  unpriced: "ללא מחיר מאז",
+  unpriced_help:
+    "אין מחיר שוק כבר יותר מחמישה ימי מסחר. הערך המוצג הוא סגירת המסחר האחרונה, שנגררת קדימה; אי אפשר למכור את האחזקה בלי מחיר, והיא נשארת בתיק עד שתסולק לפי הדיווחים של החברה.",
+  unpriced_banner_title: "אחזקות ללא מחיר",
+  unpriced_banner_body:
+    "ל-{n} אחזקות אין מחיר שוק כבר יותר מחמישה ימי מסחר, והן נספרות בשווי התיק לפי סגירת המסחר האחרונה ({value}). ייתכן שהמספר הזה כבר לא מתייחס לשום דבר סחיר.",
   days_ago: "לפני {n} ימים",
   stale_warning:
     "⚠️ נתונים לא מעודכנים מעל 24 שעות — בדוק את הסריקה היומית.",
+  fundamentals_stale_warning:
+    "הסריקה של {date} סחרה על דוחות חברות שהחדש שבהם הוגש ב-{filed} — לפני יותר מ-120 יום. ההחלטות לא משתמשות בדוחות הרבעוניים האחרונים.",
+  fundamentals_missing_warning:
+    "הסריקה של {date} סחרה בלי לקרוא אף דוח של חברה. ההחלטות לא משתמשות בנתונים מדווחים.",
   not_backtested: "לא נבדק היסטורית",
   punch_card: "כרטיס ניקוב",
   council_card_note:

@@ -297,14 +297,20 @@ def buffett_watch_why(score: Any) -> tuple[str, str]:
 
 
 def lynch_why(score: Any) -> tuple[str, str]:
-    """``LynchScore`` → bilingual rationale."""
+    """``LynchScore`` → bilingual rationale.
+
+    The window is the one the growth figure actually spans: a held name
+    whose 5-year base rolled onto a loss year is measured over fewer
+    years (audit item 18), and calling that number "5y" would misstate it.
+    """
+    years = getattr(score, "growth_window_years", 5)
     en = (
-        f"{score.lynch_category}: PEG {score.peg:.2f}, 5y EPS CAGR "
+        f"{score.lynch_category}: PEG {score.peg:.2f}, {years}y EPS CAGR "
         f"{score.growth_rate_5yr_pct:.1f}%, P/E "
         f"{fmt_ratio(score.pe)}."
     )
     he = (
-        f"{score.lynch_category}: PEG {score.peg:.2f}, צמיחת EPS 5 שנתית "
+        f"{score.lynch_category}: PEG {score.peg:.2f}, צמיחת EPS {years} שנתית "
         f"{score.growth_rate_5yr_pct:.1f}%, P/E "
         f"{fmt_ratio(score.pe)}."
     )

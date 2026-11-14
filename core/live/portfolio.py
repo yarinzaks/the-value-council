@@ -19,21 +19,56 @@ import tempfile
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, date, datetime
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
 from core.exceptions import ValueCouncilError
 from core.logger import get_logger
+from core.market_calendar import next_trading_day, sessions_between
 
 logger = get_logger("core.live.portfolio")
 
 DEFAULT_INITIAL_CASH: float = 10_000.0
-DEFAULT_COST_BPS: float = 0.001  # 0.1% per trade
+
+#: The broker's commission: a flat $2.50 per order, buy or sell, whatever
+#: its size. These books exist to be copied into that account, so the
+#: cost they charge is the one it charges. Until audit ENG-2 the book
+#: charged 0.1% of the gross instead — 48c on a typical $480 order where
+#: the broker takes $2.50 — and understated its costs about six-fold.
+DEFAULT_COMMISSION_USD: float = 2.50
+
+# A vendor split ratio within this relative distance of a simple fraction
+# (denominator at most _SPLIT_MAX_DENOMINATOR) is read as that fraction:
+# yfinance reports a 1-for-3 as 0.333333.
+_SPLIT_MAX_DENOMINATOR = 1000
+_SPLIT_RATIO_RTOL = 1e-5
+
+#: The plausible range of a split ratio (new shares per old share). A
+#: 1-for-500 reverse split or a 100-for-1 forward split is already at
+#: the edge of what issuers do; a ratio outside it is a vendor glitch,
+#: and applying one would rewrite the line irreversibly.
+SPLIT_RATIO_MIN: float = 1 / 500
+SPLIT_RATIO_MAX: float = 100.0
+
+#: A proportional cost charged on top of the commission, as a fraction of
+#: the gross. Zero in the live book: the broker charges no such thing.
+#: Kept as a parameter so a caller that wants to model slippage still
+#: can. Research and backtest code carry their own cost model and do not
+#: read this.
+DEFAULT_COST_BPS: float = 0.0
 
 #: Decimal places share counts are rounded to. Matches what ``to_dict``
 #: already persists, so a round-trip through JSON is lossless. Six
 #: places on a $10,000 book is sub-cent precision.
 SHARE_PRECISION: int = 6
+
+#: Sessions a held name may go without a bar before it is flagged
+#: unpriced. Five matches the price loader's carry-forward bound
+#: (``MAX_CARRY_FORWARD_DAYS``): past it the loader already refuses to
+#: quote the name, so the mark is the last close and nothing newer.
+#: Counted in sessions so a long weekend never trips it.
+UNPRICED_AFTER_SESSIONS: int = 5
 
 from core.paths import portfolios_dir as _portfolios_dir
 
@@ -61,6 +96,20 @@ class Position:
     weight_pct: float = 0.0
     why_en: str = ""
     why_he: str = ""
+    #: The first session this name had no bar, as an ISO date, once it
+    #: has gone more than :data:`UNPRICED_AFTER_SESSIONS` without one.
+    #: Empty while the name is priced.
+    #:
+    #: ``current_price`` keeps the last close when no bar arrives, which
+    #: is right for NAV over a halt and wrong as a silent state: LEG was
+    #: acquired on 2026-08-26 and sat in Klarman's book at its last
+    #: close for 78 days with nothing saying the number referred to a
+    #: listing that no longer existed (audit CE-1a). The runner sets
+    #: this and logs at ERROR every run it stays set; the dashboard
+    #: shows it; the post-run verifier fails a run that leaves an
+    #: unpriced holding without it. It does not change NAV — what the
+    #: holding is worth is a decision about evidence, not a default.
+    unpriced_since: str = ""
 
     @property
     def market_value(self) -> float:
@@ -172,6 +221,30 @@ class LivePortfolio:
     #: on its own.
     paid_dividends: dict[str, list[str]] = field(default_factory=dict)
 
+    #: The earliest split ex-date this book may be restated for, as ISO.
+    #:
+    #: Stamped once by the runner, at the book's last mark before split
+    #: handling first ran, and never moved. A split from before it is
+    #: one the book already priced through without adjusting — restating
+    #: it now would be a correction of history, which is the owner's
+    #: call, not a daily run's (audit item 22).
+    split_floor_date: str = ""
+
+    #: Split ex-dates already applied, per ticker:
+    #: ``{"NVDA": ["2024-06-10"]}``. Applying a split twice doubles a
+    #: line for nothing, so the record, not a date window, is what makes
+    #: a re-run or a late-arriving cache row safe. Dropped with the line,
+    #: exactly like :attr:`paid_dividends`.
+    applied_splits: dict[str, list[str]] = field(default_factory=dict)
+
+    #: The ratio each entry of :attr:`applied_splits` was applied at:
+    #: ``{"NVDA": {"2024-06-10": 10.0}}``. Kept beside it, not inside
+    #: it, so books written before ratios were recorded read unchanged
+    #: (their ex-dates simply have no ratio here). With it, a vendor
+    #: that later revises an applied ex-date's ratio is caught and said
+    #: rather than skipped in silence.
+    applied_split_ratios: dict[str, dict[str, float]] = field(default_factory=dict)
+
     # ------------------------------------------------------------------
     # Derived metrics (computed against current_price on positions)
     # ------------------------------------------------------------------
@@ -225,6 +298,7 @@ class LivePortfolio:
         price: float,
         shares: float | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
+        commission: float = DEFAULT_COMMISSION_USD,
     ) -> TradeRecord:
         """Sell ``shares`` of ``ticker`` at ``price``; all of it by default.
 
@@ -233,10 +307,15 @@ class LivePortfolio:
         so the reported P&L on the residual stays honest. Selling the
         whole line, or more than is held, closes it.
 
+        The order pays ``commission`` once, plus ``cost_bps`` of the
+        gross. Pass ``commission=0.0`` for a conversion that is not an
+        order, such as a merger cash-out.
+
         Raises LivePortfolioError if no such position exists.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive sell price for {ticker}: {price}")
+        _check_commission(ticker, commission)
         idx = self._index_of(ticker)
         if idx is None:
             raise LivePortfolioError(f"{ticker} not in portfolio")
@@ -268,11 +347,13 @@ class LivePortfolio:
             # carries a new entry date, and settlement never looks before
             # that — so dropping these cannot resurrect an old payment.
             self.paid_dividends.pop(ticker.upper(), None)
+            self.applied_splits.pop(ticker.upper(), None)
+            self.applied_split_ratios.pop(ticker.upper(), None)
         else:
             pos.shares = remaining
 
         gross = sold * price
-        cost = gross * cost_bps
+        cost = commission + gross * cost_bps
         self.cash += gross - cost
         self.cumulative_costs += cost
         return TradeRecord(
@@ -375,8 +456,75 @@ class LivePortfolio:
             merged = set(self.paid_dividends.pop(old_u))
             merged.update(self.paid_dividends.get(new_u, []))
             self.paid_dividends[new_u] = sorted(merged)
+        # So are splits already applied: the vendor's history under the
+        # new symbol carries the old one's ex-dates.
+        if old_u in self.applied_splits:
+            done = set(self.applied_splits.pop(old_u))
+            done.update(self.applied_splits.get(new_u, []))
+            self.applied_splits[new_u] = sorted(done)
+        if old_u in self.applied_split_ratios:
+            ratios = self.applied_split_ratios.pop(old_u)
+            ratios.update(self.applied_split_ratios.get(new_u, {}))
+            self.applied_split_ratios[new_u] = ratios
 
         return True
+
+    def prune_event_history(self) -> dict[str, dict[str, list[str]]]:
+        """Drop settled-event records the book can no longer consult.
+
+        Audit item 23 / CE-3b. :meth:`sell` and :meth:`apply_split` pop
+        a closed line's :attr:`paid_dividends` and :attr:`applied_splits`;
+        a line removed any other way (the 2026-10-31 whole-share
+        flooring did) leaves them behind. Two kinds are removed:
+
+        - a key for a name the book does not hold;
+        - an ex-date strictly before the held line's ``entry_date``, left
+          by an earlier holding of the same name. Settlement scans from
+          ``max(entry_date, floor)``, so such a date is never looked up
+          again and removing it cannot cause a second payment.
+
+        Dates on or after the entry date are kept — they are what stops
+        a re-scan paying twice. A line with no entry date keeps every
+        date. Cash, NAV and every cumulative figure are untouched.
+
+        Returns what was removed, per map, as ``{ticker: [ex_dates]}``.
+        """
+        entry_by_ticker: dict[str, str] = {}
+        for p in self.positions:
+            key = p.ticker.upper()
+            start = p.entry_date[:10]
+            # Two lines in one name is a repair case (see `consolidate`);
+            # the earlier start is the one that keeps more history.
+            prior = entry_by_ticker.get(key)
+            entry_by_ticker[key] = start if prior is None else min(prior, start)
+
+        removed: dict[str, dict[str, list[str]]] = {}
+        for name, record in (
+            ("paid_dividends", self.paid_dividends),
+            ("applied_splits", self.applied_splits),
+        ):
+            dropped: dict[str, list[str]] = {}
+            for ticker in list(record):
+                if ticker not in entry_by_ticker:
+                    dropped[ticker] = sorted(record.pop(ticker))
+                    continue
+                start = entry_by_ticker[ticker]
+                stale = sorted(d for d in record[ticker] if start and d < start)
+                if not stale:
+                    continue
+                dropped[ticker] = stale
+                kept = [d for d in record[ticker] if not (start and d < start)]
+                if kept:
+                    record[ticker] = kept
+                else:
+                    del record[ticker]
+            removed[name] = dropped
+        # A ratio is only ever a note on an applied ex-date; it goes
+        # with the ex-date it belongs to.
+        self.applied_split_ratios = _ratios_for(
+            self.applied_split_ratios, self.applied_splits
+        )
+        return removed
 
     def credit_dividend(
         self, ticker: str, *, amount_per_share: float, ex_date: str
@@ -405,6 +553,117 @@ class LivePortfolio:
             self.last_dividend_date = ex_date
         return cash
 
+    def apply_split(
+        self,
+        ticker: str,
+        *,
+        ratio: float,
+        ex_date: str,
+        price: float | None,
+    ) -> SplitRecord | None:
+        """Restate the holding of ``ticker`` for a stock split.
+
+        ``ratio`` is new shares per old share (2.0 for 2-for-1, 1.5 for
+        3-for-2, 0.1 for 1-for-10). Shares are multiplied by it and the
+        entry price and last mark divided by it, so cost basis and value
+        are the same money in the new units. The price cache is
+        split-adjusted; without this the ex-date's quote halved a 2:1
+        line's value with nothing having happened to the investment.
+
+        Whole shares stay whole. A result that is not whole (3 shares
+        through a 3-for-2 is 4.5) is floored, and the fraction is paid
+        out as cash in lieu at ``price`` — the post-split quote — or, if
+        there is none today, at the restated last mark. That is what a
+        broker does with a fractional entitlement. No commission is
+        charged: cash in lieu is not an order. A reverse split that
+        leaves less than one share closes the line entirely for cash.
+
+        The vendor rounds ratios: a 1-for-3 arrives as 0.333333. A ratio
+        within one part in 100,000 of a fraction with a denominator of at
+        most 1,000 is taken as that fraction, so 300 shares become 100,
+        not 99 and 0.9999 of one in cash. A product within 1e-4 of a
+        whole number is also taken as that number.
+
+        Idempotent per ``(ticker, ex_date)``: returns None when that
+        split was already applied, or when the ticker is not held. If
+        the ratio now reported for an applied ex-date differs from the
+        one applied, that is said at ERROR and nothing is changed: the
+        book cannot tell which report is right, and re-splitting on a
+        guess is the irreversible mistake this record exists to stop.
+
+        Raises LivePortfolioError, with nothing changed, for a ratio
+        that is not a finite positive number or that lies outside
+        [:data:`SPLIT_RATIO_MIN`, :data:`SPLIT_RATIO_MAX`].
+        """
+        if not (math.isfinite(ratio) and ratio > 0):
+            raise LivePortfolioError(f"invalid split ratio for {ticker}: {ratio}")
+        if not SPLIT_RATIO_MIN <= ratio <= SPLIT_RATIO_MAX:
+            raise LivePortfolioError(
+                f"split ratio for {ticker} (ex {ex_date}) is {ratio:g}, outside "
+                f"the plausible range [1/{1 / SPLIT_RATIO_MIN:g}, "
+                f"{SPLIT_RATIO_MAX:g}]; treated as a vendor error"
+            )
+        idx = self._index_of(ticker)
+        if idx is None:
+            return None
+        key = ticker.upper()
+        if ex_date in self.applied_splits.get(key, ()):
+            applied = self.applied_split_ratios.get(key, {}).get(ex_date)
+            if applied is not None and not math.isclose(
+                applied, ratio, rel_tol=_SPLIT_RATIO_RTOL
+            ):
+                logger.error(
+                    f"{self.agent}: split of {key} ex {ex_date} was applied at "
+                    f"{applied:g} but is now reported as {ratio:g}; the line was "
+                    f"not restated again — check the ratio and correct by hand"
+                )
+            return None
+
+        pos = self.positions[idx]
+        shares_before = pos.shares
+        entry_before = pos.entry_price
+        exact = Fraction(ratio).limit_denominator(_SPLIT_MAX_DENOMINATOR)
+        if abs(float(exact) - ratio) <= _SPLIT_RATIO_RTOL * ratio:
+            effective = float(exact)
+            raw = float(Fraction(shares_before) * exact)
+        else:
+            effective = ratio
+            raw = shares_before * ratio
+        if abs(raw - round(raw)) < 1e-4:
+            raw = float(round(raw))
+        whole = float(math.floor(raw))
+        fraction = raw - whole
+        entry_after = entry_before / effective
+        mark_after = pos.current_price / effective
+        lieu_price = price if price is not None and price > 0 else mark_after
+        cash_in_lieu = fraction * lieu_price
+        realized = (lieu_price - entry_after) * fraction
+
+        self.cash += cash_in_lieu
+        if whole <= 0:
+            self.positions.pop(idx)
+            self.paid_dividends.pop(key, None)
+            self.applied_splits.pop(key, None)
+            self.applied_split_ratios.pop(key, None)
+        else:
+            pos.shares = whole
+            pos.entry_price = entry_after
+            pos.current_price = mark_after
+            self.applied_splits.setdefault(key, []).append(ex_date)
+            self.applied_split_ratios.setdefault(key, {})[ex_date] = ratio
+        return SplitRecord(
+            ticker=key,
+            ex_date=ex_date,
+            ratio=ratio,
+            shares_before=shares_before,
+            shares_after=whole,
+            entry_price_before=entry_before,
+            entry_price_after=entry_after,
+            cash_in_lieu=cash_in_lieu,
+            lieu_price=lieu_price,
+            realized_pnl_usd=realized,
+        )
+
     def buy(
         self,
         ticker: str,
@@ -415,6 +674,7 @@ class LivePortfolio:
         why_en: str,
         why_he: str,
         cost_bps: float = DEFAULT_COST_BPS,
+        commission: float = DEFAULT_COMMISSION_USD,
     ) -> TradeRecord:
         """Buy whole shares of ``ticker`` for at most ``target_dollars``.
 
@@ -437,10 +697,13 @@ class LivePortfolio:
         not have opened.
 
         Costs are taken on top of notional, so ``target_dollars`` is the
-        limit including fees.
+        limit including fees: one ``commission`` for the order plus
+        ``cost_bps`` of the gross. A target that cannot cover the
+        commission and one share buys nothing.
         """
         if price <= 0:
             raise LivePortfolioError(f"non-positive buy price for {ticker}: {price}")
+        _check_commission(ticker, commission)
         if target_dollars <= 0:
             raise LivePortfolioError(
                 f"non-positive target dollars for {ticker}: {target_dollars}"
@@ -450,8 +713,9 @@ class LivePortfolio:
                 f"insufficient cash for {ticker}: target ${target_dollars:.2f}, "
                 f"cash ${self.cash:.2f}"
             )
-        # Solve: notional + notional*cost_bps <= target_dollars  →  notional max.
-        max_notional = target_dollars / (1.0 + cost_bps)
+        # Solve: commission + notional*(1 + cost_bps) <= target_dollars
+        # for the largest notional.
+        max_notional = max(target_dollars - commission, 0.0) / (1.0 + cost_bps)
         # Floor, never round: rounding up buys a share the cash does not
         # cover, and the check below would then reject the whole trade
         # for an off-by-one the caller could not have anticipated.
@@ -459,10 +723,10 @@ class LivePortfolio:
         if shares_bought <= 0:
             raise LivePortfolioError(
                 f"${target_dollars:.2f} target on {ticker} at ${price:.2f} "
-                f"buys no whole share"
+                f"buys no whole share after the ${commission:.2f} commission"
             )
         gross = shares_bought * price
-        cost = gross * cost_bps
+        cost = commission + gross * cost_bps
         spend = gross + cost
         if spend > self.cash + 1e-9:
             raise LivePortfolioError(
@@ -545,6 +809,16 @@ class LivePortfolio:
             "paid_dividends": {
                 k: sorted(v) for k, v in sorted(self.paid_dividends.items())
             },
+            "split_floor_date": self.split_floor_date,
+            "applied_splits": {
+                k: sorted(v) for k, v in sorted(self.applied_splits.items())
+            },
+            "applied_split_ratios": {
+                k: dict(sorted(v.items()))
+                for k, v in sorted(
+                    _ratios_for(self.applied_split_ratios, self.applied_splits).items()
+                )
+            },
             "positions": [_round_position(p) for p in self.positions],
             "watchlist": [asdict(w) for w in self.watchlist],
             "last_updated": self.last_updated,
@@ -569,6 +843,7 @@ class LivePortfolio:
                 weight_pct=float(p.get("weight_pct", 0.0)),
                 why_en=str(p.get("why_en", "")),
                 why_he=str(p.get("why_he", "")),
+                unpriced_since=str(p.get("unpriced_since", "")),
             )
             for p in data.get("positions", [])
         ]
@@ -595,6 +870,10 @@ class LivePortfolio:
             )
             for w in data.get("watchlist", [])
         ]
+        applied_splits = {
+            str(k).upper(): [str(d) for d in v]
+            for k, v in dict(data.get("applied_splits", {})).items()
+        }
         return cls(
             agent=str(data["agent"]),
             cash=float(data.get("cash", DEFAULT_INITIAL_CASH)),
@@ -621,6 +900,16 @@ class LivePortfolio:
                 str(k).upper(): [str(d) for d in v]
                 for k, v in dict(data.get("paid_dividends", {})).items()
             },
+            split_floor_date=str(data.get("split_floor_date", "")),
+            applied_splits=applied_splits,
+            # Absent from books written before ratios were recorded.
+            applied_split_ratios=_ratios_for(
+                {
+                    str(k).upper(): {str(d): float(r) for d, r in dict(v).items()}
+                    for k, v in dict(data.get("applied_split_ratios", {})).items()
+                },
+                applied_splits,
+            ),
         )
 
     @classmethod
@@ -677,6 +966,38 @@ class TradeRecord:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class SplitRecord:
+    """What :meth:`LivePortfolio.apply_split` did to one holding.
+
+    Not a trade — no order was placed — so it never reaches the trade
+    ledger. ``cash_in_lieu`` and ``realized_pnl_usd`` are the fraction
+    of a share the split left over, paid out at ``lieu_price``; both are
+    zero when the result was whole.
+    """
+
+    ticker: str
+    ex_date: str
+    ratio: float
+    shares_before: float
+    shares_after: float
+    entry_price_before: float
+    entry_price_after: float
+    cash_in_lieu: float
+    lieu_price: float
+    realized_pnl_usd: float
+
+
+def _check_commission(ticker: str, commission: float) -> None:
+    """Refuse a commission the broker could not have charged.
+
+    A negative one would pay the book for trading. ``not >= 0`` rather
+    than ``< 0`` so a NaN is refused too instead of poisoning the cash.
+    """
+    if not commission >= 0.0:
+        raise LivePortfolioError(f"invalid commission for {ticker}: {commission}")
+
+
 def _round_position(p: Position) -> dict[str, Any]:
     d = asdict(p)
     for k in ("entry_price", "current_price"):
@@ -689,6 +1010,24 @@ def _round_position(p: Position) -> dict[str, Any]:
     return d
 
 
+def _ratios_for(
+    ratios: dict[str, dict[str, float]], applied: dict[str, list[str]]
+) -> dict[str, dict[str, float]]:
+    """``ratios`` restricted to the ex-dates ``applied`` still records.
+
+    A ratio is a note on an applied ex-date and means nothing without
+    it; a record map pruned or rewritten without its ratios (the prune
+    script rewrites only the two record maps) must not leave one behind.
+    """
+    kept: dict[str, dict[str, float]] = {}
+    for ticker, by_date in ratios.items():
+        dates = set(applied.get(ticker, ()))
+        sub = {d: r for d, r in by_date.items() if d in dates}
+        if sub:
+            kept[ticker] = sub
+    return kept
+
+
 def now_iso() -> str:
     """Timestamp string used for ``last_updated``. UTC, second-precision."""
     return datetime.now(UTC).replace(microsecond=0).isoformat()
@@ -699,15 +1038,42 @@ def today_iso() -> str:
     return date.today().isoformat()
 
 
+def unpriced_since_for(
+    last_bar: date | None, *, as_of: date, entry_date: str
+) -> str:
+    """When a holding became unpriced, or ``""`` while it still prices.
+
+    ``last_bar`` is the newest bar the price cache holds for the name,
+    ``None`` when it holds none. Unpriced means more than
+    :data:`UNPRICED_AFTER_SESSIONS` sessions after that bar up to and
+    including ``as_of``; the answer is then the first session with no
+    bar. A name with no bar at all has never been priced from the cache
+    and is unpriced since it was bought (or since ``as_of`` when even
+    the entry date is missing).
+
+    One function, so the runner that sets the flag and the verifier
+    that checks for it apply the same rule.
+    """
+    if last_bar is None:
+        return entry_date or as_of.isoformat()
+    if sessions_between(last_bar, as_of) <= UNPRICED_AFTER_SESSIONS:
+        return ""
+    return next_trading_day(last_bar).isoformat()
+
+
 __all__ = [
+    "DEFAULT_COMMISSION_USD",
     "DEFAULT_COST_BPS",
     "DEFAULT_INITIAL_CASH",
     "DEFAULT_PORTFOLIO_DIR",
+    "UNPRICED_AFTER_SESSIONS",
     "LivePortfolio",
     "LivePortfolioError",
     "Position",
+    "SplitRecord",
     "TradeRecord",
     "WatchEntry",
     "now_iso",
     "today_iso",
+    "unpriced_since_for",
 ]

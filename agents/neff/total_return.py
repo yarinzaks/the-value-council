@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from agents.market_core.shares import market_cap_at
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -35,14 +36,16 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.logger import get_logger
 
+from . import exits as neff_exits
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
     apply_quality_gates,
 )
-from .ranking import NeffScore, score_candidates, select_top_n
+from .ranking import MarketBenchmarks, NeffScore, score_candidates, select_top_n
 
 logger = get_logger("agents.neff.total_return")
 
@@ -97,6 +100,11 @@ class JohnNeff(Strategy):
         self.edgar_cache = edgar_cache
         self.decision_logger = decision_logger
         self.selection_history: list[NeffSelection] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.neff.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -117,7 +125,7 @@ class JohnNeff(Strategy):
         for ticker in universe:
             fin = fundamentals.get(ticker)
             price = prices.get(ticker)
-            mcap = self._market_cap(fin, price)
+            mcap = self._market_cap(ticker, as_of, fin, price)
             triples.append((fin, mcap, price))
 
         with_data = sum(1 for fin, _, _ in triples if fin is not None)
@@ -131,10 +139,30 @@ class JohnNeff(Strategy):
         )
 
         # Stage 2: market-aware 7-criterion screen + TR/PE ranking.
+        market: list[MarketBenchmarks] = []
         scores = score_candidates(
-            survivors, as_of=as_of, edgar_cache=self.edgar_cache
+            survivors,
+            as_of=as_of,
+            edgar_cache=self.edgar_cache,
+            on_market=market.append,
         )
         top = select_top_n(scores, n=self.portfolio_size)
+
+        # Before the empty-screen return, so it is published even when
+        # nothing qualifies today — when a held name's verdict matters
+        # most. Judged against the market this screen just measured.
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: neff_exits.verdicts(
+                held,
+                prices,
+                fundamentals,
+                market[0] if market else None,
+                cache=self.edgar_cache,
+                market_cap=lambda t, fin, price: self._market_cap(t, as_of, fin, price),
+                as_of=as_of,
+            ),
+        )
 
         if not top:
             logger.warning(
@@ -164,15 +192,23 @@ class JohnNeff(Strategy):
         )
         return weights
 
-    @staticmethod
     def _market_cap(
-        fin: PointInTimeFinancials | None, price: float | None
+        self,
+        ticker: str,
+        as_of: date,
+        fin: PointInTimeFinancials | None,
+        price: float | None,
     ) -> float | None:
-        if fin is None or fin.shares_outstanding is None:
+        """Price times the newest split-adjusted share count (audit FUND-5).
+
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
+        """
+        if fin is None:
             return None
-        if price is None or price <= 0:
-            return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _record(
         self,

@@ -95,6 +95,7 @@ def main() -> None:
         # universe-level positive-book + 2-year-revenue filters, this
         # eliminates the bulk of micro-cap data anomalies.
         min_market_cap=500_000_000.0,
+        edgar_cache=cache,
         decision_logger=decision_logger,
     )
     result = runner.run(strategy)

@@ -18,13 +18,19 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any
+from typing import Any, Final, Literal
 
 from core.backtest.strategy_runner import (
     FundamentalsLookup,
     HeldPosition,
     PriceLookup,
     Strategy,
+)
+from core.live.doctrine_exits import (
+    ExitMode,
+    ExitVerdict,
+    exit_mode_for,
+    parse_exit_mode,
 )
 from core.live.why_translator import (
     buffett_why,
@@ -49,6 +55,10 @@ logger = get_logger("core.live.agent_adapter")
 
 # Default watchlist size — names ranked just below the buy threshold.
 DEFAULT_WATCHLIST_SIZE: int = 30
+
+#: An adapter whose ``rebalance_band`` is this takes the band the runner
+#: was built with. Distinct from ``None``, which means "never trim".
+RUNNER_BAND: Final = "runner"
 
 
 @dataclass(frozen=True)
@@ -102,6 +112,12 @@ class ScanResult:
     #: Setting this says the emptiness is the decision. Silence still
     #: means hold everything.
     flat_is_intentional: bool = False
+    #: The doctrine's own keep-or-sell verdict on held names, each with
+    #: its reason (audit SF-X1). Empty means the doctrine expressed no
+    #: exit opinion — not that it wants to keep everything. Whether the
+    #: runner acts on these or only journals them is the adapter's
+    #: ``exit_mode``.
+    exit_verdicts: list[ExitVerdict] = field(default_factory=list)
 
 
 class AgentAdapter:
@@ -129,10 +145,42 @@ class AgentAdapter:
     #: wearing the clothes of a bug fix.
     honours_run_types: bool = False
 
-    def __init__(self, strategy: Strategy, *, watchlist_size: int = DEFAULT_WATCHLIST_SIZE):
+    #: How far a held name may drift above or below its target weight,
+    #: as a fraction of the target, before the runner resizes it.
+    #:
+    #: :data:`RUNNER_BAND` (the default) is the runner's one band for
+    #: everyone. ``None`` is a doctrine that never trims a position to
+    #: rebalance: the runner leaves an overweight name alone and still
+    #: tops up an underweight one at its own band. Audit SF-X3 — Lynch's
+    #: playbook forbids the trim, and the runner-wide 25% band cut his
+    #: EXEL winner while the book held fifteen losers.
+    rebalance_band: float | Literal["runner"] | None = RUNNER_BAND
+
+    #: The doctrine's largest single name, in percent of the book.
+    #:
+    #: ``None`` is no cap beyond the weights the strategy states. A cap
+    #: lowers any target weight above it — the strategy's own or one the
+    #: whole-share pass would lift — and the excess stays cash. Audit
+    #: SF-X5 — with no cap, Graham held five names at 15.8-20.9% and
+    #: Schloss five at 11.7-25.9%.
+    max_position_pct: float | None = None
+
+    def __init__(
+        self,
+        strategy: Strategy,
+        *,
+        watchlist_size: int = DEFAULT_WATCHLIST_SIZE,
+        exit_mode: str | None = None,
+    ):
         self.strategy = strategy
         self.watchlist_size = watchlist_size
         self.entry_trigger: str = "rank enters top portfolio"
+        #: Whether this agent's doctrine exits only watch ("shadow", the
+        #: default for every agent) or govern its held names
+        #: ("enforce"). See :mod:`core.live.doctrine_exits`.
+        self.exit_mode: ExitMode = (
+            exit_mode_for(self.name) if exit_mode is None else parse_exit_mode(exit_mode)
+        )
 
     def run_scan(
         self,
@@ -158,7 +206,36 @@ class AgentAdapter:
             watchlist=watchlist,
             universe_size=len(universe),
             forced_exits=forced,
+            exit_verdicts=self._exit_verdicts(),
         )
+
+    def _exit_verdicts(self) -> list[ExitVerdict]:
+        """The strategy's keep-or-sell verdicts from the ``select`` just run.
+
+        Read off ``last_exit_decisions``; an absent attribute means the
+        doctrine has no exit opinion yet. An entry that is not an
+        :class:`ExitVerdict` is a bug in the strategy. In shadow it is
+        dropped and logged at ERROR — shadow only journals, and a
+        journaling bug must not cost the agent its trading day — while
+        an enforcing agent stops, because there the verdict trades.
+        """
+        raw = list(getattr(self.strategy, "last_exit_decisions", []) or [])
+        return self._checked_verdicts(raw)
+
+    def _checked_verdicts(self, raw: list[object]) -> list[ExitVerdict]:
+        verdicts: list[ExitVerdict] = []
+        for item in raw:
+            if isinstance(item, ExitVerdict):
+                verdicts.append(item)
+                continue
+            message = (
+                f"{self.name}: malformed exit verdict {item!r} "
+                f"(expected ExitVerdict, got {type(item).__name__})"
+            )
+            if self.exit_mode == "enforce":
+                raise TypeError(message)
+            logger.error(f"{message} — dropped; exits are in shadow")
+        return verdicts
 
     # -- subclass hooks -------------------------------------------------
     def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
@@ -195,6 +272,30 @@ class GreenblattLive(AgentAdapter):
                     score=s,
                 )
             )
+        # A holding inside the one-year hold that no longer scores today
+        # (no filing, no price, filtered out) still owns its slot in
+        # ``weights``. Dropped here, the runner read it as having left
+        # the list and sold it — CRMD, 177 days in (audit item 17).
+        emitted = {t.ticker for t in out}
+        for ticker, weight in weights.items():
+            if ticker in emitted:
+                continue
+            out.append(
+                LiveTarget(
+                    ticker=ticker,
+                    weight=weight,
+                    rank=len(out) + 1,
+                    why_en=(
+                        "Inside Greenblatt's one-year holding period; no Magic "
+                        "Formula score today, so the position is held, not re-ranked."
+                    ),
+                    why_he=(
+                        "בתוך תקופת ההחזקה של שנה לפי גרינבלט; אין היום ציון "
+                        "בפורמולה הקסומה, ולכן הפוזיציה מוחזקת ולא מדורגת מחדש."
+                    ),
+                    score=None,
+                )
+            )
         return out
 
     def _collect_watchlist(self, targets: list[LiveTarget]) -> list[LiveWatch]:
@@ -227,6 +328,9 @@ class GreenblattLive(AgentAdapter):
 # --------------------------------------------------------------------------
 class SchlossLive(AgentAdapter):
     name = "walter_schloss"
+
+    #: Playbook §6.3: "Never more than 5% in any single name".
+    max_position_pct = 5.0
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
@@ -280,6 +384,10 @@ class SchlossLive(AgentAdapter):
 # --------------------------------------------------------------------------
 class GrahamLive(AgentAdapter):
     name = "benjamin_graham"
+
+    #: Playbook §6.1: "No single position exceeds 10% of portfolio
+    #: value". Inherited by the second cohort, which is the same class.
+    max_position_pct = 10.0
 
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
@@ -389,6 +497,16 @@ class GrahamSecondCohortLive(GrahamLive):
     """
 
     name = "benjamin_graham_2"
+
+    def __init__(self, strategy: Strategy, **kw: Any) -> None:
+        super().__init__(strategy, **kw)
+        # The strategy journals its intent rows under ``strategy.name``,
+        # a class attribute BenjaminGraham fixes at "benjamin_graham" for
+        # both cohorts, so this book's BUY/WATCH rows landed in the first
+        # Graham's folder (audit SF-X7). Name this instance after the
+        # book it serves. An instance attribute: the class, and the
+        # first cohort's strategy, keep their name.
+        strategy.name = self.name
 
 
 # --------------------------------------------------------------------------
@@ -509,9 +627,35 @@ class BuffettLive(AgentAdapter):
 class LynchLive(AgentAdapter):
     name = "peter_lynch"
 
+    #: Playbook §6.4: a winner whose thesis is playing out is not
+    #: trimmed "to rebalance" — "let it run".
+    rebalance_band = None
+
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
         self.entry_trigger = "PEG drops into category buy zone"
+
+    def _exit_verdicts(self) -> list[ExitVerdict]:
+        """Lynch's held-name decisions, which ``select`` already computes.
+
+        :func:`agents.lynch.exits.retained` reasons about every held
+        name and the strategy stores the result as ``last_exits`` —
+        which nothing read (audit SF-X1). Same content, the shared
+        vocabulary: ``retained`` is the inverse of ``sell``.
+        """
+        raw: list[object] = []
+        for decision in getattr(self.strategy, "last_exits", []) or []:
+            try:
+                raw.append(
+                    ExitVerdict(
+                        decision.ticker,
+                        sell=not decision.retained,
+                        reason=decision.reason,
+                    )
+                )
+            except (AttributeError, TypeError, ValueError):
+                raw.append(decision)
+        return self._checked_verdicts(raw)
 
     def _collect_targets(self, weights: dict[str, float]) -> list[LiveTarget]:
         return _hybrid_collect_targets(self.strategy, weights, lynch_why)
@@ -661,6 +805,11 @@ class PabraiLive(AgentAdapter):
     #: This is the agent Part 7 was written for.
     honours_run_types = True
 
+    #: §6's table trims only by E5, E6 and E9, and none of them is a
+    #: drift band; "Nothing else sells". The runner's 25% band cut SIG
+    #: and REPX on 2026-10-30 with no row in the journal (audit item 19).
+    rebalance_band = None
+
     def __init__(self, strategy: Strategy, **kw: Any) -> None:
         super().__init__(strategy, **kw)
         self.entry_trigger = (
@@ -739,6 +888,7 @@ class PabraiLive(AgentAdapter):
 
 
 __all__ = [
+    "RUNNER_BAND",
     "AgentAdapter",
     "BuffettLive",
     "DremanLive",

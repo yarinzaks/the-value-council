@@ -5,13 +5,17 @@
   "ticker": "EFOR",
   "side": "SELL",
   "shares": 24.0,
-  "price": 32.42,
-  "gross_value": 778.08,
+  "price": 31.88,
+  "gross_value": 765.12,
   "cost_paid": 0.0,
-  "realized_pnl_usd": 320.16,
+  "realized_pnl_usd": 307.2,
   "source": "reconstructed",
   "entry_date": "2026-07-23",
-  "entry_price": 19.08
+  "entry_price": 19.08,
+  "tags": [
+   "exit-from-journal",
+   "fractional-era"
+  ]
  },
  {
   "date": "2026-09-01",
@@ -25,6 +29,10 @@
   "realized_pnl_usd": 32.96,
   "source": "reconstructed",
   "entry_date": "2026-08-07",
-  "entry_price": 18.82
+  "entry_price": 18.82,
+  "tags": [
+   "exit-at-last-mark",
+   "fractional-era"
+  ]
  }
 ]

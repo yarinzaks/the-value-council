@@ -92,6 +92,7 @@ def main() -> None:
     strategy = BenjaminGraham(
         portfolio_size=30,
         min_market_cap=500_000_000.0,
+        edgar_cache=cache,
         decision_logger=decision_logger,
     )
     result = runner.run(strategy)

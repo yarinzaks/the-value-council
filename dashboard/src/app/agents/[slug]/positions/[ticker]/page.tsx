@@ -24,6 +24,7 @@ import { PositionPriceChart } from "@/components/PositionPriceChart";
 import { AGENTS, metaLocalized } from "@/lib/agents";
 import type { AgentSlug } from "@/lib/types";
 import { getServerI18n } from "@/lib/locale-server";
+import { isUnpriced } from "@/lib/unpriced";
 import {
   translateCriterion,
   translateExitTrigger,
@@ -205,6 +206,16 @@ export default async function PositionDetailPage({
           <div className="text-xs text-muted mt-1">
             {position.shares.toFixed(0)} {t("col_shares").toLowerCase()}
           </div>
+          {/* The figure above is the last close, carried forward; the
+              runner found no market for this name (audit CE-1a). */}
+          {isUnpriced(position) && (
+            <div
+              className="text-xs mt-1 font-semibold text-red-700 dark:text-red-400"
+              title={t("unpriced_help")}
+            >
+              ⚠ {t("unpriced")} {position.unpriced_since}
+            </div>
+          )}
         </Card>
         <Card>
           <div className="text-xs text-muted">{t("col_value")}</div>

@@ -158,6 +158,50 @@ def trailing_eps_cagr_pct(
     return cagr * 100.0
 
 
+#: Full window for Lynch's primary growth input (playbook §5.3).
+GROWTH_WINDOW_YEARS: int = 5
+
+#: Shortest window a HELD name's growth may fall back to when the
+#: longer bases are loss years — the playbook's own 3-year cross-check
+#: (§5.3). Nothing shorter counts as demonstrated growth.
+RETENTION_MIN_GROWTH_YEARS: int = 3
+
+
+def retention_eps_cagr_pct(
+    cache: EdgarCache,
+    ticker: str,
+    as_of: date,
+    *,
+    years: int = GROWTH_WINDOW_YEARS,
+    min_years: int = RETENTION_MIN_GROWTH_YEARS,
+) -> tuple[float, int] | None:
+    """Growth for a name already owned: ``(cagr_pct, window_years)``.
+
+    :func:`trailing_eps_cagr_pct` anchors its base at ``as_of - years``,
+    so the day the base rolls onto a filed loss year the CAGR becomes
+    undefined — with no change in the company at all. Held, that read
+    as a failed gate and sold the name (audit item 18: CRS on
+    2026-08-19, base rolled onto FY2021 EPS -4.76 while current EPS was
+    7.42, up from 1.14 three years earlier). And it would recur every
+    August.
+
+    A loss-year base is skipped, one year at a time, down to
+    ``min_years``. Only a base that EXISTS and is non-positive is
+    skipped: a missing base is missing data, not a window artefact, and
+    returns ``None`` as before. When every base down to ``min_years`` is
+    a loss there is no demonstrated growth, and ``None`` is returned.
+    """
+    for span in range(years, min_years - 1, -1):
+        base = _eps_at(
+            cache, ticker, as_of - timedelta(days=int(365.25 * span))
+        )
+        if base is not None and base[0] <= 0:
+            continue
+        cagr = trailing_eps_cagr_pct(cache, ticker, as_of, years=span)
+        return None if cagr is None else (cagr, span)
+    return None
+
+
 def acceleration_pct(
     cache: EdgarCache,
     ticker: str,
@@ -201,15 +245,18 @@ def peg_for(
 
 
 __all__ = [
+    "GROWTH_WINDOW_YEARS",
     "PEG_BUY",
     "PEG_FLOOR",
     "PEG_HOLD",
     "PEG_STRONG_BUY",
+    "RETENTION_MIN_GROWTH_YEARS",
     "PegResult",
     "acceleration_pct",
     "peg_buy_zone",
     "peg_for",
     "peg_ratio",
     "pegy_ratio",
+    "retention_eps_cagr_pct",
     "trailing_eps_cagr_pct",
 ]

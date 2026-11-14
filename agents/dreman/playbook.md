@@ -382,6 +382,10 @@ For the agent:
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Dreman's verdict (`agents/dreman/exits.py`) is computed for every held name against the market the day's screen measured (the median P/E of the quality-gate survivors the quintile cuts are taken from). In order: trigger 2 — §6.5's hard stop — sells at any price when any of four computable tests breaks: current ratio below 1.0, D/E above the strategy's 1.0 maximum (test 4's "maximum acceptable"; the industry-average comparison is not computed), ROE down two years running (three consecutive 10-Ks, as filed), or pre-tax margin more than 3 points lower than five years before (the strength battery's line; "collapsing" has no number here). An unreported figure is unjudged, never a break. Trigger 1 sells at or past 100% of the market P/E; from 80% to 100% the verdict is a keep whose reason names the trim zone (the trim itself is not executed — a verdict is keep or sell). Anything else is kept, on or off the day's list; a price decline is never a sell. No verdict when no test broke and the fundamentals, the price, a positive P/E or the day's market P/E is missing. Not computed: the trim, accounting irregularities, trigger 3 (a better candidate — rank rotation by another name), trigger 4 (deal data), and §6.5's add after a 15% drop. Note §6.4 says a position "rotates when P/E reaches 80% of market average"; this follows §7.1's 80% trim / 100% exit.
+
 ### 7.1 The four legitimate sell triggers
 
 **Trigger 1 — P/E (or other primary metric) approaches market average.** The contrarian thesis was built on the gap between bottom-20% and market average. Once that gap closes, the thesis is complete.

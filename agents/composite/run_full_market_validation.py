@@ -96,6 +96,7 @@ def main() -> None:
     )
     strategy = FactorComposite(
         price_loader=price_loader,
+        edgar_cache=cache,
         decision_logger=decision_logger,
     )
     result = runner.run(strategy)

@@ -87,6 +87,7 @@ def main() -> None:
     strategy = MagicFormula(
         portfolio_size=30,
         min_market_cap=1_000_000_000.0,
+        edgar_cache=cache,
     )
     result = runner.run(strategy)
     report_dir = write_report(result)

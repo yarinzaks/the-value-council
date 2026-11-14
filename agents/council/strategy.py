@@ -46,6 +46,12 @@ from agents.council.exits import (
 )
 from agents.council.pipeline import Selection, run_selection
 from agents.council.review import quarters_without_progress
+from core.backtest.decision_logger import (
+    Decision,
+    DecisionLogger,
+    DecisionLoggerError,
+    make_decision,
+)
 from core.backtest.strategy_runner import HeldPosition, Strategy
 from core.logger import get_logger
 from core.paths import council_reviews_dir
@@ -56,6 +62,14 @@ AGENT_SLUG = "mohnish_pabrai"
 
 #: Entries already spent, derived from the journal rather than stored.
 PUNCH_CARD_TOTAL = 20
+
+#: What closes a statistical position, as §6's table states it. Carried
+#: on every BUY intent so the journal says how the name will leave.
+STATISTICAL_EXIT_TRIGGER = (
+    "E8 at the quarterly rebalance: composite rank > 40, or a gate (A-D) "
+    "or universe rule fails; E2 any session: 8-K 4.02/1.03, going-concern, "
+    "delisting notice, or filings > 400 days stale"
+)
 
 
 class MohnishPabrai(Strategy):
@@ -73,6 +87,7 @@ class MohnishPabrai(Strategy):
         drawdown_reader: Any = None,
         news_service: Any | None = None,
         reviews_dir: Any = None,
+        decision_logger: DecisionLogger | None = None,
     ) -> None:
         """
         Args:
@@ -94,6 +109,10 @@ class MohnishPabrai(Strategy):
                 the 8-K stream is the event feed; the parameter stays so
                 the runner's wiring does not have to special-case this
                 agent.
+            reviews_dir: Where the REVIEW records live.
+            decision_logger: Where the intent rows go -- BUY per target,
+                SELL per forced exit. ``None`` journals nothing; the
+                runner's FILL/EXIT rows are written either way.
         """
         self.edgar_cache = edgar_cache
         self.price_loader = price_loader
@@ -101,6 +120,7 @@ class MohnishPabrai(Strategy):
         self.opinion_index = opinion_index
         self.drawdown_reader = drawdown_reader
         self.news_service = news_service
+        self.decision_logger = decision_logger
         # Where the REVIEW records live. Injectable so a test can point
         # it at a tmp_path rather than the real data root.
         self._reviews_dir = reviews_dir or council_reviews_dir()
@@ -194,8 +214,10 @@ class MohnishPabrai(Strategy):
         400-day staleness bound. The rest of the table is either the
         Core sleeve's (E4-E7), the Event sleeve's (E3), or already
         expressed by the basket itself: E8's rank buffer decides
-        membership in :mod:`agents.council.pipeline`, and a name that
-        leaves the target list is sold by the runner in the ordinary way.
+        membership in :mod:`agents.council.pipeline`, and the runner sells
+        a name that left that list only at the quarterly rebalance, from
+        the cooled-off published list. Between rebalances only what this
+        method forces out is sold.
 
         The filings check costs one request per held name, which is
         twenty at most. That is the same reasoning that puts Gate D last
@@ -309,8 +331,92 @@ class MohnishPabrai(Strategy):
         # already consumed it: a name every gate passed yesterday can be
         # suspended this morning.
         tradeable = {t.upper() for t in universe}
-        return {
+        weights = {
             t: w
             for t, w in selection.weights.items()
             if not tradeable or t.upper() in tradeable
         }
+        if self.decision_logger is not None:
+            self._journal_intents(
+                self.decision_logger, as_of, weights, selection, last, prices
+            )
+        return weights
+
+    def _journal_intents(
+        self,
+        journal: DecisionLogger,
+        as_of: date,
+        weights: Mapping[str, float],
+        selection: Selection,
+        last: Mapping[str, float | None],
+        prices: Any,
+    ) -> None:
+        """Write what the doctrine intends, beside what the runner executes.
+
+        Audit SF-X7: every other agent journals its intent, and this one
+        wrote only the runner's FILL and EXIT rows, so no record said why
+        a name was wanted or what would close it. A journal that cannot
+        be written is said out loud and costs nothing else -- the trade
+        it describes is still the doctrine's.
+        """
+        timestamp = f"{as_of.isoformat()}T00:00:00+00:00"
+        rank_of = {r.ticker: i for i, r in enumerate(selection.ranked, start=1)}
+        composite = {r.ticker: r.composite for r in selection.ranked}
+
+        def price_of(ticker: str) -> float | None:
+            if ticker in last:
+                return last[ticker]
+            try:
+                value = prices.get(ticker)
+            except Exception as exc:
+                # Same tolerance as _price_inputs: a missing quote leaves
+                # the row without a price rather than dropping the row.
+                logger.warning(f"{as_of}: no quote for {ticker} — {exc}")
+                return None
+            return None if value is None else float(value)
+
+        rows: list[Decision] = []
+        for ticker in sorted(weights):
+            result = selection.screened.get(ticker)
+            floor = (result.floor if result else None) or "held from a prior rebalance"
+            met = [floor]
+            if ticker in rank_of:
+                met.append(f"composite rank #{rank_of[ticker]}")
+            rows.append(
+                make_decision(
+                    ticker=ticker,
+                    decision="BUY",
+                    agent=self.name,
+                    timestamp=timestamp,
+                    criteria_met=met,
+                    criteria_values={
+                        "composite": composite.get(ticker),
+                        "composite_rank": rank_of.get(ticker),
+                        "target_weight": weights[ticker],
+                    },
+                    entry_price=price_of(ticker),
+                    exit_trigger=STATISTICAL_EXIT_TRIGGER,
+                    rationale=f"Statistical sleeve. Structural floor: {floor}.",
+                )
+            )
+        for ticker in self.last_forced_exits:
+            reason = self.last_exit_reasons.get(ticker, "forced exit")
+            rows.append(
+                make_decision(
+                    ticker=ticker,
+                    decision="SELL",
+                    agent=self.name,
+                    timestamp=timestamp,
+                    criteria_met=[reason],
+                    entry_price=price_of(ticker),
+                    rationale=f"Forced exit, ahead of any holding floor: {reason}.",
+                )
+            )
+        for row in rows:
+            try:
+                journal.log(row)
+            except (DecisionLoggerError, OSError) as exc:
+                logger.warning(
+                    f"{as_of}: intent row {row.decision} {row.ticker} "
+                    f"not journaled — {exc}"
+                )

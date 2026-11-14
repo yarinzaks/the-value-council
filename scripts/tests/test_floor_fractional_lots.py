@@ -167,3 +167,82 @@ class TestAnEmptyBookIsNotAnError:
         assert freed == 0.0
         assert changes == []
         assert book.cash == 10_000.0
+
+
+class TestAClosedLotTakesItsHistoryWithIt:
+    """Audit CE-3b. The flooring closed sub-share lots by dropping them
+    from the list, which skipped what `sell()` does on a close — pop the
+    line's `paid_dividends` and `applied_splits`. Seven orphan keys and
+    six stale ones were left in the committed books."""
+
+    def test_paid_dividends_keys_subset_of_positions_after_floor(self) -> None:
+        book = _book([_pos("SEB", 0.4, 4_283.0), _pos("KEEP", 5.25, 10.0)])
+        book.paid_dividends = {"SEB": ["2026-08-14"], "KEEP": ["2026-09-01"]}
+        book.applied_splits = {"SEB": ["2026-07-01"]}
+
+        floor_one(book)
+
+        held = {p.ticker.upper() for p in book.positions}
+        assert set(book.paid_dividends) <= held
+        assert set(book.applied_splits) <= held
+        assert book.paid_dividends == {"KEEP": ["2026-09-01"]}
+
+    def test_a_kept_lot_keeps_its_history(self) -> None:
+        book = _book([_pos("KEEP", 5.25, 10.0)])
+        book.paid_dividends = {"KEEP": ["2026-09-01"]}
+
+        floor_one(book)
+
+        assert book.paid_dividends == {"KEEP": ["2026-09-01"]}
+
+    def test_the_close_charges_nothing_and_is_valued_at_the_mark(self) -> None:
+        book = _book([_pos("SEB", 0.4, 4_283.0, entry=4_000.0)], cash=100.0)
+
+        freed, changes = floor_one(book)
+
+        assert book.positions == []
+        assert freed == pytest.approx(0.4 * 4_283.0)
+        assert book.cash == pytest.approx(100.0 + 0.4 * 4_283.0)
+        assert book.cumulative_costs == 0.0
+        [(ticker, before, after, cash)] = changes
+        assert (ticker, before, after) == ("SEB", 0.4, 0.0)
+        assert cash == pytest.approx(0.4 * 4_283.0)
+
+
+class TestTwoLinesInOneName:
+    """Follow-up L1. A name can hold two lines (see `consolidate`). The
+    close went through `sell(ticker)`, which acts on the *first* line of
+    that ticker — so a sub-share second line closed the whole first line
+    instead, and the close dropped the name's dividend records although
+    a line of it was still held."""
+
+    def test_the_sub_share_line_closes_not_the_first_line(self) -> None:
+        first = _pos("A", 5.0, 10.0, entry=8.0)
+        stub = _pos("A", 0.4, 10.0, entry=9.0)
+        book = _book([first, stub], cash=100.0)
+        book.paid_dividends = {"A": ["2026-09-01"]}
+        book.applied_splits = {"A": ["2026-07-01"]}
+        before = book.total_nav
+
+        freed, _ = floor_one(book)
+        book.mark_to_market({p.ticker: p.current_price for p in book.positions})
+
+        assert len(book.positions) == 1
+        assert book.positions[0].shares == 5.0
+        assert book.positions[0].entry_price == 8.0
+        assert freed == pytest.approx(4.0)
+        assert book.cash == pytest.approx(104.0)
+        assert book.total_nav == pytest.approx(before, abs=1e-9)
+        assert book.paid_dividends == {"A": ["2026-09-01"]}
+        assert book.applied_splits == {"A": ["2026-07-01"]}
+
+    def test_both_lines_under_one_share_close_and_drop_the_history(self) -> None:
+        book = _book([_pos("A", 0.4, 10.0), _pos("A", 0.3, 10.0)], cash=0.0)
+        book.paid_dividends = {"A": ["2026-09-01"]}
+
+        freed, _ = floor_one(book)
+
+        assert book.positions == []
+        assert freed == pytest.approx(7.0)
+        assert book.cash == pytest.approx(7.0)
+        assert book.paid_dividends == {}

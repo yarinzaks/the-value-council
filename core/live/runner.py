@@ -25,10 +25,12 @@ the shortest of them two days.
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, timedelta
+from fractions import Fraction
 from pathlib import Path
 
 from agents.buffett import WarrenBuffett
@@ -70,6 +72,7 @@ from core.data.fundamentals_fetcher import (
 )
 from core.data.news_service import NewsService
 from core.live.agent_adapter import (
+    RUNNER_BAND,
     AgentAdapter,
     BuffettLive,
     DremanLive,
@@ -88,17 +91,22 @@ from core.live.agent_adapter import (
     ScanResult,
     SchlossLive,
 )
+from core.live.doctrine_exits import DEFAULT_EXIT_MODE, ExitVerdict
+from core.live.fundamentals_freshness import FundamentalsFreshness, assess_freshness
 from core.live.notify import notify_run
 from core.live.portfolio import (
+    DEFAULT_COMMISSION_USD,
     DEFAULT_COST_BPS,
     DEFAULT_INITIAL_CASH,
     DEFAULT_PORTFOLIO_DIR,
     LivePortfolio,
     LivePortfolioError,
     Position,
+    SplitRecord,
     TradeRecord,
     WatchEntry,
     now_iso,
+    unpriced_since_for,
 )
 from core.live.price_export import export_prices
 from core.live.sector_export import export_sectors
@@ -108,13 +116,24 @@ from core.llm.mode import LLMMode
 from core.llm.wiring import build_analyst_layer
 from core.logger import get_logger
 from core.market_calendar import closes_early, why_closed
-from core.paths import council_published_dir, trade_ledger_dir
+from core.paths import council_published_dir, doctrine_exits_dir, trade_ledger_dir
 
 logger = get_logger("core.live.runner")
 
 #: Smallest notional worth executing. Below this the transaction cost
 #: dominates and the position is noise in the weight table.
 MIN_TRADE_USD: float = 1.0
+
+#: The most of a rebalance trade the commission may eat, as a fraction
+#: of the trade's value. Above it the trim or add is skipped and the
+#: drift stays until a run where correcting it is worth the fee.
+#:
+#: 1% means $2.50 needs a trade of at least $250. A $10,000 book of 30
+#: names has $333 slots, and the 25% band first triggers at a drift of
+#: about $83 — a correction on which $2.50 is 3%, paid again when the
+#: drift reverses. Applies only to rebalancing: an entry or exit is a
+#: doctrine decision and pays what it costs.
+MAX_REBALANCE_COMMISSION_FRACTION: float = 0.01
 
 #: How far a position may drift from its target weight before the
 #: rebalance pass corrects it, as a fraction of the target. 0.25 means a
@@ -123,7 +142,8 @@ MIN_TRADE_USD: float = 1.0
 #: was expressed once and then abandoned to price drift.
 DEFAULT_REBALANCE_BAND: float = 0.25
 
-#: Days a position is held before a rotation may sell it.
+#: Days a position is held before a rotation or a rebalance trim may
+#: sell any of it.
 #:
 #: Not a doctrine — a floor under one. Every investor here holds for
 #: years; none of them sells because a name slipped a rank overnight.
@@ -152,11 +172,75 @@ def pos_age_days(pos: Position, as_of: date) -> int | None:
     return max(0, (as_of - entry).days)
 
 
+def band_for(adapter: object, *, default: float) -> float | None:
+    """The rebalance band ``adapter``'s doctrine declares.
+
+    An adapter that declares none, or declares :data:`RUNNER_BAND`,
+    gets ``default`` — the runner's band. ``None`` is passed through: a
+    doctrine that never trims to rebalance (audit SF-X3). Anything else
+    must be a non-negative number; a malformed declaration raises
+    rather than trading on a band nobody meant.
+    """
+    band = getattr(adapter, "rebalance_band", RUNNER_BAND)
+    if band is None:
+        return None
+    if isinstance(band, str) and band == RUNNER_BAND:
+        return default
+    if isinstance(band, bool) or not isinstance(band, int | float) or not band >= 0:
+        raise ValueError(
+            f"{getattr(adapter, 'name', adapter)!r}: rebalance_band must be "
+            f"None, {RUNNER_BAND!r} or a number >= 0; got {band!r}"
+        )
+    return float(band)
+
+
+def max_weight_for(adapter: object) -> float | None:
+    """``adapter``'s per-name cap as a fraction of the book, or ``None``.
+
+    Declared in percent (``max_position_pct``, as the playbooks state
+    it); returned as a weight. A cap outside (0, 100] raises.
+    """
+    pct = getattr(adapter, "max_position_pct", None)
+    if pct is None:
+        return None
+    if isinstance(pct, bool) or not isinstance(pct, int | float) or not 0 < pct <= 100:
+        raise ValueError(
+            f"{getattr(adapter, 'name', adapter)!r}: max_position_pct must be "
+            f"in (0, 100]; got {pct!r}"
+        )
+    return float(pct) / 100.0
+
+
+def _check_max_weight(max_weight: float | None) -> None:
+    if max_weight is not None and not 0.0 < max_weight <= 1.0:
+        raise ValueError(f"max_weight must be in (0, 1]; got {max_weight}")
+
+
+def _capped(
+    targets: list[LiveTarget], max_weight: float | None
+) -> list[LiveTarget]:
+    """``targets`` with every weight above ``max_weight`` lowered to it."""
+    if max_weight is None:
+        return targets
+    out: list[LiveTarget] = []
+    for t in targets:
+        if t.weight > max_weight:
+            logger.info(
+                f"{t.ticker} capped at {max_weight:.1%} of the book from "
+                f"{t.weight:.1%}; the difference stays cash"
+            )
+            t = replace(t, weight=max_weight)
+        out.append(t)
+    return out
+
+
 def reachable_targets(
     targets: Sequence[LiveTarget],
     prices: dict[str, float | None],
     nav: float,
     held: frozenset[str] = frozenset(),
+    *,
+    max_weight: float | None = None,
 ) -> list[LiveTarget]:
     """``targets`` reduced to the names this book can hold a share of.
 
@@ -187,11 +271,20 @@ def reachable_targets(
     stays in cash. That is the honest outcome for a small book pointed
     at a list of expensive names, and the agents it happens to should
     show it rather than have it modelled away.
+
+    ``max_weight`` is the doctrine's largest single name (audit SF-X5).
+    No weight leaves this function above it — neither the strategy's
+    own nor one lifted by a drop — and the excess stays cash: Graham
+    told he may hold 10% of a name does not hold 20% because only five
+    names passed. Reach is judged against the capped slot, so a share
+    the cap cannot hold is dropped rather than kept on the list as a
+    buy that never happens.
     """
+    _check_max_weight(max_weight)
     priced = [t for t in targets if (prices.get(t.ticker) or 0.0) > 0.0]
     invested = sum(t.weight for t in priced)
     if not priced or nav <= 0 or invested <= 0:
-        return list(priced)
+        return _capped(list(priced), max_weight)
 
     kept = list(priced)
     while True:
@@ -204,7 +297,10 @@ def reachable_targets(
             if t.ticker in held:
                 continue
             price = prices[t.ticker] or 0.0
-            slot = nav * t.weight * scale
+            weight = t.weight * scale
+            if max_weight is not None:
+                weight = min(weight, max_weight)
+            slot = nav * weight
             if slot <= 0 or price <= slot:
                 continue
             ratio = price / slot
@@ -224,8 +320,103 @@ def reachable_targets(
 
     scale = invested / sum(t.weight for t in kept)
     if scale == 1.0:
-        return kept
-    return [replace(t, weight=t.weight * scale) for t in kept]
+        return _capped(kept, max_weight)
+    return _capped([replace(t, weight=t.weight * scale) for t in kept], max_weight)
+
+
+def commission_dominates(trade_value: float, *, commission: float) -> bool:
+    """True when ``commission`` is too large a share of ``trade_value``.
+
+    The line is :data:`MAX_REBALANCE_COMMISSION_FRACTION`, inclusive: a
+    $250 trade at $2.50 is exactly 1% and is placed. A free order is
+    never dominated.
+    """
+    if commission <= 0:
+        return False
+    return commission > trade_value * MAX_REBALANCE_COMMISSION_FRACTION
+
+
+#: Weights within this of 1.0 are a fully deployed list. Equal weights of
+#: 1/27 sum to 0.9999999999999998, and reading that as a posture would
+#: cap the cash a hair under itself and could cost the last share.
+_FULLY_DEPLOYED_TOLERANCE: float = 1e-9
+
+
+def deployable_cash(
+    targets: Sequence[LiveTarget],
+    *,
+    nav: float,
+    invested: float,
+    cash: float,
+) -> float:
+    """The cash the book may spend today without breaking its posture.
+
+    A doctrine's weights say how much of the book belongs in stocks.
+    Klarman's list sums to 92% and Marks's, at Neutral, to 80%; the rest
+    is cash on purpose — "cash is a position". The invested total those
+    weights describe is ``nav × Σ weights``, and the book may spend up
+    to that, less what it already holds. Every holding counts, on the
+    list or not: a name the holding floor keeps is capital already in
+    stocks.
+
+    A list that sums to the whole book (within float error) leaves the
+    cash uncapped. One that sums to more — never meant, but not this
+    function's to correct — is likewise capped only by the cash. A
+    book already past its posture deploys nothing; that is a reason not
+    to buy, not a reason to sell. An empty list deploys nothing.
+
+    A non-finite weight, NAV or invested total deploys nothing too. NaN
+    fails every comparison, so without the check ``min(cash, nan)``
+    returned the whole cash and a broken mark lifted the cap entirely.
+    """
+    posture = sum(t.weight for t in targets if t.weight > 0)
+    available = max(0.0, cash)
+    if not (math.isfinite(posture) and math.isfinite(nav) and math.isfinite(invested)):
+        logger.warning(
+            f"posture not computable (weights {posture}, nav {nav}, "
+            f"invested {invested}) — deploying no cash"
+        )
+        return 0.0
+    if posture <= 0:
+        return 0.0
+    if posture >= 1.0 - _FULLY_DEPLOYED_TOLERANCE:
+        return available
+    return max(0.0, min(available, nav * posture - invested))
+
+
+def posture_targets(
+    listed: Sequence[LiveTarget],
+    reachable: Sequence[LiveTarget],
+    prices: dict[str, float | None],
+    held: frozenset[str],
+    *,
+    max_weight: float | None = None,
+) -> list[LiveTarget]:
+    """The list :func:`deployable_cash` should read the posture from.
+
+    :func:`reachable_targets` drops a name with no quote today and does
+    not hand its weight to the others. For a name not held that is
+    right: its slot stays cash until it can be priced. For a held name
+    it is not: the position is still in ``invested`` at its last mark,
+    so dropping its weight from Σw counts its slot twice — once as
+    capital already in stocks, once as posture that no longer exists —
+    and an equal-weight book could buy nothing on a day one holding
+    went unquoted (review of audit SF-X2).
+
+    So the posture is ``reachable`` plus every held name of ``listed``
+    that it dropped for want of a price, at the same per-name cap.
+    Held names are never dropped for reach, so a missing price is the
+    only way one leaves.
+    """
+    kept = {t.ticker for t in reachable}
+    unquoted_held = [
+        t
+        for t in listed
+        if t.ticker in held
+        and t.ticker not in kept
+        and not (prices.get(t.ticker) or 0.0) > 0.0
+    ]
+    return list(reachable) + _capped(unquoted_held, max_weight)
 
 
 def plan_whole_share_buys(
@@ -235,7 +426,9 @@ def plan_whole_share_buys(
     cash: float,
     *,
     cost_bps: float,
+    commission: float,
     band: float,
+    max_weight: float | None = None,
 ) -> dict[str, int]:
     """How many whole shares of each target to buy, decided in one pass.
 
@@ -262,7 +455,18 @@ def plan_whole_share_buys(
     irreducible rather than zero: a $331 share in a $370 slot cannot
     take a second one without reaching 179% of its target, so its $40
     stays in cash — visibly, which is the point.
+
+    ``commission`` is per order, so each name pays it once — on its
+    first share — and a top-up of a name already planned pays only the
+    share. Each slot carries its own commission, and the plan as a whole
+    never spends more than ``cash``: every trade it implies can be
+    placed in full, in any order.
+
+    ``max_weight`` is the doctrine's per-name cap (audit SF-X5). Slots
+    are no larger than it and a top-up may not carry a name past it,
+    however much band is left.
     """
+    _check_max_weight(max_weight)
     per_share: dict[str, float] = {}
     for t in targets:
         price = prices.get(t.ticker) or 0.0
@@ -271,15 +475,26 @@ def plan_whole_share_buys(
     if not per_share or nav <= 0 or cash <= 0:
         return {}
 
-    slots = {t.ticker: nav * t.weight for t in targets if t.ticker in per_share}
+    slots = {
+        t.ticker: nav * (t.weight if max_weight is None else min(t.weight, max_weight))
+        for t in targets
+        if t.ticker in per_share
+    }
     ceiling = {tk: slot * (1.0 + band) for tk, slot in slots.items()}
+    if max_weight is not None:
+        ceiling = {tk: min(c, nav * max_weight) for tk, c in ceiling.items()}
 
     shares: dict[str, int] = {}
     spent = 0.0
     for tk, slot in slots.items():
-        n = int(min(slot, cash) // per_share[tk])
+        # Against what is left, not the whole of the cash: slots that
+        # add up to more than the book holds must not plan to spend it
+        # twice.
+        budget = min(slot, cash - spent) - commission
+        n = int(budget // per_share[tk]) if budget > 0 else 0
         shares[tk] = n
-        spent += n * per_share[tk]
+        if n > 0:
+            spent += n * per_share[tk] + commission
 
     # The pooled remainder, one share at a time, to the biggest gap.
     while True:
@@ -287,7 +502,9 @@ def plan_whole_share_buys(
         best: tuple[float, str] | None = None
         for tk, slot in slots.items():
             outlay = per_share[tk]
-            if outlay > remaining:
+            # A name with no share yet is a new order and pays its fee.
+            fee = commission if shares[tk] == 0 else 0.0
+            if outlay + fee > remaining:
                 continue
             held_value = (shares[tk] + 1) * outlay
             if held_value > ceiling[tk]:
@@ -299,6 +516,8 @@ def plan_whole_share_buys(
                 best = (gap, tk)
         if best is None:
             return {tk: n for tk, n in shares.items() if n > 0}
+        if shares[best[1]] == 0:
+            spent += commission
         shares[best[1]] += 1
         spent += per_share[best[1]]
 
@@ -355,6 +574,11 @@ class AgentRunResult:
     #: True when this agent had already completed ``as_of`` and the run
     #: was a no-op. Distinguishes "nothing to do" from "traded nothing".
     skipped: bool = False
+    #: Journal rows this run tried to write and could not (audit RK-04).
+    #: The trades stand either way; a non-zero count says the decision
+    #: journal — the only store the dashboard reads — is missing rows
+    #: for them, which until now was logged at DEBUG and seen by no one.
+    journal_failures: int = 0
 
 
 def build_default_adapters(
@@ -370,11 +594,11 @@ def build_default_adapters(
     on a later start date, so the pair isolates entry timing. See
     :class:`~core.live.agent_adapter.GrahamSecondCohortLive`.
 
-    The 4 original quant agents (Greenblatt, Schloss, Graham, Dreman)
-    don't need ``edgar_cache`` (they read fundamentals via the runner's
-    ``FundamentalsLookup``). The 6 hybrid agents (Neff, Buffett, Lynch,
-    Marks, Klarman, Fisher) DO need it for trailing growth / FCF /
-    margin-trend lookups, so we pass the runner's cache through.
+    Every agent gets ``edgar_cache``: its market cap is price times the
+    newest filed share count restated into the split-adjusted price's
+    units, and that count is read from the cache (audit FUND-5). The 6
+    hybrid agents (Neff, Buffett, Lynch, Marks, Klarman, Fisher) and
+    Dreman also use it for trailing growth / FCF / margin-trend lookups.
 
     Schloss additionally takes the price loader: his entry condition is
     a 52-week low and a five-year high, which are price facts rather
@@ -405,6 +629,7 @@ def build_default_adapters(
             MagicFormula(
                 portfolio_size=30,
                 min_market_cap=500_000_000.0,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -418,6 +643,7 @@ def build_default_adapters(
                 # tested behind a flag no caller passed.
                 price_loader=prices,
                 require_distressed_price=True,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -425,6 +651,7 @@ def build_default_adapters(
             BenjaminGraham(
                 portfolio_size=30,
                 min_market_cap=500_000_000.0,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -437,6 +664,7 @@ def build_default_adapters(
             BenjaminGraham(
                 portfolio_size=30,
                 min_market_cap=500_000_000.0,
+                edgar_cache=cache,
                 decision_logger=decision_logger,
             )
         ),
@@ -486,6 +714,10 @@ def build_default_adapters(
                 second_level_analyzer=layer.build("marks", SecondLevelAnalyzer),
                 llm_mode=mode,
                 decision_logger=decision_logger,
+                # A fresh process every day: the posture held yesterday
+                # is read back from the journal, so one day's score
+                # change does not flip it (audit item 21).
+                posture_from_journal=True,
             )
         ),
         KlarmanLive(
@@ -534,6 +766,7 @@ def build_default_adapters(
                 # thousand names, found a hundred and eleven candidates,
                 # and bought none of them.
                 drawdown_reader=lambda: drawdown_from_peak("mohnish_pabrai"),
+                decision_logger=decision_logger,
             )
         ),
     ]
@@ -635,13 +868,22 @@ class DailyRunner:
             quant-only path; LLM analyzers are not invoked in live mode
             here (see ``build_default_adapters`` docstring).
         portfolio_dir: Where to persist portfolio JSON.
-        cost_bps: Per-trade cost (default 10 bps).
+        cost_bps: Proportional cost per order on top of the commission,
+            as a fraction of the gross (default 0 — the broker charges
+            none).
+        commission: Flat cost per order, buy or sell (default $2.50,
+            the broker's).
         initial_cash: Seed cash for first run (default $10,000).
         only_agents: Restrict the run to these agent slugs. ``None``
             (default) runs everyone. An unknown slug raises rather than
             silently running nothing — a filter that quietly matches
             no-one looks exactly like a clean run that traded nothing,
             which is also the normal outcome on a quiet day.
+        exit_verdict_logger: Where each doctrine's keep-or-sell verdict
+            on its held names is journaled beside what the engine did
+            (default ``<data root>/doctrine_exits``). Separate from the
+            decision journal on purpose: a shadow SELL there would read
+            as a sale to the dashboard and the notifier.
     """
 
     def __init__(
@@ -653,6 +895,7 @@ class DailyRunner:
         published_dir: Path | None = None,
         ledger_dir: Path | None = None,
         cost_bps: float = DEFAULT_COST_BPS,
+        commission: float = DEFAULT_COMMISSION_USD,
         initial_cash: float = DEFAULT_INITIAL_CASH,
         rebalance_band: float = DEFAULT_REBALANCE_BAND,
         min_holding_days: int = DEFAULT_MIN_HOLDING_DAYS,
@@ -663,6 +906,7 @@ class DailyRunner:
         decision_logger: DecisionLogger | None = None,
         only_agents: Sequence[str] | None = None,
         llm_mode: LLMMode = LLMMode.OFF,
+        exit_verdict_logger: DecisionLogger | None = None,
     ) -> None:
         if market not in ("US", "TASE"):
             raise ValueError(
@@ -671,6 +915,9 @@ class DailyRunner:
         self.market = market
         self.cache = cache or EdgarCache()
         self.decision_logger = decision_logger or DecisionLogger()
+        self.exit_verdict_logger = exit_verdict_logger or DecisionLogger(
+            doctrine_exits_dir()
+        )
         # Before the adapters: Schloss's distressed-price condition
         # needs this loader, and the builder takes it as an argument.
         self.price_loader = price_loader or PriceDataLoader()
@@ -688,6 +935,7 @@ class DailyRunner:
         self.published_dir = published_dir or council_published_dir()
         self.ledger_dir = ledger_dir or trade_ledger_dir()
         self.cost_bps = cost_bps
+        self.commission = commission
         self.initial_cash = initial_cash
         self.rebalance_band = rebalance_band
         self.min_holding_days = min_holding_days
@@ -708,6 +956,9 @@ class DailyRunner:
             self.pit_loader = PointInTimeLoader(adapter=adapter)
         else:
             self.pit_loader = pit_loader
+        # Journal rows lost in the current run, per agent. Reset at the
+        # start of each agent's pass and reported on its result.
+        self._journal_failures: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     def _tase_placeholder(
@@ -810,7 +1061,11 @@ class DailyRunner:
                             f"close-of-day price for {t} @ {as_of} failed: {exc}"
                         )
                         fresh[t] = None
+                # Before the mark: today's quote is on the post-split
+                # basis, so the share count has to be too.
+                self._apply_splits(portfolio, as_of, fresh)
                 portfolio.mark_to_market(fresh)
+                self._flag_unpriced(portfolio, fresh, as_of)
                 stamp = now_iso()
                 portfolio.last_updated = stamp
                 portfolio.last_close_run = stamp
@@ -818,7 +1073,12 @@ class DailyRunner:
                 portfolio.save(directory=self.portfolio_dir)
                 # Snapshot — no trades, just refreshed valuation.
                 try:
-                    snap = make_snapshot(portfolio, as_of=as_of, trades=[])
+                    # _market_shut said the session was open: say so,
+                    # which also clears a closed-session tag put on the
+                    # day by mistake.
+                    snap = make_snapshot(
+                        portfolio, as_of=as_of, trades=[], closed_session=False
+                    )
                     save_snapshot(snap)
                 except Exception as exc:
                     logger.warning(
@@ -911,12 +1171,19 @@ class DailyRunner:
             f"{as_of}: fundamentals available for "
             f"{sum(1 for v in fundamentals.values() if v is not None)}/{len(members)}"
         )
+        freshness = self._report_freshness(fundamentals, as_of)
 
         results: list[AgentRunResult] = []
         for adapter in self.adapters:
             try:
                 result = self._run_one(
-                    adapter, as_of, members, prices, fundamentals, force=force
+                    adapter,
+                    as_of,
+                    members,
+                    prices,
+                    fundamentals,
+                    force=force,
+                    freshness=freshness,
                 )
             except Exception as exc:
                 logger.error(f"{as_of}: {adapter.name} failed: {exc}")
@@ -965,7 +1232,9 @@ class DailyRunner:
         *,
         force: bool = False,
         run_type: RunType | None = None,
+        freshness: FundamentalsFreshness | None = None,
     ) -> AgentRunResult:
+        self._journal_failures[adapter.name] = 0
         portfolio = LivePortfolio.load_or_seed(
             adapter.name,
             directory=self.portfolio_dir,
@@ -1002,7 +1271,20 @@ class DailyRunner:
                 held_prices[pos.ticker] = self.price_loader.get_price_on(
                     pos.ticker, as_of
                 )
+        # ---- SPLITS: restate holdings before they are marked ----------
+        # The quotes just fetched are split-adjusted; a held line whose
+        # share count is not would be marked at half (or double) its
+        # value, and every weight, trim and buy below would act on that.
+        # A held name whose split lookup failed is unpriced for the whole
+        # run, not only for the mark: the scan, the buys and the
+        # rebalance read ``prices``. A copy, because that dict is shared
+        # by every agent.
+        split_unresolved: set[str] = set()
+        self._apply_splits(portfolio, as_of, held_prices, split_unresolved)
+        if split_unresolved:
+            prices = {**prices, **{t: None for t in split_unresolved}}
         portfolio.mark_to_market(held_prices)
+        self._flag_unpriced(portfolio, held_prices, as_of)
 
         # The agent sees what it owns. Without this every doctrine
         # inherited the same exit rule — "sold because you left today's
@@ -1034,15 +1316,28 @@ class DailyRunner:
         # machine". So every Council scan writes its would-be list, and
         # a rebalance run trades from whatever was written before today
         # rather than from the rank computed a second ago.
+        #
+        # §6 also makes E8 -- "left the rank" -- a quarterly rule: "Nothing
+        # else sells." So between rebalances a held name is kept unless
+        # the doctrine forced it out, and the rebalance itself sells by
+        # E8 only when it trades a cooled-off list (audit item 19: YELP,
+        # ZUMZ, CRTO, HOG, CLMB and NATR were sold mid-quarter on a
+        # daily re-rank). None for the eleven, who are not bound.
+        held_between_rebalances: set[str] | None = None
         if getattr(adapter, "honours_run_types", False):
             self._publish_would_be_list(adapter, scan, as_of)
+            rebalanced = False
             if is_rebalance_run(
                 as_of,
                 previous_run=_parse_date(portfolio.last_open_date),
                 last_rebalance=_parse_date(portfolio.last_rebalance_date),
             ):
-                scan = self._rebalance_from_published(adapter, scan, portfolio, as_of)
+                scan, rebalanced = self._rebalance_from_published(
+                    adapter, scan, portfolio, as_of
+                )
                 portfolio.last_rebalance_date = as_of.isoformat()
+            if not rebalanced:
+                held_between_rebalances = {p.ticker for p in portfolio.positions}
         if getattr(adapter, "honours_run_types", False) and not permissions_for(
             run_type
         ).may_open:
@@ -1055,6 +1350,32 @@ class DailyRunner:
                     f"{', '.join(sorted(t.ticker for t in refused))}"
                 )
             scan.targets = [t for t in scan.targets if t.ticker in held_now]
+
+        # ---- DOCTRINE EXITS: the strategy's own keep-or-sell ----------
+        # Audit SF-X1: no playbook's exit rule ever ran. The strategy may
+        # now say, per held name, keep or sell and why. In shadow — every
+        # agent's default — that verdict is journaled beside what the
+        # engine does and changes nothing below: `doctrine_keeps` and
+        # `doctrine_sells` stay empty, so the sell loop, the buys and the
+        # rebalance see exactly the scan they saw before.
+        exit_mode = getattr(adapter, "exit_mode", DEFAULT_EXIT_MODE)
+        held_at_open = {p.ticker.upper(): p for p in portfolio.positions}
+        verdicts = self._held_verdicts(
+            adapter.name, scan.exit_verdicts, held_at_open, as_of
+        )
+        # Whether the scan produced a target list at all, read before an
+        # enforced sell can take its own target out of it. Removing the
+        # doctrine's sells must not turn a real scan into the no-trade
+        # signal the empty-list guard below protects.
+        had_targets = bool(scan.targets)
+        listed_tickers = {t.ticker for t in scan.targets}
+        doctrine_keeps: set[str] = set()
+        doctrine_sells: set[str] = set()
+        if exit_mode == "enforce":
+            doctrine_keeps = {t for t, v in verdicts.items() if not v.sell}
+            doctrine_sells = {t for t, v in verdicts.items() if v.sell}
+            # A name the doctrine sells is not bought back the same day.
+            scan.targets = [t for t in scan.targets if t.ticker not in doctrine_sells]
 
         target_tickers = {t.ticker for t in scan.targets}
         trades: list[TradeRecord] = []
@@ -1080,13 +1401,40 @@ class DailyRunner:
         # wants no equities at all, which produces the same empty list a
         # failed scan does. The flag is how the two are told apart.
         going_flat = scan.flat_is_intentional
-        if scan.targets or forced_exits or going_flat:
+        if had_targets or forced_exits or going_flat:
             for pos in list(portfolio.positions):
                 # Forced first: a name can be both a current target and
                 # under a terminal filing, and the filing wins.
                 if pos.ticker in target_tickers and pos.ticker not in forced_exits:
                     continue
-                if not scan.targets and not going_flat and pos.ticker not in forced_exits:
+                if not had_targets and not going_flat and pos.ticker not in forced_exits:
+                    continue
+                # Enforced doctrine keep: the name left the list but its
+                # own exit rule has not fired. A terminal filing and an
+                # intentional flat still outrank it.
+                if (
+                    pos.ticker in doctrine_keeps
+                    and pos.ticker not in forced_exits
+                    and not going_flat
+                ):
+                    logger.info(
+                        f"{as_of}: {adapter.name} keeping {pos.ticker} — "
+                        f"doctrine: {verdicts[pos.ticker].reason}"
+                    )
+                    continue
+                # Between rebalances only a forced exit sells (§6). The
+                # name may have slipped in today's rank, but that is
+                # E8's question and E8 is asked once a quarter.
+                if (
+                    held_between_rebalances is not None
+                    and pos.ticker in held_between_rebalances
+                    and pos.ticker not in forced_exits
+                    and not going_flat
+                ):
+                    logger.info(
+                        f"{as_of}: {adapter.name} keeping {pos.ticker} — "
+                        "between rebalances only a forced exit sells"
+                    )
                     continue
                 # A name can leave the target list for a day because a
                 # price moved and it slipped a rank, then come straight
@@ -1144,12 +1492,35 @@ class DailyRunner:
                     continue
                 try:
                     trade = portfolio.sell(
-                        pos.ticker, price=price, cost_bps=self.cost_bps
+                        pos.ticker,
+                        price=price,
+                        cost_bps=self.cost_bps,
+                        commission=self.commission,
                     )
                     trades.append(trade)
-                    self._log_sell(adapter.name, pos, price, as_of)
+                    self._log_sell(
+                        adapter.name,
+                        pos,
+                        price,
+                        as_of,
+                        shares=trade.shares,
+                        verdict=verdicts.get(pos.ticker),
+                        exit_mode=exit_mode,
+                        left_list=pos.ticker not in listed_tickers,
+                    )
                 except LivePortfolioError as exc:
                     logger.warning(f"{as_of}: sell of {pos.ticker} failed: {exc}")
+
+        # Every verdict on a held name, beside what the engine did with
+        # it. In shadow this is the whole effect of the doctrine's exits.
+        self._journal_exit_verdicts(
+            adapter.name,
+            exit_mode,
+            verdicts,
+            held_at_open,
+            sold={t.ticker for t in trades if t.side == "SELL"},
+            as_of=as_of,
+        )
 
         # ---- BUYs: targets we don't yet hold --------------------------
         nav_after_sells = portfolio.total_nav
@@ -1162,22 +1533,46 @@ class DailyRunner:
         # feeds the rebalance pass — sizing and the band have to agree
         # on what a target weight is, or the band spends every run
         # trimming a position the sizing pass deliberately widened.
+        #
+        # The doctrine's own band and per-name cap (audit SF-X3, SF-X5).
+        # A doctrine that never trims still sizes its entries against
+        # the runner's band: overshooting a slot it will never trim back
+        # would be permanent.
+        band = band_for(adapter, default=self.rebalance_band)
+        max_weight = max_weight_for(adapter)
+        held_after_sells = frozenset(pos.ticker for pos in portfolio.positions)
+        listed = scan.targets
         scan.targets = reachable_targets(
             scan.targets,
             prices,
             nav_after_sells,
-            held=frozenset(pos.ticker for pos in portfolio.positions),
+            held=held_after_sells,
+            max_weight=max_weight,
+        )
+        # A held name with no quote today is off the sizing list but
+        # still in ``invested``; the posture keeps its weight.
+        posture = posture_targets(
+            listed, scan.targets, prices, held_after_sells, max_weight=max_weight
         )
         # Then decide the share count for every new name together, so
         # the remainder one slot cannot round up becomes a share in the
-        # slot that needs it most.
+        # slot that needs it most — out of the cash the doctrine means
+        # to deploy, not all of it (audit SF-X2: a 92% list ran the
+        # book to 99.96% invested).
         plan = plan_whole_share_buys(
             [t for t in scan.targets if not portfolio.has(t.ticker)],
             prices,
             nav_after_sells,
-            portfolio.cash,
+            deployable_cash(
+                posture,
+                nav=nav_after_sells,
+                invested=portfolio.invested,
+                cash=portfolio.cash,
+            ),
             cost_bps=self.cost_bps,
-            band=self.rebalance_band,
+            commission=self.commission,
+            band=self.rebalance_band if band is None else band,
+            max_weight=max_weight,
         )
         for target in scan.targets:
             if portfolio.has(target.ticker):
@@ -1200,11 +1595,13 @@ class DailyRunner:
                 # allocator has already said so and said why; repeating
                 # it per ticker here would log the same fact twice.
                 continue
-            # The plan is in shares; buy() takes dollars. One cent of
-            # headroom absorbs the float error in price × shares × cost
-            # without being able to buy an extra share of anything that
-            # trades above a cent.
-            target_dollars = want_shares * price * (1.0 + self.cost_bps) + 0.01
+            # The plan is in shares; buy() takes dollars, commission
+            # included. One cent of headroom absorbs the float error in
+            # price × shares × cost without being able to buy an extra
+            # share of anything that trades above a cent.
+            target_dollars = (
+                want_shares * price * (1.0 + self.cost_bps) + self.commission + 0.01
+            )
             if target_dollars > portfolio.cash:
                 target_dollars = portfolio.cash
             if target_dollars < MIN_TRADE_USD:
@@ -1222,6 +1619,7 @@ class DailyRunner:
                     why_en=target.why_en,
                     why_he=target.why_he,
                     cost_bps=self.cost_bps,
+                    commission=self.commission,
                 )
                 trades.append(trade)
                 self._log_buy(adapter.name, target, price, as_of)
@@ -1230,7 +1628,15 @@ class DailyRunner:
 
         # ---- REBALANCE: pull drifted holdings back toward target ------
         trades.extend(
-            self._rebalance(portfolio, scan.targets, prices, as_of, adapter.name)
+            self._rebalance(
+                portfolio,
+                scan.targets,
+                prices,
+                as_of,
+                adapter.name,
+                band=band,
+                posture=posture,
+            )
         )
 
         # Re-mark after trades and refresh weights.
@@ -1263,7 +1669,19 @@ class DailyRunner:
 
         # Persist a daily snapshot for History tab + Today's-activity.
         try:
-            snap = make_snapshot(portfolio, as_of=as_of, trades=trades)
+            snap = make_snapshot(
+                portfolio,
+                as_of=as_of,
+                trades=trades,
+                fundamentals_newest_filed=(
+                    freshness.newest_filed.isoformat()
+                    if freshness is not None and freshness.newest_filed is not None
+                    else None
+                ),
+                fundamentals_stale=None if freshness is None else freshness.stale,
+                # run() only gets here once _market_shut has said open.
+                closed_session=False,
+            )
             save_snapshot(snap)
         except Exception as exc:
             logger.warning(f"{as_of}: snapshot save for {adapter.name} failed: {exc}")
@@ -1298,6 +1716,7 @@ class DailyRunner:
             previous_watchlist=previous_watchlist,
             trades=trades,
             universe_size=scan.universe_size,
+            journal_failures=self._journal_failures.get(adapter.name, 0),
         )
 
     # ------------------------------------------------------------------
@@ -1333,12 +1752,15 @@ class DailyRunner:
         scan: ScanResult,
         portfolio: LivePortfolio,
         as_of: date,
-    ) -> ScanResult:
+    ) -> tuple[ScanResult, bool]:
         """Swap today's rank for the one published on an earlier run.
 
         With nothing published in time the book is held rather than
         traded: the fallback of "rank now, execute now" is the exact
         breach §7 forbids, and it would arrive looking like resilience.
+
+        Returns the scan and whether a published list was traded. Only
+        then does E8 sell anything; a skipped rebalance holds every name.
         """
         published = executable_list(self.published_dir, as_of=as_of)
         if published is None:
@@ -1348,7 +1770,7 @@ class DailyRunner:
             )
             held = {p.ticker for p in portfolio.positions}
             scan.targets = [t for t in scan.targets if t.ticker in held]
-            return scan
+            return scan, False
 
         logger.info(
             f"{as_of}: {adapter.name} rebalancing from the list published "
@@ -1386,7 +1808,7 @@ class DailyRunner:
                 )
             )
         scan.targets = rebalanced
-        return scan
+        return scan, True
 
     def _settle_dividends(self, portfolio: LivePortfolio, as_of: date) -> float:
         """Credit cash for every unpaid dividend on the current holdings.
@@ -1458,6 +1880,151 @@ class DailyRunner:
         # nothing, which is the assumption that hid this bug.
         return total
 
+    def _apply_splits(
+        self,
+        portfolio: LivePortfolio,
+        as_of: date,
+        prices: dict[str, float | None],
+        unresolved: set[str] | None = None,
+    ) -> list[SplitRecord]:
+        """Restate every holding for the stock splits since it was marked.
+
+        Audit item 22 / CE-5. The price cache is split-adjusted, the book
+        was not: on a 2:1 ex-date a line's quote halved while its share
+        count stayed put, so its value halved with nothing having
+        happened. Each split with an ex-date after the later of the
+        position's entry date and :attr:`LivePortfolio.split_floor_date`,
+        up to ``as_of``, is applied through
+        :meth:`LivePortfolio.apply_split` and journaled as a ``SPLIT``
+        row. A position bought on the ex-date is not split: it was bought
+        at the post-split price.
+
+        The floor is stamped on the first run that sees positions, at
+        the book's last mark (the later of its last open and close
+        dates, but no later than the day before ``as_of``, so today's
+        own ex-date is never below it), and never moved. Splits before it are ones the book
+        already priced through; restating them would rewrite history,
+        which is not a daily run's call. Splits after it are applied
+        even if the cache learns of them late, because the record of
+        applied ex-dates, not a date window, is what prevents a second
+        application.
+
+        Known limit: a split the cache learns of only after the ex-date
+        leaves the runs in between marking the old share count at the
+        new price, and anything they trade in that name on that wrong
+        weight (a rebalance top-up, bought at post-split prices) is then
+        split again when the event arrives. The morning fetch and the
+        close mark's refresh both read the ex-date's bar, so this needs
+        the vendor to omit the event from both.
+
+        A failed lookup leaves the share count alone and treats the name
+        as unpriced for this run: its entry in ``prices`` is set to None,
+        so the mark keeps the last close and nothing trades it on a quote
+        that may be on the post-split basis while the shares are not
+        (follow-up S1). It is said at ERROR and added to ``unresolved``
+        when the caller passes a set.
+        """
+        if not portfolio.positions:
+            return []
+        if not portfolio.split_floor_date:
+            marks = [
+                d[:10]
+                for d in (portfolio.last_open_date, portfolio.last_close_date)
+                if d
+            ]
+            # Never today: the lower bound is exclusive, so a floor of
+            # as_of would drop today's ex-date for good on a book an
+            # earlier run already marked today (the close mark of the
+            # deploy day, after an open run of the old code).
+            day_before = (as_of - timedelta(days=1)).isoformat()
+            portfolio.split_floor_date = (
+                min(max(marks), day_before) if marks else day_before
+            )
+        floor = portfolio.split_floor_date[:10]
+
+        applied: list[SplitRecord] = []
+        for pos in list(portfolio.positions):
+            ticker = pos.ticker
+            since = max(pos.entry_date[:10], floor)
+            try:
+                events = self.price_loader.splits_between(ticker, since, as_of)
+            except Exception as exc:
+                prices[ticker] = None
+                if unresolved is not None:
+                    unresolved.add(ticker)
+                logger.error(
+                    f"{as_of}: {portfolio.agent} split lookup {ticker} failed: "
+                    f"{exc}; held at its last mark and not traded this run"
+                )
+                continue
+            for i, (ex_date, ratio) in enumerate(events):
+                # Today's quote is on the basis after every split, so it
+                # can value only the last one's fraction; an earlier one
+                # is paid at the restated mark.
+                price = prices.get(ticker) if i == len(events) - 1 else None
+                try:
+                    record = portfolio.apply_split(
+                        ticker, ratio=ratio, ex_date=ex_date.isoformat(), price=price
+                    )
+                except LivePortfolioError as exc:
+                    # Only a vendor-error ratio is refused, and an
+                    # unapplied real split leaves the line misvalued.
+                    logger.error(f"{as_of}: split of {ticker} refused: {exc}")
+                    continue
+                if record is None:
+                    continue
+                applied.append(record)
+                logger.info(
+                    f"{as_of}: {portfolio.agent} {ticker} split "
+                    f"{_split_label(ratio)} (ex {ex_date}): "
+                    f"{record.shares_before:g} -> {record.shares_after:g} shares, "
+                    f"cash in lieu ${record.cash_in_lieu:,.2f}"
+                )
+                self._log_split(portfolio.agent, record, as_of)
+        return applied
+
+    def _log_split(self, agent: str, record: SplitRecord, as_of: date) -> None:
+        """Journal one applied split. Never fatal, said at WARNING."""
+        label = _split_label(record.ratio)
+        lieu = (
+            f"; {record.shares_before * record.ratio - record.shares_after:.4f} "
+            f"of a share paid as ${record.cash_in_lieu:,.2f} cash in lieu at "
+            f"${record.lieu_price:.2f}"
+            if record.cash_in_lieu
+            else ""
+        )
+        try:
+            self.decision_logger.log(
+                make_decision(
+                    ticker=record.ticker,
+                    decision="SPLIT",
+                    agent=agent,
+                    timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
+                    criteria_met=[f"{label} split, ex {record.ex_date}"],
+                    market_conditions={
+                        "corporate_action": "split",
+                        "ex_date": record.ex_date,
+                        "ratio": record.ratio,
+                        "shares_before": record.shares_before,
+                        "shares_after": record.shares_after,
+                        "entry_price_before": record.entry_price_before,
+                        "cash_in_lieu": round(record.cash_in_lieu, 2),
+                        "realized_pnl_usd": round(record.realized_pnl_usd, 2),
+                    },
+                    entry_price=record.entry_price_after,
+                    rationale=(
+                        f"{label} stock split: {record.shares_before:g} shares "
+                        f"became {record.shares_after:g}, entry "
+                        f"${record.entry_price_before:.2f} restated to "
+                        f"${record.entry_price_after:.2f}{lieu}"
+                    ),
+                )
+            )
+        except Exception as exc:
+            logger.warning(
+                f"{as_of}: split journal for {agent} {record.ticker} failed: {exc}"
+            )
+
     # ------------------------------------------------------------------
     def _rebalance(
         self,
@@ -1466,6 +2033,9 @@ class DailyRunner:
         prices: dict[str, float | None],
         as_of: date,
         agent: str,
+        *,
+        band: float | None,
+        posture: Sequence[LiveTarget] | None = None,
     ) -> list[TradeRecord]:
         """Pull holdings that drifted outside the band back to target.
 
@@ -1479,11 +2049,23 @@ class DailyRunner:
         that left is handled by the exit path. Trims are executed before
         adds so the cash from a trim is available to fund an add in the
         same pass.
+
+        ``band`` is the doctrine's (see :func:`band_for`). ``None`` never
+        trims: an overweight name is left to run, and an underweight one
+        is still topped up at the runner's band (audit SF-X3).
+
+        A position younger than ``min_holding_days`` is never trimmed;
+        it may still be added to (audit ENG-5).
+
+        ``posture`` is the list the ADD cap reads its Σ weights from (see
+        :func:`posture_targets`); ``None`` reads it from ``targets``.
         """
         if not targets:
             return []
 
-        band = self.rebalance_band
+        trims_allowed = band is not None
+        if band is None:
+            band = self.rebalance_band
         nav = portfolio.total_nav
         if nav <= 0:
             return []
@@ -1510,9 +2092,24 @@ class DailyRunner:
             if delta < MIN_TRADE_USD:
                 continue
             if drift > 0:
+                if not trims_allowed:
+                    # The doctrine lets a winner run (Lynch §6.4).
+                    continue
                 if delta < price:
                     # Less than one share of drift. Trimming would need a
                     # fraction, and leaving it is what a real book does.
+                    continue
+                # A trim is a sale, and the holding floor governs every
+                # sale, not only the exit (audit ENG-5: BAC trimmed at 7
+                # days, TTD at 11). Same rule as the exit path: below the
+                # floor hold, an unreadable entry date imposes no floor.
+                age = pos_age_days(pos, as_of)
+                if age is not None and age < self.min_holding_days:
+                    logger.info(
+                        f"{as_of}: {agent} leaving {target.ticker} over "
+                        f"target — held {age}d, floor is "
+                        f"{self.min_holding_days}d"
+                    )
                     continue
                 trims.append((target.ticker, price, delta / price))
             else:
@@ -1520,9 +2117,23 @@ class DailyRunner:
 
         out: list[TradeRecord] = []
         for ticker, price, shares in trims:
+            # sell() floors the same way, so this is the value it would
+            # trade, judged before the order rather than after it.
+            value = math.floor(shares) * price
+            if commission_dominates(value, commission=self.commission):
+                logger.info(
+                    f"{as_of}: {agent} leaving {ticker} over target — a "
+                    f"${value:,.2f} trim does not carry a "
+                    f"${self.commission:.2f} commission"
+                )
+                continue
             try:
                 fill = portfolio.sell(
-                    ticker, price=price, shares=shares, cost_bps=self.cost_bps
+                    ticker,
+                    price=price,
+                    shares=shares,
+                    cost_bps=self.cost_bps,
+                    commission=self.commission,
                 )
                 out.append(fill)
                 logger.info(f"{as_of}: {agent} trimmed {ticker} back to target")
@@ -1531,11 +2142,34 @@ class DailyRunner:
                 logger.warning(f"{as_of}: trim of {ticker} failed: {exc}")
 
         for ticker, price, dollars in adds:
-            spend = min(dollars, portfolio.cash * 0.99)
-            if spend < MIN_TRADE_USD or spend < price:
+            # The shortfall in position value plus the order's fee, so
+            # the commission does not come out of the shares that close
+            # the gap — but never past the doctrine's posture. Read per
+            # add, after the trims and any earlier add, so the room is
+            # what is left now (audit SF-X2).
+            room = deployable_cash(
+                targets if posture is None else posture,
+                nav=portfolio.total_nav,
+                invested=portfolio.invested,
+                cash=portfolio.cash,
+            )
+            spend = min(dollars + self.commission, portfolio.cash * 0.99, room)
+            # buy() floors the same way; this is the stock it would get.
+            add_shares = math.floor(
+                max(spend - self.commission, 0.0) / (price * (1.0 + self.cost_bps))
+            )
+            if spend < MIN_TRADE_USD or add_shares < 1:
                 # Under a share's price there is no trade to make, and
                 # the drift stays until the next run — which is correct:
                 # a band cannot be closed with less than one share.
+                continue
+            value = add_shares * price
+            if commission_dominates(value, commission=self.commission):
+                logger.info(
+                    f"{as_of}: {agent} leaving {ticker} under target — a "
+                    f"${value:,.2f} add does not carry a "
+                    f"${self.commission:.2f} commission"
+                )
                 continue
             try:
                 fill = portfolio.buy(
@@ -1546,6 +2180,7 @@ class DailyRunner:
                     why_en="",
                     why_he="",
                     cost_bps=self.cost_bps,
+                    commission=self.commission,
                 )
                 out.append(fill)
                 logger.info(f"{as_of}: {agent} added to {ticker} back to target")
@@ -1609,11 +2244,76 @@ class DailyRunner:
                 )
             )
         except Exception as exc:
-            logger.debug(f"decision log {decision} {fill.ticker} failed: {exc}")
+            self._journal_failed(agent, as_of, f"{decision} {fill.ticker}", exc)
+
+    def _journal_failed(
+        self, agent: str, as_of: date, row: str, exc: Exception
+    ) -> None:
+        """Say, and count, a journal row that could not be written.
+
+        Never fatal: the trade it describes already happened and the
+        book already holds it, so raising here would lose the book to
+        save the journal. But it was logged at DEBUG, below everything
+        the daily job prints, and 103 book changes reached the repo
+        with no journal row and nothing anywhere saying so (audit
+        RK-04). WARNING puts it in the run log; the count puts it on
+        the agent's result and the daily report.
+        """
+        self._journal_failures[agent] = self._journal_failures.get(agent, 0) + 1
+        logger.warning(
+            f"{as_of}: journal row {row} for {agent} NOT written: {exc}. "
+            f"The trade stands; the decision journal is missing it."
+        )
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _flag_unpriced(
+        self,
+        portfolio: LivePortfolio,
+        prices: dict[str, float | None],
+        as_of: date,
+    ) -> None:
+        """Flag every holding that has gone too long without a bar.
+
+        ``mark_to_market`` keeps the last close when no price arrives,
+        and the sell loop refuses to sell without one, both correctly.
+        Together they left LEG — acquired 2026-08-26 — in Klarman's book
+        at its last close for 78 days with nothing anywhere saying so
+        (audit CE-1a). Now the position carries ``unpriced_since`` and
+        the run says so at ERROR, every run, until a bar returns or the
+        holding is settled by hand. NAV is not touched: what a holding
+        with no market is worth needs evidence, not a default.
+
+        A fresh price clears the flag. The bar date comes from the
+        price cache, which is what the post-run verifier reads too.
+        """
+        for pos in portfolio.positions:
+            price = prices.get(pos.ticker)
+            if price is not None and price > 0:
+                if pos.unpriced_since:
+                    logger.info(
+                        f"{as_of}: {portfolio.agent} {pos.ticker} priced again "
+                        f"after being unpriced since {pos.unpriced_since}"
+                    )
+                pos.unpriced_since = ""
+                continue
+            cached = self.price_loader.cached_range(pos.ticker)
+            last_bar = cached[1] if cached is not None else None
+            since = unpriced_since_for(
+                last_bar, as_of=as_of, entry_date=pos.entry_date
+            )
+            if not since:
+                continue
+            pos.unpriced_since = since
+            logger.error(
+                f"{as_of}: {portfolio.agent} holds {pos.ticker} UNPRICED since "
+                f"{since} (last bar {last_bar or 'never'}); carried at its last "
+                f"mark ${pos.current_price:.2f} x {pos.shares:g} sh. It cannot "
+                f"be sold without a price - settle it from the filings "
+                f"(scripts/settle_cash_merger.py for a cash deal)."
+            )
+
     def _fetch_prices(
         self, tickers: list[str], as_of: date
     ) -> dict[str, float | None]:
@@ -1625,6 +2325,39 @@ class DailyRunner:
                 logger.warning(f"price fetch {t} @ {as_of} failed: {exc}")
                 out[t] = None
         return out
+
+    def _report_freshness(
+        self,
+        fundamentals: dict[str, PointInTimeFinancials | None],
+        as_of: date,
+    ) -> FundamentalsFreshness:
+        """Say how old the filings this scan read are (audit FUND-2).
+
+        Logged at ERROR when past the limit, and recorded on every
+        book's snapshot by ``_run_one``. Never halts: the corpus was
+        stale the day this shipped, and stopping on it is an owner
+        decision this check does not take.
+        """
+        freshness = assess_freshness(fundamentals, as_of)
+        if freshness.stale:
+            newest = (
+                f"the newest filing read is {freshness.newest_filed} "
+                f"({freshness.age_days} days old)"
+                if freshness.newest_filed is not None
+                else "no member's fundamentals could be read"
+            )
+            logger.error(
+                f"{as_of}: fundamentals are stale — {newest}, over the "
+                f"{freshness.max_age_days}-day limit. Trading continues on "
+                f"them; check the Refresh EDGAR cache workflow and the "
+                f"filing list the loader reads (audit FUND-2)."
+            )
+        else:
+            logger.info(
+                f"{as_of}: newest filing read is {freshness.newest_filed} "
+                f"({freshness.age_days} days old)"
+            )
+        return freshness
 
     def _load_fundamentals(
         self, tickers: list[str], as_of: date
@@ -1656,32 +2389,158 @@ class DailyRunner:
                 )
             )
         except Exception as exc:
-            logger.debug(f"decision log BUY {target.ticker} failed: {exc}")
+            self._journal_failed(agent, as_of, f"FILL {target.ticker}", exc)
+
+    def _held_verdicts(
+        self,
+        agent: str,
+        verdicts: list[ExitVerdict],
+        held: dict[str, Position],
+        as_of: date,
+    ) -> dict[str, ExitVerdict]:
+        """The verdicts that are about a name the book holds, by ticker.
+
+        A verdict on anything else has no position to keep or sell and
+        is dropped with a warning rather than journaled as if it did.
+        """
+        out: dict[str, ExitVerdict] = {}
+        for verdict in verdicts:
+            ticker = verdict.ticker.upper()
+            if ticker not in held:
+                logger.warning(
+                    f"{as_of}: {agent} gave an exit verdict on {ticker}, "
+                    f"which the book does not hold — ignored"
+                )
+                continue
+            out[ticker] = verdict
+        return out
+
+    def _journal_exit_verdicts(
+        self,
+        agent: str,
+        exit_mode: str,
+        verdicts: dict[str, ExitVerdict],
+        held: dict[str, Position],
+        *,
+        sold: set[str],
+        as_of: date,
+    ) -> None:
+        """Write each doctrine verdict beside the engine's action.
+
+        One row per held name the doctrine spoke about: SELL or HOLD
+        for the doctrine's call, its reason, the mode, and whether the
+        engine sold or kept the name. Reading the shadow weeks back is
+        a filter on ``engine_action`` against ``decision``.
+
+        Never fatal. The trades already happened; a lost journal costs
+        the comparison, not money, and is said at WARNING.
+        """
+        for ticker, verdict in sorted(verdicts.items()):
+            pos = held[ticker]
+            action = "sold" if ticker in sold else "kept"
+            try:
+                self.exit_verdict_logger.log(
+                    make_decision(
+                        ticker=ticker,
+                        decision="SELL" if verdict.sell else "HOLD",
+                        agent=agent,
+                        timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
+                        criteria_met=[verdict.reason],
+                        market_conditions={
+                            "exit_mode": exit_mode,
+                            "engine_action": action,
+                        },
+                        entry_price=pos.entry_price,
+                        exit_trigger=verdict.reason if verdict.sell else None,
+                        rationale=(
+                            f"Doctrine said {'sell' if verdict.sell else 'keep'} "
+                            f"({verdict.reason}); the engine {action} it "
+                            f"[{exit_mode}]"
+                        ),
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"{as_of}: doctrine exit journal for {agent} {ticker} "
+                    f"failed: {exc}"
+                )
 
     def _log_sell(
-        self, agent: str, pos: Position, price: float, as_of: date
+        self,
+        agent: str,
+        pos: Position,
+        price: float,
+        as_of: date,
+        *,
+        shares: float,
+        verdict: ExitVerdict | None = None,
+        exit_mode: str = DEFAULT_EXIT_MODE,
+        left_list: bool = True,
     ) -> None:
+        # ``shares`` is the fill's, not the position's: the row records
+        # what left the book, as ``_log_rebalance`` does (audit RK-05:
+        # ADD and TRIM named their shares and EXIT never did). Appended
+        # after the percentage so the "entry $X, exit $Y" prefix that
+        # the backfill and the dashboard read is unchanged.
+        # The reason this row gives. With no doctrine verdict it is the
+        # one it always was. When the doctrine called the sale, its rule
+        # comes first and becomes the row's exit_trigger (audit SF-X1:
+        # 823 of 823 exits had none); the list exit is kept beside it
+        # only if the name did leave the list. A doctrine that wanted to
+        # keep the name is recorded too, so a shadow sale it opposed is
+        # visible on the row that made it.
+        criteria = ["left today's target list"]
+        trigger: str | None = None
+        conditions: dict[str, str] = {}
+        if verdict is not None:
+            conditions = {
+                "doctrine_exit_mode": exit_mode,
+                "doctrine_verdict": "sell" if verdict.sell else "keep",
+                "doctrine_reason": verdict.reason,
+            }
+            if verdict.sell:
+                trigger = verdict.reason
+                criteria = [verdict.reason] + (
+                    ["left today's target list"] if left_list else []
+                )
         try:
             self.decision_logger.log(
                 make_decision(
                     ticker=pos.ticker,
-                    # EXIT, not SELL — this is the executed disposal, and
-                    # the trigger is a real one: the name left today's
-                    # target list. Recording it as "SELL" made a
-                    # mechanical rotation look like a doctrine decision.
+                    # EXIT, not SELL — this is the executed disposal.
+                    # Recording it as "SELL" made a mechanical rotation
+                    # look like a doctrine decision.
                     decision="EXIT",
                     agent=agent,
                     timestamp=f"{as_of.isoformat()}T00:00:00+00:00",
-                    criteria_met=["left today's target list"],
+                    criteria_met=criteria,
+                    market_conditions=conditions,
+                    exit_trigger=trigger,
                     rationale=(
                         f"Closed live position: entry ${pos.entry_price:.2f}, "
-                        f"exit ${price:.2f} ({(price/pos.entry_price - 1)*100:+.2f}%)"
+                        f"exit ${price:.2f} ({(price/pos.entry_price - 1)*100:+.2f}%), "
+                        f"sold {_shares_label(shares)} shares"
                     ),
                     entry_price=pos.entry_price,
                 )
             )
         except Exception as exc:
-            logger.debug(f"decision log SELL {pos.ticker} failed: {exc}")
+            self._journal_failed(agent, as_of, f"EXIT {pos.ticker}", exc)
+
+
+def _shares_label(shares: float) -> str:
+    """``10.0`` -> ``"10"``; a legacy fractional line keeps its fraction.
+
+    Six places, the precision the book and the ledger store shares at,
+    with trailing zeros dropped so a whole-share sale reads as one.
+    """
+    return f"{shares:.6f}".rstrip("0").rstrip(".")
+
+
+def _split_label(ratio: float) -> str:
+    """``2.0`` -> ``"2-for-1"``, ``1.5`` -> ``"3-for-2"``, ``0.1`` -> ``"1-for-10"``."""
+    frac = Fraction(ratio).limit_denominator(1000)
+    return f"{frac.numerator}-for-{frac.denominator}"
 
 
 __all__ = [

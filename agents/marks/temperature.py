@@ -56,6 +56,7 @@ for being *bad* is what breaks it.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -83,6 +84,11 @@ def _posture_for(score: float) -> Posture:
     if score < 4.0:
         return "Warm"
     return "Hot"
+
+
+def posture_for_score(score: float) -> Posture:
+    """The posture a composite score reads as on its own, with no history."""
+    return _posture_for(score)
 
 
 # ---- Per-signal voting functions ------------------------------------------
@@ -176,6 +182,10 @@ class TemperatureAssessment:
     posture: Posture
     signals: TemperatureSignals
     votes: dict[str, int]
+    #: What ``score`` reads as on its own, when :func:`settle_posture`
+    #: kept a different ``posture``; None when the two are the same
+    #: reading (no history was consulted, or it agreed).
+    measured_posture: Posture | None = None
 
 
 # ---- Universe-stat helpers -----------------------------------------------
@@ -337,6 +347,91 @@ def assess_market_temperature(
     )
 
 
+# ---- Posture persistence (audit item 21) ----------------------------------
+#: Sessions a newly measured posture must hold, today included, before
+#: the agent acts on it.
+#:
+#: The composite is a sum of five integer votes, and the Cool/Neutral
+#: edge sits at -1.5 — so one signal moving one notch is enough to cross
+#: it. From 2026-08-05 to 2026-11-13 the live score alternated between
+#: -1 and -2 and the posture flipped Cool<->Neutral 8 times, each flip
+#: resizing the book between 22 names at 90% and 18 at 80%, with the
+#: 30-day floor keeping the previous posture's names on top.
+#:
+#: A score band cannot fix that: the scores are whole numbers, so a band
+#: narrower than one vote changes nothing and one a full vote wide
+#: swallows both -1 and -2 and never leaves whichever posture it started
+#: in. Persistence does what the playbook asks of the pendulum — read
+#: where it is, not where one day's filings nudged it. Three sessions is
+#: the shortest run that absorbs every one- and two-session excursion in
+#: that series (8 flips become 3) while still following the three-
+#: session moves; the playbook gives no number.
+POSTURE_PERSISTENCE_SESSIONS = 3
+
+_POSTURE_ORDER: dict[Posture, int] = {
+    "Cold": 0,
+    "Cool": 1,
+    "Neutral": 2,
+    "Warm": 3,
+    "Hot": 4,
+}
+
+
+@dataclass(frozen=True)
+class PostureReading:
+    """One past session: the raw composite and the posture acted on."""
+
+    as_of: date
+    score: float
+    posture: Posture
+
+
+def settle_posture(
+    measured: Posture,
+    as_of: date,
+    history: Sequence[PostureReading],
+    *,
+    sessions: int = POSTURE_PERSISTENCE_SESSIONS,
+) -> Posture:
+    """The posture to act on at ``as_of``, given what was held before.
+
+    ``history`` is the agent's past sessions; readings on or after
+    ``as_of`` are ignored (a second run on the same day must not count
+    itself), and of several readings on one day the last is kept.
+
+    With no earlier session the measurement stands. Otherwise the held
+    posture (the latest session's) stands until the measured posture —
+    each past session's re-read from its score, plus today's — has sat
+    on the same side of it for ``sessions`` sessions running. The move
+    then goes only as far as every one of those sessions agrees: held
+    Neutral and measured Cool, Cold, Cold settles on Cool.
+    """
+    if sessions < 1:
+        raise ValueError(f"sessions must be at least 1; got {sessions}")
+    by_day: dict[date, PostureReading] = {}
+    for reading in history:
+        if reading.as_of < as_of:
+            by_day[reading.as_of] = reading
+    if not by_day:
+        return measured
+    prior = [by_day[d] for d in sorted(by_day)]
+    held = prior[-1].posture
+    if measured == held:
+        return measured
+    needed = sessions - 1
+    recent = prior[len(prior) - needed:] if needed else []
+    if len(recent) < needed:
+        return held
+    run = [_posture_for(r.score) for r in recent] + [measured]
+    anchor = _POSTURE_ORDER[held]
+    colder = _POSTURE_ORDER[measured] < anchor
+    for p in run:
+        rank = _POSTURE_ORDER[p]
+        if rank == anchor or (rank < anchor) != colder:
+            return held
+    return min(run, key=lambda p: abs(_POSTURE_ORDER[p] - anchor))
+
+
 # ---- Posture → deployment intensity ---------------------------------------
 @dataclass(frozen=True)
 class PostureProfile:
@@ -369,10 +464,14 @@ def profile_for(posture: Posture) -> PostureProfile:
 
 
 __all__ = [
+    "POSTURE_PERSISTENCE_SESSIONS",
     "Posture",
     "PostureProfile",
+    "PostureReading",
     "TemperatureAssessment",
     "TemperatureSignals",
     "assess_market_temperature",
+    "posture_for_score",
     "profile_for",
+    "settle_posture",
 ]

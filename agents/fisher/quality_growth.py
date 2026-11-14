@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from agents.market_core.shares import market_cap_at
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -36,11 +37,13 @@ from core.backtest.strategy_runner import (
     Strategy,
 )
 from core.data.edgar_cache import EdgarCache
+from core.live.doctrine_exits import ExitVerdict, guarded_verdicts
 from core.llm.concurrency import analyze_all
 from core.llm.held_context import portfolio_state_for
 from core.llm.mode import LLMMode
 from core.logger import get_logger
 
+from . import exits as fisher_exits
 from .filters import (
     DEFAULT_MAX_DE,
     DEFAULT_MIN_MARKET_CAP_USD,
@@ -122,6 +125,11 @@ class PhilipFisher(Strategy):
         self.decision_logger = decision_logger
         self.selection_history: list[FisherSelection] = []
         self.last_memos: list[FisherMemo] = []
+        #: Playbook §7's keep-or-sell verdict on each held name from the
+        #: last ``select`` (audit SF-X1); see :mod:`agents.fisher.exits`.
+        #: Read by the live adapter and journaled. The weights ``select``
+        #: returns do not depend on it.
+        self.last_exit_decisions: list[ExitVerdict] = []
 
     def select(
         self,
@@ -136,6 +144,18 @@ class PhilipFisher(Strategy):
             f"{as_of}: starting Fisher quality-growth scan over "
             f"{len(universe)} candidates"
         )
+        # First, so it is published even when nothing qualifies today —
+        # an empty screen is when a held name's verdict matters most.
+        self.last_exit_decisions = guarded_verdicts(
+            self.name,
+            lambda: fisher_exits.verdicts(
+                held,
+                fundamentals,
+                cache=self.edgar_cache,
+                as_of=as_of,
+                max_de=self.max_de,
+            ),
+        )
 
         triples: list[
             tuple[PointInTimeFinancials | None, float | None, float | None]
@@ -143,7 +163,7 @@ class PhilipFisher(Strategy):
         for ticker in universe:
             fin = fundamentals.get(ticker)
             price = prices.get(ticker)
-            mcap = self._market_cap(fin, price)
+            mcap = self._market_cap(ticker, as_of, fin, price)
             triples.append((fin, mcap, price))
 
         with_data = sum(1 for fin, _, _ in triples if fin is not None)
@@ -224,15 +244,23 @@ class PhilipFisher(Strategy):
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
-    @staticmethod
     def _market_cap(
-        fin: PointInTimeFinancials | None, price: float | None
+        self,
+        ticker: str,
+        as_of: date,
+        fin: PointInTimeFinancials | None,
+        price: float | None,
     ) -> float | None:
-        if fin is None or fin.shares_outstanding is None:
+        """Price times the newest split-adjusted share count (audit FUND-5).
+
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
+        """
+        if fin is None:
             return None
-        if price is None or price <= 0:
-            return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _llm_filter(
         self,

@@ -217,6 +217,11 @@ const RATIONALE_RULES: Rule[] = [
   // the price never arrives; the sign and the group each need their
   // own token. `$3` carries no sign and so was never affected, which
   // is why only the money went missing.
+  // The same row since audit RK-05, which appended the shares sold.
+  {
+    re: /^Closed live position: entry \$([\d.]+), exit \$([\d.]+) \(([+\-−][\d.]+)%\), sold ([\d.]+) shares$/,
+    he: "סגירת פוזיציה חיה: כניסה ‎$$$1, יציאה ‎$$$2 ($3%), נמכרו $4 מניות",
+  },
   {
     re: /^Closed live position: entry \$([\d.]+), exit \$([\d.]+) \(([+\-−][\d.]+)%\)$/,
     he: "סגירת פוזיציה חיה: כניסה ‎$$$1, יציאה ‎$$$2 ($3%)",

@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from agents.market_core.shares import market_cap_at
 from core.backtest.decision_logger import DecisionLogger, make_decision
 from core.backtest.point_in_time import PointInTimeFinancials
 from core.backtest.strategy_runner import (
@@ -33,6 +34,7 @@ from core.backtest.strategy_runner import (
     PriceLookup,
     Strategy,
 )
+from core.data.edgar_cache import EdgarCache
 from core.logger import get_logger
 
 from .exits import DEFAULT_HOLDING_PERIOD_DAYS, build_targets
@@ -71,6 +73,9 @@ class MagicFormula(Strategy):
             playbook's retirement-account guidance).
         earnings_recency_days: Reject stocks whose filing landed within
             this many days of the rebalance.
+        edgar_cache: EDGAR XBRL cache the market cap's share count is
+            read from, restated into the split-adjusted price's units.
+            Without it the filed count is used as-is (audit FUND-5).
     """
 
     name = "greenblatt_magic_formula"
@@ -82,6 +87,7 @@ class MagicFormula(Strategy):
         min_market_cap: float = DEFAULT_MIN_MARKET_CAP_USD,
         earnings_recency_days: int = 7,
         holding_period_days: int = DEFAULT_HOLDING_PERIOD_DAYS,
+        edgar_cache: EdgarCache | None = None,
         decision_logger: DecisionLogger | None = None,
     ) -> None:
         if portfolio_size <= 0:
@@ -92,6 +98,7 @@ class MagicFormula(Strategy):
         self.min_market_cap = min_market_cap
         self.earnings_recency_days = earnings_recency_days
         self.holding_period_days = holding_period_days
+        self.edgar_cache = edgar_cache
         self.decision_logger = decision_logger
         self.selection_history: list[MagicFormulaSelection] = []
 
@@ -126,7 +133,8 @@ class MagicFormula(Strategy):
         candidates: list[tuple[PointInTimeFinancials | None, float | None]] = []
         for ticker in universe:
             fin = fundamentals.get(ticker)
-            mcap = self._market_cap(ticker, fin, prices)
+            price = prices.get(ticker) if fin is not None else None
+            mcap = self._market_cap(ticker, as_of, fin, price)
             candidates.append((fin, mcap))
 
         with_data = sum(1 for fin, _ in candidates if fin is not None)
@@ -189,9 +197,18 @@ class MagicFormula(Strategy):
         )
         if self.decision_logger is not None:
             self._log_decisions(as_of, top, scores, prices)
+        # ``top`` is empty when every chosen slot is a protected holding
+        # that did not score; indexing it raised IndexError and cost the
+        # agent the run (audit RK-08, 2026-11-12).
+        best = (
+            f"top combined rank: {top[0].combined_rank}, "
+            f"top EY: {top[0].earnings_yield:.4f}"
+            if top
+            else "none scored today"
+        )
         logger.info(
-            f"{as_of}: selected {len(top)} stocks "
-            f"(top combined rank: {top[0].combined_rank}, top EY: {top[0].earnings_yield:.4f})"
+            f"{as_of}: selected {len(top)} scored + {len(unscored)} protected "
+            f"unscored stocks ({best})"
         )
         return weights
 
@@ -257,25 +274,23 @@ class MagicFormula(Strategy):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    @staticmethod
     def _market_cap(
+        self,
         ticker: str,
+        as_of: date,
         fin: PointInTimeFinancials | None,
-        prices: PriceLookup,
+        price: float | None,
     ) -> float | None:
-        """Compute market cap = price × shares outstanding.
+        """Price times the newest split-adjusted share count (audit FUND-5).
 
-        The price lookup returns the most recent price on or before the
-        rebalance date; shares outstanding comes from the most recent
-        filing as of the same date — this is the genuinely PIT-correct
-        market cap.
+        See :func:`~agents.market_core.shares.market_cap_at`: the price is
+        split-adjusted, so the filed count is restated into its units.
         """
-        if fin is None or fin.shares_outstanding is None:
+        if fin is None:
             return None
-        price = prices.get(ticker)
-        if price is None or price <= 0:
-            return None
-        return price * fin.shares_outstanding
+        return market_cap_at(
+            self.edgar_cache, ticker, as_of, price, fin.shares_outstanding
+        )
 
     def _record(
         self,

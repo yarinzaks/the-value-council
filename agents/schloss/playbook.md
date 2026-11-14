@@ -313,6 +313,10 @@ For the agent:
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Schloss's verdict (`agents/schloss/exits.py`) is computed for every held name against tangible book, in this order: §7.2 deterioration — debt above 100% of equity, or tangible book no longer positive — sells at any price; price above 1.2x tangible book sells; a gain of 40% or more from cost sells unless the name is still at 0.8x tangible book or under (§7.3's "significantly below book", read as the entry discount), in which case it is kept. Anything else is a keep, even off the day's list; a price decline or a loss year is never a sell. Not computed: the 50-75% trim (a verdict is keep or sell, so the gain target is a whole-position sell), a 30% decline in book short of losing all of it (the book value at entry is not carried), and business-model breaks or fraud.
+
 Schloss had a clear, simple, consistent exit framework — different from any other Council member.
 
 ### 7.1 Primary exit trigger: ~50% gain

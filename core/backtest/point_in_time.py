@@ -365,7 +365,35 @@ CREATE TABLE IF NOT EXISTS financials (
 #
 # 2: sic_code populated from the bundled SEC map (was always None).
 # 3: goodwill and intangible_assets, for tangible common equity.
-_PAYLOAD_VERSION = 3
+# 4: total_debt reads lease-inclusive and per-instrument debt elements
+#    (audit FUND-4); v3 rows hold total_debt=None for e.g. FISV and HRI.
+# 5: balance-sheet fields take the newest instant instead of preferring
+#    the last 10-K (audit FUND-6); v4 rows stored under a 10-Q accession
+#    hold that 10-K's balance sheet, CALM's three quarters old.
+# 6: total_debt prefers complete debt shapes over newer one-sided ones,
+#    reads instrument lines when long-term debt is zero, and takes one
+#    figure per overlapping notes group; v5 rows can hold a lower total.
+# 7: senior and convertible notes are summed against NotesPayable rather
+#    than capped by the larger family, a zero DebtAndCapitalLeaseObligations
+#    reaches the instrument fallback, and a newer larger one-sided shape
+#    beats an older complete one; v6 rows can hold a lower total.
+# 8: the LongTermDebt and lease-inclusive families are ranked by
+#    completeness before recency, and a one-sided long-term reading no
+#    longer blocks the instrument fallback; v7 rows can hold a lower total.
+# 9: a LongTermDebt split is dated by its oldest half, a same-date tie
+#    keeps the larger total, and disjoint one-sided halves (across the
+#    two families, or against the instrument lines) are summed instead
+#    of one replacing the other; v8 rows can hold a lower total.
+# 10: instrument lines are split by half, so the current part of a
+#     complete or mixed instrument reading is added to a noncurrent-only
+#     total (and the reverse) instead of being lost in a max, and a larger
+#     one-sided LongTermDebt reading keeps the other half of a same-date
+#     lease split; v9 rows can hold a lower total.
+# 11: the LongTermDebt and lease-inclusive readings are combined half by
+#     half (a complete reading no longer hides a larger one-sided reading
+#     of the same balance sheet), and that combination keeps its halves
+#     when instrument lines are added; v10 rows can hold a lower total.
+_PAYLOAD_VERSION = 11
 _VERSION_KEY = "_payload_version"
 
 
@@ -379,6 +407,9 @@ class PointInTimeLoader:
     ) -> None:
         self._adapter = adapter or EdgartoolsAdapter()
         self._cache_path = cache_path or DEFAULT_CACHE_PATH
+        # Filing lists already read from a local-cache adapter in this
+        # loader's lifetime. See list_filings.
+        self._listed: dict[tuple[str, tuple[str, ...]], list[FilingMetadata]] = {}
         self._cache_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
@@ -476,8 +507,29 @@ class PointInTimeLoader:
         form_types: tuple[str, ...] = ("10-K", "10-Q"),
         force_refresh: bool = False,
     ) -> list[FilingMetadata]:
-        """Return all known filings for ticker — from cache when possible."""
+        """Return all known filings for ticker — from cache when possible.
+
+        An adapter that reads a local cache (``lists_locally = True``,
+        as :class:`~core.data.fundamentals_fetcher.CachedEdgarAdapter`
+        does) is asked once per ticker per loader, and its answer is the
+        answer. The stored list is not consulted for it, because that
+        list never expires: ``edgar_filings.sqlite`` rides between daily
+        runs in the price cache, so a ticker listed once was listed the
+        same way on every later run however many filings the refreshed
+        parquet had gained (audit FUND-2). Asking costs a parquet read
+        the payload parse needed anyway, and nothing on the network.
+
+        Every other adapter keeps the stored list, which is what lets a
+        network-backed one run offline.
+        """
         ticker = ticker.upper()
+        if getattr(self._adapter, "lists_locally", False):
+            key = (ticker, form_types)
+            if force_refresh or key not in self._listed:
+                filings = self._adapter.list_filings(ticker, form_types=form_types)
+                self._store_filings(filings)
+                self._listed[key] = filings
+            return list(self._listed[key])
         if not force_refresh:
             cached = self._cached_filings(ticker)
             if cached:

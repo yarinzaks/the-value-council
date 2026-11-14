@@ -90,7 +90,10 @@ export type DecisionKind =
   | "TRIM"
   | "ADD"
   | "FILL"
-  | "EXIT";
+  | "EXIT"
+  /** A stock split the runner applied to a holding — a corporate
+   *  action, not anyone's decision (audit item 22). */
+  | "SPLIT";
 
 export interface DecisionRow {
   ticker: string;
@@ -171,6 +174,11 @@ export interface LivePosition {
   weight_pct: number;
   why_en: string;
   why_he: string;
+  /** First session with no bar, once the name has gone more than five
+   *  sessions without one; empty while it prices. The mark is then the
+   *  last close and nothing newer (audit CE-1a). Optional: absent from
+   *  every file written before the field existed. */
+  unpriced_since?: string;
 }
 
 export interface LiveWatchEntry {
@@ -236,6 +244,13 @@ export interface DailySnapshot {
   buys: string[];
   sells: string[];
   trade_count: number;
+  /** Newest filing the open scan read for any universe member (audit
+   *  FUND-2). Absent/null when not measured: files written before the
+   *  field existed; also null when the scan read no fundamentals. */
+  fundamentals_newest_filed?: string | null;
+  /** True when that filing was over 120 days old, or none was read. The
+   *  run traded regardless. Absent/null when not measured. */
+  fundamentals_stale?: boolean | null;
 }
 
 export interface AgentDailyDelta {

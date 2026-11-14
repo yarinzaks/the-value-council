@@ -383,6 +383,10 @@ Marks's signature concept: diversification across **cycle exposures**, not just 
 
 ## 7. Exit Rules
 
+> **Execution status (audit SF-X1):** exits run in shadow until enforced. This section's verdict is journaled beside what the engine did (`data/doctrine_exits/`, see `core/live/doctrine_exits.py`) but does not itself sell or keep a name; the engine sells when a name drops off the day's target list, after a 30-day floor.
+>
+> Marks's verdict (`agents/marks/exits.py`) is computed for every held name against the cycle the day's temperature assessment measured. The agent computes no intrinsic value, so fair value is the entry screen's own value line: the price at which the name's earnings yield falls to the posture's floor below which the screen ranks nothing (Cold 4.0%, Cool 4.5%, Neutral 5.0%, Warm 5.5%, Hot 6.5% — 25x down to 15.4x EPS). "Cycle hot" (trigger 1, §7.2) and "positioned for reversion" (trigger 2) are read as a Warm or Hot posture. In order: trigger 4, the thesis breaks — book equity no longer positive, a full-year loss, or D/E above the gates' 1.0 (unreported debt is not a breach) — sells at any price; at or past 100% of fair value with the cycle Warm or Hot, §7.2's full exit, sells. At or past 100% in a Neutral or colder cycle is a keep naming the second 25% trim; from 80% (the playbook gives "approaches" no number; this is Klarman's) to 100% is a keep naming the first 25% trim; below 80% is a keep, whose reason names trigger 1's trim when the cycle is Warm or Hot. Neither trim is executed — a verdict is keep or sell. A price decline is never a sell. No verdict when no thesis break fired and the fundamentals, the price, a positive EPS or a measured market is missing. Not computed: the trims, §7.2's add on a further drop, trigger 3 (a better opportunity weighs a candidate against a holding), and thesis breaks read from text; the LLM memo's `scaling_out_plan` is not read.
+
 Marks's exit framework integrates **cycle position** and **fundamental valuation**.
 
 ### 7.1 The four legitimate sell triggers
