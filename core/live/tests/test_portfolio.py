@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 
 import pytest
+from loguru import logger as loguru_logger
 
 from core.live.portfolio import (
     DEFAULT_COMMISSION_USD,
@@ -19,6 +22,23 @@ from core.live.portfolio import (
     now_iso,
     unpriced_since_for,
 )
+
+
+@contextmanager
+def _logged(level: str) -> Iterator[list[str]]:
+    """What the project's loguru logger wrote at ``level`` or above.
+
+    ``caplog`` cannot see loguru, which does not propagate to stdlib
+    logging; a sink can.
+    """
+    messages: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: messages.append(m.record["message"]), level=level
+    )
+    try:
+        yield messages
+    finally:
+        loguru_logger.remove(sink_id)
 
 
 # ---------------------------------------------------------------------------
@@ -942,6 +962,105 @@ class TestApplySplit:
 
         loaded.sell("NVDA", price=60.0)
         assert loaded.applied_splits == {}
+
+    @pytest.mark.parametrize("ratio", [1000.0, 100.5, 0.0001, 1 / 600])
+    def test_an_implausible_ratio_is_refused_and_nothing_moves(
+        self, ratio: float
+    ) -> None:
+        # A vendor glitch of 1000:1 would rewrite the line for good: the
+        # next day's quote then "confirms" the inflated share count.
+        p = self._book()
+        before = p.to_dict()
+
+        with pytest.raises(LivePortfolioError, match="outside"):
+            p.apply_split("NVDA", ratio=ratio, ex_date="2026-08-05", price=60.0)
+
+        assert p.to_dict() == before
+        assert p.applied_splits == {}
+        assert p.applied_split_ratios == {}
+
+    @pytest.mark.parametrize("ratio", [100.0, 1 / 500])
+    def test_the_range_bounds_themselves_are_accepted(self, ratio: float) -> None:
+        p = self._book(shares=1_000.0)
+
+        rec = p.apply_split("NVDA", ratio=ratio, ex_date="2026-08-05", price=1.0)
+
+        assert rec is not None
+
+    def test_the_applied_ratio_is_recorded_and_round_trips(
+        self, tmp_path: Path
+    ) -> None:
+        p = self._book()
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+        assert p.applied_split_ratios == {"NVDA": {"2026-08-05": 2.0}}
+        p.save(directory=tmp_path)
+
+        loaded = LivePortfolio.load_or_seed("t", directory=tmp_path)
+        assert loaded.applied_split_ratios == {"NVDA": {"2026-08-05": 2.0}}
+
+        loaded.sell("NVDA", price=60.0)
+        assert loaded.applied_split_ratios == {}
+
+    def test_a_book_written_before_ratios_were_recorded_still_loads(self) -> None:
+        old = {
+            "agent": "t",
+            "cash": 500.0,
+            "positions": [
+                {
+                    "ticker": "NVDA",
+                    "shares": 20.0,
+                    "entry_price": 50.0,
+                    "entry_date": "2026-07-01",
+                    "current_price": 60.0,
+                }
+            ],
+            "split_floor_date": "2026-08-04",
+            "applied_splits": {"NVDA": ["2026-08-05"]},
+        }
+
+        book = LivePortfolio.from_dict(old)
+
+        assert book.applied_splits == {"NVDA": ["2026-08-05"]}
+        assert book.applied_split_ratios == {}
+        # An ex-date applied before ratios were kept is still applied once.
+        with _logged("ERROR") as errors:
+            again = book.apply_split(
+                "NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0
+            )
+        assert again is None
+        assert book.positions[0].shares == 20.0
+        assert errors == []
+
+    def test_a_revised_ratio_for_an_applied_ex_date_is_said_loudly(self) -> None:
+        # The vendor first said 2:1 and later 3:1 for the same ex-date.
+        # The book cannot be re-split safely, but staying quiet would
+        # leave a line that is wrong by a third with nothing pointing at it.
+        p = self._book()
+        p.apply_split("NVDA", ratio=2.0, ex_date="2026-08-05", price=60.0)
+
+        with _logged("ERROR") as errors:
+            again = p.apply_split(
+                "NVDA", ratio=3.0, ex_date="2026-08-05", price=40.0
+            )
+
+        assert again is None
+        assert p.positions[0].shares == 20.0
+        assert p.applied_split_ratios == {"NVDA": {"2026-08-05": 2.0}}
+        assert len(errors) == 1
+        assert "NVDA" in errors[0] and "2026-08-05" in errors[0]
+
+    def test_the_same_ratio_reported_again_is_quiet(self) -> None:
+        # A vendor-rounded repeat of the ratio applied is not a revision.
+        p = self._book(shares=300.0)
+        p.apply_split("NVDA", ratio=0.333333, ex_date="2026-08-05", price=3.0)
+
+        with _logged("ERROR") as errors:
+            again = p.apply_split(
+                "NVDA", ratio=0.3333333, ex_date="2026-08-05", price=3.0
+            )
+
+        assert again is None
+        assert errors == []
 
 
 # ---------------------------------------------------------------------------

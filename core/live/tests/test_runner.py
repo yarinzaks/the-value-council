@@ -1899,6 +1899,31 @@ class TestSplitsAdjustTheBook:
         assert result.portfolio.positions[0].shares == 10.0
         assert any("split lookup NVDA failed" in m for m in seen)
 
+    def test_an_implausible_ratio_is_refused_at_error_level(
+        self, runner: DailyRunner
+    ) -> None:
+        # A 1000:1 from the vendor is a glitch, not a corporate action;
+        # refusing it must reach the ERROR log the owner reads, not sit
+        # among the warnings.
+        from loguru import logger as loguru_logger
+
+        self._held(runner)
+        loader = _StubPriceLoaderWithSplits(
+            {"NVDA": 60.0}, {"NVDA": [(self.EX, 1000.0)]}
+        )
+
+        seen: list[str] = []
+        sink = loguru_logger.add(
+            lambda m: seen.append(m.record["message"]), level="ERROR"
+        )
+        try:
+            result = self._run(runner, loader)
+        finally:
+            loguru_logger.remove(sink)
+
+        assert result.portfolio.positions[0].shares == 10.0
+        assert any("split of NVDA refused" in m for m in seen)
+
     def _held_with_aapl(self, runner: DailyRunner) -> None:
         self._held(runner)
         book = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)

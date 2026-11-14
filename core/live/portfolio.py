@@ -44,6 +44,13 @@ DEFAULT_COMMISSION_USD: float = 2.50
 _SPLIT_MAX_DENOMINATOR = 1000
 _SPLIT_RATIO_RTOL = 1e-5
 
+#: The plausible range of a split ratio (new shares per old share). A
+#: 1-for-500 reverse split or a 100-for-1 forward split is already at
+#: the edge of what issuers do; a ratio outside it is a vendor glitch,
+#: and applying one would rewrite the line irreversibly.
+SPLIT_RATIO_MIN: float = 1 / 500
+SPLIT_RATIO_MAX: float = 100.0
+
 #: A proportional cost charged on top of the commission, as a fraction of
 #: the gross. Zero in the live book: the broker charges no such thing.
 #: Kept as a parameter so a caller that wants to model slippage still
@@ -230,6 +237,14 @@ class LivePortfolio:
     #: exactly like :attr:`paid_dividends`.
     applied_splits: dict[str, list[str]] = field(default_factory=dict)
 
+    #: The ratio each entry of :attr:`applied_splits` was applied at:
+    #: ``{"NVDA": {"2024-06-10": 10.0}}``. Kept beside it, not inside
+    #: it, so books written before ratios were recorded read unchanged
+    #: (their ex-dates simply have no ratio here). With it, a vendor
+    #: that later revises an applied ex-date's ratio is caught and said
+    #: rather than skipped in silence.
+    applied_split_ratios: dict[str, dict[str, float]] = field(default_factory=dict)
+
     # ------------------------------------------------------------------
     # Derived metrics (computed against current_price on positions)
     # ------------------------------------------------------------------
@@ -333,6 +348,7 @@ class LivePortfolio:
             # that — so dropping these cannot resurrect an old payment.
             self.paid_dividends.pop(ticker.upper(), None)
             self.applied_splits.pop(ticker.upper(), None)
+            self.applied_split_ratios.pop(ticker.upper(), None)
         else:
             pos.shares = remaining
 
@@ -446,6 +462,10 @@ class LivePortfolio:
             done = set(self.applied_splits.pop(old_u))
             done.update(self.applied_splits.get(new_u, []))
             self.applied_splits[new_u] = sorted(done)
+        if old_u in self.applied_split_ratios:
+            ratios = self.applied_split_ratios.pop(old_u)
+            ratios.update(self.applied_split_ratios.get(new_u, {}))
+            self.applied_split_ratios[new_u] = ratios
 
         return True
 
@@ -499,6 +519,11 @@ class LivePortfolio:
                 else:
                     del record[ticker]
             removed[name] = dropped
+        # A ratio is only ever a note on an applied ex-date; it goes
+        # with the ex-date it belongs to.
+        self.applied_split_ratios = _ratios_for(
+            self.applied_split_ratios, self.applied_splits
+        )
         return removed
 
     def credit_dividend(
@@ -560,17 +585,38 @@ class LivePortfolio:
         whole number is also taken as that number.
 
         Idempotent per ``(ticker, ex_date)``: returns None when that
-        split was already applied, or when the ticker is not held.
-        Raises LivePortfolioError for a ratio that is not a finite
-        positive number.
+        split was already applied, or when the ticker is not held. If
+        the ratio now reported for an applied ex-date differs from the
+        one applied, that is said at ERROR and nothing is changed: the
+        book cannot tell which report is right, and re-splitting on a
+        guess is the irreversible mistake this record exists to stop.
+
+        Raises LivePortfolioError, with nothing changed, for a ratio
+        that is not a finite positive number or that lies outside
+        [:data:`SPLIT_RATIO_MIN`, :data:`SPLIT_RATIO_MAX`].
         """
         if not (math.isfinite(ratio) and ratio > 0):
             raise LivePortfolioError(f"invalid split ratio for {ticker}: {ratio}")
+        if not SPLIT_RATIO_MIN <= ratio <= SPLIT_RATIO_MAX:
+            raise LivePortfolioError(
+                f"split ratio for {ticker} (ex {ex_date}) is {ratio:g}, outside "
+                f"the plausible range [1/{1 / SPLIT_RATIO_MIN:g}, "
+                f"{SPLIT_RATIO_MAX:g}]; treated as a vendor error"
+            )
         idx = self._index_of(ticker)
         if idx is None:
             return None
         key = ticker.upper()
         if ex_date in self.applied_splits.get(key, ()):
+            applied = self.applied_split_ratios.get(key, {}).get(ex_date)
+            if applied is not None and not math.isclose(
+                applied, ratio, rel_tol=_SPLIT_RATIO_RTOL
+            ):
+                logger.error(
+                    f"{self.agent}: split of {key} ex {ex_date} was applied at "
+                    f"{applied:g} but is now reported as {ratio:g}; the line was "
+                    f"not restated again — check the ratio and correct by hand"
+                )
             return None
 
         pos = self.positions[idx]
@@ -598,11 +644,13 @@ class LivePortfolio:
             self.positions.pop(idx)
             self.paid_dividends.pop(key, None)
             self.applied_splits.pop(key, None)
+            self.applied_split_ratios.pop(key, None)
         else:
             pos.shares = whole
             pos.entry_price = entry_after
             pos.current_price = mark_after
             self.applied_splits.setdefault(key, []).append(ex_date)
+            self.applied_split_ratios.setdefault(key, {})[ex_date] = ratio
         return SplitRecord(
             ticker=key,
             ex_date=ex_date,
@@ -765,6 +813,12 @@ class LivePortfolio:
             "applied_splits": {
                 k: sorted(v) for k, v in sorted(self.applied_splits.items())
             },
+            "applied_split_ratios": {
+                k: dict(sorted(v.items()))
+                for k, v in sorted(
+                    _ratios_for(self.applied_split_ratios, self.applied_splits).items()
+                )
+            },
             "positions": [_round_position(p) for p in self.positions],
             "watchlist": [asdict(w) for w in self.watchlist],
             "last_updated": self.last_updated,
@@ -816,6 +870,10 @@ class LivePortfolio:
             )
             for w in data.get("watchlist", [])
         ]
+        applied_splits = {
+            str(k).upper(): [str(d) for d in v]
+            for k, v in dict(data.get("applied_splits", {})).items()
+        }
         return cls(
             agent=str(data["agent"]),
             cash=float(data.get("cash", DEFAULT_INITIAL_CASH)),
@@ -843,10 +901,15 @@ class LivePortfolio:
                 for k, v in dict(data.get("paid_dividends", {})).items()
             },
             split_floor_date=str(data.get("split_floor_date", "")),
-            applied_splits={
-                str(k).upper(): [str(d) for d in v]
-                for k, v in dict(data.get("applied_splits", {})).items()
-            },
+            applied_splits=applied_splits,
+            # Absent from books written before ratios were recorded.
+            applied_split_ratios=_ratios_for(
+                {
+                    str(k).upper(): {str(d): float(r) for d, r in dict(v).items()}
+                    for k, v in dict(data.get("applied_split_ratios", {})).items()
+                },
+                applied_splits,
+            ),
         )
 
     @classmethod
@@ -945,6 +1008,24 @@ def _round_position(p: Position) -> dict[str, Any]:
         d[k] = round(d[k], 2)
     d["pnl_pct"] = round(d["pnl_pct"], 2)
     return d
+
+
+def _ratios_for(
+    ratios: dict[str, dict[str, float]], applied: dict[str, list[str]]
+) -> dict[str, dict[str, float]]:
+    """``ratios`` restricted to the ex-dates ``applied`` still records.
+
+    A ratio is a note on an applied ex-date and means nothing without
+    it; a record map pruned or rewritten without its ratios (the prune
+    script rewrites only the two record maps) must not leave one behind.
+    """
+    kept: dict[str, dict[str, float]] = {}
+    for ticker, by_date in ratios.items():
+        dates = set(applied.get(ticker, ()))
+        sub = {d: r for d, r in by_date.items() if d in dates}
+        if sub:
+            kept[ticker] = sub
+    return kept
 
 
 def now_iso() -> str:

@@ -1960,7 +1960,9 @@ class DailyRunner:
                         ticker, ratio=ratio, ex_date=ex_date.isoformat(), price=price
                     )
                 except LivePortfolioError as exc:
-                    logger.warning(f"{as_of}: split of {ticker} refused: {exc}")
+                    # Only a vendor-error ratio is refused, and an
+                    # unapplied real split leaves the line misvalued.
+                    logger.error(f"{as_of}: split of {ticker} refused: {exc}")
                     continue
                 if record is None:
                     continue
