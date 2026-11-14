@@ -389,7 +389,11 @@ CREATE TABLE IF NOT EXISTS financials (
 #     total (and the reverse) instead of being lost in a max, and a larger
 #     one-sided LongTermDebt reading keeps the other half of a same-date
 #     lease split; v9 rows can hold a lower total.
-_PAYLOAD_VERSION = 10
+# 11: the LongTermDebt and lease-inclusive readings are combined half by
+#     half (a complete reading no longer hides a larger one-sided reading
+#     of the same balance sheet), and that combination keeps its halves
+#     when instrument lines are added; v10 rows can hold a lower total.
+_PAYLOAD_VERSION = 11
 _VERSION_KEY = "_payload_version"
 
 

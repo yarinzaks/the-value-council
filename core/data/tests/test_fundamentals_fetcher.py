@@ -889,15 +889,38 @@ class TestDebtRollupsAndInstruments:
     def test_same_period_long_term_debt_keeps_precedence(
         self, tmp_path: Path
     ) -> None:
-        # Existing behaviour: a filer that tags LongTermDebt at the same
-        # balance-sheet date is still read from LongTermDebt.
+        # A filer that tags LongTermDebt at the same balance-sheet date is
+        # still read from LongTermDebt when the lease-inclusive reading
+        # fits inside it.
         total, source = self._total(
             tmp_path,
             self._at("LongTermDebt", 900.0),
-            self._at("LongTermDebtAndCapitalLeaseObligations", 950.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 850.0),
         )
         assert total == 900.0
         assert source == "rollup"
+
+    def test_same_period_larger_lease_half_is_not_hidden_by_long_term_debt(
+        self, tmp_path: Path
+    ) -> None:
+        # 950 of noncurrent debt cannot fit inside a same-date total of
+        # 900. Keeping 900 also made the answer depend on whether the
+        # filer tagged a zero current half: adding
+        # LongTermDebtAndCapitalLeaseObligationsCurrent 0 turned it into a
+        # complete split and the larger 950 won.
+        alone = self._total(
+            tmp_path / "alone",
+            self._at("LongTermDebt", 900.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 950.0),
+        )
+        with_zero_current = self._total(
+            tmp_path / "zero",
+            self._at("LongTermDebt", 900.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 950.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 0.0),
+        )
+        assert alone == (950.0, "lease_noncurrent_only")
+        assert with_zero_current == (950.0, "lease_split")
 
     def test_convertible_notes_are_debt(self, tmp_path: Path) -> None:
         # RPD: its only borrowing is a convertible.
@@ -1441,6 +1464,169 @@ class TestDebtRollupsAndInstruments:
         )
         assert newer_sliver == (437.0, "lease_split")
         assert stale_larger == (437.0, "lease_split")
+
+    def test_current_instruments_beside_a_cross_family_sum_keep_the_larger(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x9: once 9,000 of noncurrent lease-inclusive debt
+        # and 37 of LongTermDebtCurrent were summed, the total was treated
+        # as complete and the 50 of current senior notes vanished into a
+        # max against 9,037. The current half is max(37, 50).
+        before = self._total(
+            tmp_path / "before",
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+            self._at("SeniorNotesCurrent", 50.0),
+        )
+        after = self._total(
+            tmp_path / "after",
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+            self._at("SeniorNotesCurrent", 50.0),
+            self._at("LongTermDebtCurrent", 37.0),
+        )
+        assert before == (9_050.0, "lease_noncurrent_only+instruments")
+        assert after == (
+            9_050.0, "current_only+lease_noncurrent_only+instruments"
+        )
+
+    def test_noncurrent_instruments_beside_a_cross_family_sum_keep_current(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x10: the 20,000 of noncurrent notes beat the
+        # 9,000 noncurrent half, but the 37 of current maturities is
+        # disjoint from both and stays.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("SeniorLongTermNotes", 20_000.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+        )
+        assert total == 20_037.0
+        assert source == "current_only+lease_noncurrent_only+instruments"
+
+    def test_lease_current_half_survives_larger_noncurrent_instruments(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x5: the mirror of x10 across the families.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 37.0),
+            self._at("SeniorLongTermNotes", 2_000.0),
+        )
+        assert total == 2_037.0
+        assert source == "noncurrent_only+lease_current_only+instruments"
+
+    def test_lease_split_beside_current_instruments_keeps_the_larger_current(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x6: adding a same-date lease split of 400 + 37
+        # turned 1,050 into 1,037. The current half is max(37, 50).
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("SeniorNotesCurrent", 50.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 400.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 37.0),
+        )
+        assert total == 1_050.0
+        assert source == "noncurrent_only+lease_current_only+instruments"
+
+    def test_complete_zero_does_not_hide_a_same_date_one_sided_reading(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x13: a LongTermDebt of 0 beside 9,000 of
+        # noncurrent lease-inclusive debt on the same balance sheet read
+        # the company as debt-free.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+            self._at("LongTermDebt", 0.0),
+        )
+        assert total == 9_000.0
+        assert source == "lease_noncurrent_only"
+
+    def test_same_date_larger_lease_half_beside_a_debt_split_keeps_both(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x1, the mirror of
+        # test_larger_one_sided_debt_beside_a_lease_split_keeps_both_halves.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+        )
+        assert total == 9_037.0
+        assert source == "current_only+lease_noncurrent_only"
+
+    def test_newer_larger_lease_half_keeps_the_debt_split_current_half(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x2: the newer noncurrent reading replaces only
+        # the noncurrent half; the 37 of current maturities stays.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 9_037.0
+        assert source == "current_only+lease_noncurrent_only"
+
+    def test_newer_lease_current_half_beside_a_debt_split_keeps_both(
+        self, tmp_path: Path
+    ) -> None:
+        # The current-half mirror of x2.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 500.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 1_500.0
+        assert source == "noncurrent_only+lease_current_only"
+
+    def test_same_date_larger_lease_half_beats_a_debt_rollup(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x3: 9,000 of noncurrent debt cannot fit inside a
+        # same-date total of 1,037.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 1_037.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+        )
+        assert total == 9_000.0
+        assert source == "lease_noncurrent_only"
+
+    def test_same_date_larger_debt_half_beats_a_lease_rollup(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x4: the mirror of x3.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 9_000.0),
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                1_037.0,
+            ),
+        )
+        assert total == 9_000.0
+        assert source == "noncurrent_only"
+
+    def test_same_date_larger_debt_half_beats_a_debt_and_lease_total(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x14.
+        total, source = self._total(
+            tmp_path,
+            self._at("DebtAndCapitalLeaseObligations", 1_000.0),
+            self._at("LongTermDebtNoncurrent", 5_000.0),
+        )
+        assert total == 5_000.0
+        assert source == "noncurrent_only"
 
     def test_overlap_group_is_still_summed_with_loans_and_credit_lines(
         self, tmp_path: Path
