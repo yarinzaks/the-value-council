@@ -7,6 +7,7 @@ that no longer existed.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterator
 from datetime import date, timedelta
@@ -3767,6 +3768,32 @@ class TestFundamentalsFreshnessGate:
         runner.run_mark_to_market(as_of=AS_OF)
 
         assert [s.closed_session for s in snaps] == [False, False]  # type: ignore[attr-defined]
+
+    def test_the_close_mark_clears_a_stored_tag_on_an_open_day(
+        self,
+        runner: DailyRunner,
+        snaps: list[object],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """End to end: a wrong tag in the day's file does not survive.
+
+        The mark books no trades, so only the runner's explicit False can
+        clear the tag; a save that passed None would inherit it.
+        """
+        from core.live.snapshots import save_snapshot
+
+        root = tmp_path / "snapshots"
+        day = root / "stub_agent" / f"{AS_OF.isoformat()}.json"
+        day.parent.mkdir(parents=True)
+        day.write_text(json.dumps({"closed_session": True}))
+        monkeypatch.setattr(
+            "core.live.runner.save_snapshot", lambda s: save_snapshot(s, root=root)
+        )
+
+        runner.run_mark_to_market(as_of=AS_OF)
+
+        assert "closed_session" not in json.loads(day.read_text())
 
 
 class _DoctrineAdapter(_StubAdapter):

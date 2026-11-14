@@ -174,17 +174,20 @@ def save_snapshot(snap: DailySnapshot, *, root: Path = SNAPSHOTS_DIR) -> Path:
     traded_now = snap.trade_count
     keeps_freshness = snap.fundamentals_stale is None
     if path.exists():
+        prior: object = None
+        readable = True
         try:
             prior = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning(f"{snap.agent}@{snap.date}: unreadable snapshot: {exc}")
-            prior = None
-        if prior is not None and not isinstance(prior, dict):
+            readable = False
+        # A file holding ``null`` parses to None; it is not an object
+        # either, so it is warned about like any other non-dict value.
+        if readable and not isinstance(prior, dict):
             logger.warning(
                 f"{snap.agent}@{snap.date}: prior snapshot is not a JSON "
                 f"object ({type(prior).__name__}); overwriting it"
             )
-            prior = None
         if isinstance(prior, dict):
             if keeps_trades and prior.get("trade_count"):
                 snap = replace(

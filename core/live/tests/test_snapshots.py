@@ -433,14 +433,17 @@ class TestTheClosedSessionMarkerCanBeCorrected:
 
         assert "restored_from" not in json.loads(path.read_text())
 
+    @pytest.mark.parametrize("content", ["[1, 2, 3]", "null", "true", '"x"', "5"])
     def test_a_prior_file_that_is_not_an_object_is_overwritten(
-        self, tmp_path: Path, warnings_seen: list[str]
+        self, tmp_path: Path, warnings_seen: list[str], content: str
     ) -> None:
         # ``prior.get`` on a list raised AttributeError, so the day's
-        # record was never written at all.
+        # record was never written at all. ``null`` parses to None, the
+        # same value that once stood for "unreadable", so it must not
+        # slip through as a missing file would.
         folder = tmp_path / "a"
         folder.mkdir()
-        (folder / "2026-09-07.json").write_text("[1, 2, 3]")
+        (folder / "2026-09-07.json").write_text(content)
 
         path = save_snapshot(
             make_snapshot(self._book(), as_of=date(2026, 9, 7)), root=tmp_path
