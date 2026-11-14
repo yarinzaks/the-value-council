@@ -21,6 +21,7 @@ from scripts.verify_run_state import (
     STAMP_FIELD,
     check_portfolios,
     format_report,
+    git_baseline_books,
     git_baseline_reader,
     last_bar_reader,
     main,
@@ -382,11 +383,27 @@ def _book(directory: Path, agent: str, holdings: dict[str, float]) -> Path:
     )
 
 
-def _ledger_day(ledger: Path, agent: str, day: str = "2026-08-05") -> Path:
+def _ledger_day(
+    ledger: Path, agent: str, tickers: tuple[str, ...], day: str = "2026-08-05"
+) -> Path:
+    """A ledger day holding one executed SELL row per ticker, shaped as
+    ``LedgerEntry.to_dict`` writes it."""
     folder = ledger / agent
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{day}.json"
-    path.write_text("[]")
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "date": day, "agent": agent, "ticker": t, "side": "SELL",
+                    "shares": 1.0, "price": 1.0, "gross_value": 1.0,
+                    "cost_paid": 0.0, "realized_pnl_usd": 0.0,
+                    "source": "executed",
+                }
+                for t in tickers
+            ]
+        )
+    )
     return path
 
 
@@ -431,7 +448,7 @@ class TestSharesMovedWithoutALedgerDay:
         books, ledger = tmp_path / "portfolios", tmp_path / "trades"
         books.mkdir()
         _book(books, "walter_schloss", {"BUR": 574})
-        _ledger_day(ledger, "walter_schloss")
+        _ledger_day(ledger, "walter_schloss", ("BHF",))
 
         report = check_portfolios(
             books, mode="open", as_of=AS_OF,
@@ -475,7 +492,7 @@ class TestSharesMovedWithoutALedgerDay:
         books, ledger = tmp_path / "portfolios", tmp_path / "trades"
         books.mkdir()
         _book(books, "market_core", {"BAC": 3})
-        _ledger_day(ledger, "market_core", day="2026-08-04")
+        _ledger_day(ledger, "market_core", ("BAC",), day="2026-08-04")
         # Nor does a sync-collision copy of today's.
         (ledger / "market_core" / "2026-08-05 2.json").write_text("[]")
 
@@ -554,7 +571,7 @@ class TestTheCommittedBaseline:
         assert main(args) == 1
         assert "walter_schloss (-BHF)" in capsys.readouterr().out
 
-        _ledger_day(tmp_path / "trades", "walter_schloss")
+        _ledger_day(tmp_path / "trades", "walter_schloss", ("BHF",))
         assert main(args) == 0
 
     def test_main_fails_when_the_baseline_ref_cannot_be_read(
@@ -775,3 +792,165 @@ class TestASplitIsNotAnUnledgeredMove:
         out = capsys.readouterr().out
         assert code == 0, out
         assert "graham (NVDA 10→20)" in out
+
+
+# ---------------------------------------------------------------------------
+# A book the baseline held must still exist; a ledger day must cover every
+# name that moved (security review V1)
+# ---------------------------------------------------------------------------
+class TestABaselineBookMissingAfterTheRun:
+    """The gate globbed the books the run left behind, so a book the
+    run deleted — or never wrote back — was simply not looked at, and a
+    directory with nine of ten books passed."""
+
+    def test_a_book_missing_after_the_run_fails(self, tmp_path: Path) -> None:
+        books = tmp_path / "portfolios"
+        books.mkdir()
+        _book(books, "graham", {"KO": 5})
+
+        report = check_portfolios(
+            books, mode="open", as_of=AS_OF,
+            previous=_committed({"graham.json": {"KO": 5}}),
+            ledger_dir=tmp_path / "trades",
+            baseline_books=frozenset({"graham.json", "seth_klarman.json"}),
+        )
+
+        assert not report.ok
+        assert report.missing == ["seth_klarman.json"]
+        text = format_report(report, mode="open", as_of=AS_OF)
+        assert "::error::" in text
+        assert "seth_klarman.json" in text
+
+    def test_every_baseline_book_present_passes(self, tmp_path: Path) -> None:
+        books = tmp_path / "portfolios"
+        books.mkdir()
+        _book(books, "graham", {"KO": 5})
+        _book(books, "new_agent", {})
+
+        report = check_portfolios(
+            books, mode="open", as_of=AS_OF,
+            previous=_committed({"graham.json": {"KO": 5}}),
+            ledger_dir=tmp_path / "trades",
+            baseline_books=frozenset({"graham.json"}),
+        )
+
+        assert report.ok
+        assert report.missing == []
+
+    def test_the_baseline_books_need_the_baseline(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError):
+            check_portfolios(
+                tmp_path, mode="open", as_of=AS_OF,
+                baseline_books=frozenset({"graham.json"}),
+            )
+
+    def test_the_committed_books_are_listed_by_file_name(
+        self, tmp_path: Path
+    ) -> None:
+        books = tmp_path / "repo" / "data" / "portfolios"
+        books.mkdir(parents=True)
+        _git(tmp_path / "repo", "init", "-q")
+        _book(books, "graham", {"KO": 5})
+        (books / ".gitkeep").write_text("")
+        _git(tmp_path / "repo", "add", "data/portfolios")
+        _git(tmp_path / "repo", "commit", "-q", "-m", "pre-run books")
+
+        assert git_baseline_books(books, "HEAD") == frozenset({"graham.json"})
+        assert git_baseline_books(books, "no-such-ref") is None
+        assert git_baseline_books(books, "--all") is None
+
+    def test_main_fails_a_run_that_lost_a_book(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        books = tmp_path / "repo" / "data" / "portfolios"
+        books.mkdir(parents=True)
+        _git(tmp_path / "repo", "init", "-q")
+        _book(books, "graham", {"KO": 5})
+        _book(books, "seth_klarman", {"KO": 5})
+        _git(tmp_path / "repo", "add", "data/portfolios")
+        _git(tmp_path / "repo", "commit", "-q", "-m", "pre-run books")
+        (books / "seth_klarman.json").unlink()
+        db = _prices_db(tmp_path / "prices.sqlite", {"KO": "2026-08-05"})
+
+        code = main(
+            [
+                "--mode", "open", "--as-of", "2026-08-05",
+                "--portfolios", str(books), "--prices-db", str(db),
+                "--trades", str(tmp_path / "trades"),
+                "--decisions", str(tmp_path / "decisions"),
+                "--baseline-ref", "HEAD",
+            ]
+        )
+
+        out = capsys.readouterr().out
+        assert code == 1, out
+        assert "seth_klarman.json" in out
+
+
+class TestTheLedgerDayMustCoverEveryMove:
+    """A ledger file's existence was the whole check, so an empty one,
+    or one naming a different trade, excused every share change in the
+    book."""
+
+    def _check(
+        self, tmp_path: Path, after: dict[str, float], before: dict[str, float]
+    ) -> Any:
+        books = tmp_path / "portfolios"
+        books.mkdir(exist_ok=True)
+        _book(books, "graham", after)
+        return check_portfolios(
+            books, mode="open", as_of=AS_OF,
+            previous=_committed({"graham.json": before}),
+            ledger_dir=tmp_path / "trades",
+            journal_dir=tmp_path / "decisions",
+        )
+
+    def test_an_empty_ledger_day_fails(self, tmp_path: Path) -> None:
+        _ledger_day(tmp_path / "trades", "graham", ())
+
+        report = self._check(tmp_path, {"KO": 3}, {"KO": 5})
+
+        assert not report.ok
+        assert report.unledgered == ["graham (KO 5→3)"]
+        assert any("ledger" in u and "empty" in u for u in report.unreadable)
+
+    def test_a_ledger_day_missing_a_moved_name_fails(
+        self, tmp_path: Path
+    ) -> None:
+        _ledger_day(tmp_path / "trades", "graham", ("KO",))
+
+        report = self._check(
+            tmp_path, {"KO": 3, "PEP": 4}, {"KO": 5, "PEP": 2, "BAC": 1}
+        )
+
+        assert not report.ok
+        assert report.unledgered == ["graham (-BAC, PEP 2→4)"]
+
+    def test_a_malformed_ledger_day_is_unreadable_not_an_excuse(
+        self, tmp_path: Path
+    ) -> None:
+        folder = tmp_path / "trades" / "graham"
+        folder.mkdir(parents=True)
+        (folder / "2026-08-05.json").write_text('{"ticker": "KO"}')
+
+        report = self._check(tmp_path, {"KO": 3}, {"KO": 5})
+
+        assert not report.ok
+        assert report.unledgered == ["graham (KO 5→3)"]
+        assert any("ledger" in u for u in report.unreadable)
+
+    def test_ledger_and_split_together_cover_the_day(
+        self, tmp_path: Path
+    ) -> None:
+        # KO was traded and is on the ledger; NVDA split and is journaled.
+        _ledger_day(tmp_path / "trades", "graham", ("KO",))
+        _journal_day(tmp_path / "decisions", "graham", [_split_row("NVDA", 10, 20)])
+
+        report = self._check(
+            tmp_path, {"KO": 3, "NVDA": 20}, {"KO": 5, "NVDA": 10}
+        )
+
+        assert report.ok, report
+        assert report.unledgered == []
+        assert report.unreadable == []
+        assert report.split_adjusted == ["graham (NVDA 10→20)"]

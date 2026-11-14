@@ -54,6 +54,13 @@ its ledger day. Before this, a split on a day the holder placed no
 order failed the gate, so the run's state was never committed and the
 next run split the uncommitted book again.
 
+A ledger day that exists has to cover the day, not merely be there: an
+empty file, or one that names none of a moved ticker, excuses nothing.
+Every name whose count changed must appear on the day's ledger or be
+accounted for by its ``SPLIT`` rows. And a book the baseline held must
+still exist after the run — the books are found by listing the
+directory, so one the run lost would otherwise not be looked at at all.
+
 Usage::
 
     python -m scripts.verify_run_state --mode open
@@ -68,7 +75,7 @@ import json
 import sqlite3
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -118,14 +125,18 @@ class VerifyReport:
     #: ``agent (changes)`` for every book whose only unledgered moves
     #: are accounted for by the day's journaled splits.
     split_adjusted: list[str] = field(default_factory=list)
+    #: File names of books the baseline held that the run left absent.
+    missing: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         """True only when at least one portfolio was found, every one of
         them is readable and freshly stamped, no unpriced holding is
-        left unflagged, and no book moved shares without a ledger day."""
+        left unflagged, no book moved shares without a ledger day, and
+        no book the baseline held is missing."""
         return (
             bool(self.rows)
+            and not self.missing
             and not self.stale
             and not self.unreadable
             and not self.unflagged
@@ -171,14 +182,9 @@ def _holdings(positions: object) -> dict[str, float]:
     }
 
 
-def git_baseline_reader(directory: Path, ref: str) -> PreviousShares | None:
-    """Read each book in *directory* as committed at *ref*.
-
-    ``None`` when *ref* does not resolve to a commit in the repository
-    holding *directory* (or there is no repository): the caller must
-    then refuse rather than compare against nothing. A book file the
-    commit does not hold reads as ``{}`` — a new book starts empty.
-    """
+def _resolve_commit(directory: Path, ref: str) -> str | None:
+    """The commit *ref* names in the repository holding *directory*, or
+    ``None`` when it names none (or there is no repository)."""
     # A ref is never an option; refusing a leading dash keeps git from
     # reading one as such.
     if not ref or ref.startswith("-"):
@@ -192,7 +198,45 @@ def git_baseline_reader(directory: Path, ref: str) -> PreviousShares | None:
     )
     if probe.returncode != 0:
         return None
-    commit = probe.stdout.strip()
+    return probe.stdout.strip()
+
+
+def git_baseline_books(directory: Path, ref: str) -> frozenset[str] | None:
+    """File names of the ``*.json`` books committed in *directory* at *ref*.
+
+    ``None`` when *ref* does not resolve or the listing fails: the
+    caller must then refuse rather than assume no book existed.
+    """
+    commit = _resolve_commit(directory, ref)
+    if commit is None:
+        return None
+    # ls-tree names paths relative to -C's directory, and "./" limits
+    # the listing to it.
+    listed = subprocess.run(
+        ["git", "-C", str(directory), "ls-tree", "--name-only", commit, "./"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if listed.returncode != 0:
+        return None
+    return frozenset(
+        name for name in listed.stdout.splitlines()
+        if name.endswith(".json") and "/" not in name
+    )
+
+
+def git_baseline_reader(directory: Path, ref: str) -> PreviousShares | None:
+    """Read each book in *directory* as committed at *ref*.
+
+    ``None`` when *ref* does not resolve to a commit in the repository
+    holding *directory* (or there is no repository): the caller must
+    then refuse rather than compare against nothing. A book file the
+    commit does not hold reads as ``{}`` — a new book starts empty.
+    """
+    commit = _resolve_commit(directory, ref)
+    if commit is None:
+        return None
 
     def previous(path: Path) -> dict[str, float]:
         # "<rev>:./<name>" resolves against -C's directory, so no
@@ -242,6 +286,27 @@ def _journaled_splits(path: Path) -> dict[str, list[_SplitRow]]:
             )
         )
     return splits
+
+
+def _ledgered_tickers(path: Path) -> set[str]:
+    """Tickers named on one agent's ledger day file.
+
+    Raises ``ValueError``/``TypeError``/``KeyError`` on a malformed file
+    and on an empty one — ``record_day`` never writes a day without a
+    trade — which the caller reports as unreadable rather than as a day
+    that covers nothing in particular.
+    """
+    rows = json.loads(path.read_text())
+    if not isinstance(rows, list):
+        raise TypeError(f"{path.name} is {type(rows).__name__}, not a list")
+    if not rows:
+        raise ValueError(f"{path.name} is empty")
+    tickers: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise TypeError(f"{path.name} holds a {type(row).__name__} row")
+        tickers.add(str(row["ticker"]).upper())
+    return tickers
 
 
 def _explained_by_splits(
@@ -313,6 +378,7 @@ def check_portfolios(
     previous: PreviousShares | None = None,
     ledger_dir: Path | None = None,
     journal_dir: Path | None = None,
+    baseline_books: Collection[str] | None = None,
 ) -> VerifyReport:
     """Assert every portfolio in *directory* was written by today's run.
 
@@ -320,19 +386,25 @@ def check_portfolios(
     such; without it that check is not run.
 
     With *previous* and *ledger_dir*, also assert that every book whose
-    holdings differ from *previous* has a ledger file for *as_of*;
-    without them that check is not run. With *journal_dir* as well, a
-    change the day's journaled ``SPLIT`` rows account for exactly needs
-    no ledger file and is reported in ``split_adjusted``.
+    holdings differ from *previous* has a ledger file for *as_of* that
+    names every ticker that moved; without them that check is not run.
+    With *journal_dir* as well, a change the day's journaled ``SPLIT``
+    rows account for exactly needs no ledger row and is reported in
+    ``split_adjusted``. With *baseline_books* (the file names the
+    baseline held), each one absent from *directory* is reported in
+    ``missing``.
 
     Raises ``KeyError`` for an unknown *mode* rather than guessing which
     timestamp to read, and ``ValueError`` when only one of *previous*
-    and *ledger_dir* is given, or *journal_dir* without them.
+    and *ledger_dir* is given, or *journal_dir* or *baseline_books*
+    without them.
     """
     if (previous is None) != (ledger_dir is None):
         raise ValueError("previous and ledger_dir are given together or not at all")
     if journal_dir is not None and previous is None:
         raise ValueError("journal_dir needs previous and ledger_dir")
+    if baseline_books is not None and previous is None:
+        raise ValueError("baseline_books needs previous and ledger_dir")
     field_name = STAMP_FIELD[mode]
     expected = as_of.isoformat()
 
@@ -344,7 +416,10 @@ def check_portfolios(
     unledgered: list[str] = []
     split_adjusted: list[str] = []
 
-    for path in sorted(directory.glob("*.json")):
+    paths = sorted(directory.glob("*.json"))
+    missing = sorted(set(baseline_books or ()) - {p.name for p in paths})
+
+    for path in paths:
         before: dict[str, float] = {}
         after: dict[str, float] = {}
         try:
@@ -372,18 +447,19 @@ def check_portfolios(
         if not fresh:
             stale.append(agent)
 
-        if (
-            previous is not None
-            and ledger_dir is not None
-            and before != after
-            and not (ledger_dir / agent / f"{expected}.json").is_file()
-        ):
+        if previous is not None and ledger_dir is not None and before != after:
             moved = {
                 t for t in before.keys() | after.keys()
                 if before.get(t) != after.get(t)
             }
+            ledger = ledger_dir / agent / f"{expected}.json"
+            if ledger.is_file():
+                try:
+                    moved -= _ledgered_tickers(ledger)
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    unreadable.append(f"{agent} ledger {ledger.name}: {exc}")
             split: set[str] = set()
-            if journal_dir is not None:
+            if moved and journal_dir is not None:
                 journal = journal_dir / agent / f"{expected}.json"
                 try:
                     split = _explained_by_splits(
@@ -425,6 +501,7 @@ def check_portfolios(
         flagged=flagged,
         unledgered=unledgered,
         split_adjusted=split_adjusted,
+        missing=missing,
     )
 
 
@@ -445,6 +522,12 @@ def format_report(report: VerifyReport, *, mode: str, as_of: date) -> str:
         lines.append(
             "::error::no portfolio files found in the state directory — "
             "the run wrote nothing"
+        )
+
+    for name in report.missing:
+        lines.append(
+            f"::error::book missing after the run — {name} was in the "
+            f"baseline and is not in the state directory now."
         )
 
     if report.stale:
@@ -558,11 +641,13 @@ def main(argv: list[str] | None = None) -> int:
     previous: PreviousShares | None = None
     ledger_dir: Path | None = None
     journal_dir: Path | None = None
+    baseline_books: frozenset[str] | None = None
     if args.baseline_ref is not None:
         previous = git_baseline_reader(directory, args.baseline_ref)
+        baseline_books = git_baseline_books(directory, args.baseline_ref)
         # Asked to compare and unable to is not the same as nothing
         # moved: without the baseline no share change can be seen.
-        if previous is None:
+        if previous is None or baseline_books is None:
             print(
                 f"::error::cannot read the baseline ref {args.baseline_ref!r} "
                 f"from the repository holding {directory} — cannot check "
@@ -582,6 +667,7 @@ def main(argv: list[str] | None = None) -> int:
         previous=previous,
         ledger_dir=ledger_dir,
         journal_dir=journal_dir,
+        baseline_books=baseline_books,
     )
     print(format_report(report, mode=args.mode, as_of=as_of))
     return 0 if report.ok else 1
