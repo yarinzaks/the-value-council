@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
+
+import pytest
 
 from core.live.portfolio import LivePortfolio, TradeRecord
 from core.live.snapshots import load_snapshots, make_snapshot, save_snapshot
@@ -294,8 +297,10 @@ class TestProvenanceMarkers:
         self, tmp_path: Path
     ) -> None:
         # A re-run scan replaces trades and freshness outright, so it
-        # had no reason to read the prior file at all; the markers are
-        # about the day, not the run, and must survive it too.
+        # had no reason to read the prior file at all; the provenance
+        # marker is about the day, not the run, and must survive it too.
+        # The closed-session tag does not: a save that booked trades
+        # contradicts it (see TestTheClosedSessionMarkerCanBeCorrected).
         self._write(
             tmp_path, {"closed_session": True, "restored_from": "8ac0c8bf"}
         )
@@ -318,5 +323,128 @@ class TestProvenanceMarkers:
 
         written = json.loads(path.read_text())
         assert written["trade_count"] == 1
-        assert written["closed_session"] is True
+        assert "closed_session" not in written
         assert written["restored_from"] == "8ac0c8bf"
+
+
+@pytest.fixture
+def warnings_seen() -> Iterator[list[str]]:
+    """Every WARNING-or-worse message logged while the test runs.
+
+    The project logs through loguru, which pytest's caplog never sees.
+    """
+    from loguru import logger as loguru_logger
+
+    seen: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: seen.append(m.record["message"]), level="WARNING"
+    )
+    try:
+        yield seen
+    finally:
+        loguru_logger.remove(sink_id)
+
+
+class TestTheClosedSessionMarkerCanBeCorrected:
+    """``closed_session`` is tri-state, so a wrong tag is not forever.
+
+    It used to be a one-way ratchet: a True in the day's file survived
+    every later save, so a day tagged by mistake could only be fixed by
+    hand-editing JSON. Now ``None`` means "this save did not assess it"
+    and inherits, while an explicit ``False`` — what the runner passes,
+    having just asked the market calendar — clears it.
+    """
+
+    _write = staticmethod(TestProvenanceMarkers._write)
+
+    @staticmethod
+    def _book() -> LivePortfolio:
+        return LivePortfolio(agent="a", cash=100.0)
+
+    def test_an_explicit_false_clears_a_wrong_tag(self, tmp_path: Path) -> None:
+        self._write(tmp_path, {"closed_session": True})
+
+        path = save_snapshot(
+            make_snapshot(self._book(), as_of=date(2026, 9, 7), closed_session=False),
+            root=tmp_path,
+        )
+
+        # Cleared, and written the way an ordinary day always was.
+        assert "closed_session" not in json.loads(path.read_text())
+        (snap,) = load_snapshots("a", root=tmp_path)
+        assert snap.closed_session is False
+
+    def test_a_save_that_did_not_assess_it_inherits(self, tmp_path: Path) -> None:
+        self._write(tmp_path, {"closed_session": True})
+        snap = make_snapshot(self._book(), as_of=date(2026, 9, 7))
+        assert snap.closed_session is None
+
+        path = save_snapshot(snap, root=tmp_path)
+
+        assert json.loads(path.read_text())["closed_session"] is True
+
+    def test_a_day_with_trades_does_not_inherit_the_tag(
+        self, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        # Trades booked today and "the market was shut today" cannot both
+        # be true; the save that carries the trades wins, loudly.
+        self._write(tmp_path, {"closed_session": True})
+        trade = TradeRecord(
+            ticker="AAA", side="BUY", shares=1.0, price=10.0,
+            gross_value=10.0, cost_paid=0.01, realized_pnl_usd=0.0,
+        )
+
+        path = save_snapshot(
+            make_snapshot(self._book(), as_of=date(2026, 9, 7), trades=[trade]),
+            root=tmp_path,
+        )
+
+        written = json.loads(path.read_text())
+        assert written["trade_count"] == 1
+        assert "closed_session" not in written
+        assert any("closed_session" in m and "a@2026-09-07" in m for m in warnings_seen)
+
+    def test_a_tagged_day_keeps_its_tag_and_its_old_trades(
+        self, tmp_path: Path
+    ) -> None:
+        # The holidays tagged by ``scripts.tag_closed_sessions`` include
+        # the ones that booked trades. A trade-less save carries those
+        # trades over; it adds no contradiction, so the tag stays.
+        self._write(
+            tmp_path, {"closed_session": True, "buys": ["AAA"], "trade_count": 1}
+        )
+
+        path = save_snapshot(
+            make_snapshot(self._book(), as_of=date(2026, 9, 7)), root=tmp_path
+        )
+
+        written = json.loads(path.read_text())
+        assert written["trade_count"] == 1
+        assert written["closed_session"] is True
+
+    def test_a_non_string_restored_from_is_not_inherited(
+        self, tmp_path: Path
+    ) -> None:
+        self._write(tmp_path, {"restored_from": 12345})
+
+        path = save_snapshot(
+            make_snapshot(self._book(), as_of=date(2026, 9, 7)), root=tmp_path
+        )
+
+        assert "restored_from" not in json.loads(path.read_text())
+
+    def test_a_prior_file_that_is_not_an_object_is_overwritten(
+        self, tmp_path: Path, warnings_seen: list[str]
+    ) -> None:
+        # ``prior.get`` on a list raised AttributeError, so the day's
+        # record was never written at all.
+        folder = tmp_path / "a"
+        folder.mkdir()
+        (folder / "2026-09-07.json").write_text("[1, 2, 3]")
+
+        path = save_snapshot(
+            make_snapshot(self._book(), as_of=date(2026, 9, 7)), root=tmp_path
+        )
+
+        assert json.loads(path.read_text())["agent"] == "a"
+        assert any("a@2026-09-07" in m and "not a JSON object" in m for m in warnings_seen)

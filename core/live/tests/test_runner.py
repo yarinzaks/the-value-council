@@ -3753,6 +3753,21 @@ class TestFundamentalsFreshnessGate:
 
         assert snaps[0].fundamentals_stale is None  # type: ignore[attr-defined]
 
+    def test_both_snapshots_say_the_session_was_open(
+        self, runner: DailyRunner, snaps: list[object]
+    ) -> None:
+        """The runner asked the calendar before writing, so it says so.
+
+        An explicit False is what clears a closed-session tag put on an
+        open day by mistake; None would leave it stuck.
+        """
+        runner.pit_loader = _StubPitLoader({"KO": date(2026, 7, 28)})  # type: ignore[assignment]
+
+        runner.run(as_of=AS_OF)
+        runner.run_mark_to_market(as_of=AS_OF)
+
+        assert [s.closed_session for s in snaps] == [False, False]  # type: ignore[attr-defined]
+
 
 class _DoctrineAdapter(_StubAdapter):
     """A stub that declares the doctrine's band and per-name cap, the

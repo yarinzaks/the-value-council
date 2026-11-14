@@ -1073,7 +1073,12 @@ class DailyRunner:
                 portfolio.save(directory=self.portfolio_dir)
                 # Snapshot — no trades, just refreshed valuation.
                 try:
-                    snap = make_snapshot(portfolio, as_of=as_of, trades=[])
+                    # _market_shut said the session was open: say so,
+                    # which also clears a closed-session tag put on the
+                    # day by mistake.
+                    snap = make_snapshot(
+                        portfolio, as_of=as_of, trades=[], closed_session=False
+                    )
                     save_snapshot(snap)
                 except Exception as exc:
                     logger.warning(
@@ -1674,6 +1679,8 @@ class DailyRunner:
                     else None
                 ),
                 fundamentals_stale=None if freshness is None else freshness.stale,
+                # run() only gets here once _market_shut has said open.
+                closed_session=False,
             )
             save_snapshot(snap)
         except Exception as exc:
