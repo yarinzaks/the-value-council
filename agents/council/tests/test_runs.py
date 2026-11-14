@@ -238,6 +238,9 @@ class _Prices:
     def cached_range(self, ticker):  # type: ignore[no-untyped-def]
         return None
 
+    def splits_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
+        return []
+
     def dividends_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
         return []
 

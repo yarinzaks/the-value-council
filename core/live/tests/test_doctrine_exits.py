@@ -86,6 +86,11 @@ class _Prices:
     def cached_range(self, ticker: str) -> tuple[date, date] | None:
         return None
 
+    def splits_between(
+        self, ticker: str, start: date, end: date
+    ) -> list[tuple[date, float]]:
+        return []
+
 
 class _Adapter:
     """A scan with fixed targets and fixed verdicts."""

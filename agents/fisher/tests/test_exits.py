@@ -201,6 +201,9 @@ def test_exit_reason_in_journal_names_the_trigger(
         def cached_range(self, ticker):  # type: ignore[no-untyped-def]
             return None
 
+        def splits_between(self, ticker, start, end):  # type: ignore[no-untyped-def]
+            return []
+
     runner = DailyRunner(
         market="US",
         adapters=[],

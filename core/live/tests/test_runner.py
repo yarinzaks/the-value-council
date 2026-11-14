@@ -87,6 +87,12 @@ class _StubPriceLoader:
         last = self._last_bars.get(ticker)
         return None if last is None else (date(2020, 1, 2), last)
 
+    def splits_between(
+        self, ticker: str, start: date, end: date
+    ) -> list[tuple[date, float]]:
+        """No splits. A failed lookup makes the name unpriced for the run."""
+        return []
+
 
 def _target(ticker: str, *, weight: float = 0.5, rank: int = 1) -> LiveTarget:
     return LiveTarget(
@@ -1892,6 +1898,85 @@ class TestSplitsAdjustTheBook:
 
         assert result.portfolio.positions[0].shares == 10.0
         assert any("split lookup NVDA failed" in m for m in seen)
+
+    def _held_with_aapl(self, runner: DailyRunner) -> None:
+        self._held(runner)
+        book = LivePortfolio.load_or_seed("stub_agent", directory=runner.portfolio_dir)
+        book.positions.append(
+            Position(
+                ticker="AAPL",
+                shares=10.0,
+                entry_price=100.0,
+                entry_date="2026-07-01",
+                current_price=100.0,  # yesterday's close, pre-split
+                why_en="",
+                why_he="",
+            )
+        )
+        book.save(directory=runner.portfolio_dir)
+
+    class _BrokenForNvda(_StubPriceLoaderWithSplits):
+        def splits_between(
+            self, ticker: str, start: date | str, end: date | str
+        ) -> list[tuple[date, float]]:
+            from core.backtest.data_loader import _to_date
+
+            if ticker == "NVDA":
+                raise RuntimeError("sqlite is locked")
+            s, e = _to_date(start), _to_date(end)
+            return [(d, r) for d, r in self._splits.get(ticker, []) if s < d <= e]
+
+    def test_a_failed_lookup_leaves_the_name_unmarked_and_untraded(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        # NVDA's quote of 60 may be on the post-split basis while its 10
+        # shares are not: marked, the line would read $600 instead of
+        # $1,200, and a 90% target would top it up on that wrong weight.
+        self._held_with_aapl(runner)
+        loader = self._BrokenForNvda(
+            {"NVDA": 60.0, "AAPL": 50.0}, {"AAPL": [(self.EX, 2.0)]}
+        )
+        runner.price_loader = loader  # type: ignore[assignment]
+        adapter = _StubAdapter(
+            "stub_agent",
+            [_target("NVDA", weight=0.9), _target("AAPL", weight=0.31, rank=2)],
+        )
+
+        result = runner._run_one(
+            adapter,  # type: ignore[arg-type]
+            AS_OF,
+            ["NVDA", "AAPL"],
+            {"NVDA": 60.0, "AAPL": 50.0},
+            {"NVDA": None, "AAPL": None},
+        )
+
+        by_ticker = {p.ticker: p for p in result.portfolio.positions}
+        nvda = by_ticker["NVDA"]
+        assert nvda.shares == 10.0
+        assert nvda.current_price == 120.0
+        assert [t for t in result.trades if t.ticker == "NVDA"] == []
+        # The other holding is split and marked as normal.
+        assert by_ticker["AAPL"].shares == 20.0
+        assert by_ticker["AAPL"].current_price == 50.0
+        assert any("split lookup NVDA failed" in m for m in errors)
+
+    def test_a_failed_lookup_leaves_the_close_mark_alone(
+        self, runner: DailyRunner, errors: list[str]
+    ) -> None:
+        self._held_with_aapl(runner)
+        runner.price_loader = self._BrokenForNvda(  # type: ignore[assignment]
+            {"NVDA": 60.0, "AAPL": 50.0}, {"AAPL": [(self.EX, 2.0)]}
+        )
+        runner.adapters = [_StubAdapter("stub_agent", [])]  # type: ignore[list-item]
+
+        results = runner.run_mark_to_market(as_of=AS_OF)
+
+        by_ticker = {p.ticker: p for p in results[0].portfolio.positions}
+        assert by_ticker["NVDA"].shares == 10.0
+        assert by_ticker["NVDA"].current_price == 120.0
+        assert by_ticker["AAPL"].shares == 20.0
+        assert by_ticker["AAPL"].current_price == 50.0
+        assert any("split lookup NVDA failed" in m for m in errors)
 
     def test_the_close_of_day_mark_applies_it(self, runner: DailyRunner) -> None:
         self._held(runner)

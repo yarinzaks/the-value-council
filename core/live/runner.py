@@ -1270,7 +1270,14 @@ class DailyRunner:
         # The quotes just fetched are split-adjusted; a held line whose
         # share count is not would be marked at half (or double) its
         # value, and every weight, trim and buy below would act on that.
-        self._apply_splits(portfolio, as_of, held_prices)
+        # A held name whose split lookup failed is unpriced for the whole
+        # run, not only for the mark: the scan, the buys and the
+        # rebalance read ``prices``. A copy, because that dict is shared
+        # by every agent.
+        split_unresolved: set[str] = set()
+        self._apply_splits(portfolio, as_of, held_prices, split_unresolved)
+        if split_unresolved:
+            prices = {**prices, **{t: None for t in split_unresolved}}
         portfolio.mark_to_market(held_prices)
         self._flag_unpriced(portfolio, held_prices, as_of)
 
@@ -1871,6 +1878,7 @@ class DailyRunner:
         portfolio: LivePortfolio,
         as_of: date,
         prices: dict[str, float | None],
+        unresolved: set[str] | None = None,
     ) -> list[SplitRecord]:
         """Restate every holding for the stock splits since it was marked.
 
@@ -1902,8 +1910,12 @@ class DailyRunner:
         close mark's refresh both read the ex-date's bar, so this needs
         the vendor to omit the event from both.
 
-        A failed lookup is logged and changes nothing for that name, the
-        same as a failed dividend lookup.
+        A failed lookup leaves the share count alone and treats the name
+        as unpriced for this run: its entry in ``prices`` is set to None,
+        so the mark keeps the last close and nothing trades it on a quote
+        that may be on the post-split basis while the shares are not
+        (follow-up S1). It is said at ERROR and added to ``unresolved``
+        when the caller passes a set.
         """
         if not portfolio.positions:
             return []
@@ -1930,7 +1942,13 @@ class DailyRunner:
             try:
                 events = self.price_loader.splits_between(ticker, since, as_of)
             except Exception as exc:
-                logger.warning(f"{as_of}: split lookup {ticker} failed: {exc}")
+                prices[ticker] = None
+                if unresolved is not None:
+                    unresolved.add(ticker)
+                logger.error(
+                    f"{as_of}: {portfolio.agent} split lookup {ticker} failed: "
+                    f"{exc}; held at its last mark and not traded this run"
+                )
                 continue
             for i, (ex_date, ratio) in enumerate(events):
                 # Today's quote is on the basis after every split, so it
