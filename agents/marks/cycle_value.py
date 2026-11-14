@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Mapping
+from collections.abc import Hashable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
@@ -352,7 +352,7 @@ class HowardMarks(Strategy):
             except (OSError, json.JSONDecodeError) as exc:
                 logger.warning(f"posture history: skipping {path}: {exc}")
                 continue
-            reading = _reading_from_rows(day, rows)
+            reading = _reading_from_rows(day, rows, path)
             if reading is not None:
                 found.append(reading)
                 if len(found) >= POSTURE_PERSISTENCE_SESSIONS:
@@ -587,8 +587,15 @@ class HowardMarks(Strategy):
 _KNOWN_POSTURES: dict[object, Posture] = {p: p for p in get_args(Posture)}
 
 
-def _reading_from_rows(day: date, rows: object) -> PostureReading | None:
-    """The day's last journaled posture reading, or None if it has none."""
+def _reading_from_rows(
+    day: date, rows: object, source: Path
+) -> PostureReading | None:
+    """The day's last journaled posture reading, or None if it has none.
+
+    A posture that is not hashable (a list or dict in a hand-edited or
+    corrupted row) cannot be looked up; that row is skipped with a
+    warning naming ``source`` rather than raising out of ``select``.
+    """
     if not isinstance(rows, list):
         return None
     reading: PostureReading | None = None
@@ -598,7 +605,15 @@ def _reading_from_rows(day: date, rows: object) -> PostureReading | None:
         values = row.get("criteria_values")
         if not isinstance(values, dict):
             continue
-        posture = _KNOWN_POSTURES.get(values.get("posture"))
+        raw_posture = values.get("posture")
+        if not isinstance(raw_posture, Hashable):
+            logger.warning(
+                f"posture history: skipping a row in {source}: posture "
+                f"{raw_posture!r} is a {type(raw_posture).__name__}, "
+                "not a posture name"
+            )
+            continue
+        posture = _KNOWN_POSTURES.get(raw_posture)
         score = values.get("temperature_score")
         if posture is None:
             continue

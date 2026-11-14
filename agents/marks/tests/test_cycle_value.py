@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from loguru import logger as loguru_logger
 
 from agents.marks import cycle_value
 from agents.marks.cycle_value import HowardMarks
@@ -536,3 +538,42 @@ class TestPosturePersistsAcrossSessions:
         assert isinstance(marks.strategy, HowardMarks)
         assert marks.strategy.posture_from_journal is True
         assert marks.strategy.decision_logger is log
+
+    def test_an_unhashable_journaled_posture_skips_the_row_not_the_run(
+        self, empty_cache: EdgarCache, tmp_path: Path
+    ) -> None:
+        # A hand-edited or corrupted journal row whose posture is a list
+        # used to reach a dict lookup and raise TypeError out of select.
+        log = DecisionLogger(root=tmp_path / "decisions")
+        days = (date(2026, 11, 9), date(2026, 11, 10), date(2026, 11, 11))
+        for d in days:
+            _journal_posture(log, d, -2.0, "Cool")
+        (bad,) = [
+            p
+            for p in (log.root / "howard_marks").glob("*.json")
+            if p.name.startswith("2026-11-11")
+        ]
+        rows = json.loads(bad.read_text())
+        rows.append(
+            {"criteria_values": {"posture": ["Hot"], "temperature_score": 2.0}}
+        )
+        bad.write_text(json.dumps(rows))
+        s = HowardMarks(
+            edgar_cache=empty_cache,
+            decision_logger=log,
+            posture_from_journal=True,
+        )
+
+        messages: list[str] = []
+        sink = loguru_logger.add(
+            lambda m: messages.append(str(m)), level="WARNING"
+        )
+        try:
+            readings = s._journal_readings(date(2026, 11, 12))
+        finally:
+            loguru_logger.remove(sink)
+
+        assert [(r.as_of, r.posture) for r in readings] == [
+            (d, "Cool") for d in days
+        ]
+        assert any(str(bad) in m and "posture" in m for m in messages)
