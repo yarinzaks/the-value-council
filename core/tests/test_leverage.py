@@ -142,10 +142,11 @@ class TestDebtToEquity:
         )
         assert debt_to_equity(hri) is None
 
-    def test_liab_eq_exactly_at_the_threshold_still_reads_as_debt_free(
-        self,
-    ) -> None:
-        assert debt_to_equity(_fin(total_liabilities=1_500.0)) == 0.0
+    def test_liab_eq_exactly_at_the_threshold_abstains(self) -> None:
+        assert debt_to_equity(_fin(total_liabilities=1_500.0)) is None
+
+    def test_liab_eq_just_under_the_threshold_reads_as_debt_free(self) -> None:
+        assert debt_to_equity(_fin(total_liabilities=1_499.99)) == 0.0
 
     def test_liab_eq_just_over_the_threshold_abstains(self) -> None:
         assert debt_to_equity(_fin(total_liabilities=1_500.01)) is None
@@ -155,6 +156,41 @@ class TestDebtToEquity:
         assert debt_to_equity(
             _fin(total_debt=2_000.0, total_liabilities=6_000.0)
         ) == pytest.approx(2.0)
+
+
+class TestImplausiblyLowDebt:
+    """A tagged figure that is a sliver of a heavily levered balance
+    sheet is the same evidence as no tag at all: the debt sits in an
+    element the composer did not read (CRTO's $37M of current notes was
+    the only debt figure it found)."""
+
+    def test_sliver_of_debt_on_a_levered_sheet_abstains(self) -> None:
+        assert (
+            debt_to_equity(_fin(total_debt=10.0, total_liabilities=6_000.0))
+            is None
+        )
+
+    def test_reported_zero_on_a_levered_sheet_abstains(self) -> None:
+        assert (
+            debt_to_equity(_fin(total_debt=0.0, total_liabilities=6_000.0))
+            is None
+        )
+
+    def test_small_debt_on_an_unlevered_sheet_is_scored(self) -> None:
+        assert debt_to_equity(
+            _fin(total_debt=10.0, total_liabilities=1_000.0)
+        ) == pytest.approx(0.01)
+
+    def test_debt_at_the_minimum_share_is_scored(self) -> None:
+        # 5% of 6,000 = 300: plausible, scored as reported.
+        assert debt_to_equity(
+            _fin(total_debt=300.0, total_liabilities=6_000.0)
+        ) == pytest.approx(0.3)
+
+    def test_low_debt_without_liabilities_is_scored(self) -> None:
+        assert debt_to_equity(
+            _fin(total_debt=10.0, total_liabilities=None)
+        ) == pytest.approx(0.01)
 
 
 class TestAgentsShareTheRule:

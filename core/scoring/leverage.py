@@ -34,13 +34,20 @@ A complete balance sheet is not enough on its own, though. Audit FUND-4
 found ten holdings with a full balance sheet whose debt sat in elements
 the composer did not read, all scored 0.00 — HRI with liabilities 6.1x
 equity, WH 7.9x, RPD 10.2x. A debt-free company does not carry
-liabilities well beyond its equity on operating items alone, so above
-:data:`MAX_DEBT_FREE_LIABILITIES_TO_EQUITY` absence stays unknown.
+liabilities well beyond its equity on operating items alone, so at or
+above :data:`MAX_DEBT_FREE_LIABILITIES_TO_EQUITY` absence stays unknown.
+A tagged figure below :data:`MIN_DEBT_SHARE_OF_LIABILITIES` of such a
+balance sheet is the same evidence — a fragment of the debt read from
+the one element the composer found (CRTO's $37M of current notes) — and
+is treated the same way.
 """
 
 from __future__ import annotations
 
 from core.backtest.point_in_time import PointInTimeFinancials
+from core.logger import get_logger
+
+logger = get_logger("core.scoring.leverage")
 
 # Fields that together constitute "this filer tagged a balance sheet".
 _BALANCE_SHEET_FIELDS = ("total_assets", "total_liabilities", "current_liabilities")
@@ -51,6 +58,12 @@ _BALANCE_SHEET_FIELDS = ("total_assets", "total_liabilities", "current_liabiliti
 # tags; APH 1.69, FISV 2.11, GOLD 2.33, COLL 4.49, HRI 6.07, WH 7.94 and
 # RPD 10.16 sit above.
 MAX_DEBT_FREE_LIABILITIES_TO_EQUITY = 1.5
+
+# On a balance sheet at or above that leverage, reported debt below this
+# share of total liabilities is implausibly low and the ratio abstains.
+# Uncalibrated against the universe: a conservative floor chosen so that
+# only a sliver of debt against heavy liabilities trips it.
+MIN_DEBT_SHARE_OF_LIABILITIES = 0.05
 
 
 def reported_debt(fin: PointInTimeFinancials) -> float | None:
@@ -74,30 +87,41 @@ def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
     * equity is missing or non-positive — the ratio is undefined;
     * no debt concept was tagged *and* the balance sheet is too sparse
       to read that absence as zero;
-    * no debt concept was tagged *and* liabilities exceed
+    * no debt concept was tagged *and* liabilities are at least
       :data:`MAX_DEBT_FREE_LIABILITIES_TO_EQUITY` times equity — too
-      leveraged for absence to mean no borrowings.
+      leveraged for absence to mean no borrowings;
+    * debt was tagged but is below :data:`MIN_DEBT_SHARE_OF_LIABILITIES`
+      of liabilities on such a balance sheet — implausibly low.
     """
     if fin is None or fin.total_equity is None or fin.total_equity <= 0:
         return None
+    levered = (
+        fin.total_liabilities is not None
+        and fin.total_liabilities / fin.total_equity
+        >= MAX_DEBT_FREE_LIABILITIES_TO_EQUITY
+    )
     debt = reported_debt(fin)
     if debt is None:
-        if not has_complete_balance_sheet(fin):
-            return None
-        # has_complete_balance_sheet guarantees total_liabilities is set;
-        # the None check only narrows the type.
-        if (
-            fin.total_liabilities is not None
-            and fin.total_liabilities / fin.total_equity
-            > MAX_DEBT_FREE_LIABILITIES_TO_EQUITY
-        ):
+        if not has_complete_balance_sheet(fin) or levered:
             return None
         debt = 0.0
+    elif (
+        levered
+        and fin.total_liabilities is not None
+        and debt < MIN_DEBT_SHARE_OF_LIABILITIES * fin.total_liabilities
+    ):
+        logger.info(
+            f"{fin.ticker}: reported debt {debt:,.0f} is under "
+            f"{MIN_DEBT_SHARE_OF_LIABILITIES:.0%} of liabilities "
+            f"{fin.total_liabilities:,.0f}; D/E treated as unknown"
+        )
+        return None
     return debt / fin.total_equity
 
 
 __all__ = [
     "MAX_DEBT_FREE_LIABILITIES_TO_EQUITY",
+    "MIN_DEBT_SHARE_OF_LIABILITIES",
     "debt_to_equity",
     "has_complete_balance_sheet",
     "reported_debt",

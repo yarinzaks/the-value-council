@@ -973,6 +973,95 @@ class TestDebtRollupsAndInstruments:
         assert total == 460.0
         assert source == "instruments+short_term"
 
+    def test_complete_lease_shape_beats_a_newer_one_sided_shape(
+        self, tmp_path: Path
+    ) -> None:
+        # A 10-Q that re-tags only the noncurrent half: taking it because
+        # it is newer drops the current maturities the 10-K roll-up holds.
+        total, source = self._total(
+            tmp_path,
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                9_717.0,
+            ),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 8_648.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 9_717.0
+        assert source == "lease_rollup"
+
+    def test_complete_instrument_shape_beats_a_newer_one_sided_shape(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("SeniorNotes", 989.5),
+            self._at("SeniorLongTermNotes", 489.6,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == pytest.approx(989.5)
+        assert source == "instruments"
+
+    def test_newer_complete_shape_still_beats_an_older_complete_one(
+        self, tmp_path: Path
+    ) -> None:
+        total, _ = self._total(
+            tmp_path,
+            self._at("SeniorNotes", 989.5),
+            self._at("SeniorLongTermNotes", 450.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+            self._at("SeniorNotesCurrent", 500.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 950.0
+
+    def test_instruments_are_read_when_long_term_debt_is_zero(
+        self, tmp_path: Path
+    ) -> None:
+        # A LongTermDebt of zero beside $990M of senior notes is not a
+        # debt-free balance sheet; the larger figure is the debt.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 0.0),
+            self._at("SeniorLongTermNotes", 489.6),
+            self._at("SeniorNotesCurrent", 499.9),
+        )
+        assert total == pytest.approx(989.5)
+        assert source == "instruments"
+
+    def test_a_reported_zero_with_no_instruments_stays_zero(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(tmp_path, self._at("LongTermDebt", 0.0))
+        assert total == 0.0
+        assert source == "rollup"
+
+    def test_overlapping_note_families_are_not_double_counted(
+        self, tmp_path: Path
+    ) -> None:
+        # NotesPayable is defined as all notes payable, senior notes and
+        # convertible notes included: one figure per overlap group.
+        total, source = self._total(
+            tmp_path,
+            self._at("SeniorNotes", 990.0),
+            self._at("NotesPayable", 1_000.0),
+            self._at("ConvertibleNotesPayable", 400.0),
+        )
+        assert total == 1_000.0
+        assert source == "instruments"
+
+    def test_overlap_group_is_still_summed_with_loans_and_credit_lines(
+        self, tmp_path: Path
+    ) -> None:
+        total, _ = self._total(
+            tmp_path,
+            self._at("SeniorNotes", 990.0),
+            self._at("NotesPayable", 1_000.0),
+            self._at("LoansPayable", 200.0),
+            self._at("LineOfCredit", 50.0),
+        )
+        assert total == 1_250.0
+
     def test_stale_rollups_and_instruments_are_ignored(
         self, tmp_path: Path
     ) -> None:

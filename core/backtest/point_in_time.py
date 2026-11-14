@@ -370,7 +370,10 @@ CREATE TABLE IF NOT EXISTS financials (
 # 5: balance-sheet fields take the newest instant instead of preferring
 #    the last 10-K (audit FUND-6); v4 rows stored under a 10-Q accession
 #    hold that 10-K's balance sheet, CALM's three quarters old.
-_PAYLOAD_VERSION = 5
+# 6: total_debt prefers complete debt shapes over newer one-sided ones,
+#    reads instrument lines when long-term debt is zero, and takes one
+#    figure per overlapping notes group; v5 rows can hold a lower total.
+_PAYLOAD_VERSION = 6
 _VERSION_KEY = "_payload_version"
 
 

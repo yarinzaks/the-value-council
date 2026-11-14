@@ -258,25 +258,38 @@ def _instrument_family(
 # LongTermLineOfCredit ($300M) + LongTermNotesPayable/NotesPayableCurrent;
 # CRTO NotesPayableCurrent ($37M). The two convertible element sets
 # describe the same instrument, so they are one family, not two.
-_INSTRUMENT_DEBT_FAMILIES: tuple[tuple[tuple[str, tuple[str, ...]], ...], ...] = (
+#
+# Families are grouped by overlap. NotesPayable is defined as all notes
+# payable, which includes senior notes and convertible notes, so a filer
+# tagging NotesPayable beside SeniorNotes may be reporting one borrowing
+# twice; the groups take the largest family in each and sum across
+# groups. Loans and credit lines are distinct instruments.
+_DebtShapes = tuple[tuple[str, tuple[str, ...]], ...]
+_INSTRUMENT_DEBT_GROUPS: tuple[tuple[_DebtShapes, ...], ...] = (
     (
-        ("convertible_rollup", ("ConvertibleDebt",)),
-        ("convertible_notes_rollup", ("ConvertibleNotesPayable",)),
-        ("convertible_split", ("ConvertibleDebtNoncurrent", "ConvertibleDebtCurrent")),
         (
-            "convertible_notes_split",
-            ("ConvertibleLongTermNotesPayable", "ConvertibleNotesPayableCurrent"),
+            ("convertible_rollup", ("ConvertibleDebt",)),
+            ("convertible_notes_rollup", ("ConvertibleNotesPayable",)),
+            ("convertible_split", ("ConvertibleDebtNoncurrent", "ConvertibleDebtCurrent")),
+            (
+                "convertible_notes_split",
+                ("ConvertibleLongTermNotesPayable", "ConvertibleNotesPayableCurrent"),
+            ),
+            ("convertible_noncurrent_only", ("ConvertibleDebtNoncurrent",)),
+            ("convertible_notes_noncurrent_only", ("ConvertibleLongTermNotesPayable",)),
+            ("convertible_current_only", ("ConvertibleDebtCurrent",)),
+            ("convertible_notes_current_only", ("ConvertibleNotesPayableCurrent",)),
         ),
-        ("convertible_noncurrent_only", ("ConvertibleDebtNoncurrent",)),
-        ("convertible_notes_noncurrent_only", ("ConvertibleLongTermNotesPayable",)),
-        ("convertible_current_only", ("ConvertibleDebtCurrent",)),
-        ("convertible_notes_current_only", ("ConvertibleNotesPayableCurrent",)),
+        _instrument_family(
+            "senior_notes", "SeniorNotes", "SeniorLongTermNotes", "SeniorNotesCurrent"
+        ),
+        _instrument_family("notes", "NotesPayable", "LongTermNotesPayable", "NotesPayableCurrent"),
     ),
-    _instrument_family("senior_notes", "SeniorNotes", "SeniorLongTermNotes", "SeniorNotesCurrent"),
-    _instrument_family("loans", "LoansPayable", "LongTermLoansPayable", "LoansPayableCurrent"),
-    _instrument_family("notes", "NotesPayable", "LongTermNotesPayable", "NotesPayableCurrent"),
-    _instrument_family(
-        "line_of_credit", "LineOfCredit", "LongTermLineOfCredit", "LinesOfCreditCurrent"
+    (_instrument_family("loans", "LoansPayable", "LongTermLoansPayable", "LoansPayableCurrent"),),
+    (
+        _instrument_family(
+            "line_of_credit", "LineOfCredit", "LongTermLineOfCredit", "LinesOfCreditCurrent"
+        ),
     ),
 )
 
@@ -591,16 +604,21 @@ class FundamentalsFetcher:
         """Resolve one family of alternative debt tags to a single figure.
 
         Each shape is ``(label, concepts)``: the concepts are summed and
-        all of them must be present. The shape describing the newest
-        balance sheet wins (a shape is as old as its oldest component),
-        and on a tie the earlier shape wins — so a roll-up is never added
-        to its own split, and a split beats either half on its own.
+        all of them must be present. A complete shape (a roll-up or a
+        split) beats a one-sided one (label ending ``_only``) whatever
+        their dates: a 10-Q that re-tags only the noncurrent half would
+        otherwise displace the 10-K roll-up and drop the current
+        maturities. Within the same completeness the shape describing
+        the newest balance sheet wins (a shape is as old as its oldest
+        component), and on a tie the earlier shape wins — so a roll-up is
+        never added to its own split.
 
         Returns ``(value, period_end, label)``, or ``None`` when no shape
         has every component within the age bound.
         """
         cache: dict[str, XbrlFact | None] = {}
         best: tuple[float, date, str] | None = None
+        best_rank: tuple[bool, date] = (False, date.min)
         for label, concepts in shapes:
             facts: list[XbrlFact] = []
             for concept in concepts:
@@ -612,8 +630,10 @@ class FundamentalsFetcher:
                 facts.append(fact)
             else:
                 period_end = min(f.period_end for f in facts)
-                if best is None or period_end > best[1]:
+                rank = (not label.endswith("_only"), period_end)
+                if best is None or rank > best_rank:
                     best = (sum(f.value for f in facts), period_end, label)
+                    best_rank = rank
         return best
 
     def _instrument_debt(
@@ -624,15 +644,22 @@ class FundamentalsFetcher:
         Some filers never tag a long-term-debt total at all and put each
         borrowing on its own balance-sheet line: RPD's convertible, ALRM's
         senior notes, COLL's term loan beside its convertible, GOLD's
-        revolver. Each family is resolved roll-up-or-split on its own,
-        then the families are summed. Only reached when no total exists,
-        because a total already contains these lines.
+        revolver. Each family is resolved roll-up-or-split on its own;
+        within an overlap group the largest family is taken, and the
+        groups are summed (see :data:`_INSTRUMENT_DEBT_GROUPS`). Only
+        reached when no long-term total exists or it reads zero, because
+        a total already contains these lines.
         """
-        found = [
-            resolved[0]
-            for family in _INSTRUMENT_DEBT_FAMILIES
-            if (resolved := self._resolve_debt_shapes(ticker, as_of, family)) is not None
-        ]
+        found: list[float] = []
+        for group in _INSTRUMENT_DEBT_GROUPS:
+            values = [
+                resolved[0]
+                for family in group
+                if (resolved := self._resolve_debt_shapes(ticker, as_of, family))
+                is not None
+            ]
+            if values:
+                found.append(max(values))
         return sum(found) if found else None
 
     def _compute_total_debt(
@@ -663,8 +690,10 @@ class FundamentalsFetcher:
         carries a few percent of leases beats reading a levered balance
         sheet as debt-free (audit FUND-4).
 
-        When neither total exists, per-instrument tags are summed (see
-        :meth:`_instrument_debt`).
+        When neither total exists, or the long-term figure is zero,
+        per-instrument tags are summed (see :meth:`_instrument_debt`) and
+        the larger of the two figures is kept — never both, since a total
+        already contains the instrument lines.
         """
         ltd_noncurrent = self._debt_fact(ticker, "LongTermDebtNoncurrent", as_of)
         ltd_current = self._debt_fact(ticker, "LongTermDebtCurrent", as_of)
@@ -704,9 +733,10 @@ class FundamentalsFetcher:
                 # short-term tags on top would count them twice.
                 return long_term, source
 
-        if long_term is None:
-            long_term = self._instrument_debt(ticker, as_of)
-            if long_term is not None:
+        if not long_term:  # None, or a zero beside instrument lines
+            instruments = self._instrument_debt(ticker, as_of)
+            if instruments is not None and (long_term is None or instruments > long_term):
+                long_term = instruments
                 source = "instruments"
 
         if long_term is None and short_term is None:
