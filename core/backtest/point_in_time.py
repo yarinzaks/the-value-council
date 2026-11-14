@@ -380,7 +380,11 @@ CREATE TABLE IF NOT EXISTS financials (
 # 8: the LongTermDebt and lease-inclusive families are ranked by
 #    completeness before recency, and a one-sided long-term reading no
 #    longer blocks the instrument fallback; v7 rows can hold a lower total.
-_PAYLOAD_VERSION = 8
+# 9: a LongTermDebt split is dated by its oldest half, a same-date tie
+#    keeps the larger total, and disjoint one-sided halves (across the
+#    two families, or against the instrument lines) are summed instead
+#    of one replacing the other; v8 rows can hold a lower total.
+_PAYLOAD_VERSION = 9
 _VERSION_KEY = "_payload_version"
 
 

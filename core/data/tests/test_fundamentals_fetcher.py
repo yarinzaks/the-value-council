@@ -1183,15 +1183,154 @@ class TestDebtRollupsAndInstruments:
     def test_larger_one_sided_long_term_debt_beats_smaller_instruments(
         self, tmp_path: Path
     ) -> None:
-        # The larger reading is kept, never the sum: the one-sided figure
-        # may already contain the instrument lines.
+        # Same half: the larger reading is kept, never the sum, because
+        # the one-sided total may already contain the instrument lines.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("SeniorLongTermNotes", 400.0),
+        )
+        assert total == 1_000.0
+        assert source == "noncurrent_only"
+
+    def test_noncurrent_long_term_debt_and_current_instruments_are_summed(
+        self, tmp_path: Path
+    ) -> None:
+        # Opposite halves are disjoint: LongTermDebtNoncurrent excludes
+        # the current maturities SeniorNotesCurrent reports, so keeping
+        # the larger dropped the 37.
         total, source = self._total(
             tmp_path,
             self._at("LongTermDebtNoncurrent", 1_000.0),
             self._at("SeniorNotesCurrent", 37.0),
         )
-        assert total == 1_000.0
+        assert total == 1_037.0
+        assert source == "noncurrent_only+instruments"
+
+    def test_current_long_term_debt_and_noncurrent_instruments_are_summed(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("SeniorLongTermNotes", 990.0),
+        )
+        assert total == 1_027.0
+        assert source == "current_only+instruments"
+
+    def test_mixed_half_instruments_are_not_summed_with_a_one_sided_total(
+        self, tmp_path: Path
+    ) -> None:
+        # The loans roll-up covers both halves, so it may hold the 37 of
+        # current maturities: only wholly disjoint halves are summed.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("SeniorLongTermNotes", 500.0),
+            self._at("LoansPayable", 200.0),
+        )
+        assert total == 700.0
+        assert source == "instruments"
+
+    def test_ltd_split_is_dated_by_its_oldest_component(
+        self, tmp_path: Path
+    ) -> None:
+        # A split is only as current as its oldest half, the same rule
+        # the lease shapes use. Dating it by its newest half made a split
+        # half from 2025-09-30 outrank a 2025-12-31 lease roll-up.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 100.0,
+                     period_end=date(2025, 9, 30), filed=date(2025, 11, 5)),
+            self._at("LongTermDebtCurrent", 37.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                9_717.0,
+            ),
+        )
+        assert total == 9_717.0
+        assert source == "lease_rollup"
+
+    def test_ltd_split_with_a_newer_current_half_does_not_beat_lease_rollup(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe: the split's oldest half is the FY balance
+        # sheet, a tie with the roll-up, and the larger complete wins.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 100.0),
+            self._at("LongTermDebtCurrent", 37.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                9_717.0,
+            ),
+        )
+        assert total == 9_717.0
+        assert source == "lease_rollup"
+
+    def test_complete_readings_tied_on_date_keep_the_larger(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 0.0),
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                9_717.0,
+            ),
+        )
+        assert total == 9_717.0
+        assert source == "lease_rollup"
+
+    def test_one_sided_halves_from_both_families_are_summed(
+        self, tmp_path: Path
+    ) -> None:
+        # A newer LongTermDebtCurrent sliver must not replace the 9,000 of
+        # noncurrent lease-inclusive debt: the halves are disjoint.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+            self._at("LongTermDebtCurrent", 37.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 9_037.0
+        assert source == "current_only+lease_noncurrent_only"
+
+    def test_same_half_one_sided_readings_keep_the_newer(
+        self, tmp_path: Path
+    ) -> None:
+        # The same half from two families describes the same balance-sheet
+        # line; the newer balance sheet is kept, as within a family.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtAndCapitalLeaseObligations", 9_000.0),
+            self._at("LongTermDebtNoncurrent", 100.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 100.0
         assert source == "noncurrent_only"
+
+    def test_lease_win_does_not_mask_a_one_sided_long_term_debt(
+        self, tmp_path: Path
+    ) -> None:
+        # The complete lease roll-up wins over the newer one-sided
+        # LongTermDebtNoncurrent, but the LongTermDebt family was
+        # one-sided, so the instrument lines are still read and the
+        # larger figure kept.
+        total, source = self._total(
+            tmp_path,
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                500.0,
+            ),
+            self._at("LongTermDebtNoncurrent", 100.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+            self._at("SeniorNotes", 990.0),
+        )
+        assert total == 990.0
+        assert source == "instruments"
 
     def test_overlap_group_is_still_summed_with_loans_and_credit_lines(
         self, tmp_path: Path
