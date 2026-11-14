@@ -1332,6 +1332,116 @@ class TestDebtRollupsAndInstruments:
         assert total == 990.0
         assert source == "instruments"
 
+    def test_completing_an_instrument_split_does_not_lower_the_total(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x1: SeniorNotesCurrent is a current line, never
+        # inside LongTermDebtNoncurrent. Adding SeniorLongTermNotes made
+        # the senior split complete and the 37 disappeared into a max.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("SeniorNotesCurrent", 37.0),
+            self._at("SeniorLongTermNotes", 400.0),
+        )
+        assert total == 1_037.0
+        assert source == "noncurrent_only+instruments"
+
+    def test_a_noncurrent_instrument_in_another_group_keeps_current_lines(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x2: the noncurrent senior notes may sit inside
+        # the noncurrent total; the current loans cannot.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("LoansPayableCurrent", 50.0),
+            self._at("SeniorLongTermNotes", 400.0),
+        )
+        assert total == 1_050.0
+        assert source == "noncurrent_only+instruments"
+
+    def test_a_current_only_total_keeps_noncurrent_instrument_lines(
+        self, tmp_path: Path
+    ) -> None:
+        # The mirror: a current-only total may contain the current loans,
+        # never the noncurrent senior notes.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("SeniorLongTermNotes", 990.0),
+            self._at("LoansPayableCurrent", 20.0),
+        )
+        assert total == 1_027.0
+        assert source == "current_only+instruments"
+
+    def test_overlap_alternative_is_chosen_by_the_combined_total(
+        self, tmp_path: Path
+    ) -> None:
+        # Within an overlap group the larger alternative alone (40 of
+        # noncurrent senior notes) may vanish into the noncurrent total,
+        # while the smaller one (37 of current notes) is disjoint from it.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("NotesPayableCurrent", 37.0),
+            self._at("SeniorLongTermNotes", 40.0),
+        )
+        assert total == 1_037.0
+        assert source == "noncurrent_only+instruments"
+
+    def test_instrument_rollup_beside_a_noncurrent_total_keeps_the_larger(
+        self, tmp_path: Path
+    ) -> None:
+        # A roll-up covers both halves in unknown shares, so it may sit
+        # inside the noncurrent total: kept as the larger, not summed.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("LoansPayable", 200.0),
+        )
+        assert total == 1_000.0
+        assert source == "noncurrent_only"
+
+    def test_larger_one_sided_debt_beside_a_lease_split_keeps_both_halves(
+        self, tmp_path: Path
+    ) -> None:
+        # Reviewer probe x8: on the same balance sheet the complete lease
+        # split replaced 1,000 of noncurrent debt with 437. The noncurrent
+        # reading is kept and the split's current half, disjoint from it,
+        # is added.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 400.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 37.0),
+        )
+        assert total == 1_037.0
+        assert source == "noncurrent_only+lease_current_only"
+
+    def test_smaller_or_stale_one_sided_debt_does_not_split_a_lease_split(
+        self, tmp_path: Path
+    ) -> None:
+        # A newer sliver smaller than the split's own noncurrent half, or
+        # a larger reading from an older balance sheet, leaves the
+        # complete split in charge, as before.
+        newer_sliver = self._total(
+            tmp_path / "sliver",
+            self._at("LongTermDebtNoncurrent", 300.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 400.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 37.0),
+        )
+        stale_larger = self._total(
+            tmp_path / "stale",
+            self._at("LongTermDebtNoncurrent", 1_000.0,
+                     period_end=date(2025, 9, 30), filed=date(2025, 11, 5)),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 400.0),
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 37.0),
+        )
+        assert newer_sliver == (437.0, "lease_split")
+        assert stale_larger == (437.0, "lease_split")
+
     def test_overlap_group_is_still_summed_with_loans_and_credit_lines(
         self, tmp_path: Path
     ) -> None:

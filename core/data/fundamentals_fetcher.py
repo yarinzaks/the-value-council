@@ -34,7 +34,8 @@ adapter, we fall back to that source for missing fields.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Literal
@@ -315,10 +316,9 @@ _INSTRUMENT_DEBT_GROUPS: tuple[tuple[tuple[_DebtShapes, ...], ...], ...] = (
 
 # Which part of the balance sheet a debt reading covers. A roll-up or a
 # split is "complete"; a one-sided shape covers only its "noncurrent" or
-# "current" half; a sum of instrument families that do not all cover the
-# same part is "mixed". Two readings are disjoint only when one covers
-# exactly the noncurrent half and the other exactly the current half.
-_DebtHalf = Literal["complete", "noncurrent", "current", "mixed"]
+# "current" half. Two readings are disjoint only when one covers exactly
+# the noncurrent half and the other exactly the current half.
+_DebtHalf = Literal["complete", "noncurrent", "current"]
 
 
 def _debt_half(label: str) -> _DebtHalf:
@@ -331,16 +331,99 @@ def _debt_half(label: str) -> _DebtHalf:
     return "complete"
 
 
-def _combined_half(halves: Iterable[_DebtHalf]) -> _DebtHalf:
-    """The half a sum of readings covers: theirs if they all agree."""
-    distinct = set(halves)
-    if len(distinct) == 1:
-        return distinct.pop()
-    return "mixed"
-
-
 def _disjoint_halves(first: _DebtHalf, second: _DebtHalf) -> bool:
     return {first, second} == {"noncurrent", "current"}
+
+
+@dataclass(frozen=True)
+class _DebtParts:
+    """A debt reading broken down by the half each amount covers.
+
+    A split contributes its noncurrent and current components, a
+    one-sided shape its one half, and a roll-up goes to ``whole``: it
+    covers both halves in proportions the filing does not state.
+    """
+
+    noncurrent: float = 0.0
+    current: float = 0.0
+    whole: float = 0.0
+
+    def __add__(self, other: _DebtParts) -> _DebtParts:
+        return _DebtParts(
+            self.noncurrent + other.noncurrent,
+            self.current + other.current,
+            self.whole + other.whole,
+        )
+
+    @property
+    def total(self) -> float:
+        return self.noncurrent + self.current + self.whole
+
+
+def _debt_parts(facts: Sequence[XbrlFact], label: str) -> _DebtParts:
+    """The parts of one resolved shape. Every split shape lists its
+    noncurrent concept before its current one."""
+    half = _debt_half(label)
+    value = sum(f.value for f in facts)
+    if half == "noncurrent":
+        return _DebtParts(noncurrent=value)
+    if half == "current":
+        return _DebtParts(current=value)
+    if len(facts) == 2:
+        return _DebtParts(noncurrent=facts[0].value, current=facts[1].value)
+    return _DebtParts(whole=value)
+
+
+def _with_instruments(
+    long_term: float | None, half: _DebtHalf, parts: _DebtParts
+) -> tuple[float, bool]:
+    """Long-term debt combined with instrument lines, and whether the
+    long-term figure was kept as the base.
+
+    A total may already contain every instrument amount on its own half
+    and the roll-ups (which straddle both), so those are kept as the
+    larger of the two; amounts on the opposite half are disjoint from a
+    one-sided total and are added. Each input only ever raises the result.
+    """
+    if not long_term:
+        return parts.total, False
+    if half == "complete":
+        overlapping, disjoint = parts.total, 0.0
+    elif half == "noncurrent":
+        overlapping, disjoint = parts.noncurrent + parts.whole, parts.current
+    else:
+        overlapping, disjoint = parts.current + parts.whole, parts.noncurrent
+    if overlapping > long_term:
+        return overlapping + disjoint, False
+    return long_term + disjoint, True
+
+
+def _other_half_of_split(
+    one_sided: tuple[float, date, str],
+    split: tuple[float, date, str],
+    split_parts: _DebtParts,
+) -> tuple[float, Literal["noncurrent", "current"]] | None:
+    """The half of a complete split that a one-sided reading leaves out.
+
+    Returned only when ``split`` is the lease-inclusive noncurrent +
+    current split, ``one_sided`` is a one-sided reading of the other
+    family describing a balance sheet at least as new, and it is larger
+    than the split's own figure for that half: it then supersedes that
+    half alone, and the returned ``(value, half)`` is what to add to it.
+    A smaller or older one-sided reading returns ``None`` and the usual
+    completeness-first rule applies.
+    """
+    half = _debt_half(one_sided[2])
+    if half == "complete" or split[2] != "lease_split" or one_sided[1] < split[1]:
+        return None
+    other: tuple[float, Literal["noncurrent", "current"]]
+    if half == "noncurrent":
+        same, other = split_parts.noncurrent, (split_parts.current, "current")
+    else:
+        same, other = split_parts.current, (split_parts.noncurrent, "noncurrent")
+    if one_sided[0] <= same:
+        return None
+    return other
 
 
 def _debt_reading(facts: Sequence[XbrlFact], label: str) -> tuple[float, date, str]:
@@ -705,9 +788,20 @@ class FundamentalsFetcher:
         Returns ``(value, period_end, label)``, or ``None`` when no shape
         has every component within the age bound.
         """
+        resolved = self._resolve_debt_parts(ticker, as_of, shapes)
+        return None if resolved is None else resolved[0]
+
+    def _resolve_debt_parts(
+        self,
+        ticker: str,
+        as_of: date | datetime,
+        shapes: tuple[tuple[str, tuple[str, ...]], ...],
+    ) -> tuple[tuple[float, date, str], _DebtParts] | None:
+        """:meth:`_resolve_debt_shapes`, with the chosen shape's
+        :class:`_DebtParts` beside its reading."""
         cache: dict[str, XbrlFact | None] = {}
-        complete: tuple[float, date, str] | None = None
-        one_sided: tuple[float, date, str] | None = None
+        complete: tuple[tuple[float, date, str], _DebtParts] | None = None
+        one_sided: tuple[tuple[float, date, str], _DebtParts] | None = None
         for label, concepts in shapes:
             facts: list[XbrlFact] = []
             for concept in concepts:
@@ -718,67 +812,65 @@ class FundamentalsFetcher:
                     break
                 facts.append(fact)
             else:
-                found = _debt_reading(facts, label)
-                period_end = found[1]
+                found = (_debt_reading(facts, label), _debt_parts(facts, label))
+                period_end = found[0][1]
                 if label.endswith("_only"):
-                    if one_sided is None or period_end > one_sided[1]:
+                    if one_sided is None or period_end > one_sided[0][1]:
                         one_sided = found
-                elif complete is None or period_end > complete[1]:
+                elif complete is None or period_end > complete[0][1]:
                     complete = found
         if complete is None:
             return one_sided
         if (
             one_sided is not None
-            and one_sided[1] > complete[1]
-            and one_sided[0] > complete[0]
+            and one_sided[0][1] > complete[0][1]
+            and one_sided[0][0] > complete[0][0]
         ):
             return one_sided
         return complete
 
     def _instrument_debt(
         self, ticker: str, as_of: date | datetime
-    ) -> tuple[float, _DebtHalf] | None:
-        """Debt summed from per-instrument tags, and the half it covers.
+    ) -> list[_DebtParts] | None:
+        """Candidate readings of debt summed from per-instrument tags.
 
         Some filers never tag a long-term-debt total at all and put each
         borrowing on its own balance-sheet line: RPD's convertible, ALRM's
         senior notes, COLL's term loan beside its convertible, GOLD's
         revolver. Each family is resolved roll-up-or-split on its own;
         within an overlap group each alternative reading sums its
-        families, the largest reading is taken, and the groups are summed
-        (see :data:`_INSTRUMENT_DEBT_GROUPS`).
+        families, and the groups are summed (see
+        :data:`_INSTRUMENT_DEBT_GROUPS`).
 
         Reached when no long-term total exists, it reads zero, or it is
-        one-sided. The half is returned so the caller can tell whether
-        this reading and a one-sided total are disjoint (one noncurrent,
-        the other current: summed) or may overlap (kept as the larger,
-        because a total already contains these lines). It is
-        ``"complete"``, ``"noncurrent"`` or ``"current"`` when every
-        family taken covers that part, and ``"mixed"`` otherwise.
+        one-sided. One candidate is returned per choice of alternative in
+        each overlap group, each as :class:`_DebtParts`, so the caller can
+        pick the choice whose combination with a one-sided total is
+        largest: the amounts on the total's half may already be inside
+        it, those on the other half are not (see
+        :func:`_with_instruments`). Picking the larger alternative by its
+        own sum first would let 40 of noncurrent notes that vanish into a
+        noncurrent total beat 37 of current notes that add to it. With no
+        total, the largest candidate is the largest reading per group,
+        summed. ``None`` when no instrument family is tagged.
         """
-        found: list[tuple[float, _DebtHalf]] = []
+        groups: list[list[_DebtParts]] = []
         for group in _INSTRUMENT_DEBT_GROUPS:
-            best: tuple[float, _DebtHalf] | None = None
+            readings: list[_DebtParts] = []
             for alternative in group:
                 resolved_families = [
-                    resolved
+                    resolved[1]
                     for family in alternative
-                    if (resolved := self._resolve_debt_shapes(ticker, as_of, family))
+                    if (resolved := self._resolve_debt_parts(ticker, as_of, family))
                     is not None
                 ]
-                if not resolved_families:
-                    continue
-                reading = (
-                    sum(r[0] for r in resolved_families),
-                    _combined_half(_debt_half(r[2]) for r in resolved_families),
-                )
-                if best is None or reading[0] > best[0]:
-                    best = reading
-            if best is not None:
-                found.append(best)
-        if not found:
+                if resolved_families:
+                    readings.append(sum(resolved_families, _DebtParts()))
+            if readings:
+                groups.append(readings)
+        if not groups:
             return None
-        return sum(f[0] for f in found), _combined_half(f[1] for f in found)
+        return [sum(choice, _DebtParts()) for choice in itertools.product(*groups)]
 
     def _compute_total_debt(
         self, ticker: str, as_of: date | datetime
@@ -812,15 +904,18 @@ class FundamentalsFetcher:
 
         One-sided readings from the two families that cover opposite
         halves (one only noncurrent, the other only current) are disjoint
-        and summed; of the same half, the rule above picks one.
+        and summed; of the same half, the rule above picks one. A larger
+        one-sided LongTermDebt reading, at least as new as a complete
+        lease split, replaces only the split's half on its side, and the
+        split's other half is added.
 
         When neither total exists, the long-term figure is zero, or it or
         the LongTermDebt family is one-sided (only the noncurrent or only
-        the current half), per-instrument tags are summed (see
-        :meth:`_instrument_debt`). If the long-term figure and the
-        instruments cover opposite halves they are added; otherwise the
-        larger is kept — never both, since a total covering the same half
-        may already contain the instrument lines.
+        the current half), per-instrument tags are read (see
+        :meth:`_instrument_debt`). Instrument amounts on the opposite half
+        of a one-sided total are added to it; amounts on its own half and
+        instrument roll-ups are kept as the larger of them and the total
+        — never both, since the total may already contain those lines.
         """
         ltd_noncurrent = self._debt_fact(ticker, "LongTermDebtNoncurrent", as_of)
         ltd_current = self._debt_fact(ticker, "LongTermDebtCurrent", as_of)
@@ -861,8 +956,22 @@ class FundamentalsFetcher:
         # are summed: a newer LongTermDebtCurrent sliver must not replace
         # the noncurrent lease-inclusive debt beside it. Two of the same
         # half describe one line, and the rule above picks between them.
-        lease = self._resolve_debt_shapes(ticker, as_of, _LEASE_INCLUSIVE_DEBT_SHAPES)
+        #
+        # A complete lease split holds both halves as separate figures. A
+        # one-sided LongTermDebt reading at least as new as the split and
+        # larger than the split's own half on that side replaces only that
+        # half; the split's other half is disjoint from it and is added,
+        # rather than the whole split replacing the larger reading.
+        lease_found = self._resolve_debt_parts(
+            ticker, as_of, _LEASE_INCLUSIVE_DEBT_SHAPES
+        )
+        lease = None if lease_found is None else lease_found[0]
         ltd = _debt_reading(used, source) if used else None
+        lease_other_half = (
+            None
+            if ltd is None or lease_found is None
+            else _other_half_of_split(ltd, *lease_found)
+        )
         if (
             ltd is not None
             and lease is not None
@@ -870,6 +979,11 @@ class FundamentalsFetcher:
         ):
             long_term = ltd[0] + lease[0]
             source = f"{ltd[2]}+{lease[2]}"
+            long_term_half = "complete"
+        elif ltd is not None and lease_other_half is not None:
+            other_value, other_half = lease_other_half
+            long_term = ltd[0] + other_value
+            source = f"{ltd[2]}+lease_{other_half}_only"
             long_term_half = "complete"
         elif lease is not None and _prefer_debt_reading(ltd, lease) is lease:
             long_term, _lease_end, source = lease
@@ -884,23 +998,31 @@ class FundamentalsFetcher:
         # (CRTO's $37M of current maturities beside $990M of senior
         # notes): the instrument lines are read. Gated on the
         # LongTermDebt family's own label too, so a lease win cannot mask
-        # a one-sided LongTermDebt reading. Disjoint halves (a noncurrent
-        # total beside current-only instruments, or the reverse) are
-        # summed; otherwise the larger is kept, since a total that covers
-        # the instruments' half may already contain them.
+        # a one-sided LongTermDebt reading. Instrument amounts on the
+        # opposite half of a one-sided total are disjoint from it and are
+        # added; those on its half, and roll-ups that straddle both, may
+        # already be inside it, so the larger of them and the total is
+        # kept (see :func:`_with_instruments`).
         if (
             not long_term
             or long_term_half != "complete"
             or _debt_half(ltd_source) != "complete"
         ):
-            instruments = self._instrument_debt(ticker, as_of)
-            if instruments is not None:
-                instrument_total, instrument_half = instruments
-                if long_term and _disjoint_halves(long_term_half, instrument_half):
-                    long_term += instrument_total
-                    source = f"{source}+instruments"
-                elif long_term is None or instrument_total > long_term:
-                    long_term = instrument_total
+            candidates = self._instrument_debt(ticker, as_of)
+            if candidates is not None:
+                combined, kept_total = max(
+                    (
+                        _with_instruments(long_term, long_term_half, parts)
+                        for parts in candidates
+                    ),
+                    key=lambda result: result[0],
+                )
+                if kept_total:
+                    if long_term is not None and combined > long_term:
+                        long_term = combined
+                        source = f"{source}+instruments"
+                elif long_term is None or combined > long_term:
+                    long_term = combined
                     source = "instruments"
         if source == "debt_and_lease_total":
             # A zero total the instruments did not beat: still a total

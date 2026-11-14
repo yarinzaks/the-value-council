@@ -384,7 +384,12 @@ CREATE TABLE IF NOT EXISTS financials (
 #    keeps the larger total, and disjoint one-sided halves (across the
 #    two families, or against the instrument lines) are summed instead
 #    of one replacing the other; v8 rows can hold a lower total.
-_PAYLOAD_VERSION = 9
+# 10: instrument lines are split by half, so the current part of a
+#     complete or mixed instrument reading is added to a noncurrent-only
+#     total (and the reverse) instead of being lost in a max, and a larger
+#     one-sided LongTermDebt reading keeps the other half of a same-date
+#     lease split; v9 rows can hold a lower total.
+_PAYLOAD_VERSION = 10
 _VERSION_KEY = "_payload_version"
 
 
