@@ -377,7 +377,10 @@ CREATE TABLE IF NOT EXISTS financials (
 #    than capped by the larger family, a zero DebtAndCapitalLeaseObligations
 #    reaches the instrument fallback, and a newer larger one-sided shape
 #    beats an older complete one; v6 rows can hold a lower total.
-_PAYLOAD_VERSION = 7
+# 8: the LongTermDebt and lease-inclusive families are ranked by
+#    completeness before recency, and a one-sided long-term reading no
+#    longer blocks the instrument fallback; v7 rows can hold a lower total.
+_PAYLOAD_VERSION = 8
 _VERSION_KEY = "_payload_version"
 
 

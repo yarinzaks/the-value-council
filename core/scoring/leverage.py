@@ -37,9 +37,10 @@ equity, WH 7.9x, RPD 10.2x. A debt-free company does not carry
 liabilities well beyond its equity on operating items alone, so at or
 above :data:`MAX_DEBT_FREE_LIABILITIES_TO_EQUITY` absence stays unknown.
 A tagged figure below :data:`MIN_DEBT_SHARE_OF_LIABILITIES` of such a
-balance sheet is the same evidence — a fragment of the debt read from
-the one element the composer found (CRTO's $37M of current notes) — and
-is treated the same way.
+balance sheet may be a fragment of the debt read from the one element
+the composer found (CRTO's $37M of current notes), but it is also what a
+bank or insurer looks like. The floor is uncalibrated, so it only logs a
+warning; D/E is still scored from the reported figure.
 """
 
 from __future__ import annotations
@@ -60,9 +61,9 @@ _BALANCE_SHEET_FIELDS = ("total_assets", "total_liabilities", "current_liabiliti
 MAX_DEBT_FREE_LIABILITIES_TO_EQUITY = 1.5
 
 # On a balance sheet at or above that leverage, reported debt below this
-# share of total liabilities is implausibly low and the ratio abstains.
-# Uncalibrated against the universe: a conservative floor chosen so that
-# only a sliver of debt against heavy liabilities trips it.
+# share of total liabilities is implausibly low and logged as a warning.
+# Uncalibrated against the universe, so it does not change the ratio;
+# making it a filter is an owner decision after calibration.
 MIN_DEBT_SHARE_OF_LIABILITIES = 0.05
 
 
@@ -89,9 +90,11 @@ def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
       to read that absence as zero;
     * no debt concept was tagged *and* liabilities are at least
       :data:`MAX_DEBT_FREE_LIABILITIES_TO_EQUITY` times equity — too
-      leveraged for absence to mean no borrowings;
-    * debt was tagged but is below :data:`MIN_DEBT_SHARE_OF_LIABILITIES`
-      of liabilities on such a balance sheet — implausibly low.
+      leveraged for absence to mean no borrowings.
+
+    Debt that was tagged but is below :data:`MIN_DEBT_SHARE_OF_LIABILITIES`
+    of liabilities on such a balance sheet is logged as a warning and
+    still scored from the reported figure.
     """
     if fin is None or fin.total_equity is None or fin.total_equity <= 0:
         return None
@@ -110,12 +113,16 @@ def debt_to_equity(fin: PointInTimeFinancials | None) -> float | None:
         and fin.total_liabilities is not None
         and debt < MIN_DEBT_SHARE_OF_LIABILITIES * fin.total_liabilities
     ):
-        logger.info(
-            f"{fin.ticker}: reported debt {debt:,.0f} is under "
-            f"{MIN_DEBT_SHARE_OF_LIABILITIES:.0%} of liabilities "
-            f"{fin.total_liabilities:,.0f}; D/E treated as unknown"
+        # Flag only. Returning None here would make every entry filter
+        # reject the name, and an uncalibrated floor would silently drop
+        # banks and insurers, whose liabilities are deposits and reserves.
+        logger.warning(
+            f"{fin.ticker}: reported debt {debt:,.0f} is "
+            f"{debt / fin.total_liabilities:.2%} of liabilities "
+            f"{fin.total_liabilities:,.0f}, under the "
+            f"{MIN_DEBT_SHARE_OF_LIABILITIES:.0%} floor; D/E scored from "
+            f"reported debt, which may be understated"
         )
-        return None
     return debt / fin.total_equity
 
 

@@ -1112,6 +1112,87 @@ class TestDebtRollupsAndInstruments:
         )
         assert total == 2_000.0
 
+    def test_complete_lease_rollup_beats_a_newer_one_sided_long_term_debt(
+        self, tmp_path: Path
+    ) -> None:
+        # Completeness before recency holds across the LongTermDebt and
+        # lease-inclusive families too: a 10-Q that re-tags only a sliver
+        # of noncurrent debt must not replace the complete 10-K total.
+        total, source = self._total(
+            tmp_path,
+            self._at(
+                "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+                9_717.0,
+            ),
+            self._at("LongTermDebtNoncurrent", 100.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 9_717.0
+        assert source == "lease_rollup"
+
+    def test_complete_long_term_debt_beats_a_newer_one_sided_lease_shape(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 9_717.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 8_648.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 9_717.0
+        assert source == "rollup"
+
+    def test_newer_larger_one_sided_lease_shape_beats_older_long_term_debt(
+        self, tmp_path: Path
+    ) -> None:
+        # The same exception as inside a family: debt that grew past the
+        # stale complete total is not hidden by it.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebt", 500.0),
+            self._at("LongTermDebtAndCapitalLeaseObligations", 2_000.0,
+                     period_end=date(2026, 3, 31), filed=date(2026, 5, 5)),
+        )
+        assert total == 2_000.0
+        assert source == "lease_noncurrent_only"
+
+    def test_small_one_sided_long_term_debt_does_not_block_instruments(
+        self, tmp_path: Path
+    ) -> None:
+        # CRTO-shaped: only $37M of current maturities is tagged as
+        # LongTermDebt, the senior notes sit in their own elements.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtCurrent", 37.0),
+            self._at("SeniorNotes", 990.0),
+        )
+        assert total == 990.0
+        assert source == "instruments"
+
+    def test_small_one_sided_lease_shape_does_not_block_instruments(
+        self, tmp_path: Path
+    ) -> None:
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtAndCapitalLeaseObligationsCurrent", 37.0),
+            self._at("SeniorNotes", 990.0),
+        )
+        assert total == 990.0
+        assert source == "instruments"
+
+    def test_larger_one_sided_long_term_debt_beats_smaller_instruments(
+        self, tmp_path: Path
+    ) -> None:
+        # The larger reading is kept, never the sum: the one-sided figure
+        # may already contain the instrument lines.
+        total, source = self._total(
+            tmp_path,
+            self._at("LongTermDebtNoncurrent", 1_000.0),
+            self._at("SeniorNotesCurrent", 37.0),
+        )
+        assert total == 1_000.0
+        assert source == "noncurrent_only"
+
     def test_overlap_group_is_still_summed_with_loans_and_credit_lines(
         self, tmp_path: Path
     ) -> None:

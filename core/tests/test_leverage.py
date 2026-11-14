@@ -9,9 +9,12 @@ ejects Texas Pacific Land and Snowflake.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 
 import pytest
+from loguru import logger as loguru_logger
 
 from core.backtest.point_in_time import FilingMetadata, PointInTimeFinancials
 from core.scoring.leverage import (
@@ -19,6 +22,23 @@ from core.scoring.leverage import (
     has_complete_balance_sheet,
     reported_debt,
 )
+
+
+@contextmanager
+def _logged(level: str) -> Iterator[list[str]]:
+    """What the project's loguru logger wrote at ``level`` or above.
+
+    ``caplog`` cannot see loguru, which does not propagate to stdlib
+    logging; a sink can.
+    """
+    messages: list[str] = []
+    sink_id = loguru_logger.add(
+        lambda m: messages.append(m.record["message"]), level=level
+    )
+    try:
+        yield messages
+    finally:
+        loguru_logger.remove(sink_id)
 
 
 def _fin(
@@ -160,21 +180,39 @@ class TestDebtToEquity:
 
 class TestImplausiblyLowDebt:
     """A tagged figure that is a sliver of a heavily levered balance
-    sheet is the same evidence as no tag at all: the debt sits in an
-    element the composer did not read (CRTO's $37M of current notes was
-    the only debt figure it found)."""
+    sheet may be a fragment of the debt read from the one element the
+    composer found (CRTO's $37M of current notes). It may also be a bank
+    or insurer whose liabilities are deposits and reserves. The 5% floor
+    is uncalibrated, so it only flags: D/E is still computed from the
+    reported debt, never ``None`` (which every entry filter rejects)."""
 
-    def test_sliver_of_debt_on_a_levered_sheet_abstains(self) -> None:
-        assert (
-            debt_to_equity(_fin(total_debt=10.0, total_liabilities=6_000.0))
-            is None
-        )
+    def test_sliver_of_debt_on_a_levered_sheet_is_scored_and_flagged(
+        self,
+    ) -> None:
+        with _logged("WARNING") as messages:
+            ratio = debt_to_equity(
+                _fin(total_debt=10.0, total_liabilities=6_000.0)
+            )
+        assert ratio == pytest.approx(0.01)
+        assert len(messages) == 1
+        assert "TEST" in messages[0]
+        assert "0.17%" in messages[0]  # 10 / 6,000 of liabilities
 
-    def test_reported_zero_on_a_levered_sheet_abstains(self) -> None:
-        assert (
-            debt_to_equity(_fin(total_debt=0.0, total_liabilities=6_000.0))
-            is None
-        )
+    def test_reported_zero_on_a_levered_sheet_is_scored_and_flagged(
+        self,
+    ) -> None:
+        with _logged("WARNING") as messages:
+            ratio = debt_to_equity(
+                _fin(total_debt=0.0, total_liabilities=6_000.0)
+            )
+        assert ratio == 0.0
+        assert len(messages) == 1
+        assert "TEST" in messages[0]
+
+    def test_plausible_debt_is_not_flagged(self) -> None:
+        with _logged("WARNING") as messages:
+            debt_to_equity(_fin(total_debt=300.0, total_liabilities=6_000.0))
+        assert messages == []
 
     def test_small_debt_on_an_unlevered_sheet_is_scored(self) -> None:
         assert debt_to_equity(

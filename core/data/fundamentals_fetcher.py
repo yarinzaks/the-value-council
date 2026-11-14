@@ -310,6 +310,29 @@ _INSTRUMENT_DEBT_GROUPS: tuple[tuple[tuple[_DebtShapes, ...], ...], ...] = (
     ),
 )
 
+
+def _prefer_debt_reading(
+    first: tuple[float, date, str] | None,
+    second: tuple[float, date, str] | None,
+) -> tuple[float, date, str] | None:
+    """The better of two ``(value, period_end, label)`` debt readings.
+
+    A complete reading (label not ending ``_only``) beats a one-sided
+    one unless the one-sided reading is both newer and larger — debt
+    that grew past a stale total. At equal completeness the newer wins,
+    and on a tie ``first`` does.
+    """
+    if first is None or second is None:
+        return first if second is None else second
+    first_complete = not first[2].endswith("_only")
+    if first_complete == (not second[2].endswith("_only")):
+        return second if second[1] > first[1] else first
+    complete, one_sided = (first, second) if first_complete else (second, first)
+    if one_sided[1] > complete[1] and one_sided[0] > complete[0]:
+        return one_sided
+    return complete
+
+
 # Concepts that flow over time (income/cash flow). We prefer the most
 # recent annual (10-K) filing for these unless a fresher 10-Q exists.
 _FLOW_CONCEPTS: frozenset[str] = frozenset(
@@ -720,12 +743,15 @@ class FundamentalsFetcher:
         ``LongTermDebt`` reading. They are debt-like, but ASC 842
         capitalised them in 2019 and including them would make leverage
         incomparable across the history these agents screen on. The
-        lease-inclusive elements are read only when that family is absent
-        or older (see :data:`_LEASE_INCLUSIVE_DEBT_SHAPES`): a figure that
+        lease-inclusive elements are read only when that family is absent,
+        one-sided beside a complete lease shape, or older (see
+        :func:`_prefer_debt_reading` and
+        :data:`_LEASE_INCLUSIVE_DEBT_SHAPES`): a figure that
         carries a few percent of leases beats reading a levered balance
         sheet as debt-free (audit FUND-4).
 
-        When neither total exists, or the long-term figure is zero,
+        When neither total exists, the long-term figure is zero, or it is
+        one-sided (only the noncurrent or only the current half),
         per-instrument tags are summed (see :meth:`_instrument_debt`) and
         the larger of the two figures is kept — never both, since a total
         already contains the instrument lines.
@@ -755,13 +781,17 @@ class FundamentalsFetcher:
 
         # Audit FUND-4: the lease-inclusive elements. A filer that tags
         # its debt only here (FISV, APH, SIRI, HRI, WH) read as debt-free.
-        # Used when the LongTermDebt family is absent, or when it
-        # describes an older balance sheet than this one does — the
-        # signature of a filer that moved from one element to the other.
+        # Chosen over the LongTermDebt family by the same rule as within a
+        # family: completeness first, then recency, with a newer AND
+        # larger one-sided reading beating a stale complete one. Recency
+        # alone let a 10-Q's one-sided sliver replace a complete total.
         lease = self._resolve_debt_shapes(ticker, as_of, _LEASE_INCLUSIVE_DEBT_SHAPES)
-        if lease is not None and (
-            not used or lease[1] > max(f.period_end for f in used)
-        ):
+        ltd: tuple[float, date, str] | None = (
+            (sum(f.value for f in used), max(f.period_end for f in used), source)
+            if used
+            else None
+        )
+        if lease is not None and _prefer_debt_reading(ltd, lease) is lease:
             long_term, _lease_end, source = lease
             if source == "debt_and_lease_total" and long_term:
                 # Defined as short- AND long-term debt: adding the
@@ -769,7 +799,10 @@ class FundamentalsFetcher:
                 # still goes through the instrument fallback below.
                 return long_term, source
 
-        if not long_term:  # None, or a zero beside instrument lines
+        # None, a zero beside instrument lines, or a one-sided reading
+        # (CRTO's $37M of current maturities beside $990M of senior
+        # notes): the instrument lines are read and the larger is kept.
+        if not long_term or source.endswith("_only"):
             instruments = self._instrument_debt(ticker, as_of)
             if instruments is not None and (long_term is None or instruments > long_term):
                 long_term = instruments
