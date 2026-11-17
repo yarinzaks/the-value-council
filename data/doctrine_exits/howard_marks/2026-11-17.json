@@ -1,0 +1,462 @@
+[
+  {
+    "ticker": "ACIC",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $10.16 is 23.6% of fair value $43.00/share (P/E 4.7 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 10.7,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $10.16 is 23.6% of fair value $43.00/share (P/E 4.7 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "BMNR",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $16.33 is 6.1% of fair value $267.80/share (P/E 1.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 19.1663,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $16.33 is 6.1% of fair value $267.80/share (P/E 1.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "BYD",
+    "decision": "SELL",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis broken: balance sheet deteriorated, D/E 1.09 above the 1.0 the entry gates allow"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 75.53,
+    "target_price": null,
+    "exit_trigger": "thesis broken: balance sheet deteriorated, D/E 1.09 above the 1.0 the entry gates allow",
+    "rationale": "Doctrine said sell (thesis broken: balance sheet deteriorated, D/E 1.09 above the 1.0 the entry gates allow); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "CAG",
+    "decision": "SELL",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis broken: net income $-1,916,200,000 for the latest fiscal year is no longer positive, which the entry gates require"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 14.57,
+    "target_price": null,
+    "exit_trigger": "thesis broken: net income $-1,916,200,000 for the latest fiscal year is no longer positive, which the entry gates require",
+    "rationale": "Doctrine said sell (thesis broken: net income $-1,916,200,000 for the latest fiscal year is no longer positive, which the entry gates require); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "CASH",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $74.37 is 47.2% of fair value $157.40/share (P/E 9.4 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 79.18,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $74.37 is 47.2% of fair value $157.40/share (P/E 9.4 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "CRTO",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $19.03 is 36.0% of fair value $52.80/share (P/E 7.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "sold"
+    },
+    "confidence": 0.0,
+    "entry_price": 18.22,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $19.03 is 36.0% of fair value $52.80/share (P/E 7.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine sold it [shadow]"
+  },
+  {
+    "ticker": "CTVA",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $8.99 is 28.1% of fair value $32.00/share (P/E 5.6 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 12.705,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $8.99 is 28.1% of fair value $32.00/share (P/E 5.6 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "DVN",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $45.08 is 54.1% of fair value $83.40/share (P/E 10.8 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 44.86,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $45.08 is 54.1% of fair value $83.40/share (P/E 10.8 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "DXC",
+    "decision": "SELL",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis broken: balance sheet deteriorated, D/E 1.15 above the 1.0 the entry gates allow"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 14.86,
+    "target_price": null,
+    "exit_trigger": "thesis broken: balance sheet deteriorated, D/E 1.15 above the 1.0 the entry gates allow",
+    "rationale": "Doctrine said sell (thesis broken: balance sheet deteriorated, D/E 1.15 above the 1.0 the entry gates allow); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "GLRE",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $16.25 is 37.4% of fair value $43.40/share (P/E 7.5 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 14.79,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $16.25 is 37.4% of fair value $43.40/share (P/E 7.5 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "GTM",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $3.04 is 40.0% of fair value $7.60/share (P/E 8.0 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 4.193,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $3.04 is 40.0% of fair value $7.60/share (P/E 8.0 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "HRTG",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $33.66 is 26.6% of fair value $126.40/share (P/E 5.3 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 33.78,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $33.66 is 26.6% of fair value $126.40/share (P/E 5.3 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "KMPR",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $33.43 is 73.0% of fair value $45.80/share (P/E 14.6 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 34.82,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $33.43 is 73.0% of fair value $45.80/share (P/E 14.6 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "KSS",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $23.45 is 49.3% of fair value $47.60/share (P/E 9.9 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 19.485,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $23.45 is 49.3% of fair value $47.60/share (P/E 9.9 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "LYFT",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $16.79 is 12.3% of fair value $136.20/share (P/E 2.5 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 16.875,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $16.79 is 12.3% of fair value $136.20/share (P/E 2.5 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "NRIM",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $23.42 is 40.8% of fair value $57.40/share (P/E 8.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 24.1,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $23.42 is 40.8% of fair value $57.40/share (P/E 8.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "PIPR",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $65.82 is 20.8% of fair value $316.40/share (P/E 4.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 65.91,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $65.82 is 20.8% of fair value $316.40/share (P/E 4.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "PPC",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $28.98 is 31.9% of fair value $90.80/share (P/E 6.4 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 27.98,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $28.98 is 31.9% of fair value $90.80/share (P/E 6.4 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "REPX",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $43.73 is 28.8% of fair value $151.80/share (P/E 5.8 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 44.968,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $43.73 is 28.8% of fair value $151.80/share (P/E 5.8 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "RIGL",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $43.20 is 11.1% of fair value $389.60/share (P/E 2.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 49.3869,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $43.20 is 11.1% of fair value $389.60/share (P/E 2.2 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "UVE",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $48.76 is 38.6% of fair value $126.40/share (P/E 7.7 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 49.125,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $48.76 is 38.6% of fair value $126.40/share (P/E 7.7 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "UVV",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "second trim rung: price $37.29 is 143.4% of fair value $26.00/share (P/E 28.7 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), at or past it with the cycle Neutral, not positioned for reversion; the playbook's second 25% trim is not executed (a verdict is keep or sell), the position is kept"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 41.44,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (second trim rung: price $37.29 is 143.4% of fair value $26.00/share (P/E 28.7 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), at or past it with the cycle Neutral, not positioned for reversion; the playbook's second 25% trim is not executed (a verdict is keep or sell), the position is kept); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "YELP",
+    "decision": "HOLD",
+    "agent": "howard_marks",
+    "timestamp": "2026-11-17T00:00:00+00:00",
+    "criteria_met": [
+      "thesis intact; price $20.45 is 45.6% of fair value $44.80/share (P/E 9.1 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 20.3113,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (thesis intact; price $20.45 is 45.6% of fair value $44.80/share (P/E 9.1 against the Neutral screen's 20.0x value line, its 5.0% earnings-yield floor), under the 80% rung where the first 25% trim begins); the engine kept it [shadow]"
+  }
+]
