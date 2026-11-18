@@ -1,0 +1,1470 @@
+[
+  {
+    "agent": "howard_marks",
+    "ticker": "VISN",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:50:26.221666+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "VISN",
+      "decision": "WATCH",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A screen reading a P/E of 0.43 and an earnings yield of 235% would call this absurdly cheap. The first-level conclusion is to buy it before anyone else notices.",
+        "non_consensus_view": "A number this extreme is more likely to say something about the earnings than about the price. It could be a one-time gain, a tax item, or a data artifact. I would rather ask what the earnings really are before I trust the multiple.",
+        "why_consensus_might_be_wrong": "Cheapness is only real if the earnings recur. If the net income behind that ratio is non-recurring, the true price-to-earnings is far higher and the margin of safety may not exist. Confusing a distorted ratio with a bargain is how investors end up owning something they never understood."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings and free cash flow prove largely recurring, so the free cash flow yield in the snapshot (30.3%) is roughly sustainable. Return is an illustrative judgment, not a forecast.",
+            "probability_pct": 25.0,
+            "return_pct": 30.0
+          },
+          {
+            "scenario": "The headline earnings are mostly one-off and the market already prices the normalized business fairly. Return is an illustrative judgment.",
+            "probability_pct": 50.0,
+            "return_pct": 0.0
+          },
+          {
+            "scenario": "Underlying cash generation fades and the price re-rates lower. Return is an illustrative judgment.",
+            "probability_pct": 25.0,
+            "return_pct": -30.0
+          }
+        ],
+        "expected_return_pct": 0.0
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "I assume the P/E of 0.43 and earnings yield of 235% reflect a distortion I cannot see. The snapshot gives no breakdown of the net income.",
+          "I assume the reported D/E of 0.0 is a true absence of debt. A debt figure that is untagged is not the same as no debt.",
+          "I do not know the business, its revenue trend or its competitive position, because the snapshot does not describe them.",
+          "I do not know the price history, so I cannot judge whether this is a knife that has already fallen or has been rising.",
+          "The scenario probabilities and returns above are my judgment under uncertainty, not figures taken from the data."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.25,
+      "thesis_en": "I start with the pendulum. The market temperature reads Neutral, with a median P/E of 21.16 and 46.2% of companies reporting negative net income. That is neither euphoria nor panic, so I should be selective and not forced into anything. VISN shows a P/E of 0.43, an earnings yield of 235% and a free cash flow yield of 30.3% with a reported D/E of 0.0, and numbers that extreme make me suspicious before they make me excited. I cannot tell from this snapshot whether the earnings recur, so I cannot check whether there is a real margin of safety. I do not own it, I will not pay up for a ratio I cannot explain, and I will watch until the earnings are understood.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05ea \u05d4\u05e9\u05d5\u05e7 \u05e0\u05de\u05e6\u05d0\u05ea \u05d1\u05e8\u05de\u05d4 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea: \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16, \u05d5-46.2% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e0\u05e7\u05d9 \u05e9\u05dc\u05d9\u05dc\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4, \u05d5\u05dc\u05db\u05df \u05e2\u05dc\u05d9\u05d9 \u05dc\u05d4\u05d9\u05d5\u05ea \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9 \u05d5\u05dc\u05d0 \u05dc\u05d4\u05d9\u05db\u05e0\u05e1 \u05dc\u05e9\u05d5\u05dd \u05d3\u05d1\u05e8 \u05d1\u05db\u05d5\u05d7. \u05dc-VISN \u05d9\u05e9 \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 0.43, \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 235% \u05d5\u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 30.3%, \u05e2\u05dd \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05de\u05d3\u05d5\u05d5\u05d7 \u05e9\u05dc 0.0. \u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e7\u05d9\u05e6\u05d5\u05e0\u05d9\u05d9\u05dd \u05db\u05d0\u05dc\u05d4 \u05de\u05e2\u05d5\u05e8\u05e8\u05d9\u05dd \u05d0\u05e6\u05dc\u05d9 \u05d7\u05e9\u05d3 \u05dc\u05e4\u05e0\u05d9 \u05e9\u05d4\u05dd \u05de\u05e2\u05d5\u05e8\u05e8\u05d9\u05dd \u05d4\u05ea\u05dc\u05d4\u05d1\u05d5\u05ea. \u05de\u05ea\u05d5\u05da \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05d0\u05d9\u05e0\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05d3\u05e2\u05ea \u05d0\u05dd \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d7\u05d5\u05d6\u05e8\u05d9\u05dd \u05e2\u05dc \u05e2\u05e6\u05de\u05dd, \u05d5\u05dc\u05db\u05df \u05d0\u05d9\u05e0\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05d5\u05d5\u05d3\u05d0 \u05e9\u05d9\u05e9 \u05db\u05d0\u05df \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05d0\u05de\u05d9\u05ea\u05d9. \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4, \u05dc\u05d0 \u05d0\u05e9\u05dc\u05dd \u05e2\u05d1\u05d5\u05e8 \u05d9\u05d7\u05e1 \u05e9\u05d0\u05d9\u05e0\u05d9 \u05de\u05e6\u05dc\u05d9\u05d7 \u05dc\u05d4\u05e1\u05d1\u05d9\u05e8, \u05d5\u05d0\u05de\u05e9\u05d9\u05da \u05dc\u05e2\u05e7\u05d5\u05d1 \u05e2\u05d3 \u05e9\u05d0\u05d1\u05d9\u05df \u05d0\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd.",
+      "criteria_passed": [
+        "Reported debt-to-equity of 0.0, with the caveat that the snapshot does not show whether debt is untagged",
+        "Free cash flow yield of 30.3% reported in the snapshot",
+        "Market temperature Neutral, which permits selective deployment but does not demand it"
+      ],
+      "criteria_failed": [
+        "Earnings yield of 235% and P/E of 0.43 cannot be reconciled with a normal recurring earnings base; I could not verify whether they are one-off",
+        "No business description, revenue trend or cash flow history in the snapshot, so I could not check the quality or durability of the earnings",
+        "No price history is given, so I could not check whether this is a falling knife",
+        "Capital structure cannot be confirmed from a single reported D/E field"
+      ],
+      "position_size_pct": 0.0,
+      "expected_holding_period_months": 0,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 481,
+    "output_tokens": 2779,
+    "cache_write_tokens": 18177,
+    "cache_read_tokens": 0,
+    "prompt_chars": 970,
+    "prompt_sha256": "5a1fce8d201a6da5ea53cd676d951e17d67eff249e5855bccc97a9012551e825"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "GOLD",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:50:54.628859+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "GOLD",
+      "decision": "WATCH",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "On the snapshot, the market treats GOLD as an ordinary, profitable, almost debt-free equity. It trades at a P/E of 11.78 against a universe median of 21.16, and the screen rates its balance sheet as clean. The first-level read is that it is cheap, has no leverage and pays a 2.17% dividend, so it should be bought.",
+        "non_consensus_view": "A low multiple is not a margin of safety until I know what earns the profit and how durable it is. The snapshot does not describe the business, its earnings history or its book equity. The 116.64% free-cash-flow yield is implausible against a market cap of about $1.04 billion. I will not build a thesis on a number I cannot reconcile. I would rather wait for the missing facts than pay for a cheap-looking multiple.",
+        "why_consensus_might_be_wrong": "Earnings yields look best at the peak of an earnings cycle, and a low P/E can reflect profits that are about to fall. If this company's earnings are cyclical or tied to a commodity price, today's 8.49% earnings yield may be the high point. The balance sheet protects against bankruptcy, but it does not protect against overpaying for peak earnings."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings prove durable and the multiple drifts toward the universe median (illustrative judgment, not a data point)",
+            "probability_pct": 40.0,
+            "return_pct": 25.0
+          },
+          {
+            "scenario": "Earnings hold roughly flat; return is mostly the 2.17% dividend plus modest drift (illustrative)",
+            "probability_pct": 40.0,
+            "return_pct": 5.0
+          },
+          {
+            "scenario": "Current earnings prove to be a cyclical peak and the multiple compresses on lower profits (illustrative)",
+            "probability_pct": 20.0,
+            "return_pct": -30.0
+          }
+        ],
+        "expected_return_pct": 6.0
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "The reported P/E of 11.78 reflects recurring earnings rather than a one-off or peak-cycle profit",
+          "The 116.64% free-cash-flow yield is a data artifact and not a true measure of cash generation",
+          "Book equity is positive and the last full year was not a loss; neither is stated in this snapshot",
+          "The business does not depend on a macro or commodity forecast to justify the price; the snapshot does not describe the business",
+          "The universe median P/E of 21.16 is a fair yardstick for this company"
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.35,
+      "thesis_en": "I start with the pendulum, and it sits near the middle. The temperature read is Neutral, with a median P/E of 21.16 and 46% of companies reporting negative earnings, so there is no panic to exploit and no euphoria to flee. Against that, GOLD shows a P/E of 11.78, an earnings yield of 8.49%, and debt-to-equity of 0.00023, which looks attractive. But I do not own it, and I cannot check book equity, earnings history or what the business does. The 116.64% free-cash-flow yield makes me trust the data less, not more. Missing information lowers my confidence, so I will wait, as I have always said: you can't predict, you can prepare.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea, \u05d5\u05d4\u05d9\u05d0 \u05e0\u05de\u05e6\u05d0\u05ea \u05e7\u05e8\u05d5\u05d1 \u05dc\u05d0\u05de\u05e6\u05e2. \u05e7\u05e8\u05d9\u05d0\u05ea \u05d4\u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05d4 \u05d4\u05d9\u05d0 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea: \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e2\u05dd \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc\u05d9\u05dc\u05d9, \u05db\u05da \u05e9\u05d0\u05d9\u05df \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4 \u05dc\u05e0\u05e6\u05dc \u05d5\u05d2\u05dd \u05d0\u05d9\u05df \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05dc\u05d1\u05e8\u05d5\u05d7 \u05de\u05de\u05e0\u05d4. \u05de\u05e0\u05d2\u05d3, \u05dc-GOLD \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 11.78, \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 8.49% \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.00023, \u05d5\u05d6\u05d4 \u05e0\u05e8\u05d0\u05d4 \u05d0\u05d8\u05e8\u05e7\u05d8\u05d9\u05d1\u05d9. \u05d0\u05d1\u05dc \u05d0\u05d9\u05df \u05dc\u05d9 \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05d4, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d1\u05d3\u05d5\u05e7 \u05d4\u05d5\u05df \u05e2\u05e6\u05de\u05d9, \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d9\u05ea \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d0\u05d5 \u05d1\u05de\u05d4 \u05d4\u05e2\u05e1\u05e7 \u05e2\u05d5\u05e1\u05e7. \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 116.64% \u05d2\u05d5\u05e8\u05de\u05ea \u05dc\u05d9 \u05dc\u05e1\u05de\u05d5\u05da \u05e2\u05dc \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e4\u05d7\u05d5\u05ea, \u05dc\u05d0 \u05d9\u05d5\u05ea\u05e8. \u05de\u05d9\u05d3\u05e2 \u05d7\u05e1\u05e8 \u05de\u05d5\u05e8\u05d9\u05d3 \u05d0\u05ea \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05de\u05ea\u05d9\u05df, \u05db\u05e4\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05ea\u05de\u05d9\u05d3 \u05d0\u05d5\u05de\u05e8: \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea, \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df.",
+      "criteria_passed": [
+        "Earnings yield 8.49% is above the 5.0% Neutral-posture screen floor",
+        "Debt-to-equity 0.00023 is well below the 1.0 gate",
+        "P/E 11.78 is below the universe median P/E of 21.16",
+        "Cycle read is Neutral, so there is no hot-market bar to clear and nothing forces a rejection"
+      ],
+      "criteria_failed": [
+        "FCF yield of 116.64% is implausible against the other figures and cannot be verified, so I give it no weight",
+        "Book equity and full-year profit history are not in the snapshot, so the thesis-break checks could not be run",
+        "The business, sector and earnings durability are not described, so second-level analysis of the cycle exposure cannot be completed",
+        "The snapshot gives no basis for a margin-of-safety estimate beyond the screen multiples"
+      ],
+      "position_size_pct": 0.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [
+          48.32,
+          60.4
+        ],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 494,
+    "output_tokens": 3446,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1006,
+    "prompt_sha256": "c8eab9c6cb3115704c0d395d78d8a45db125d3824156753ccc792b924884c149"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "CTVA",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:50:55.812029+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "CTVA",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "The market has marked this name down 32.74% from my entry price of 12.705 to 8.545 in 48 days. That is the behavior of a crowd that sees something broken: either the earnings are not durable, or a bad event has happened that I cannot see in this snapshot.",
+        "non_consensus_view": "I own it, and the snapshot shows a trailing P/E of 5.34, an earnings yield of 18.72%, a free-cash-flow yield of 39.34%, a dividend yield of 8.33% and a debt-to-equity ratio of 0.067. If those figures are durable, the price embeds far more pessimism than the balance sheet suggests. In a Neutral market, with a median P/E of 21.16, that is a real divergence from the pack. I will not add until I understand why the divergence exists.",
+        "why_consensus_might_be_wrong": "Prices fall furthest when sellers are indifferent to value, and a fall of this size in 48 days has the look of forced or emotional selling. But the consensus may also be right, because trailing earnings and cash flow can peak just before they roll over. A very high yield is often the market's warning, not its gift. A decline is not a thesis break, but neither is it proof of opportunity."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Reported earnings and cash flow prove durable; the market re-rates the shares toward the market median multiple",
+            "probability_pct": 35.0,
+            "return_pct": 40.0
+          },
+          {
+            "scenario": "Earnings prove cyclical or partly one-off; the shares stay range-bound while I collect the dividend",
+            "probability_pct": 40.0,
+            "return_pct": 0.0
+          },
+          {
+            "scenario": "The yields reflect real, permanent impairment of earning power that I cannot see here; further capital loss",
+            "probability_pct": 25.0,
+            "return_pct": -35.0
+          }
+        ],
+        "expected_return_pct": 5.25
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "I do not know why the shares fell 32.74% in 48 days; the snapshot gives no cause.",
+          "I am assuming the reported P/E, FCF yield and dividend yield reflect sustainable earning power; I cannot verify that from this snapshot.",
+          "Book equity, full-year net income and the current ratio are not reported in this snapshot, so I could not test the thesis-break gates beyond the debt-to-equity figure of 0.067.",
+          "I am assuming the dividend is covered; payout coverage is not reported here.",
+          "I do not know where the cycle goes next, and I do not need to: this is a Neutral market with 46.24% of companies showing negative net income."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.4,
+      "thesis_en": "I start with the pendulum: the market is Neutral, neither euphoric nor panicked, with a median P/E of 21.16 and a high 46.24% of companies reporting negative earnings, so there is no cyclical tailwind and I must rely on price discipline. I own this name, and my entry at 12.705 is down 32.74%. But a falling price is not a broken thesis; the earnings yield is 18.72%, the free-cash-flow yield 39.34%, and the debt-to-equity ratio is only 0.067, so the balance sheet gives me staying power. What stops me from adding is not the price but my ignorance: I cannot see why it fell, and book equity and full-year earnings are not reported in this snapshot. So I hold, I do not average down on faith, and I accept that being early in a Neutral market is uncomfortable.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea: \u05d4\u05e9\u05d5\u05e7 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9, \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9 \u05d5\u05dc\u05d0 \u05de\u05d1\u05d5\u05d4\u05dc. \u05de\u05db\u05e4\u05d9\u05dc \u05d4\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e2\u05d5\u05de\u05d3 \u05e2\u05dc 21.16, \u05d5-46.24% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05d4\u05e4\u05e1\u05d3, \u05db\u05da \u05e9\u05d0\u05d9\u05df \u05e8\u05d5\u05d7 \u05d2\u05d1\u05d9\u05ea \u05de\u05d7\u05d6\u05d5\u05e8\u05d9\u05ea \u05d5\u05d0\u05e0\u05d9 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05de\u05e9\u05de\u05e2\u05ea \u05de\u05d7\u05d9\u05e8. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4, \u05d5\u05db\u05e0\u05d9\u05e1\u05ea\u05d9 \u05d1-12.705 \u05e0\u05de\u05e6\u05d0\u05ea \u05d1\u05d4\u05e4\u05e1\u05d3 \u05e9\u05dc 32.74%. \u05d0\u05d1\u05dc \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d0\u05d9\u05e0\u05d4 \u05e9\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05d4\u05ea\u05d6\u05d4: \u05ea\u05e9\u05d5\u05d0\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d9\u05d0 18.72%, \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 39.34%, \u05d5\u05d9\u05d7\u05e1 \u05d4\u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05d4\u05d5\u05d0 0.067 \u05d1\u05dc\u05d1\u05d3, \u05db\u05da \u05e9\u05de\u05d0\u05d6\u05df \u05d4\u05d7\u05d1\u05e8\u05d4 \u05e0\u05d5\u05ea\u05df \u05dc\u05d9 \u05db\u05d5\u05e9\u05e8 \u05e2\u05de\u05d9\u05d3\u05d4. \u05de\u05d4 \u05e9\u05e2\u05d5\u05e6\u05e8 \u05d0\u05d5\u05ea\u05d9 \u05de\u05dc\u05d4\u05d5\u05e1\u05d9\u05e3 \u05d0\u05d9\u05e0\u05d5 \u05d4\u05de\u05d7\u05d9\u05e8 \u05d0\u05dc\u05d0 \u05d4\u05d1\u05e2\u05e8\u05d5\u05ea \u05e9\u05dc\u05d9: \u05d0\u05d9\u05e0\u05d9 \u05e8\u05d5\u05d0\u05d4 \u05de\u05d3\u05d5\u05e2 \u05d4\u05de\u05e0\u05d9\u05d4 \u05e0\u05e4\u05dc\u05d4, \u05d5\u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9 \u05d5\u05d4\u05e8\u05d5\u05d5\u05d7 \u05d4\u05e9\u05e0\u05ea\u05d9 \u05d0\u05d9\u05e0\u05dd \u05de\u05d3\u05d5\u05d5\u05d7\u05d9\u05dd \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05de\u05ea\u05d5\u05da \u05d0\u05de\u05d5\u05e0\u05d4 \u05e2\u05d9\u05d5\u05d5\u05e8\u05ea, \u05d5\u05de\u05e7\u05d1\u05dc \u05e9\u05dc\u05d4\u05e7\u05d3\u05d9\u05dd \u05d0\u05ea \u05d4\u05e9\u05d5\u05e7 \u05d1\u05e9\u05d5\u05e7 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9 \u05d0\u05d9\u05e0\u05d5 \u05e0\u05e2\u05d9\u05dd.",
+      "criteria_passed": [
+        "Debt-to-equity 0.067, well below the 1.0 thesis-break gate",
+        "P/E 5.34 and earnings yield 18.72%, positive earnings, no sign of a full-year loss in the snapshot",
+        "FCF yield 39.34% and dividend yield 8.33%",
+        "Market temperature Neutral, so no hot-market disqualifier applies",
+        "No hard anti-pattern triggered; a price decline alone is never a sell trigger"
+      ],
+      "criteria_failed": [
+        "Cause of the 32.74% decline in 48 days is not in the snapshot",
+        "Book equity is not reported, so the positive-equity gate could not be checked",
+        "Full-year net income is not reported, so the full-year-loss gate could not be checked",
+        "Current ratio and dividend coverage are not reported",
+        "Not enough evidence to justify adding to the position"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [
+          12.705
+        ],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 571,
+    "output_tokens": 3249,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1164,
+    "prompt_sha256": "c1400d908f564beec661cafb01f5c5b027907829231698dbfbb7ce32bafb4811"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "SNEX",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:50:57.791569+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "SNEX",
+      "decision": "WATCH",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "The market is pricing SNEX at a P/E of 9.29 against a median P/E of 21.16 across the screened universe. That is the price of a company investors treat as ordinary, or as exposed to something. The snapshot does not describe the business, so I cannot say what that something is.",
+        "non_consensus_view": "An earnings yield of 10.77% in a market where 46% of companies report negative net income can be a real margin of safety. Profitable and cheap is scarce in this tape. But I will not call it a bargain until I know why it is cheap.",
+        "why_consensus_might_be_wrong": "Investors may be extrapolating a cyclical or sentiment-driven discount, and a modest re-rating would reward patient buyers. It may also be that the earnings are at a cycle high and the low multiple is a trap. I cannot tell from this snapshot which of the two it is."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings hold and the multiple drifts modestly higher (illustrative judgment, not data)",
+            "probability_pct": 40.0,
+            "return_pct": 22.0
+          },
+          {
+            "scenario": "Earnings flat, no re-rating, the low multiple persists (illustrative)",
+            "probability_pct": 35.0,
+            "return_pct": 6.0
+          },
+          {
+            "scenario": "Earnings deteriorate as credit or market conditions turn, and the multiple stays compressed (illustrative)",
+            "probability_pct": 25.0,
+            "return_pct": -25.0
+          }
+        ],
+        "expected_return_pct": 4.65
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "Trailing earnings are representative and not at a cyclical peak; the snapshot gives only a P/E of 9.29, not an earnings history.",
+          "Book equity is positive and the latest full year was profitable; neither is reported in this snapshot, so I cannot confirm them.",
+          "A debt-to-equity of 0.64 is meaningful for this kind of business; I do not know how debt is composed or how sensitive it is to credit conditions.",
+          "The FCF yield of 65.51% is not usable as evidence of cheapness. It is implausibly high, and I treat it as probably distorted until I understand what is in it.",
+          "I have no credit-cycle data here (spreads, lending standards, defaults), so I have not checked how this name behaves if credit turns."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.4,
+      "thesis_en": "Let me start with the pendulum: the temperature read is Neutral, with a median P/E of 21.16 and 46% of companies losing money. That is neither the fear that makes me aggressive nor the euphoria that makes me retreat. SNEX looks inexpensive, with a P/E of 9.29, an earnings yield of 10.77% and a debt-to-equity of 0.64, but I cannot confirm book equity, the full-year earnings record or its credit sensitivity from this snapshot, and I distrust the 65.51% FCF yield. I don't own it, and a cheap-looking number I do not yet understand is not a margin of safety. I will watch it and do the work on why it is cheap, because cash is a position and nothing is forcing me to buy.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea: \u05e7\u05e8\u05d9\u05d0\u05ea \u05d4\u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05d4 \u05d4\u05d9\u05d0 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea, \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e9\u05de\u05e4\u05e1\u05d9\u05d3\u05d5\u05ea \u05db\u05e1\u05e3. \u05d6\u05d5 \u05dc\u05d0 \u05d4\u05e4\u05d7\u05d3 \u05e9\u05d4\u05d5\u05e4\u05da \u05d0\u05d5\u05ea\u05d9 \u05dc\u05d0\u05d2\u05e8\u05e1\u05d9\u05d1\u05d9, \u05d5\u05d2\u05dd \u05dc\u05d0 \u05d4\u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05e9\u05de\u05db\u05e8\u05d9\u05d7\u05d4 \u05d0\u05d5\u05ea\u05d9 \u05dc\u05e1\u05d2\u05ea. SNEX \u05e0\u05e8\u05d0\u05d9\u05ea \u05d6\u05d5\u05dc\u05d4, \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 9.29, \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 10.77% \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.64. \u05d0\u05d1\u05dc \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9 \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d0\u05e9\u05e8 \u05d0\u05ea \u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9, \u05d0\u05ea \u05e8\u05d5\u05d5\u05d7\u05d9\u05d5\u05ea \u05d4\u05e9\u05e0\u05d4 \u05d4\u05de\u05dc\u05d0\u05d4 \u05d0\u05d5 \u05d0\u05ea \u05d4\u05e8\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05dc\u05d4 \u05dc\u05d0\u05e9\u05e8\u05d0\u05d9, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e1\u05d5\u05de\u05da \u05e2\u05dc \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 65.51%. \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4, \u05d5\u05de\u05e1\u05e4\u05e8 \u05e9\u05e0\u05e8\u05d0\u05d4 \u05d6\u05d5\u05dc \u05d5\u05e9\u05d0\u05e0\u05d9 \u05e2\u05d5\u05d3 \u05dc\u05d0 \u05de\u05d1\u05d9\u05df \u05d0\u05d9\u05e0\u05d5 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df. \u05d0\u05e0\u05d9 \u05e2\u05d5\u05e7\u05d1, \u05d0\u05e2\u05e9\u05d4 \u05d0\u05ea \u05e9\u05d9\u05e2\u05d5\u05e8\u05d9 \u05d4\u05d1\u05d9\u05ea \u05d5\u05d0\u05d1\u05d9\u05df \u05dc\u05de\u05d4 \u05d4\u05d9\u05d0 \u05d6\u05d5\u05dc\u05d4, \u05db\u05d9 \u05de\u05d6\u05d5\u05de\u05df \u05d4\u05d5\u05d0 \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d5\u05e9\u05d5\u05dd \u05d3\u05d1\u05e8 \u05dc\u05d0 \u05de\u05db\u05e8\u05d9\u05d7 \u05d0\u05d5\u05ea\u05d9 \u05dc\u05e7\u05e0\u05d5\u05ea.",
+      "criteria_passed": [
+        "Earnings yield 10.77% is above the Neutral-posture screen floor of 5.0%",
+        "P/E of 9.29 is well below the universe median P/E of 21.16",
+        "Debt-to-equity of 0.64 is under the 1.0 gate",
+        "P/E is positive, so trailing EPS is positive",
+        "Market posture is Neutral, so no hot-market bar applies"
+      ],
+      "criteria_failed": [
+        "Book equity is not reported in this snapshot, so I cannot confirm it is positive",
+        "The full-year profit record cannot be checked from this snapshot",
+        "No credit-cycle data (spreads, lending standards, defaults) is provided to assess credit sensitivity",
+        "The FCF yield of 65.51% is implausible and cannot be relied upon",
+        "The business, capital structure and reason for the low multiple are not described, so risk-adjusted return is only modest"
+      ],
+      "position_size_pct": 0.0,
+      "expected_holding_period_months": 0,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 486,
+    "output_tokens": 3705,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 984,
+    "prompt_sha256": "3f346247c4d61ee58d43994ece5737861f21e02b80ce2e490040696b730ab4fe"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "BMNR",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:50:58.130145+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "BMNR",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A price-to-earnings ratio of about 1.2 and an earnings yield above 83% look like a screaming bargain to anyone who reads the headline ratio. That is first-level thinking: the stock is cheap, so it must be a good investment.",
+        "non_consensus_view": "A reported yield that high should make me suspicious, not excited. Free cash flow yield in the snapshot is slightly negative, so the reported earnings are not showing up as cash. I do not know what produces those earnings, because the snapshot does not say. I keep a small position because the balance sheet is nearly debt-free and no thesis-break gate has fired, but I will not pay up for earnings I cannot trace to cash.",
+        "why_consensus_might_be_wrong": "The bulls may be capitalizing a number that does not repeat. If the earnings are non-cash or non-recurring, the ratio is an artifact and the market is correctly refusing to pay for it. The opposite error is possible too: if the earnings are durable, the market is far too pessimistic. I cannot resolve that from this snapshot, and that is why I am not adding."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Reported earnings prove durable and convert to cash; the market re-rates the shares",
+            "probability_pct": 30.0,
+            "return_pct": 40.0
+          },
+          {
+            "scenario": "Earnings are partly real; shares drift sideways to modestly higher",
+            "probability_pct": 35.0,
+            "return_pct": 5.0
+          },
+          {
+            "scenario": "Earnings prove largely non-cash or non-recurring; the shares re-rate lower",
+            "probability_pct": 25.0,
+            "return_pct": -30.0
+          },
+          {
+            "scenario": "Severe disappointment in a market that turns risk-averse",
+            "probability_pct": 10.0,
+            "return_pct": -60.0
+          }
+        ],
+        "expected_return_pct": 0.25
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "The source of the reported earnings is not described in the snapshot, so I assume nothing about its durability",
+          "Debt-to-equity near zero means the balance sheet is not the risk, but book equity is not reported here, so I cannot confirm that gate",
+          "Free cash flow yield is slightly negative; I assume the gap to the earnings yield is meaningful rather than a timing quirk",
+          "Scenario probabilities and returns are my judgment, not data",
+          "The market temperature reading is Neutral, but 46% of companies in the sample have negative net income, which I read as speculative froth rather than health"
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.35,
+      "thesis_en": "Before looking at this name, I ask where the pendulum is. The market reads Neutral, with a median P/E near 21 and nearly half the sample losing money, so it is neither a moment to deploy aggressively nor one to flee. I own BMNR at a loss of about 16% from my entry, but a price decline is never a reason to sell, and the debt-to-equity of almost zero means no thesis-break gate has fired. Still, a P/E of 1.2 beside a slightly negative free cash flow yield tells me the earnings are not showing up as cash. I distrust a number that looks too good until I understand it, and I cannot do that from this snapshot. So I hold the small position, refuse to add, and let the evidence, not my hopes, decide what comes next.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05d0\u05e0\u05d9 \u05e9\u05d5\u05d0\u05dc \u05d0\u05d9\u05e4\u05d4 \u05e0\u05de\u05e6\u05d0 \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d4\u05e9\u05d5\u05e7 \u05d1\u05de\u05e6\u05d1 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9, \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc \u05db-21 \u05d5\u05db\u05de\u05e2\u05d8 \u05de\u05d7\u05e6\u05d9\u05ea \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05d1\u05de\u05d3\u05d2\u05dd \u05de\u05e4\u05e1\u05d9\u05d3\u05d5\u05ea, \u05d5\u05dc\u05db\u05df \u05d6\u05d4 \u05dc\u05d0 \u05e8\u05d2\u05e2 \u05dc\u05e4\u05e8\u05d5\u05e1 \u05d4\u05d5\u05df \u05d1\u05db\u05d5\u05d7 \u05d5\u05d2\u05dd \u05dc\u05d0 \u05e8\u05d2\u05e2 \u05dc\u05d1\u05e8\u05d5\u05d7. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-BMNR \u05d1\u05d4\u05e4\u05e1\u05d3 \u05e9\u05dc \u05db-16% \u05de\u05de\u05d7\u05d9\u05e8 \u05d4\u05db\u05e0\u05d9\u05e1\u05d4 \u05e9\u05dc\u05d9, \u05d0\u05d1\u05dc \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05dc\u05e2\u05d5\u05dc\u05dd \u05d0\u05d9\u05e0\u05d4 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8, \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05db\u05de\u05e2\u05d8 \u05d0\u05e4\u05e1\u05d9 \u05d0\u05d5\u05de\u05e8 \u05e9\u05d0\u05e3 \u05e9\u05e2\u05e8 \u05e9\u05d1\u05d9\u05e8\u05ea \u05ea\u05d6\u05d4 \u05dc\u05d0 \u05e0\u05e4\u05e8\u05e5. \u05e2\u05dd \u05d6\u05d0\u05ea, \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 1.2 \u05dc\u05e6\u05d3 \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc\u05d9\u05dc\u05d9\u05ea \u05d1\u05de\u05e2\u05d8 \u05de\u05dc\u05de\u05d3 \u05d0\u05d5\u05ea\u05d9 \u05e9\u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d0\u05d9\u05e0\u05dd \u05de\u05ea\u05d5\u05e8\u05d2\u05de\u05d9\u05dd \u05dc\u05de\u05d6\u05d5\u05de\u05df. \u05d0\u05e0\u05d9 \u05d7\u05e9\u05d3\u05df \u05db\u05dc\u05e4\u05d9 \u05de\u05e1\u05e4\u05e8 \u05e9\u05e0\u05e8\u05d0\u05d4 \u05d8\u05d5\u05d1 \u05de\u05d3\u05d9 \u05e2\u05d3 \u05e9\u05d0\u05d1\u05d9\u05df \u05d0\u05d5\u05ea\u05d5, \u05d5\u05d0\u05ea \u05d6\u05d4 \u05d0\u05d9\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05e2\u05e9\u05d5\u05ea \u05de\u05ea\u05d5\u05da \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d4\u05e7\u05d8\u05e0\u05d4, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05d5\u05de\u05e0\u05d9\u05d7 \u05dc\u05e2\u05d5\u05d1\u05d3\u05d5\u05ea \u05d5\u05dc\u05d0 \u05dc\u05ea\u05e7\u05d5\u05d5\u05ea \u05dc\u05d4\u05db\u05e8\u05d9\u05e2 \u05de\u05d4 \u05d9\u05d1\u05d5\u05d0.",
+      "criteria_passed": [
+        "No hard disqualifier from section 10 clearly applies",
+        "Debt-to-equity of about 0.0002, far below the 1.0 gate",
+        "Reported P/E of about 1.2 is positive, so no full-year loss is indicated",
+        "Market temperature is Neutral, so a held name is not forced out by a hot cycle",
+        "Price decline alone (-16.36% from entry) is not a sell trigger"
+      ],
+      "criteria_failed": [
+        "Free cash flow yield is -0.05%, so reported earnings are not confirmed by cash",
+        "Source and durability of earnings are not described in the snapshot",
+        "Book equity is not reported, so the positive-equity gate could not be checked",
+        "Risk-adjusted expected return is near zero, which is mediocre, so I will not add"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 12,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [
+          19.17
+        ],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 570,
+    "output_tokens": 3856,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1159,
+    "prompt_sha256": "efa934d6805b92bce8818bd19bbc951ef9933749b09bf16752edd5ae27777d68"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "FNF",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:18.654786+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "FNF",
+      "decision": "WATCH",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "FNF is a leading title insurer with a 4.65% dividend yield and a P/E of 19.59, so it is a sensible, income-paying way to own the real estate transaction cycle. Most would call it fairly priced and acceptable to own.",
+        "non_consensus_view": "A fair price is not a margin of safety. The earnings yield of 5.11% sits only just above the 5.0% floor my screen uses in a Neutral cycle. I would rather wait for a price that pays me for the cyclicality than accept the consensus view that the dividend makes the wait unnecessary.",
+        "why_consensus_might_be_wrong": "Title insurance earnings follow transaction volumes, which follow credit availability and rates, and I cannot see that cycle in this snapshot. If current earnings are above normal, the P/E of 19.59 flatters the price. The snapshot's free-cash-flow yield of 47.87% looks implausible against the market cap, and I will not lean on it. A high number I cannot explain is a reason for caution, not comfort."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Transaction volumes stay roughly steady; earnings hold and the dividend is collected",
+            "probability_pct": 50.0,
+            "return_pct": 8.0
+          },
+          {
+            "scenario": "Credit eases and real estate activity improves; earnings and multiple both expand",
+            "probability_pct": 20.0,
+            "return_pct": 20.0
+          },
+          {
+            "scenario": "Rates stay restrictive or housing weakens; earnings fall and the multiple compresses",
+            "probability_pct": 30.0,
+            "return_pct": -18.0
+          }
+        ],
+        "expected_return_pct": 2.6
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "I assume current earnings are roughly normal, but the snapshot gives no earnings history to test this.",
+          "I do not know the direction of mortgage rates or housing transaction volumes, and I will not forecast them.",
+          "The snapshot gives no book equity, no loss history and no investment portfolio quality, so I cannot verify the thesis-break checks beyond D/E of 0.59.",
+          "The market temperature inputs are partly odd: median yield is shown as 0.0% yet carries a positive vote. I treat the Neutral reading as approximate.",
+          "The scenario probabilities are my own judgement, not data."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.4,
+      "thesis_en": "Before looking at FNF, I ask where the pendulum is. The reading is Neutral, with a market median P/E of 21.16 and 46% of companies reporting negative net income. That is neither the fear that pays me to be aggressive nor the euphoria that demands cash. In that setting FNF's 5.11% earnings yield clears my Neutral floor of 5.0% by a hair, with D/E of 0.59 and a 4.65% dividend yield. But a thin cushion on a cyclical earnings stream, with an unexplained 47.87% FCF yield and no book equity or earnings history in front of me, is not a margin of safety. I do not own it, I am not forced to, and I would rather wait for a better price or better evidence. As I wrote, most things prove to be cyclical, and I will not pretend to know where title earnings sit in theirs.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc FNF, \u05d0\u05e0\u05d9 \u05e9\u05d5\u05d0\u05dc \u05d0\u05d9\u05e4\u05d4 \u05e0\u05de\u05e6\u05d0 \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d4\u05e7\u05e8\u05d9\u05d0\u05d4 \u05d4\u05d9\u05d0 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea: \u05d4-P/E \u05d4\u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05d1\u05e9\u05d5\u05e7 \u05d4\u05d5\u05d0 21.16, \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05d4\u05e4\u05e1\u05d3 \u05e0\u05e7\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d4\u05e4\u05d7\u05d3 \u05e9\u05de\u05e6\u05d3\u05d9\u05e7 \u05d0\u05d2\u05e8\u05e1\u05d9\u05d1\u05d9\u05d5\u05ea, \u05d5\u05d2\u05dd \u05dc\u05d0 \u05d4\u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05e9\u05de\u05d7\u05d9\u05d9\u05d1\u05ea \u05de\u05d6\u05d5\u05de\u05df. \u05d1\u05ea\u05e0\u05d0\u05d9\u05dd \u05db\u05d0\u05dc\u05d4 \u05ea\u05e9\u05d5\u05d0\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc FNF, 5.11%, \u05e2\u05d5\u05d1\u05e8\u05ea \u05d1\u05e7\u05d5\u05e9\u05d9 \u05d0\u05ea \u05d4\u05e8\u05e3 \u05d4\u05e0\u05d9\u05d8\u05e8\u05dc\u05d9 \u05e9\u05dc\u05d9 \u05e9\u05dc 5.0%, \u05e2\u05dd \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.59 \u05d5\u05ea\u05e9\u05d5\u05d0\u05ea \u05d3\u05d9\u05d1\u05d9\u05d3\u05e0\u05d3 \u05e9\u05dc 4.65%. \u05d0\u05d1\u05dc \u05db\u05e8\u05d9\u05ea \u05d3\u05e7\u05d4 \u05e2\u05dc \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05e6\u05d9\u05e7\u05dc\u05d9\u05d9\u05dd, \u05dc\u05e6\u05d3 \u05ea\u05e9\u05d5\u05d0\u05ea FCF \u05e9\u05dc 47.87% \u05e9\u05d0\u05d9\u05df \u05dc\u05d9 \u05d4\u05e1\u05d1\u05e8 \u05dc\u05d4, \u05d5\u05dc\u05dc\u05d0 \u05e0\u05ea\u05d5\u05e0\u05d9 \u05d4\u05d5\u05df \u05e2\u05e6\u05de\u05d9 \u05d0\u05d5 \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d9\u05ea \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd, \u05d0\u05d9\u05e0\u05e0\u05d4 margin of safety. \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4, \u05d5\u05d0\u05d9\u05e9 \u05dc\u05d0 \u05de\u05db\u05e8\u05d9\u05d7 \u05d0\u05d5\u05ea\u05d9 \u05dc\u05e7\u05e0\u05d5\u05ea. \u05d0\u05e0\u05d9 \u05de\u05e2\u05d3\u05d9\u05e3 \u05dc\u05d4\u05de\u05ea\u05d9\u05df \u05dc\u05de\u05d7\u05d9\u05e8 \u05d8\u05d5\u05d1 \u05d9\u05d5\u05ea\u05e8 \u05d0\u05d5 \u05dc\u05e8\u05d0\u05d9\u05d5\u05ea \u05d8\u05d5\u05d1\u05d5\u05ea \u05d9\u05d5\u05ea\u05e8. \u05db\u05e4\u05d9 \u05e9\u05db\u05ea\u05d1\u05ea\u05d9, \u05e8\u05d5\u05d1 \u05d4\u05d3\u05d1\u05e8\u05d9\u05dd \u05de\u05ea\u05d2\u05dc\u05d9\u05dd \u05db\u05e6\u05d9\u05e7\u05dc\u05d9\u05d9\u05dd, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05e2\u05de\u05d9\u05d3 \u05e4\u05e0\u05d9\u05dd \u05e9\u05d0\u05e0\u05d9 \u05d9\u05d5\u05d3\u05e2 \u05d0\u05d9\u05e4\u05d4 \u05e0\u05de\u05e6\u05d0\u05d9\u05dd \u05e8\u05d5\u05d5\u05d7\u05d9 \u05d4\u05d8\u05d9\u05d9\u05d8\u05dc \u05d1\u05de\u05d7\u05d6\u05d5\u05e8 \u05e9\u05dc\u05d4\u05dd.",
+      "criteria_passed": [
+        "Earnings yield 5.11% is at or above the 5.0% Neutral-posture floor, but only just",
+        "Debt to equity 0.59 is below the 1.0 gate",
+        "Dividend yield 4.65% is reported"
+      ],
+      "criteria_failed": [
+        "No clear margin of safety: the earnings yield clears the floor by only about 0.1 point",
+        "Book equity, full-year earnings history and investment portfolio quality are not in the snapshot, so thesis-break checks could not be completed",
+        "The reported FCF yield of 47.87% is not credible against the market cap and was not relied upon",
+        "Real estate and credit cycle exposure of title insurance cannot be assessed from the snapshot"
+      ],
+      "position_size_pct": 0.0,
+      "expected_holding_period_months": 0,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 491,
+    "output_tokens": 2969,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 998,
+    "prompt_sha256": "e7d4569e4e47d2d941eaa2685738e10071ca65dc345650b8bc30f8744b4845b9"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "GLRE",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:20.023724+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "GLRE",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "The market sees a low-multiple, thinly levered small-cap, with a P/E of 7.5 against a median of 21.2 across the universe. A discount that wide usually means the market doubts the earnings are durable.",
+        "non_consensus_view": "I own it because the price is low relative to what the business reports, not because I know why it is cheap. The balance sheet barely uses debt (debt/equity 0.0069 against a median of 0.35), so a bad cycle is less likely to cost me permanent capital through creditors.",
+        "why_consensus_might_be_wrong": "The skepticism may be excessive, and low multiples can persist or re-rate. But I must also consider that the consensus is right and the earnings are cyclical or flattered. The 40.1% free cash flow yield is so high that I treat it as a warning to verify, not as a gift."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings prove durable and the multiple partially re-rates toward the market median",
+            "probability_pct": 25.0,
+            "return_pct": 30.0
+          },
+          {
+            "scenario": "Earnings hold, the multiple stays low, and I mostly collect fundamental progress",
+            "probability_pct": 50.0,
+            "return_pct": 8.0
+          },
+          {
+            "scenario": "Earnings prove cyclical or non-recurring and the low multiple was justified",
+            "probability_pct": 25.0,
+            "return_pct": -20.0
+          }
+        ],
+        "expected_return_pct": 6.5
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "Reported earnings (P/E 7.5, earnings yield 13.3%) are representative and not a one-time peak",
+          "The 40.1% FCF yield is not a timing artifact; I cannot verify its drivers from this snapshot",
+          "Book equity is positive and the latest full year was not a loss; neither is reported in this snapshot, so I cannot confirm them",
+          "The nature of the business and its cyclicality are not described in the snapshot",
+          "Credit conditions stay non-hostile; I make no forecast about them"
+        ],
+        "thesis_robust_to_multiple_futures": true
+      },
+      "confidence": 0.5,
+      "thesis_en": "Before the security, the pendulum: the temperature reads Neutral, not euphoric and not panicked, with a median P/E of 21.2 and 46% of companies reporting negative earnings. That says be selective, not aggressive. I own GLRE, up 10.0% from my 14.79 entry 47 days ago, and the question is whether to keep it, not whether to open it. At 7.5 times earnings with almost no debt, I still see a margin of safety, and the price sits well short of the point where I would trim. But a 40.1% free cash flow yield is the kind of number that makes me ask what I am missing, and I cannot check book equity or full-year results from this snapshot, so my confidence is moderate. I hold, I don't add on a 10% gain, and I stay humble: you can't predict, you can prepare.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05de\u05e1\u05ea\u05db\u05dc\u05d9\u05dd \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05de\u05e1\u05ea\u05db\u05dc\u05d9\u05dd \u05e2\u05dc \u05d4\u05d4\u05d8\u05d9\u05d4 \u05e9\u05dc \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea: \u05de\u05d3 \u05d4\u05d7\u05d5\u05dd \u05de\u05e8\u05d0\u05d4 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9 \u2013 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4, \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.2 \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e9\u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05d4\u05e4\u05e1\u05d3. \u05d4\u05de\u05e9\u05de\u05e2\u05d5\u05ea \u05d4\u05d9\u05d0 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9\u05d5\u05ea, \u05dc\u05d0 \u05d0\u05d2\u05e8\u05e1\u05d9\u05d1\u05d9\u05d5\u05ea. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-GLRE, \u05d0\u05d7\u05e8\u05d9 \u05e2\u05dc\u05d9\u05d9\u05d4 \u05e9\u05dc 10.0% \u05de\u05de\u05d7\u05d9\u05e8 \u05d4\u05db\u05e0\u05d9\u05e1\u05d4 \u05e9\u05dc\u05d9 (14.79) \u05dc\u05e4\u05e0\u05d9 47 \u05d9\u05de\u05d9\u05dd, \u05d5\u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05d9\u05d0 \u05d0\u05dd \u05dc\u05d4\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05d0\u05dd \u05dc\u05e4\u05ea\u05d5\u05d7 \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4. \u05d1\u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 7.5 \u05d5\u05e2\u05dd \u05db\u05de\u05e2\u05d8 \u05d0\u05e4\u05e1 \u05d7\u05d5\u05d1 \u05e2\u05d3\u05d9\u05d9\u05df \u05d9\u05e9 \u05dc\u05d9 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df, \u05d5\u05d4\u05de\u05d7\u05d9\u05e8 \u05e8\u05d7\u05d5\u05e7 \u05de\u05d4\u05e0\u05e7\u05d5\u05d3\u05d4 \u05e9\u05d1\u05d4 \u05d4\u05d9\u05d9\u05ea\u05d9 \u05de\u05e7\u05e6\u05e5. \u05d0\u05d1\u05dc \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 40.1% \u05d4\u05d9\u05d0 \u05de\u05e1\u05e4\u05e8 \u05e9\u05d2\u05d5\u05e8\u05dd \u05dc\u05d9 \u05dc\u05e9\u05d0\u05d5\u05dc \u05de\u05d4 \u05d0\u05e0\u05d9 \u05de\u05e4\u05e1\u05e4\u05e1, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d5\u05d5\u05d3\u05d0 \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d0\u05ea \u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9 \u05d0\u05d5 \u05d0\u05ea \u05ea\u05d5\u05e6\u05d0\u05d5\u05ea \u05d4\u05e9\u05e0\u05d4 \u05d4\u05de\u05dc\u05d0\u05d4, \u05d5\u05dc\u05db\u05df \u05e8\u05de\u05ea \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9 \u05d1\u05d9\u05e0\u05d5\u05e0\u05d9\u05ea. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05d0\u05d7\u05e8\u05d9 \u05e2\u05dc\u05d9\u05d9\u05d4 \u05e9\u05dc 10%, \u05d5\u05e0\u05e9\u05d0\u05e8 \u05e6\u05e0\u05d5\u05e2: \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea, \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df.",
+      "criteria_passed": [
+        "Market temperature Neutral, so selective holding is consistent with the posture",
+        "P/E 7.5 against a universe median of 21.2",
+        "Debt/equity 0.0069, well under the 1.0 gate and the 0.35 median",
+        "Earnings yield 13.3%, well above the Neutral screen floor of 5.0%",
+        "No hard anti-pattern triggered: no leverage, no peak-optimism purchase, no macro forecast required"
+      ],
+      "criteria_failed": [
+        "Book equity positivity is not reported in this snapshot, so the thesis-break check could not be performed",
+        "Full-year profit or loss is not reported in this snapshot, so the check could not be performed",
+        "The 40.1% FCF yield is unexplained, so it lowers my confidence and does not raise it",
+        "Credit-cycle indicators such as spreads and cov-lite share are not in the snapshot, so I could not assess them",
+        "The dividend yield is 0.0%, so there is no income while I wait"
+      ],
+      "position_size_pct": 4.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 567,
+    "output_tokens": 2695,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1152,
+    "prompt_sha256": "0a7d08aaa3462e086350ea92da65e263dfbe7433dd976df23b34a83ea773140f"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "GTM",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:20.919072+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "GTM",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "The market is pricing GTM as a business in trouble. The shares are 28.33% below our entry at 4.193, and a P/E of 7.9 against a market median of 21.16 says investors expect earnings to fade or not to be real.",
+        "non_consensus_view": "A low multiple is not by itself a margin of safety, but here the snapshot shows an earnings yield of 12.65%, a free cash flow yield of 42.43% and debt to equity of 0.88, which is under the 1.0 gate. If even part of that cash generation is durable, the price already discounts a lot of bad news.",
+        "why_consensus_might_be_wrong": "Pessimism tends to extrapolate the recent price decline into the future. The decline is not evidence of a broken thesis, because a price drop alone never triggers a sale. The consensus could also be right, though. A free cash flow yield this high often reflects a one-time item, working-capital release or data distortion. I cannot tell which from this snapshot."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings and cash flow prove durable; the multiple drifts toward the market's, partly recovering the loss",
+            "probability_pct": 45.0,
+            "return_pct": 35.0
+          },
+          {
+            "scenario": "Earnings hold but the market stays skeptical; the stock goes sideways",
+            "probability_pct": 35.0,
+            "return_pct": 0.0
+          },
+          {
+            "scenario": "Cash flow proves non-recurring or earnings deteriorate; the thesis breaks",
+            "probability_pct": 20.0,
+            "return_pct": -35.0
+          }
+        ],
+        "expected_return_pct": 8.75
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "The reported P/E and free cash flow yield reflect recurring earning power. The 42.43% free cash flow yield is unusually high and I have not verified its source.",
+          "Debt to equity of 0.88 is a fair picture of the capital structure. The maturity profile, covenants and current ratio are not in the snapshot.",
+          "The business description, revenue trend and margin trend are not provided, so I cannot check the quality of the earnings.",
+          "Whether the company reported a full-year loss or has positive book equity is not stated explicitly in this snapshot, so I cannot fully rule out a thesis break.",
+          "I do not know why the stock fell 28.33% over 103 days; this could be noise or information."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.4,
+      "thesis_en": "Before I look at the stock, the pendulum: the market reads Neutral, with a median P/E of 21.16 and 46% of companies showing negative net income. That calls for selectivity, not aggression and not panic. I own GTM, and I am down 28.33% from 4.193. A price decline is not a thesis break, and volatility is opportunity, not risk. The numbers I can see are encouraging: P/E of 7.9, earnings yield of 12.65%, debt to equity of 0.88 under the 1.0 gate. But a free cash flow yield of 42.43% makes me more cautious, not more excited, because things that look this good deserve suspicion. So I keep the position and do not add, and I treat the missing business and balance-sheet detail as a reason to keep it modest. I would sell if book equity turned negative, if a full-year loss appeared, or if debt to equity went above 1.0. As I wrote, 'You can't predict. You can prepare.'",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05d0\u05e0\u05d9 \u05d1\u05d5\u05d3\u05e7 \u05d0\u05d9\u05e4\u05d4 \u05d4\u05e9\u05e2\u05d5\u05df: \u05d4\u05e9\u05d5\u05e7 \u05d1\u05de\u05e6\u05d1 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9, \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e9\u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05d4\u05e4\u05e1\u05d3 \u05e0\u05e7\u05d9. \u05d6\u05d4 \u05de\u05e6\u05d1 \u05e9\u05d3\u05d5\u05e8\u05e9 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9\u05d5\u05ea, \u05dc\u05d0 \u05ea\u05d5\u05e7\u05e4\u05e0\u05d5\u05ea \u05d5\u05dc\u05d0 \u05d1\u05d4\u05dc\u05d4. GTM \u05db\u05d1\u05e8 \u05d1\u05ea\u05d9\u05e7 \u05e9\u05dc\u05d9, \u05d5\u05d0\u05e0\u05d9 \u05e0\u05de\u05e6\u05d0 28.33% \u05de\u05ea\u05d7\u05ea \u05dc\u05de\u05d7\u05d9\u05e8 \u05d4\u05db\u05e0\u05d9\u05e1\u05d4 \u05e9\u05dc 4.193. \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d0\u05d9\u05e0\u05d4 \u05e9\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05d4\u05ea\u05d6\u05d4, \u05d5\u05ea\u05e0\u05d5\u05d3\u05ea\u05d9\u05d5\u05ea \u05d4\u05d9\u05d0 \u05d4\u05d6\u05d3\u05de\u05e0\u05d5\u05ea \u05d5\u05dc\u05d0 \u05e1\u05d9\u05db\u05d5\u05df. \u05d4\u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e9\u05d0\u05e0\u05d9 \u05e8\u05d5\u05d0\u05d4 \u05de\u05e2\u05d5\u05d3\u05d3\u05d9\u05dd: \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 7.9, \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 12.65% \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.88, \u05de\u05ea\u05d7\u05ea \u05dc\u05e8\u05e3 1.0. \u05d0\u05d1\u05dc \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 42.43% \u05de\u05e2\u05d5\u05e8\u05e8\u05ea \u05d1\u05d9 \u05d6\u05d4\u05d9\u05e8\u05d5\u05ea \u05d5\u05dc\u05d0 \u05d4\u05ea\u05dc\u05d4\u05d1\u05d5\u05ea, \u05db\u05d9 \u05d3\u05d1\u05e8\u05d9\u05dd \u05e9\u05e0\u05e8\u05d0\u05d9\u05dd \u05d8\u05d5\u05d1 \u05db\u05dc \u05db\u05da \u05de\u05d7\u05d9\u05d9\u05d1\u05d9\u05dd \u05d7\u05e9\u05d3\u05e0\u05d5\u05ea. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05d5\u05d7\u05e1\u05e8\u05d9\u05dd \u05dc\u05d9 \u05e4\u05e8\u05d8\u05d9\u05dd \u05e2\u05dc \u05d4\u05e2\u05e1\u05e7 \u05d5\u05e2\u05dc \u05d4\u05de\u05d0\u05d6\u05df, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05d2\u05d5\u05d3\u05dc \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e6\u05e0\u05d5\u05e2. \u05d4\u05d9\u05d9\u05ea\u05d9 \u05de\u05d5\u05db\u05e8 \u05d0\u05dd \u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9 \u05d4\u05d9\u05d4 \u05d4\u05d5\u05e4\u05da \u05e9\u05dc\u05d9\u05dc\u05d9, \u05d0\u05dd \u05d4\u05d9\u05d4 \u05de\u05d5\u05e4\u05d9\u05e2 \u05d4\u05e4\u05e1\u05d3 \u05e9\u05e0\u05ea\u05d9 \u05de\u05dc\u05d0 \u05d0\u05d5 \u05d0\u05dd \u05d9\u05d7\u05e1 \u05d4\u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05d4\u05d9\u05d4 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea 1.0. \u05db\u05e4\u05d9 \u05e9\u05db\u05ea\u05d1\u05ea\u05d9: '\u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea, \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df'.",
+      "criteria_passed": [
+        "Debt to equity 0.88 is below the 1.0 gate",
+        "P/E of 7.9 is positive, and the earnings yield of 12.65% is well above the Neutral posture's 5.0% screen floor",
+        "Free cash flow yield of 42.43% is very high, but needs verification",
+        "No price-based sell trigger: the price is far below the Neutral-cycle fair value line, and a price decline alone is never a sell"
+      ],
+      "criteria_failed": [
+        "Cannot verify earnings quality: business description, revenue and margin trends are absent from the snapshot",
+        "Cannot confirm book equity is positive or that there was no full-year loss; the snapshot does not state either",
+        "Current ratio, debt maturities and covenants are not reported here",
+        "Margin of safety is suggested by the multiples but not confirmed, so this is no reason to add"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [
+          4.193,
+          5.0
+        ],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 566,
+    "output_tokens": 3071,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1149,
+    "prompt_sha256": "4460ffb9a856b7845236f2bad8a528856ae1c8b81e0cad67a1c3c18f124f640f"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "RIGL",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:22.402095+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "RIGL",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A stock at a price-to-earnings ratio of 2.2 and an earnings yield of 45.5% looks like an obvious bargain. The first-level reading is that the market has simply missed it, so one should buy more. The opposite first-level reading is that a number that cheap must be a trap.",
+        "non_consensus_view": "The gap between a 45.5% earnings yield and a 9.4% free-cash-flow yield tells me reported earnings and cash generation are not the same thing. I will not pay for the headline earnings number. I keep the position because the balance sheet shows debt-to-equity of 0.106 and cash flow is positive. I do not add, because I cannot verify that the earnings are recurring.",
+        "why_consensus_might_be_wrong": "The bargain-hunters may be capitalizing a one-time or non-cash earnings item as if it were permanent. The skeptics may be ignoring that the free-cash-flow yield is still positive on a lightly levered balance sheet. Either camp is extrapolating from a single number. The snapshot does not show what is behind the earnings."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings prove largely durable and the market re-rates the stock toward a more normal multiple",
+            "probability_pct": 30.0,
+            "return_pct": 35.0
+          },
+          {
+            "scenario": "Earnings are partly non-recurring; the price drifts sideways as cash flow supports it",
+            "probability_pct": 45.0,
+            "return_pct": 5.0
+          },
+          {
+            "scenario": "Earnings prove mostly one-off and the stock falls toward a multiple that reflects cash flow only",
+            "probability_pct": 25.0,
+            "return_pct": -30.0
+          }
+        ],
+        "expected_return_pct": 5.25
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "I assume the earnings behind the 2.2 P/E are at least partly recurring. The snapshot does not say, and the gap to the 9.4% FCF yield argues for caution.",
+          "I assume the positive free cash flow persists. Revenue, margins and cash runway are not in this snapshot, so I could not check them.",
+          "Book equity, full-year profit or loss, and the prior-year trend are not reported in the snapshot. I could not test the thesis-break conditions directly.",
+          "I do not know where the stock goes next. The position is down 13.32% in 43 days, and that move alone tells me nothing about the thesis.",
+          "I assume the Neutral market backdrop (median P/E 21.16, 46.2% of companies with negative net income) does not tip into stress."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.4,
+      "thesis_en": "I start with the pendulum. The market reads Neutral, with a median P/E of 21.16 and 46.2% of companies reporting negative net income. That is not euphoria and not panic, so I stay selective. I own RIGL, and it is down 13.32% since October 6. A price decline is not a thesis break. Debt-to-equity of 0.106 and a 9.4% free-cash-flow yield give me a margin of safety. But a 45.5% earnings yield is far above the cash yield, and I do not trust a number that good until I know what is behind it. So I keep the position at its current size, do not add, and will sell only if the earnings prove illusory. As I have written, you can't predict, but you can prepare.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d4\u05e9\u05d5\u05e7 \u05e0\u05de\u05e6\u05d0 \u05d1\u05de\u05e6\u05d1 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9: \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16, \u05d5-46.2% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e0\u05e7\u05d9 \u05e9\u05dc\u05d9\u05dc\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05d2\u05dd \u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05e0\u05e9\u05d0\u05e8 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d9\u05ea RIGL, \u05d5\u05d4\u05d9\u05d0 \u05d9\u05e8\u05d3\u05d4 13.32% \u05de\u05d0\u05d6 6 \u05d1\u05d0\u05d5\u05e7\u05d8\u05d5\u05d1\u05e8. \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d0\u05d9\u05e0\u05e0\u05d4 \u05e9\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05d4\u05ea\u05d6\u05d4. \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.106 \u05d5\u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 9.4% \u05e0\u05d5\u05ea\u05e0\u05d9\u05dd \u05dc\u05d9 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df. \u05d0\u05d1\u05dc \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 45.5% \u05d2\u05d1\u05d5\u05d4\u05d4 \u05d1\u05d4\u05e8\u05d1\u05d4 \u05de\u05ea\u05e9\u05d5\u05d0\u05ea \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e1\u05d5\u05de\u05da \u05e2\u05dc \u05de\u05e1\u05e4\u05e8 \u05d8\u05d5\u05d1 \u05db\u05dc \u05db\u05da \u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05d1\u05d9\u05df \u05de\u05d4 \u05e2\u05d5\u05de\u05d3 \u05de\u05d0\u05d7\u05d5\u05e8\u05d9\u05d5. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05d2\u05d5\u05d3\u05dc\u05d4 \u05d4\u05e0\u05d5\u05db\u05d7\u05d9, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05d5\u05d0\u05de\u05db\u05d5\u05e8 \u05e8\u05e7 \u05d0\u05dd \u05d9\u05ea\u05d1\u05e8\u05e8 \u05e9\u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d0\u05d9\u05e0\u05dd \u05d0\u05de\u05d9\u05ea\u05d9\u05d9\u05dd. \u05db\u05e4\u05d9 \u05e9\u05db\u05ea\u05d1\u05ea\u05d9: \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea, \u05d0\u05d1\u05dc \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df.",
+      "criteria_passed": [
+        "Debt-to-equity 0.106, well under the 1.0 gate",
+        "Free-cash-flow yield 9.4%, positive",
+        "Dividend yield 0.0%, so no income is expected or relied on",
+        "Earnings yield 45.5%, far above the 5.0% Neutral-posture floor",
+        "Held position is down 13.32%, and a price decline alone is not a sell trigger"
+      ],
+      "criteria_failed": [
+        "Cannot verify that earnings are recurring; the earnings yield is far above the FCF yield",
+        "Book equity, full-year profit or loss, and revenue are not in the snapshot, so thesis-break checks could not be performed",
+        "No intrinsic value estimate beyond the entry-screen line, so margin of safety is only partly established"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 568,
+    "output_tokens": 2908,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1150,
+    "prompt_sha256": "24720f1c3f7f00768f0eafdab1d616e6fe995ccfb4070af8fa03c4c4c674b39d"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "REPX",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:42.449412+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "REPX",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A stock that has fallen 8.6% in the two weeks since we bought it, at a low multiple, is probably cheap for a reason. The market is treating the earnings as unsustainable and refusing to pay for them.",
+        "non_consensus_view": "The snapshot shows a P/E of 5.4, an earnings yield of 18.5%, a free-cash-flow yield of 23.4%, a 3.7% dividend yield and debt-to-equity of 0.38, which is close to the market median of 0.35. At that price the market is already discounting a good deal of mean reversion in earnings. I own it, and a price decline alone is not a reason to sell.",
+        "why_consensus_might_be_wrong": "Pessimism may be overshooting. If earnings merely normalize rather than collapse, a multiple this far below the market median of 21.2 leaves a real cushion. But low multiples on cyclical earnings are the classic trap, so the consensus could also be right. I can't resolve that from this snapshot."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings largely persist and the multiple re-rates modestly toward the market",
+            "probability_pct": 40.0,
+            "return_pct": 25.0
+          },
+          {
+            "scenario": "Earnings mean-revert partway, the multiple stays low and the dividend cushions the result",
+            "probability_pct": 40.0,
+            "return_pct": 5.0
+          },
+          {
+            "scenario": "Earnings fall sharply and the low P/E proves to have been a mirage",
+            "probability_pct": 20.0,
+            "return_pct": -30.0
+          }
+        ],
+        "expected_return_pct": 6.0
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "The current earnings are reasonably representative; the snapshot gives no history to confirm this.",
+          "The business is not described in the snapshot, so I cannot confirm its cyclicality or what drives its earnings.",
+          "The current ratio, interest coverage, book equity and full-year profit status are not reported here, so I could not check them.",
+          "I assume the dividend is covered, but the payout ratio is not reported.",
+          "I make no forecast of the market or of the commodity and macro backdrop."
+        ],
+        "thesis_robust_to_multiple_futures": true
+      },
+      "confidence": 0.5,
+      "thesis_en": "Before looking at the stock I looked at the pendulum. The temperature reads Neutral, with the market median P/E at 21.2 and 46% of companies reporting negative earnings. That is neither euphoria nor panic, so my posture is selective. I own REPX, down 8.6% after 14 days, and a price decline is not a thesis break. The snapshot shows an 18.5% earnings yield, a 23.4% free-cash-flow yield and debt-to-equity of 0.38, which is a real margin of safety if the earnings are durable. I don't know that they are, and several balance-sheet checks aren't reported, so I hold, I don't add, and I keep the position at a modest size. As I've said, you can't predict, but you can prepare.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d4\u05e1\u05ea\u05db\u05dc\u05ea\u05d9 \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05d4\u05e1\u05ea\u05db\u05dc\u05ea\u05d9 \u05e2\u05dc \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d4\u05de\u05d3\u05d3 \u05de\u05e6\u05d1\u05d9\u05e2 \u05e2\u05dc \u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05d4 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea: \u05d7\u05e6\u05d9\u05d5\u05df \u05d4-P/E \u05d1\u05e9\u05d5\u05e7 \u05e2\u05d5\u05de\u05d3 \u05e2\u05dc 21.2, \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc\u05d9\u05dc\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05d2\u05dd \u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4, \u05d5\u05dc\u05db\u05df \u05d4\u05e2\u05de\u05d3\u05d4 \u05e9\u05dc\u05d9 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9\u05ea. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-REPX, \u05e9\u05d9\u05e8\u05d3\u05d4 8.6% \u05ea\u05d5\u05da 14 \u05d9\u05de\u05d9\u05dd, \u05d5\u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05dc\u05d1\u05d3\u05d4 \u05d0\u05d9\u05e0\u05d4 \u05e9\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05d4\u05ea\u05d6\u05d4. \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05e8\u05d0\u05d9\u05dd \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 18.5%, \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 23.4% \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.38, \u05d5\u05d6\u05d4 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05d0\u05de\u05d9\u05ea\u05d9 \u05d0\u05dd \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d9\u05e6\u05d9\u05d1\u05d9\u05dd. \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05d5\u05d3\u05e2 \u05d0\u05dd \u05d4\u05dd \u05d9\u05e6\u05d9\u05d1\u05d9\u05dd, \u05d5\u05db\u05de\u05d4 \u05d1\u05d3\u05d9\u05e7\u05d5\u05ea \u05d1\u05de\u05d0\u05d6\u05df \u05d0\u05d9\u05e0\u05df \u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05d5\u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e6\u05e0\u05d5\u05e2\u05d4. \u05db\u05e4\u05d9 \u05e9\u05d0\u05de\u05e8\u05ea\u05d9, \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea, \u05d0\u05d1\u05dc \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df.",
+      "criteria_passed": [
+        "Earnings yield 18.5% against the Neutral screen floor of 5.0%",
+        "P/E of 5.4 against a market median of 21.2",
+        "Debt-to-equity of 0.38, below the 1.0 gate",
+        "Positive free-cash-flow yield of 23.4%",
+        "No thesis-break signal visible in the snapshot"
+      ],
+      "criteria_failed": [
+        "Book equity, full-year profit and loss, current ratio and interest coverage are not reported, so those checks could not be performed",
+        "The durability of the earnings cannot be verified from a point-in-time snapshot"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 571,
+    "output_tokens": 2762,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1164,
+    "prompt_sha256": "60c51bc674a3eaac1ad0946a2955683fab599eaf35db712eda0418202591c5aa"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "KSS",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:42.993545+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "KSS",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A department-store retailer is a structurally challenged, cyclical consumer name. The consensus treats a low multiple as a value trap and expects earnings to erode.",
+        "non_consensus_view": "At a P/E of 9.93 and an earnings yield of 10.07%, against a market median P/E of 21.16, the price already assumes a lot of pessimism. Debt-to-equity of 0.35 is modest, in line with the market median of 0.35, so the balance sheet is not the weak point. I do not need the business to be wonderful, only less bad than the price implies.",
+        "why_consensus_might_be_wrong": "Pessimism about a stigmatized industry tends to be extrapolated. Cheap, disliked businesses with moderate leverage can do fine when expectations are low. I also hold this humbly. The stock is up 21.27% since I bought it 43 days ago, and part of that is simply the market catching up to the pessimism."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings hold up and the discount to the broader market narrows",
+            "probability_pct": 40.0,
+            "return_pct": 25.0
+          },
+          {
+            "scenario": "Earnings drift sideways and the stock gives back part of the recent gain but keeps collecting the dividend",
+            "probability_pct": 40.0,
+            "return_pct": 3.0
+          },
+          {
+            "scenario": "Consumer weakness hits earnings and the low multiple proves to be a value trap",
+            "probability_pct": 20.0,
+            "return_pct": -30.0
+          }
+        ],
+        "expected_return_pct": 5.2
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "I assume the reported earnings are representative. I cannot see the earnings trend or the quality of the margins from this snapshot.",
+          "The reported FCF yield of 38.01% is unusually high. I do not know what drives it and will not rely on it. It may reflect working-capital release or other one-off items.",
+          "I assume leverage stays moderate. The reported D/E is 0.35, but lease obligations, debt maturities and covenants are not in the snapshot.",
+          "I do not know the path of consumer spending, rates or the credit cycle, and the thesis does not depend on forecasting them.",
+          "Book equity, the net income history and the interest coverage ratio are not in this snapshot, so I could not check them."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.5,
+      "thesis_en": "I start with the pendulum. The market's temperature reads Neutral, with a median P/E of 21.16 and 46% of companies reporting losses, which is neither euphoria nor panic. That calls for selectivity, not aggression. I own KSS at a P/E of 9.93, an earnings yield of 10.07% and D/E of 0.35, and I bought at 19.485. The shares are now 23.63, up 21.27% in 43 days. A price that low reflects deep skepticism, and skepticism is where margin of safety comes from. But I will not let a quick gain talk me into overconfidence, and I will not trust the 38.01% FCF yield until I understand it. I keep the position at its current size, add nothing at this point, and plan to trim only as price approaches fair value or if the thesis breaks.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05ea \u05d4\u05e9\u05d5\u05e7 \u05e0\u05e7\u05e8\u05d0\u05ea \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea: \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e9\u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05d4\u05e4\u05e1\u05d3, \u05db\u05dc\u05d5\u05de\u05e8 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4. \u05d6\u05d4 \u05de\u05e6\u05d3\u05d9\u05e7 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9\u05d5\u05ea \u05d5\u05dc\u05d0 \u05ea\u05d5\u05e7\u05e4\u05e0\u05d5\u05ea. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-KSS \u05d1\u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 9.93, \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 10.07% \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.35, \u05d5\u05e7\u05e0\u05d9\u05ea\u05d9 \u05d1-19.485. \u05d4\u05de\u05e0\u05d9\u05d4 \u05e0\u05e1\u05d7\u05e8\u05ea \u05db\u05e2\u05ea \u05d1-23.63, \u05e2\u05dc\u05d9\u05d9\u05d4 \u05e9\u05dc 21.27% \u05d1-43 \u05d9\u05de\u05d9\u05dd. \u05de\u05d7\u05d9\u05e8 \u05e0\u05de\u05d5\u05da \u05db\u05dc \u05db\u05da \u05de\u05e9\u05e7\u05e3 \u05e1\u05e4\u05e7\u05e0\u05d5\u05ea \u05e2\u05de\u05d5\u05e7\u05d4, \u05d5\u05e9\u05dd \u05e0\u05de\u05e6\u05d0 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df. \u05d0\u05d1\u05dc \u05dc\u05d0 \u05d0\u05ea\u05df \u05dc\u05e8\u05d5\u05d5\u05d7 \u05de\u05d4\u05d9\u05e8 \u05dc\u05e9\u05db\u05e0\u05e2 \u05d0\u05d5\u05ea\u05d9 \u05dc\u05d4\u05ea\u05de\u05dc\u05d0 \u05d1\u05d8\u05d7\u05d5\u05df \u05e2\u05e6\u05de\u05d9, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e1\u05d5\u05de\u05da \u05e2\u05dc \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 38.01% \u05e2\u05d3 \u05e9\u05d0\u05d1\u05d9\u05df \u05de\u05d4 \u05e2\u05d5\u05de\u05d3 \u05de\u05d0\u05d7\u05d5\u05e8\u05d9\u05d4. \u05d0\u05e0\u05d9 \u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05d2\u05d5\u05d3\u05dc \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d4\u05e0\u05d5\u05db\u05d7\u05d9, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05d1\u05e9\u05dc\u05d1 \u05d6\u05d4, \u05d5\u05de\u05ea\u05db\u05e0\u05df \u05dc\u05e7\u05e6\u05e5 \u05e8\u05e7 \u05d0\u05dd \u05d4\u05de\u05d7\u05d9\u05e8 \u05de\u05ea\u05e7\u05e8\u05d1 \u05dc\u05e9\u05d5\u05d5\u05d9 \u05d4\u05d4\u05d5\u05d2\u05df \u05d0\u05d5 \u05d0\u05dd \u05d4\u05ea\u05d6\u05d4 \u05e0\u05e9\u05d1\u05e8\u05ea.",
+      "criteria_passed": [
+        "Debt-to-equity of 0.35 is below the 1.0 gate",
+        "Earnings yield of 10.07% is well above the Neutral-posture screen floor of 5.0%",
+        "P/E of 9.93 is far below the market median P/E of 21.16",
+        "Market temperature is Neutral, so no hot-cycle disqualifier applies",
+        "Not a leveraged, pre-revenue or IPO-type speculation"
+      ],
+      "criteria_failed": [
+        "Could not verify book equity or the net income history, because neither is in this snapshot",
+        "The 38.01% FCF yield cannot be verified and is excluded from my reasoning",
+        "Department-store retail is cyclical and out of favor, so the thesis is not robust in every future"
+      ],
+      "position_size_pct": 4.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 571,
+    "output_tokens": 2909,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1161,
+    "prompt_sha256": "f4825de994021aadc38e51b38d780634705910c72b2631a38b9e2fb6e423ff26"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "UVE",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:45.374357+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "UVE",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A P/E of 7.59 and an earnings yield of 13.17% look like a bargain to the first-level thinker. A cheap stock with a low debt-to-equity of 0.15 should simply be bought and left alone.",
+        "non_consensus_view": "Cheap is not the same as safe. In a market where 46.2% of companies report negative net income, a profitable name at a low multiple may be priced for earnings that will not last. I keep the position at a modest size, because the price pays me for uncertainty without demanding that I forecast anything.",
+        "why_consensus_might_be_wrong": "Earnings and free cash flow can be at a cyclical high, and a 28.39% FCF yield is the kind of number that makes me ask what is being capitalised and how long it lasts. The snapshot does not describe the business, its earnings history or its cycle sensitivity. The multiple could be low because the market expects the earnings to fall. On the other side, the market could be too pessimistic about a name that is simply unloved."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings hold near current levels and the multiple stays modest; I collect the dividend and modest re-rating",
+            "probability_pct": 55.0,
+            "return_pct": 20.0
+          },
+          {
+            "scenario": "Earnings prove durable and the market re-rates the shares toward the broader median multiple",
+            "probability_pct": 20.0,
+            "return_pct": 40.0
+          },
+          {
+            "scenario": "Current earnings prove to be a cyclical peak and the low multiple was justified; earnings fall and the shares de-rate further",
+            "probability_pct": 25.0,
+            "return_pct": -25.0
+          }
+        ],
+        "expected_return_pct": 12.75
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "Reported earnings and free cash flow are representative of normal conditions rather than a peak; I cannot verify this from the snapshot",
+          "The low debt-to-equity of 0.15 is a complete picture of leverage; the snapshot does not show off-balance-sheet or business-specific obligations",
+          "The Neutral market temperature (score -1.0) stays roughly where it is; I am not forecasting a turn",
+          "The snapshot does not describe the business, so I cannot judge its sensitivity to the credit or economic cycle",
+          "Earnings-quality checks such as multi-year earnings history and book equity are not in the snapshot and are unverified"
+        ],
+        "thesis_robust_to_multiple_futures": true
+      },
+      "confidence": 0.5,
+      "thesis_en": "I start with the pendulum: the market sits at Neutral, with a median P/E of 21.16 and 46.2% of companies showing negative net income. That is neither euphoria nor capitulation, so nothing here forces me to act. UVE is a position I already hold, at a P/E of 7.59 and an earnings yield of 13.17%, far above the 5.0% floor that a Neutral posture requires. Debt-to-equity of 0.15 is below the market median of 0.35, so I'm not exposed to leverage, and the position is only 2.31% under water after 16 days, which is noise rather than a thesis break. But a 28.39% free cash flow yield makes me ask what is being capitalised, and I cannot see the business or its earnings history in this snapshot. I therefore hold at a moderate size, neither adding nor trimming, because I can't predict, I can prepare.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea: \u05d4\u05e9\u05d5\u05e7 \u05e0\u05de\u05e6\u05d0 \u05d1\"\u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\", \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46.2% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e9\u05de\u05e6\u05d9\u05d2\u05d5\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e0\u05e7\u05d9 \u05e9\u05dc\u05d9\u05dc\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05db\u05e0\u05d9\u05e2\u05d4, \u05d5\u05dc\u05db\u05df \u05e9\u05d5\u05dd \u05d3\u05d1\u05e8 \u05dc\u05d0 \u05de\u05db\u05e8\u05d9\u05d7 \u05d0\u05d5\u05ea\u05d9 \u05dc\u05e4\u05e2\u05d5\u05dc. UVE \u05d4\u05d9\u05d0 \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e9\u05db\u05d1\u05e8 \u05d0\u05e6\u05dc\u05d9, \u05d1\u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 7.59 \u05d5\u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 13.17%, \u05d4\u05e8\u05d1\u05d4 \u05de\u05e2\u05dc \u05e8\u05e3 \u05d4-5.0% \u05e9\u05e0\u05d3\u05e8\u05e9 \u05d1\u05e2\u05de\u05d3\u05d4 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea. \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.15 \u05e0\u05de\u05d5\u05da \u05de\u05d4\u05d7\u05e6\u05d9\u05d5\u05df \u05d1\u05e9\u05d5\u05e7, 0.35, \u05db\u05da \u05e9\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d7\u05e9\u05d5\u05e3 \u05dc\u05de\u05d9\u05e0\u05d5\u05e3, \u05d5\u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e0\u05de\u05e6\u05d0\u05ea \u05e8\u05e7 2.31% \u05de\u05ea\u05d7\u05ea \u05dc\u05de\u05d7\u05d9\u05e8 \u05d4\u05e7\u05e0\u05d9\u05d9\u05d4 \u05d0\u05d7\u05e8\u05d9 16 \u05d9\u05de\u05d9\u05dd. \u05d6\u05d4 \u05e8\u05e2\u05e9, \u05dc\u05d0 \u05e9\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05d4\u05ea\u05d6\u05d4. \u05d0\u05d1\u05dc \u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 28.39% \u05d2\u05d5\u05e8\u05de\u05ea \u05dc\u05d9 \u05dc\u05e9\u05d0\u05d5\u05dc \u05de\u05d4 \u05d1\u05e2\u05e6\u05dd \u05de\u05ea\u05d5\u05de\u05d7\u05e8 \u05e9\u05dd, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e8\u05d5\u05d0\u05d4 \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d0\u05ea \u05d4\u05e2\u05e1\u05e7 \u05d0\u05d5 \u05d0\u05ea \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d9\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05e9\u05dc\u05d5. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d2\u05d5\u05d3\u05dc \u05de\u05ea\u05d5\u05df, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05d5\u05dc\u05d0 \u05de\u05e7\u05e6\u05e5, \u05db\u05d9 \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea, \u05d0\u05e4\u05e9\u05e8 \u05e8\u05e7 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df.",
+      "criteria_passed": [
+        "Earnings yield 13.17% is above the 5.0% floor for a Neutral posture",
+        "P/E of 7.59 is far below the market median P/E of 21.16",
+        "Debt-to-equity of 0.15 is below the market median of 0.35",
+        "Free cash flow yield is positive at 28.39%",
+        "Dividend yield 1.67% pays me to wait",
+        "Unrealised return of -2.31% after 16 days is not a thesis break; a price decline is never a sell"
+      ],
+      "criteria_failed": [
+        "Business description, earnings history and cycle sensitivity are not in the snapshot, so earnings durability could not be checked",
+        "Book equity and full-year profit status are not reported in the snapshot, so the thesis-break tests could not be run",
+        "The very high FCF yield of 28.39% cannot be explained from the available data"
+      ],
+      "position_size_pct": 4.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 571,
+    "output_tokens": 2927,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1161,
+    "prompt_sha256": "85e77c497247d997849e6f7b46167521e82e5da2e128d2379095e472ba8dd187"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "PPC",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:51:45.942174+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "PPC",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A low P/E (6.22) on what is probably a cyclical protein producer reads to most people as peak earnings that will not last, so the market refuses to pay a normal multiple. The 29.71% trailing dividend yield is likely seen as a one-off payout, not a recurring stream.",
+        "non_consensus_view": "I do not need peak earnings to persist. The earnings yield is 16.07% and the free-cash-flow yield is 9.73%, so the price already discounts a good deal of mean reversion. Debt to equity of 0.87 is under the 1.0 gate, so the balance sheet is not the thing that breaks the thesis. I own this as a price-discipline position, not a bet on the cycle in chicken.",
+        "why_consensus_might_be_wrong": "Consensus tends to extrapolate in both directions: cheap multiples on cyclical earnings are treated as a trap, and strong margins are treated as permanent. If earnings normalise only part of the way, a 6x multiple leaves room. If they fall hard, the consensus is right and I lose. I cannot tell which from this snapshot."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings hold near current levels and the market re-rates modestly (illustrative judgement, not a forecast)",
+            "probability_pct": 35.0,
+            "return_pct": 18.0
+          },
+          {
+            "scenario": "Earnings normalise partway, the multiple stays low, and returns come mostly from cash generation",
+            "probability_pct": 40.0,
+            "return_pct": 2.0
+          },
+          {
+            "scenario": "Sector margins compress sharply and the low multiple proves to be a cyclical-peak signal",
+            "probability_pct": 25.0,
+            "return_pct": -18.0
+          }
+        ],
+        "expected_return_pct": 2.6
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "That current earnings are not so far above mid-cycle that the 6.22 P/E is illusory; the snapshot gives no multi-year earnings history, so I cannot check this.",
+          "That the 29.71% dividend yield is largely non-recurring; the snapshot gives no payout detail, so I treat it as unreliable and place no weight on it.",
+          "That debt to equity of 0.87 stays below the 1.0 gate; the debt maturity profile, interest coverage and covenants are not in the snapshot.",
+          "That the broader market stays near Neutral; the market median P/E of 21.16 and the 46.2% share of companies with negative net income argue against calling it either hot or cold.",
+          "Input costs, product pricing and credit conditions for the company are unknown to me."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.5,
+      "thesis_en": "Before looking at the security I look at the pendulum, and it is not at an extreme: the quant temperature reads Neutral, with a median P/E of 21.16 and 46.2% of companies reporting negative net income. That calls for being selective, not aggressive, and I will not force more money in. PPC is a name I already own, bought about four weeks ago at 27.98 and now sitting at 28.26, up 0.99%. The 16.07% earnings yield and 9.73% free-cash-flow yield give a margin of safety, and debt to equity of 0.87 is inside my 1.0 limit. I keep the shares and do not add, because I cannot verify how cyclical these earnings are, and the 29.71% dividend yield is a number I distrust without more detail. As I wrote, 'most things will prove to be cyclical,' and I would rather be prepared for that than predict it.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05d0\u05e0\u05d9 \u05d1\u05d5\u05d3\u05e7 \u05d0\u05d9\u05e4\u05d4 \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea, \u05d5\u05d4\u05d9\u05d0 \u05dc\u05d0 \u05d1\u05e7\u05e6\u05d4: \u05de\u05d3\u05d3 \u05d4\u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05d4 \u05d4\u05db\u05de\u05d5\u05ea\u05d9 \u05de\u05e8\u05d0\u05d4 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9, \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46.2% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e2\u05dd \u05d4\u05e4\u05e1\u05d3 \u05e0\u05e7\u05d9. \u05d6\u05d4 \u05de\u05e6\u05d3\u05d9\u05e7 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9\u05d5\u05ea \u05d5\u05dc\u05d0 \u05d0\u05d2\u05e8\u05e1\u05d9\u05d1\u05d9\u05d5\u05ea, \u05d5\u05d0\u05d9\u05df \u05dc\u05d9 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05d3\u05d7\u05d5\u05e3 \u05e2\u05d5\u05d3 \u05db\u05e1\u05e3. PPC \u05d4\u05d9\u05d0 \u05de\u05e0\u05d9\u05d4 \u05e9\u05db\u05d1\u05e8 \u05d1\u05d1\u05e2\u05dc\u05d5\u05ea\u05d9: \u05e7\u05e0\u05d9\u05ea\u05d9 \u05dc\u05e4\u05e0\u05d9 \u05db\u05d0\u05e8\u05d1\u05e2\u05d4 \u05e9\u05d1\u05d5\u05e2\u05d5\u05ea \u05d1-27.98, \u05d5\u05d4\u05d9\u05d0 \u05e2\u05d5\u05de\u05d3\u05ea \u05e2\u05dc 28.26, \u05e2\u05dc\u05d9\u05d9\u05d4 \u05e9\u05dc 0.99%. \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 16.07% \u05d5\u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc 9.73% \u05e0\u05d5\u05ea\u05e0\u05d5\u05ea \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df, \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.87 \u05e0\u05de\u05e6\u05d0 \u05d1\u05ea\u05d5\u05da \u05d4\u05d2\u05d1\u05d5\u05dc \u05e9\u05dc\u05d9 \u05e9\u05dc 1.0. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d5\u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05db\u05d9 \u05d0\u05d9\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05d0\u05de\u05ea \u05e2\u05d3 \u05db\u05de\u05d4 \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d4\u05dc\u05dc\u05d5 \u05de\u05d7\u05d6\u05d5\u05e8\u05d9\u05d9\u05dd, \u05d5\u05ea\u05e9\u05d5\u05d0\u05ea \u05d3\u05d9\u05d1\u05d9\u05d3\u05e0\u05d3 \u05e9\u05dc 29.71% \u05d4\u05d9\u05d0 \u05e0\u05ea\u05d5\u05df \u05e9\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e1\u05d5\u05de\u05da \u05e2\u05dc\u05d9\u05d5 \u05d1\u05dc\u05d9 \u05e4\u05e8\u05d8\u05d9\u05dd \u05e0\u05d5\u05e1\u05e4\u05d9\u05dd. \u05db\u05e4\u05d9 \u05e9\u05db\u05ea\u05d1\u05ea\u05d9, '\u05e8\u05d5\u05d1 \u05d4\u05d3\u05d1\u05e8\u05d9\u05dd \u05d9\u05ea\u05d1\u05e8\u05e8\u05d5 \u05db\u05de\u05d7\u05d6\u05d5\u05e8\u05d9\u05d9\u05dd', \u05d5\u05d0\u05e0\u05d9 \u05de\u05e2\u05d3\u05d9\u05e3 \u05dc\u05d4\u05d9\u05d5\u05ea \u05de\u05d5\u05db\u05df \u05dc\u05db\u05da \u05de\u05d0\u05e9\u05e8 \u05dc\u05e0\u05e1\u05d5\u05ea \u05dc\u05e0\u05d1\u05d0.",
+      "criteria_passed": [
+        "Earnings yield 16.07%, well above the Neutral-posture entry floor of 5.0%",
+        "Debt to equity 0.87, below the 1.0 gate",
+        "P/E 6.22, far below the market median P/E of 21.16",
+        "Free-cash-flow yield 9.73%",
+        "Market temperature Neutral, so no hot-cycle disqualifier applies",
+        "Unrealised return +0.99% after 28 days; no thesis break visible"
+      ],
+      "criteria_failed": [
+        "Cannot verify through-the-cycle earnings; no multi-year history in the snapshot",
+        "Dividend yield of 29.71% cannot be checked for sustainability; no payout detail provided",
+        "Interest coverage, debt maturities and book equity are not reported in this snapshot",
+        "Credit-cycle conditions for the company are not in the snapshot, so that check was not performed"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 571,
+    "output_tokens": 3056,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1161,
+    "prompt_sha256": "ba209480dbeb3cba6aff193dd4e1193976c2d5167ae5470ba27ee98677df57d8"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "CASH",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:52:05.134263+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "CASH",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "The stock is down 7.34% from where we bought it 14 days ago, and a first-level reader sees a position that is going wrong and ought to be cut. The market as a whole is not cheap either: the median P/E in the universe is 21.16 and 46.2% of companies reported negative net income.",
+        "non_consensus_view": "A short-term drop says little about whether the thesis is intact. At a P/E of 9.32 and an earnings yield of 10.73%, the price sits well below the market's median valuation, and the debt-to-equity of 0.24 is below the 0.35 median. I would not add or sell on the strength of a two-week move. A price decline is not a reason to sell.",
+        "why_consensus_might_be_wrong": "Two weeks is noise, and treating noise as information is the mistake. But I also should not assume the low multiple is a bargain. A P/E of 9.32 may mean the market sees earnings that are about to fall, and I cannot test that from this snapshot. Either of us could be wrong."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings hold and the multiple drifts toward the market median",
+            "probability_pct": 30.0,
+            "return_pct": 25.0
+          },
+          {
+            "scenario": "Earnings hold and the stock grinds sideways with a small dividend",
+            "probability_pct": 45.0,
+            "return_pct": 8.0
+          },
+          {
+            "scenario": "Earnings prove to be peak or one-off and the low P/E was a trap",
+            "probability_pct": 25.0,
+            "return_pct": -20.0
+          }
+        ],
+        "expected_return_pct": 6.1
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "I am assuming the reported earnings are recurring. The snapshot gives no history, margins, or revenue trend to test that.",
+          "I am assuming the 28.8% FCF yield is real and durable. I cannot see what is driving it.",
+          "I am assuming the 0.24 debt-to-equity captures the balance sheet. Book equity, current ratio, and debt maturities are not given in this snapshot.",
+          "I am assuming the market temperature reading of Neutral is right. Credit spreads, VIX, and issuance data were not supplied, so the reading rests on only five votes from fundamentals.",
+          "I do not know the timing or the catalyst for any re-rating."
+        ],
+        "thesis_robust_to_multiple_futures": true
+      },
+      "confidence": 0.45,
+      "thesis_en": "Before I look at this stock, I look at the pendulum: the quant read is Neutral, with a median P/E of 21.16 and 46.2% of companies losing money. That is neither euphoria nor panic, so I stay selective and don't force anything. I own CASH, and it is down 7.34% in 14 days. That is noise, not a thesis break. At a P/E of 9.32, an earnings yield of 10.73%, and debt-to-equity of 0.24, I am paying a price that leaves some margin of safety, so I hold. I will not add until I can check what is behind the low multiple, because the snapshot does not show earnings quality, book equity, or the trend. As I wrote, 'Rule number one: most things will prove to be cyclical.'",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05d0\u05e0\u05d9 \u05d1\u05d5\u05d3\u05e7 \u05d0\u05d9\u05e4\u05d4 \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea: \u05d4\u05e7\u05e8\u05d9\u05d0\u05d4 \u05d4\u05db\u05de\u05d5\u05ea\u05d9\u05ea \u05d4\u05d9\u05d0 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea, \u05e2\u05dd P/E \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46.2% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e9\u05de\u05e4\u05e1\u05d9\u05d3\u05d5\u05ea \u05db\u05e1\u05e3. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05d2\u05dd \u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05e0\u05e9\u05d0\u05e8 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9 \u05d5\u05dc\u05d0 \u05de\u05db\u05e8\u05d9\u05d7 \u05e9\u05d5\u05dd \u05d3\u05d1\u05e8. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-CASH, \u05d5\u05d4\u05d9\u05d0 \u05d9\u05e8\u05d3\u05d4 7.34% \u05ea\u05d5\u05da 14 \u05d9\u05d5\u05dd. \u05d6\u05d4 \u05e8\u05e2\u05e9, \u05dc\u05d0 \u05e9\u05d1\u05d9\u05e8\u05ea \u05ea\u05d6\u05d4. \u05d1-P/E \u05e9\u05dc 9.32, \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 10.73% \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.24, \u05d0\u05e0\u05d9 \u05de\u05e9\u05dc\u05dd \u05de\u05d7\u05d9\u05e8 \u05e9\u05de\u05e9\u05d0\u05d9\u05e8 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05de\u05e1\u05d5\u05d9\u05dd, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7. \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d1\u05d3\u05d5\u05e7 \u05de\u05d4 \u05e2\u05d5\u05de\u05d3 \u05de\u05d0\u05d7\u05d5\u05e8\u05d9 \u05d4\u05de\u05db\u05e4\u05d9\u05dc \u05d4\u05e0\u05de\u05d5\u05da, \u05db\u05d9 \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05d0\u05d9\u05e0\u05dd \u05de\u05e8\u05d0\u05d9\u05dd \u05d0\u05ea \u05d0\u05d9\u05db\u05d5\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd, \u05d0\u05ea \u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9 \u05d0\u05d5 \u05d0\u05ea \u05d4\u05de\u05d2\u05de\u05d4. \u05db\u05e4\u05d9 \u05e9\u05db\u05ea\u05d1\u05ea\u05d9: '\u05db\u05dc\u05dc \u05de\u05e1\u05e4\u05e8 \u05d0\u05d7\u05ea: \u05e8\u05d5\u05d1 \u05d4\u05d3\u05d1\u05e8\u05d9\u05dd \u05d9\u05ea\u05d1\u05e8\u05e8\u05d5 \u05db\u05de\u05d7\u05d6\u05d5\u05e8\u05d9\u05d9\u05dd.'",
+      "criteria_passed": [
+        "Earnings yield of 10.73% is high and P/E is 9.32, against a market median P/E of 21.16",
+        "Debt-to-equity of 0.24 is below the market median of 0.35",
+        "FCF yield of 28.8% is reported",
+        "No leverage, short, or macro-forecast anti-pattern applies",
+        "A price decline alone is not a sell trigger, and the unrealised -7.34% is not a thesis break"
+      ],
+      "criteria_failed": [
+        "Book equity, a full-year profit or loss, and the earnings trend are not in the snapshot, so a thesis-break check could not be completed",
+        "Credit-cycle indicators (spreads, issuance, default rates) were not supplied, so the credit cycle could not be assessed",
+        "The 0.31% dividend yield gives little income while waiting",
+        "The 28.8% FCF yield could not be checked against any cash-flow detail"
+      ],
+      "position_size_pct": 4.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 572,
+    "output_tokens": 2810,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1166,
+    "prompt_sha256": "8b1b326fbd7e081308a58b5a32a2185cf8b4aded33ca4e46a926771585232c8f"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "NRIM",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:52:08.019505+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "NRIM",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "Small regional banks are unglamorous and cyclical, and the market has priced NRIM at 8.03x earnings with a 12.45% earnings yield. That is a low multiple next to a median P/E of 21.16 across the screened universe. First-level thinkers see a cheap bank and buy, or see a bank and avoid it.",
+        "non_consensus_view": "A low multiple is not by itself a margin of safety. It becomes one only if the earnings are durable through a credit downturn. I hold it because price is modest relative to reported earnings and leverage is low (D/E 0.23). I am not claiming to know the loan book.",
+        "why_consensus_might_be_wrong": "Cheap bank earnings can be the peak of the credit cycle, with low loan losses flattering the numbers. If credit conditions turn, the 'cheap' P/E will turn out to have been a high-water mark. Alternatively, the market may be too pessimistic about a quiet, well-capitalised lender. I cannot tell which from this snapshot."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings hold, multiple stays low; return is mostly the 2.84% dividend yield plus modest drift",
+            "probability_pct": 50.0,
+            "return_pct": 10.0
+          },
+          {
+            "scenario": "Earnings prove durable and the market re-rates toward the universe median",
+            "probability_pct": 25.0,
+            "return_pct": 20.0
+          },
+          {
+            "scenario": "Credit conditions deteriorate, earnings fall and the multiple compresses further",
+            "probability_pct": 25.0,
+            "return_pct": -20.0
+          }
+        ],
+        "expected_return_pct": 5.0
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "Reported earnings are representative and not flattered by an unusually benign stretch of loan losses",
+          "The 26.1% FCF yield is not a reliable guide for a bank, so I give it little weight",
+          "Book equity and full-year profitability are not in this snapshot, so I cannot confirm the thesis-break checks",
+          "Loan quality, deposit funding and rate sensitivity are not in this snapshot and I do not know them",
+          "I make no forecast of rates or the credit cycle; the position is sized so that being wrong is survivable"
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.4,
+      "thesis_en": "I start with the pendulum: the market temperature reads Neutral, with a median P/E of 21.16 and 46% of companies reporting negative net income. That is neither euphoria nor panic, so I am selective, not aggressive. NRIM is a name I own, bought at 24.10 and now 23.06, down 4.32% after 26 days. A price decline is not a thesis break, and volatility is not risk. A 12.45% earnings yield against the 5.0% floor for a Neutral posture, low leverage (D/E 0.23) and a 2.84% dividend yield justify keeping it. The earnings yield is not enough to add: I cannot see the loan book, and book equity and annual profit are not reported here, so my conviction is limited. I hold, I do not add, and I stay humble about what a bank's cheap earnings really represent.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea: \u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05ea \u05d4\u05e9\u05d5\u05e7 \u05e0\u05de\u05d3\u05d3\u05ea \u05db\"\u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea\", \u05e2\u05dd \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16 \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e9\u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05d4\u05e4\u05e1\u05d3 \u05e0\u05e7\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9 \u05d5\u05dc\u05d0 \u05d0\u05d2\u05e8\u05e1\u05d9\u05d1\u05d9. \u05d0\u05ea NRIM \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7: \u05e0\u05db\u05e0\u05e1\u05ea\u05d9 \u05d1-24.10 \u05d5\u05d4\u05d9\u05d0 \u05e2\u05d5\u05de\u05d3\u05ea \u05e2\u05dc 23.06, \u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc 4.32% \u05d0\u05d7\u05e8\u05d9 26 \u05d9\u05de\u05d9\u05dd. \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d0\u05d9\u05e0\u05d4 \u05e9\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05d4\u05ea\u05d6\u05d4, \u05d5\u05ea\u05e0\u05d5\u05d3\u05ea\u05d9\u05d5\u05ea \u05d0\u05d9\u05e0\u05d4 \u05e1\u05d9\u05db\u05d5\u05df. \u05ea\u05e9\u05d5\u05d0\u05ea \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 12.45% \u05de\u05d5\u05dc \u05e8\u05e3 \u05e9\u05dc 5.0% \u05dc\u05ea\u05e0\u05d5\u05d7\u05d4 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea, \u05de\u05d9\u05e0\u05d5\u05e3 \u05e0\u05de\u05d5\u05da (D/E \u05e9\u05dc 0.23) \u05d5\u05ea\u05e9\u05d5\u05d0\u05ea \u05d3\u05d9\u05d1\u05d9\u05d3\u05e0\u05d3 \u05e9\u05dc 2.84% \u05de\u05e6\u05d3\u05d9\u05e7\u05d9\u05dd \u05dc\u05d4\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7. \u05d0\u05d1\u05dc \u05d6\u05d4 \u05dc\u05d0 \u05de\u05e1\u05e4\u05d9\u05e7 \u05db\u05d3\u05d9 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3: \u05d0\u05d9\u05e0\u05d9 \u05e8\u05d5\u05d0\u05d4 \u05d0\u05ea \u05ea\u05d9\u05e7 \u05d4\u05d0\u05e9\u05e8\u05d0\u05d9, \u05d5\u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9 \u05d5\u05d4\u05e8\u05d5\u05d5\u05d7 \u05d4\u05e9\u05e0\u05ea\u05d9 \u05d0\u05d9\u05e0\u05dd \u05de\u05d3\u05d5\u05d5\u05d7\u05d9\u05dd \u05db\u05d0\u05df, \u05d5\u05dc\u05db\u05df \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9 \u05de\u05d5\u05d2\u05d1\u05dc. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05d5\u05e0\u05e9\u05d0\u05e8 \u05e6\u05e0\u05d5\u05e2 \u05dc\u05d2\u05d1\u05d9 \u05de\u05d4 \u05e9\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d6\u05d5\u05dc\u05d9\u05dd \u05e9\u05dc \u05d1\u05e0\u05e7 \u05de\u05d9\u05d9\u05e6\u05d2\u05d9\u05dd \u05d1\u05d0\u05de\u05ea.",
+      "criteria_passed": [
+        "Earnings yield 12.45%, well above the 5.0% value line for a Neutral posture",
+        "Debt-to-equity 0.23, under the 1.0 gate",
+        "Dividend yield 2.84%",
+        "Market temperature Neutral, so no cycle-driven trim trigger"
+      ],
+      "criteria_failed": [
+        "Book equity not reported in this snapshot, so not checked",
+        "Full-year profit or loss not reported in this snapshot, so not checked",
+        "Loan quality and credit-cycle exposure not available, so conviction is capped",
+        "FCF yield of 26.1% is not meaningful for a bank, so it was not relied on"
+      ],
+      "position_size_pct": 4.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 571,
+    "output_tokens": 3205,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1163,
+    "prompt_sha256": "3cadfa2f25da3c200c2519dc367dd95c39da9de35f773ac09b7da26d0b142799"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "KMPR",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:52:09.457143+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "KMPR",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "The market sees a mid-priced property and casualty insurer that is neither obviously cheap nor expensive. The shares are down about 8.6% since we bought them 14 days ago, which readers will take as a sign we were wrong.",
+        "non_consensus_view": "A short-term price decline tells me almost nothing about whether the thesis is intact. The snapshot shows a P/E of 13.9 and an earnings yield of 7.19%, against a Neutral-posture screen floor of 5.0%. Debt to equity is 0.44, inside the 1.0 gate. The market's median P/E is 21.2, so this name is priced below the market that surrounds it.",
+        "why_consensus_might_be_wrong": "Fourteen days is noise, not evidence. Volatility is opportunity, not risk. The consensus may also be wrong in the other direction: insurance earnings are cyclical, and a low multiple can be the market correctly pricing peak underwriting results. I cannot tell which from this snapshot, so I will not add."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings hold at current levels and the shares drift roughly sideways to modestly higher, with the dividend (4.24% yield per snapshot) paid in the meantime",
+            "probability_pct": 50.0,
+            "return_pct": 10.0
+          },
+          {
+            "scenario": "Underwriting or reserve deterioration shows earnings were near a cyclical high, and the multiple compresses further",
+            "probability_pct": 30.0,
+            "return_pct": -15.0
+          },
+          {
+            "scenario": "Earnings prove durable and the multiple re-rates toward the market median",
+            "probability_pct": 20.0,
+            "return_pct": 25.0
+          }
+        ],
+        "expected_return_pct": 5.5
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "That the reported earnings yield of 7.19% reflects sustainable earnings and not a cyclical peak in underwriting results.",
+          "That book equity is positive and the last full year was not a loss. Neither figure is in this snapshot, so I could not check the thesis-break test.",
+          "That the reported free cash flow yield of 29.5% is a distorted number. Insurers' operating cash flow is swollen by premium float, so I give it no weight.",
+          "That credit conditions stay benign. Spreads, VIX and issuance data are not in this snapshot, so I have not assessed them.",
+          "That the 14-day decline is noise and not new information about the business."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.45,
+      "thesis_en": "Before looking at the security, I looked at the pendulum. The quant read is Neutral, with a median P/E of 21.2 and 46% of companies reporting negative net income. That is neither euphoria nor capitulation, so being selective is the right posture. I own Kemper, and the only question is whether to keep it. A price 8.6% below our entry after 14 days is not a reason to sell; as I've always said, risk is permanent loss, not a lower quote. The earnings yield of 7.19% sits above the 5.0% floor and leverage is modest at 0.44. But I can't verify book equity or the last full-year result from this snapshot, and insurance earnings are cyclical, so I hold, I don't add, and I stay humble. You can't predict; you can prepare.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d4\u05e1\u05ea\u05db\u05dc\u05ea\u05d9 \u05e2\u05dc \u05d4\u05e0\u05d9\u05d9\u05e8 \u05e2\u05e6\u05de\u05d5, \u05d1\u05d3\u05e7\u05ea\u05d9 \u05d0\u05d9\u05e4\u05d4 \u05e0\u05de\u05e6\u05d0 \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d4\u05e7\u05e8\u05d9\u05d0\u05d4 \u05d4\u05db\u05de\u05d5\u05ea\u05d9\u05ea \u05d4\u05d9\u05d0 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9\u05ea: \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.2, \u05d5-46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05de\u05d3\u05d5\u05d5\u05d7\u05d5\u05ea \u05e2\u05dc \u05d4\u05e4\u05e1\u05d3 \u05e0\u05e7\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05d2\u05dd \u05dc\u05d0 \u05db\u05e0\u05d9\u05e2\u05d4, \u05d5\u05dc\u05db\u05df \u05d4\u05d2\u05d9\u05e9\u05d4 \u05d4\u05e0\u05db\u05d5\u05e0\u05d4 \u05d4\u05d9\u05d0 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9\u05ea. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-Kemper, \u05d5\u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05d9\u05d7\u05d9\u05d3\u05d4 \u05d4\u05d9\u05d0 \u05d0\u05dd \u05dc\u05d4\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7. \u05de\u05d7\u05d9\u05e8 \u05e9\u05e0\u05de\u05d5\u05da \u05d1-8.6% \u05de\u05de\u05d7\u05d9\u05e8 \u05d4\u05db\u05e0\u05d9\u05e1\u05d4 \u05d0\u05d7\u05e8\u05d9 14 \u05d9\u05d5\u05dd \u05d0\u05d9\u05e0\u05d5 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8; \u05db\u05e4\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05d0\u05d5\u05de\u05e8 \u05ea\u05de\u05d9\u05d3, \u05e1\u05d9\u05db\u05d5\u05df \u05d4\u05d5\u05d0 \u05d4\u05e4\u05e1\u05d3 \u05e7\u05d1\u05d5\u05e2, \u05dc\u05d0 \u05e9\u05e2\u05e8 \u05e0\u05de\u05d5\u05da \u05d9\u05d5\u05ea\u05e8. \u05ea\u05e9\u05d5\u05d0\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 7.19% \u05d2\u05d1\u05d5\u05d4\u05d4 \u05de\u05e8\u05e6\u05e4\u05ea \u05d4\u05e1\u05d9\u05e0\u05d5\u05df \u05e9\u05dc 5.0%, \u05d5\u05d4\u05de\u05d9\u05e0\u05d5\u05e3 \u05e6\u05e0\u05d5\u05e2, 0.44. \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d0\u05de\u05ea \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05d0\u05ea \u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9 \u05d0\u05d5 \u05d0\u05ea \u05ea\u05d5\u05e6\u05d0\u05d5\u05ea \u05d4\u05e9\u05e0\u05d4 \u05d4\u05de\u05dc\u05d0\u05d4 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d4, \u05d5\u05e8\u05d5\u05d5\u05d7\u05d9 \u05d1\u05d9\u05d8\u05d5\u05d7 \u05d4\u05dd \u05de\u05d7\u05d6\u05d5\u05e8\u05d9\u05d9\u05dd \u05de\u05d8\u05d1\u05e2\u05dd. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05d5\u05e0\u05e9\u05d0\u05e8 \u05e6\u05e0\u05d5\u05e2. \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea; \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df.",
+      "criteria_passed": [
+        "Earnings yield 7.19% is above the 5.0% Neutral-posture screen floor",
+        "Debt to equity 0.44 is below the 1.0 gate",
+        "Market temperature reads Neutral, so no hot-market disqualifier applies",
+        "P/E of 13.9 is below the market median P/E of 21.2",
+        "No hard anti-pattern applies: no leverage, no macro forecast, no hot-sector chase"
+      ],
+      "criteria_failed": [
+        "Book equity positive: not reported in this snapshot, so the check could not be performed",
+        "Full-year profit: not reported in this snapshot, so the check could not be performed",
+        "Credit cycle indicators (spreads, VIX, issuance) are not in the snapshot, so my credit-cycle read is incomplete",
+        "The 29.5% FCF yield cannot be relied on for an insurer, so I gave it no weight"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "You can't predict. You can prepare."
+    },
+    "input_tokens": 571,
+    "output_tokens": 2907,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1161,
+    "prompt_sha256": "b2b503031f80a48c7a852c714b436fca0e447e05cefa2b0c7e53f9779642d4b7"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "YELP",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:52:13.274259+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "YELP",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "The market treats Yelp as an ex-growth, advertising-dependent platform. It is seen as exposed to a slowdown in small-business ad spending and to AI-driven changes in how people search for local services. A low multiple is therefore read as deserved, not as an opportunity.",
+        "non_consensus_view": "A low multiple on a business with no reported leverage already discounts much of that pessimism. The snapshot shows a P/E of 9.09, an earnings yield of 11.0% and an FCF yield of 26.7%, against a market median P/E of 21.16. I am not claiming the company will grow. I am saying the price does not require growth for me to earn an acceptable return.",
+        "why_consensus_might_be_wrong": "Pessimism about a business that is out of favor often gets extrapolated into permanent decline. The pendulum tends to push such names past fair value on the downside. If earnings merely persist, the gap between price and the earnings the market is paying for can close without any heroic assumption. I also hold this view with humility. The FCF yield is well above the earnings yield, and I cannot see from the snapshot whether that reflects durable cash generation or accounting and timing effects."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings broadly persist and the multiple drifts up toward the market median",
+            "probability_pct": 45.0,
+            "return_pct": 25.0
+          },
+          {
+            "scenario": "Earnings stagnate and the stock goes sideways, with cash returns doing little",
+            "probability_pct": 35.0,
+            "return_pct": 5.0
+          },
+          {
+            "scenario": "Ad-cycle downturn or search disintermediation impairs earnings, so the low multiple proves a value trap",
+            "probability_pct": 20.0,
+            "return_pct": -30.0
+          }
+        ],
+        "expected_return_pct": 7.0
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "The reported P/E of 9.09 reflects sustainable earnings, not a one-off. Revenue trend and margins are not in the snapshot, so I cannot check this.",
+          "Debt-to-equity is reported as 0.0. I cannot tell from the snapshot whether debt is genuinely absent or simply untagged.",
+          "The FCF yield of 26.7% is meaningfully above the earnings yield of 11.0%. I cannot verify whether this reflects stock-based compensation, working-capital timing or durable cash flow.",
+          "Book equity positivity and the full-year profit or loss status are not in the snapshot, so thesis-break checks cannot be fully performed.",
+          "I make no forecast of the advertising cycle or of the effect of AI on local search. The position is sized so that I can be wrong about both."
+        ],
+        "thesis_robust_to_multiple_futures": false
+      },
+      "confidence": 0.45,
+      "thesis_en": "Before I look at the stock, I look at the pendulum. The market is Neutral, with a median P/E of 21.16 but also 46% of companies showing negative net income. That is neither euphoria nor panic, so selectivity is warranted, not aggression. I own Yelp, which I bought 16 days ago at roughly today's price, and the evidence so far does not change my view. At 9.09 times earnings and no reported leverage, I am being paid a margin of safety for uncertainty, not for certainty. Much of the data I would want is missing: growth, margins, book equity and the quality of the FCF. So I keep the position at a modest size, I do not add yet, and I accept that I could be wrong. You can't predict, but you can prepare.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05d4\u05e9\u05d5\u05e7 \u05e0\u05de\u05e6\u05d0 \u05d1\u05de\u05e6\u05d1 \u05e0\u05d9\u05d9\u05d8\u05e8\u05dc\u05d9: \u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05e9\u05dc 21.16, \u05d0\u05d1\u05dc \u05d2\u05dd 46% \u05de\u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05de\u05e6\u05d9\u05d2\u05d5\u05ea \u05d4\u05e4\u05e1\u05d3 \u05e0\u05e7\u05d9. \u05d6\u05d5 \u05dc\u05d0 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05e4\u05d0\u05e0\u05d9\u05e7\u05d4, \u05d5\u05dc\u05db\u05df \u05d4\u05de\u05e9\u05de\u05e2\u05d5\u05ea \u05d4\u05d9\u05d0 \u05e1\u05dc\u05e7\u05d8\u05d9\u05d1\u05d9\u05d5\u05ea \u05d5\u05dc\u05d0 \u05ea\u05d5\u05e7\u05e4\u05e0\u05d5\u05ea. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-Yelp, \u05e9\u05e8\u05db\u05e9\u05ea\u05d9 \u05dc\u05e4\u05e0\u05d9 16 \u05d9\u05de\u05d9\u05dd \u05d1\u05e2\u05e8\u05da \u05d1\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc \u05d4\u05d9\u05d5\u05dd, \u05d5\u05d4\u05e8\u05d0\u05d9\u05d5\u05ea \u05e2\u05d3 \u05db\u05d4 \u05dc\u05d0 \u05de\u05e9\u05e0\u05d5\u05ea \u05d0\u05ea \u05d3\u05e2\u05ea\u05d9. \u05d1\u05de\u05db\u05e4\u05d9\u05dc \u05e9\u05dc 9.09 \u05d5\u05d1\u05dc\u05d9 \u05d7\u05d5\u05d1 \u05de\u05d3\u05d5\u05d5\u05d7, \u05d0\u05e0\u05d9 \u05de\u05e7\u05d1\u05dc \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e2\u05dc \u05d0\u05d9-\u05d4\u05d5\u05d5\u05d3\u05d0\u05d5\u05ea \u05d5\u05dc\u05d0 \u05e2\u05dc \u05d5\u05d3\u05d0\u05d5\u05ea. \u05d7\u05e1\u05e8\u05d9\u05dd \u05dc\u05d9 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e8\u05d1\u05d9\u05dd \u05e9\u05d4\u05d9\u05d9\u05ea\u05d9 \u05e8\u05d5\u05e6\u05d4 \u05dc\u05e8\u05d0\u05d5\u05ea: \u05e6\u05de\u05d9\u05d7\u05d4, \u05e9\u05d5\u05dc\u05d9 \u05e8\u05d5\u05d5\u05d7, \u05d4\u05d5\u05df \u05e2\u05e6\u05de\u05d9 \u05d5\u05d0\u05d9\u05db\u05d5\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05d2\u05d5\u05d3\u05dc \u05e6\u05e0\u05d5\u05e2, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3\u05d9\u05d9\u05df, \u05d5\u05de\u05e7\u05d1\u05dc \u05e9\u05d9\u05d9\u05ea\u05db\u05df \u05e9\u05d0\u05e0\u05d9 \u05d8\u05d5\u05e2\u05d4. \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d7\u05d6\u05d5\u05ea, \u05d0\u05d1\u05dc \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05db\u05d5\u05e0\u05df.",
+      "criteria_passed": [
+        "Earnings yield of 11.0% is well above the 5.0% floor for a Neutral posture",
+        "P/E of 9.09 against a market median P/E of 21.16",
+        "FCF yield of 26.7% (quality not verified)",
+        "Debt-to-equity reported at 0.0, below the 1.0 gate (untagged debt cannot be ruled out)",
+        "Cycle is Neutral, not Hot, so there is no cycle-based trim trigger"
+      ],
+      "criteria_failed": [
+        "Book equity positivity not reported in the snapshot, so not checked",
+        "Full-year profit or loss status not in the snapshot, so not checked",
+        "Revenue growth, margins and ad-cycle sensitivity not available, so the durability of earnings is unverified",
+        "Gap between FCF yield and earnings yield is unexplained"
+      ],
+      "position_size_pct": 3.5,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [
+          36.0,
+          45.0
+        ],
+        "full_exit_price": null,
+        "reverse_trigger_price": 16.0
+      },
+      "marks_quote_relevant": "Risk is not what's going down in price \u2014 it's what you thought couldn't."
+    },
+    "input_tokens": 563,
+    "output_tokens": 3397,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1136,
+    "prompt_sha256": "e4d95b336f1fab95392b7a634c826b24ad3180aa18ea4e6d2762b7aa29214549"
+  },
+  {
+    "agent": "howard_marks",
+    "ticker": "PIPR",
+    "schema": "MarksMemo",
+    "timestamp": "2026-11-18T15:52:27.672233+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "PIPR",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "market_temperature_score": "Neutral",
+      "market_temperature_indicators": {},
+      "current_cycle_phase_estimate": "Mid-cycle",
+      "posture_recommendation": "Selective",
+      "second_level_thinking": {
+        "consensus_view": "A price-to-earnings ratio of 4.07 tells me the market does not believe the earnings will last. Investors are treating them as peak or one-off, and they are paying very little for them.",
+        "non_consensus_view": "I own the shares because the price already discounts a lot of earnings decay. A 24.6% earnings yield, a 12.86% free cash flow yield, a 2.53% dividend yield and a debt-to-equity of 0.0108 give a thick cushion even if earnings fall materially. I am not claiming earnings will hold. I am saying the price does not require them to.",
+        "why_consensus_might_be_wrong": "Skepticism about a very low multiple is often right, but it can overshoot. If earnings prove more durable than feared, the multiple has room to rise from 4x toward the roughly 20x that my Neutral screen line implies. If I am wrong and earnings are cyclically inflated, the near-absence of debt means this is an earnings risk, not a solvency risk."
+      },
+      "risk_adjusted_return_analysis": {
+        "scenarios": [
+          {
+            "scenario": "Earnings prove durable and the multiple partly re-rates",
+            "probability_pct": 35.0,
+            "return_pct": 30.0
+          },
+          {
+            "scenario": "Earnings normalize lower and the multiple stays depressed; the dividend cushions the result",
+            "probability_pct": 45.0,
+            "return_pct": 5.0
+          },
+          {
+            "scenario": "Earnings fall sharply and the market keeps the low multiple",
+            "probability_pct": 20.0,
+            "return_pct": -25.0
+          }
+        ],
+        "expected_return_pct": 7.75
+      },
+      "i_dont_know_check": {
+        "key_assumptions": [
+          "The reported earnings behind the 4.07 P/E are a fair guide to what the business earns through a cycle. The snapshot gives no multi-year earnings history, so I cannot check this.",
+          "The free cash flow yield of 12.86% being below the 24.6% earnings yield suggests cash conversion is weaker than reported earnings. I cannot tell from the snapshot whether that is timing or a quality issue.",
+          "The debt-to-equity of 0.0108 is complete. Unreported obligations would change that picture.",
+          "The Neutral market read is accurate. The median yield in the market data shows as 0.0, which looks like a data gap, so I treat that reading with caution.",
+          "I make no forecast of the economy or of when the cycle turns."
+        ],
+        "thesis_robust_to_multiple_futures": true
+      },
+      "confidence": 0.55,
+      "thesis_en": "Before looking at the name, I look at the pendulum. The market data says Neutral: median P/E is 21.2, and the share of companies with negative net income is high at 0.46, so this is neither a euphoric tape nor a capitulation. I own PIPR, bought on 2026-10-06 at $65.91 and now at $64.31, down 2.43% in 43 days. That is noise, not a thesis break. At a P/E of 4.07, with almost no debt and a positive dividend, I am paid to wait. But I do not know whether those earnings are durable, and the gap between the earnings yield and the free cash flow yield keeps me from adding. I keep the position at its current size and let the price tell me whether the consensus doubt is too deep.",
+      "thesis_he": "\u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05de\u05e0\u05d9\u05d4, \u05d0\u05e0\u05d9 \u05d1\u05d5\u05d3\u05e7 \u05d0\u05d9\u05e4\u05d4 \u05e0\u05de\u05e6\u05d0 \u05d4\u05de\u05d8\u05d5\u05d8\u05dc\u05ea. \u05e0\u05ea\u05d5\u05e0\u05d9 \u05d4\u05e9\u05d5\u05e7 \u05de\u05e6\u05d1\u05d9\u05e2\u05d9\u05dd \u05e2\u05dc \u05de\u05e6\u05d1 \u05e0\u05d9\u05d8\u05e8\u05dc\u05d9: \u05de\u05db\u05e4\u05d9\u05dc \u05d4\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d7\u05e6\u05d9\u05d5\u05e0\u05d9 \u05d4\u05d5\u05d0 21.2 \u05d5\u05e9\u05d9\u05e2\u05d5\u05e8 \u05d4\u05d7\u05d1\u05e8\u05d5\u05ea \u05e2\u05dd \u05e8\u05d5\u05d5\u05d7 \u05e0\u05e7\u05d9 \u05e9\u05dc\u05d9\u05dc\u05d9 \u05d2\u05d1\u05d5\u05d4, 0.46. \u05d6\u05d5 \u05dc\u05d0 \u05e9\u05d5\u05e7 \u05d0\u05d5\u05e4\u05d5\u05e8\u05d9 \u05d5\u05d2\u05dd \u05dc\u05d0 \u05e9\u05d5\u05e7 \u05e9\u05dc \u05db\u05e0\u05d9\u05e2\u05d4. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-PIPR, \u05e9\u05e0\u05e7\u05e0\u05ea\u05d4 \u05d1-6 \u05d1\u05d0\u05d5\u05e7\u05d8\u05d5\u05d1\u05e8 2026 \u05d1-65.91 \u05d3\u05d5\u05dc\u05e8 \u05d5\u05e0\u05e1\u05d7\u05e8\u05ea \u05db\u05e2\u05ea \u05d1-64.31, \u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc 2.43% \u05d1-43 \u05d9\u05de\u05d9\u05dd. \u05d6\u05d4 \u05e8\u05e2\u05e9 \u05d5\u05dc\u05d0 \u05e9\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05d4\u05ea\u05d6\u05d4. \u05d1\u05de\u05db\u05e4\u05d9\u05dc \u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 4.07, \u05db\u05de\u05e2\u05d8 \u05d1\u05dc\u05d9 \u05d7\u05d5\u05d1 \u05d5\u05e2\u05dd \u05d3\u05d9\u05d1\u05d9\u05d3\u05e0\u05d3 \u05d7\u05d9\u05d5\u05d1\u05d9, \u05de\u05e9\u05dc\u05de\u05d9\u05dd \u05dc\u05d9 \u05db\u05d3\u05d9 \u05e9\u05d0\u05d7\u05db\u05d4. \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05d5\u05d3\u05e2 \u05d0\u05dd \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d4\u05d0\u05dc\u05d4 \u05d9\u05e6\u05d9\u05d1\u05d9\u05dd, \u05d5\u05d4\u05e4\u05e2\u05e8 \u05d1\u05d9\u05df \u05ea\u05e9\u05d5\u05d0\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7 \u05dc\u05ea\u05e9\u05d5\u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05d5\u05e0\u05e2 \u05de\u05de\u05e0\u05d9 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3. \u05d0\u05e0\u05d9 \u05de\u05e9\u05d0\u05d9\u05e8 \u05d0\u05ea \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05d2\u05d5\u05d3\u05dc\u05d4 \u05d4\u05e0\u05d5\u05db\u05d7\u05d9 \u05d5\u05e0\u05d5\u05ea\u05df \u05dc\u05de\u05d7\u05d9\u05e8 \u05dc\u05d4\u05e8\u05d0\u05d5\u05ea \u05d0\u05dd \u05d4\u05e1\u05e4\u05e7\u05e0\u05d5\u05ea \u05e9\u05dc \u05d4\u05e7\u05d5\u05e0\u05e6\u05e0\u05d6\u05d5\u05e1 \u05e2\u05de\u05d5\u05e7\u05d4 \u05de\u05d3\u05d9.",
+      "criteria_passed": [
+        "Earnings yield 24.6%, far above the 5.0% floor of the Neutral posture",
+        "Free cash flow yield 12.86% is positive",
+        "Debt-to-equity 0.0108, well under the 1.0 gate",
+        "Dividend yield 2.53% is positive",
+        "Market temperature is Neutral, not Hot, so no cycle-driven trim is called for"
+      ],
+      "criteria_failed": [
+        "Cannot check earnings durability: no multi-year earnings history in the snapshot",
+        "Cannot explain why the free cash flow yield sits below the earnings yield",
+        "Market median yield reads 0.0, which looks unreliable, so one temperature input is weak"
+      ],
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 24,
+      "scaling_out_plan": {
+        "trim_at_price_levels": [],
+        "full_exit_price": null,
+        "reverse_trigger_price": null
+      },
+      "marks_quote_relevant": "Rule number one: most things will prove to be cyclical. Rule number two: some of the greatest opportunities for gain and loss come when other people forget rule number one."
+    },
+    "input_tokens": 572,
+    "output_tokens": 2731,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18177,
+    "prompt_chars": 1162,
+    "prompt_sha256": "92402dcfa24581871f2bf69d56506f94929c611bb865b1a7ded683e06efbad27"
+  }
+]
