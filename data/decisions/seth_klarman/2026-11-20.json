@@ -1,0 +1,572 @@
+[
+  {
+    "ticker": "EFOR",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 73.4%",
+      "5yr avg FCF $299,820,000",
+      "D/E 0.65"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 4838394841.0,
+      "intrinsic_value_per_share": 117.15,
+      "margin_of_safety_pct": 73.39,
+      "avg_fcf_usd": 299820000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.65,
+      "net_income": 113500000.0,
+      "market_cap": 1287527468.4906006,
+      "price": 31.174999237060547
+    },
+    "market_conditions": {},
+    "confidence": 0.45,
+    "entry_price": 31.174999237060547,
+    "target_price": 117.1524174571845,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest year, is negative on average, or shrinks faster than 20% a year; The five-year average free cash flow is shown to be driven by a non-recurring year, cutting the DCF materially; Price reaches 110% of intrinsic value, with no catalyst left to play out",
+    "rationale": "I own this, up about 52% from my $20.49 entry, and the question is whether to keep it, not whether to open it. What could go wrong comes first: the valuation rests on a five-year average free cash flow of $299.82M that I cannot cross-check year by year, and debt-to-equity of 0.65 sits close to my 0.7 ceiling. The model's $117.15 is a quant output built on a 5% growth cap and an 8% discount rate. I treat it as an upper bound, not a target, so I discount my own confidence. Price is far below even a conservative reading of that value, which is why I keep the position and add nothing until the cash flow trend and the balance sheet are confirmed. Without an identified catalyst, I expect to wait patiently and I will not size up on enthusiasm."
+  },
+  {
+    "ticker": "YELP",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 70.7%",
+      "5yr avg FCF $239,256,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 3861033274.0,
+      "intrinsic_value_per_share": 64.87,
+      "margin_of_safety_pct": 70.74,
+      "avg_fcf_usd": 239256000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 145600000.0,
+      "market_cap": 1129632879.4952736,
+      "price": 18.979999542236328
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 18.979999542236328,
+    "target_price": 64.87276627178632,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest year, or falls on a sustained basis faster than 20% a year; Evidence that the 5-year average FCF materially overstates current owner earnings, such as heavy dilution from stock compensation; A displacement of the core local-advertising franchise, visible in filings rather than headlines; A materially better opportunity with a larger margin of safety that requires this capital",
+    "rationale": "I own this, and the question is whether the thesis is broken. It is not, on what I can verify. Debt-to-equity is reported at 0.0, so there is nothing senior to me, and the 5-year average free cash flow of $239.3M is positive. The quant model puts value at $64.87 against a $18.98 price, a 70.74% discount. I do not treat that number as precise, because it rests on an average I cannot cross-check against latest-year cash flow, and the stock is 18.73% below my entry. A price decline is not a sell trigger. It is a reason to re-ask whether the facts changed, and I find no evidence that they did. Without a hard catalyst I keep the position modest and I am prepared to be patient for years. I will not add until I can verify current-year free cash flow."
+  },
+  {
+    "ticker": "GOLD",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 62.6%",
+      "5yr avg FCF $255,654,400",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 2899636367.0,
+      "intrinsic_value_per_share": 99.45,
+      "margin_of_safety_pct": 62.55,
+      "avg_fcf_usd": 255654400.0,
+      "growth_rate_pct": 0.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 82341000.0,
+      "market_cap": 1085819651.2196388,
+      "price": 37.2400016784668
+    },
+    "market_conditions": {},
+    "confidence": 0.45,
+    "entry_price": 37.2400016784668,
+    "target_price": 99.44788072795188,
+    "exit_trigger": "Free cash flow turns negative in the latest year, or is negative on average, or shrinks faster than 20% a year across the filings; Book equity is no longer positive; Debt to equity rises above the screen's 0.7 ceiling; Primary filings show the five-year average free cash flow is not representative of normal earning power; Price reaches 110% of intrinsic value, which is a full exit",
+    "rationale": "I own this, and my first question is what could go wrong. The quant value of 99.45 per share against a price of 37.24 is a 62.55% margin of safety, but that rests on a five-year average of free cash flow and an assumed 0% growth. A gap this wide makes me suspect the inputs before I believe the discount. Debt to equity is reported at 0.00023, which is a real comfort for a permanent-loss analysis. I cannot see book equity, the free cash flow trend, the current ratio, or a catalyst in this snapshot, so those checks are not met and my confidence is moderate. After 18 days and a -3.92% mark, a small decline is noise, not a reason to sell, but I will not add until I have verified the cash flow record in the primary filings. I hold at current size with a modest ceiling, and I scale out only as the price approaches intrinsic value."
+  },
+  {
+    "ticker": "CALM",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 58.3%",
+      "5yr avg FCF $495,309,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 7993130913.0,
+      "intrinsic_value_per_share": 171.12,
+      "margin_of_safety_pct": 58.32,
+      "avg_fcf_usd": 495309000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 316682000.0,
+      "market_cap": 3331634329.675522,
+      "price": 71.32499694824219
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 71.32499694824219,
+    "target_price": 171.1202315596621,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest annual filing, or declines faster than 20% a year across three or more 10-Ks; Evidence that normalized FCF is well below the $495.3M 5-year average, invalidating the DCF base; Material regulatory or legal action against the company's pricing; Capital deployed into large acquisitions or expansion at cyclical-peak prices",
+    "rationale": "I own this, down 8.97% from my $78.35 entry over 102 days, and I start with what could go wrong rather than what the model says. The quant value of $171.12 against a $71.33 price shows a 58.3% margin, but it rests on a 5-year average FCF of $495.3M from a business whose growth had to be capped from 57.2% to 5.0%, and I distrust any number built on a cyclical peak. Against that, debt-to-equity is reported at 0.0, so the balance sheet will not force me out, and a price decline alone is not a reason to sell. I will hold, not add, because I cannot verify from this snapshot whether the latest-year FCF and book equity support normalized earnings, and a thesis with only a weak catalyst deserves modest size. If the cash flow proves durable, the scale-out levels below apply, and if it does not, I will say so and exit."
+  },
+  {
+    "ticker": "VISN",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 57.1%",
+      "5yr avg FCF $163,320,000",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 1852378099.0,
+      "intrinsic_value_per_share": 9.1,
+      "margin_of_safety_pct": 57.14,
+      "avg_fcf_usd": 163320000.0,
+      "growth_rate_pct": 0.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 2283700000.0,
+      "market_cap": 793979733.2153349,
+      "price": 3.9000000953674316
+    },
+    "market_conditions": {},
+    "confidence": 0.45,
+    "entry_price": 3.9000000953674316,
+    "target_price": 9.09881507022779,
+    "exit_trigger": "Book equity is no longer positive; Debt-to-equity rises above 0.7, or previously unreported debt is found; Free cash flow turns negative in the latest year or on average, or shrinks faster than 20% a year; Evidence that the five-year average free cash flow was inflated by one-off items, which would invalidate the DCF; Price reaches about $10.01, 110% of intrinsic value: exit any remainder",
+    "rationale": "I own this name, so the question is whether to keep it, not whether to open it, and my answer is to hold what we have without adding. Before I think about upside, I ask what could go wrong. The valuation rests on a five-year average free cash flow of $163.32 million and a growth rate that was undefined and assumed to be 0%, and I cannot see the cash-flow trend behind that average. The conservative DCF gives $9.10 a share against $3.90, a 57.14% margin of safety, and reported debt-to-equity is 0.0, though unreported debt is not the same as no debt. I have no identified catalyst, and the position is four days old and down 2.74%, which tells me nothing about the thesis. So I keep the position at modest size, stay patient, and demand evidence on the cash-flow trend and book equity before adding."
+  },
+  {
+    "ticker": "SWKS",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 42.8%",
+      "5yr avg FCF $1,273,780,000",
+      "D/E 0.09"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 20555835436.0,
+      "intrinsic_value_per_share": 136.61,
+      "margin_of_safety_pct": 42.77,
+      "avg_fcf_usd": 1273780000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.09,
+      "net_income": 477100000.0,
+      "market_cap": 11763962142.680649,
+      "price": 78.18000030517578
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 78.18000030517578,
+    "target_price": 136.60832984675042,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative or shrinks faster than 20% a year across the 10-K record; Filings show the cause of the price drop is a permanent impairment of earning power, such as a major customer loss; Price reaches 110% of intrinsic value ($150.27), which is a full exit",
+    "rationale": "I own this, so the question is whether to keep it, not whether to open it. The first question is what could go wrong. The DCF leans on a five-year average free cash flow of $1.27B, and I cannot see the trend behind that average, so I treat the margin of safety with caution. On the figures I do have, intrinsic value is $136.61 against a price of $78.18, a 42.8% discount. That clears my 30% bar for a mid or large-cap, and debt-to-equity of 0.087 leaves the balance sheet unthreatening. I am down 11.1% in four days, but a price decline is volatility, not permanent loss, and it is not a reason to sell. There is no hard catalyst, so I hold with a cap on size, I do not add until I understand why the price fell, and I will sell if the cash flows deteriorate."
+  },
+  {
+    "ticker": "HRMY",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 41.5%",
+      "5yr avg FCF $205,637,000",
+      "D/E 0.15"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 3318501100.0,
+      "intrinsic_value_per_share": 56.98,
+      "margin_of_safety_pct": 41.49,
+      "avg_fcf_usd": 205637000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.15,
+      "net_income": 158687000.0,
+      "market_cap": 1941601351.5061684,
+      "price": 33.34000015258789
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 33.34000015258789,
+    "target_price": 56.983287072342435,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest year, or shrinks faster than 20% a year on a multi-year record; Evidence emerges that the five-year average free cash flow of $205.6M was a one-off peak; Price reaches 110% of intrinsic value (about $62.68), which means full exit; A better opportunity appears with a larger margin of safety",
+    "rationale": "I own this, and I start with what could go wrong. I cannot verify the durability of the cash flows behind a $56.98 estimate, and the stock is down 12.86% since I bought at $38.26. Still, a 41.5% discount to a deliberately capped DCF, with debt-to-equity at 0.154, is the kind of price cushion I ask for. The fall in price alone is not a reason to sell, because volatility is not risk. But the absence of an identified catalyst and the gaps in the data keep my confidence modest and my size small. I hold, I do not add until I understand why Mr. Market is selling, and I sell if the thesis breaks."
+  },
+  {
+    "ticker": "CTVA",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 39.8%",
+      "5yr avg FCF $790,666,667",
+      "D/E 0.07"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 8967754205.0,
+      "intrinsic_value_per_share": 13.44,
+      "margin_of_safety_pct": 39.77,
+      "avg_fcf_usd": 790666667.0,
+      "growth_rate_pct": 0.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.07,
+      "net_income": 1094000000.0,
+      "market_cap": 5400951798.160553,
+      "price": 8.095000267028809
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 8.095000267028809,
+    "target_price": 13.440959186235032,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above the 0.7 ceiling; Free cash flow turns negative or shrinks faster than 20% per year on a three-10-K record, which would break the DCF base; Management makes a large debt-funded acquisition or takes a material litigation hit that impairs the cash flow base; Price reaches 110% of intrinsic value (about 14.78): exit the remainder",
+    "rationale": "I own this, and the first question is what could go wrong. Roughly 28% cumulative odds of permanent impairment is tolerable but not comfortable. The main risks are that the free cash flow base is overstated, that growth is undefined and was assumed at 0%, and that I have no catalyst to close the gap. The price is 8.095 against a conservative DCF value of 13.44, a 39.77% margin of safety, above my 30% threshold for a mid-cap equity. Debt-to-equity is low at 0.067, so the balance sheet leaves room for error. The 9.96% unrealised loss after three days is Mr. Market's noise and not a broken thesis; I will not sell on a price decline, and I will not add until I can verify the business drivers and identify a catalyst. I hold, with a modest size, a long horizon and patience."
+  },
+  {
+    "ticker": "APOG",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 39.6%",
+      "5yr avg FCF $96,369,800",
+      "D/E 0.44"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 1542489667.0,
+      "intrinsic_value_per_share": 73.82,
+      "margin_of_safety_pct": 39.57,
+      "avg_fcf_usd": 96369800.0,
+      "growth_rate_pct": 4.88,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.44,
+      "net_income": 54131000.0,
+      "market_cap": 932152684.1436615,
+      "price": 44.61000061035156
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 44.61000061035156,
+    "target_price": 73.81887772056668,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest year, or falls on average or at more than 20% a year across the 10-K record; A debt-funded acquisition or other capital allocation move that visibly impairs the cash flow base; Price reaches 110% of intrinsic value ($81.20): exit the remainder",
+    "rationale": "I own this, and I own it for a modest discount, not a bargain. The first question is what could go wrong, and the answer is that the intrinsic value of $73.82 depends on a five-year average free cash flow and a 4.9% growth assumption that I cannot stress-test with the data in front of me. The balance sheet is reasonable, with debt-to-equity of 0.44 against my 0.7 ceiling. The 39.6% margin of safety is real but sits just below the 40% I want for a smaller, less-covered company. I'm not adding without a better price or a catalyst, I'm not selling at a small gain, and I'll scale out as the price approaches value. The snapshot does not report the current ratio, latest-year free cash flow, or book equity, so I have not verified those checks."
+  },
+  {
+    "ticker": "EBF",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 38.4%",
+      "5yr avg FCF $51,651,600",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 833536238.0,
+      "intrinsic_value_per_share": 32.96,
+      "margin_of_safety_pct": 38.38,
+      "avg_fcf_usd": 51651600.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 40222000.0,
+      "market_cap": 513609570.30709076,
+      "price": 20.306499481201172
+    },
+    "market_conditions": {},
+    "confidence": 0.45,
+    "entry_price": 20.306499481201172,
+    "target_price": 32.95538901382262,
+    "exit_trigger": "Book equity is no longer positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest year, or shrinks faster than 20% a year over a multi-year record; Evidence that the 5-year average FCF of about $51.7M is no longer representative; Price reaches 110% of intrinsic value (about $36.25)",
+    "rationale": "I own this stock, and the first question is what could go wrong. The valuation rests on a five-year average free cash flow of about $51.7M, 5% capped growth and an 8% discount rate. If that cash flow base erodes, the intrinsic value of $32.96 is too high. At $20.31 the discount is 38.4%, just short of the 40% I want from a small-cap with a $513.6M market cap, and the 9.2% unrealised loss since October does not change my view of value. Debt-to-equity is reported at 0.0, which is comforting, but I cannot see the current ratio, business description or any catalyst in this snapshot. I keep the position at modest size, I do not add until the margin widens or the evidence improves, and I wait without paying up."
+  },
+  {
+    "ticker": "CRC",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 37.9%",
+      "5yr avg FCF $428,600,000",
+      "D/E 0.46"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 6394882135.0,
+      "intrinsic_value_per_share": 72.44,
+      "margin_of_safety_pct": 37.85,
+      "avg_fcf_usd": 428600000.0,
+      "growth_rate_pct": 3.9,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.46,
+      "net_income": 363000000.0,
+      "market_cap": 3974175701.0294456,
+      "price": 45.02000045776367
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 45.02000045776367,
+    "target_price": 72.44209071007448,
+    "exit_trigger": "Book equity is no longer positive; Debt to equity rises above 0.7; Free cash flow turns negative in the latest year or on average, or shrinks faster than 20% a year, so the DCF can no longer be projected; The cash flow trend proves materially below the $428.6M 5-year average on a verified filing basis; A better opportunity appears at a larger margin of safety, in which case I rotate the capital",
+    "rationale": "I own this, and the first question is what could go wrong. The risks are a free cash flow base that proves too generous, a discount rate that is too low, and the absence of a catalyst. I put the cumulative chance of permanent loss at about 25%, below my 40% rejection line. My quant DCF gives $72.44 a share against a price of $45.02, a 37.9% margin of safety, above my 30% minimum for a public equity. Debt to equity of 0.46 passes my 0.7 ceiling. A 10.3% unrealised loss after 16 days is Mr. Market's opinion, not a broken thesis, and price declines alone never make me sell. But the snapshot gives no free cash flow trend, no business description and no catalyst, so I cannot verify those criteria. I hold, I do not add, and I stay patient. Cash remains a position."
+  },
+  {
+    "ticker": "MLI",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 35.6%",
+      "5yr avg FCF $567,451,400",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 9157340825.0,
+      "intrinsic_value_per_share": 82.82,
+      "margin_of_safety_pct": 35.63,
+      "avg_fcf_usd": 567451400.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 765191000.0,
+      "market_cap": 5894519530.875629,
+      "price": 53.310001373291016
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 53.310001373291016,
+    "target_price": 82.81893874811097,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above the 0.7 ceiling, or previously untagged debt is discovered; Free cash flow turns negative or shrinks faster than 20% per year; Price reaches 110% of intrinsic value ($91.10): exit the remainder; A better opportunity with a larger margin of safety requires the capital",
+    "rationale": "I own this, so the question is whether to keep it, and the question I ask first is what could go wrong: a cash flow average that may be cyclically inflated, a DCF that could be too kind, and a debt-to-equity of 0.0 that I cannot confirm is not an artifact of untagged liabilities. Against that, my conservative DCF gives $82.82 per share versus a price of $53.31, a 35.6% margin of safety that clears my 30% bar for a mid-cap, and the position is only modestly under water at -2.13% after 30 days. I estimate roughly a 22% chance of permanent impairment, which is tolerable but not comfortable. With no hard catalyst I will not add and will not sell; I hold at a modest size and let the discount close over years, not months. Nothing here justifies a larger bet, and if the facts change I will say so plainly."
+  },
+  {
+    "ticker": "OPLN",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 35.2%",
+      "5yr avg FCF $398,033,333",
+      "D/E 0.34"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 6423328752.0,
+      "intrinsic_value_per_share": 52.31,
+      "margin_of_safety_pct": 35.18,
+      "avg_fcf_usd": 398033333.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.34,
+      "net_income": 177700000.0,
+      "market_cap": 4163447561.875763,
+      "price": 33.904998779296875
+    },
+    "market_conditions": {},
+    "confidence": 0.4,
+    "entry_price": 33.904998779296875,
+    "target_price": 52.30832147441996,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest year, or shrinks faster than 20% a year across the 10-K record; The re-estimated intrinsic value falls so that the margin of safety at the current price drops below 30%; Price reaches 110% of intrinsic value, around $57.54, which is a full exit",
+    "rationale": "I own this, and I start with what could go wrong. The five-year average free cash flow is about $398 million, but the trailing growth figure of 63.8% is so erratic that I cap it at 5% and treat the base with suspicion. At $33.905 against a conservative intrinsic value of $52.31, the margin of safety is 35.18%, which clears my 30% bar for public equities. Debt-to-equity of 0.34 sits inside my 0.7 ceiling. We are down 10.58% from our $37.915 entry after 105 days, but a price decline is not a broken thesis, and I would rather ask whether the facts changed than react to Mr. Market. I see no catalyst and I have not seen current ratio, debt maturities or a business description in this snapshot, so I keep the position modest, do not add, and wait with patience."
+  },
+  {
+    "ticker": "LRN",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 34.8%",
+      "5yr avg FCF $307,347,800",
+      "D/E 0.50"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 4959875959.0,
+      "intrinsic_value_per_share": 117.96,
+      "margin_of_safety_pct": 34.78,
+      "avg_fcf_usd": 307347800.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.5,
+      "net_income": 338192000.0,
+      "market_cap": 3234818274.1222916,
+      "price": 76.93000030517578
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 76.93000030517578,
+    "target_price": 117.9550833074749,
+    "exit_trigger": "Book equity turns non-positive; Debt to equity rises above 0.7; Free cash flow turns negative or shrinks faster than 20% a year across successive 10-Ks; Adverse regulatory or funding action materially impairs the virtual schooling model; Price at or above 110% of intrinsic value ($129.75): exit remaining position; A better opportunity appears with a larger margin of safety",
+    "rationale": "I own this one, and I start with what could go wrong. The business depends on public funding and regulatory goodwill, and I put the chance of permanent impairment near 30%, below my 40% rejection line but not trivial. On a conservative DCF the stock trades at $76.93 against an estimate of $117.96, a margin of safety of 34.78%, which clears my 30% bar for a mid-cap but not by a wide margin. Debt to equity of 0.50 is inside my 0.7 ceiling, and I have already cut the historical growth of 21.8% down to 5.0%. I am down 2.98% in 18 days, and that is noise, not a broken thesis; I will not sell on price decline and I will not add until the catalyst is clearer or the discount widens. Missing data lowers my confidence: no dated catalyst, no debt maturity detail, and no reported figures on enrollment or regulatory exposure. I therefore keep a modest position and let patience do the work."
+  },
+  {
+    "ticker": "AD",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 34.0%",
+      "5yr avg FCF $217,127,200",
+      "D/E 0.50"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 3503926103.0,
+      "intrinsic_value_per_share": 40.52,
+      "margin_of_safety_pct": 34.03,
+      "avg_fcf_usd": 217127200.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.5,
+      "net_income": 48756000.0,
+      "market_cap": 2311583630.4130554,
+      "price": 26.729999542236328
+    },
+    "market_conditions": {},
+    "confidence": 0.4,
+    "entry_price": 26.729999542236328,
+    "target_price": 40.51765287971321,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7; Free cash flow turns negative in the latest year, is negative on average, or shrinks faster than 20% a year, so the DCF can no longer be projected; Filings reveal debt maturities or covenants that threaten solvency; Price reaches about 110% of intrinsic value (about 44.57) and the position is fully exited; A new opportunity offers a clearly larger margin of safety and this holding is the weakest to fund it",
+    "rationale": "I own this name, and I start with what could go wrong. The business is not described in the snapshot, the latest-year free cash flow and the current ratio are not reported, and there is no catalyst, so I cannot verify several things I would want to verify. My conservative DCF gives $40.52 a share against a price of $26.73, a 34.03% margin of safety. That clears my 30% bar for a well-understood mid-cap but not the 40% bar for a complex or smaller company, and debt-to-equity of 0.50 is inside my 0.7 ceiling. The 3.08% unrealised loss after four days is price noise, not a broken thesis, so I keep the position small, refuse to add on thin evidence, and let patience do the work."
+  },
+  {
+    "ticker": "LKQ",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 34.0%",
+      "5yr avg FCF $951,316,200",
+      "D/E 0.59"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 7285443656.0,
+      "intrinsic_value_per_share": 28.86,
+      "margin_of_safety_pct": 34.0,
+      "avg_fcf_usd": 951316200.0,
+      "growth_rate_pct": -5.75,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.59,
+      "net_income": 608000000.0,
+      "market_cap": 4808183174.285549,
+      "price": 19.049999237060547
+    },
+    "market_conditions": {},
+    "confidence": 0.5,
+    "entry_price": 19.049999237060547,
+    "target_price": 28.86489367205647,
+    "exit_trigger": "Book equity turns non-positive; Debt-to-equity rises above 0.7 on reported debt; Free cash flow turns negative in the latest year or shrinks faster than 20%/yr; Price reaches 110% of intrinsic value (about $31.75); A better opportunity appears with a materially larger margin of safety",
+    "rationale": "I own this, and I start with what could go wrong: free cash flow is shrinking at 5.8% a year, and the model already projects that decline rather than ignoring it. On that pessimistic basis I get $28.86 a share against a $19.05 price, a 34% margin of safety. That clears my 30% bar for a well-understood public equity, and debt-to-equity of 0.59 sits inside my 0.7 ceiling. But the position is four days old and down 3.5%, and I see no catalyst, so this is a patient, modestly sized holding rather than a conviction one. Several checks cannot be performed because the snapshot does not report the current ratio, interest coverage or segment trends, so my confidence is held down. I keep the shares, I do not add on a decline that proves nothing, and I sell only if the thesis breaks."
+  },
+  {
+    "ticker": "STRA",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 32.4%",
+      "5yr avg FCF $115,369,800",
+      "D/E 0.00"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 1746209760.0,
+      "intrinsic_value_per_share": 79.8,
+      "margin_of_safety_pct": 32.39,
+      "avg_fcf_usd": 115369800.0,
+      "growth_rate_pct": 4.1,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.0,
+      "net_income": 126614000.0,
+      "market_cap": 1180540768.344738,
+      "price": 53.95000076293945
+    },
+    "market_conditions": {},
+    "confidence": 0.4,
+    "entry_price": 53.95000076293945,
+    "target_price": 79.80073235924947,
+    "exit_trigger": "Book equity is no longer positive; Debt-to-equity rises above the 0.7 ceiling; Free cash flow turns negative or shrinks faster than 20% a year, so the DCF can no longer be projected; Price reaches 110% of intrinsic value (about $87.78); New facts show the 5-year average free cash flow no longer reflects earning power",
+    "rationale": "I own this, and I hold it, but I do not add to it with any enthusiasm. Start with what could go wrong: the DCF rests on a 5-year average free cash flow of $115.4M and 4.1% growth, and if either is too generous, my $79.80 value is too high. The 32.4% margin of safety clears the 30% bar for a mid-cap but not the 40% I want for a smaller or more complex name, and the snapshot gives me no real catalyst. Debt-to-equity is reported at 0.0, which helps limit capital-structure risk. With an unrealised gain of 4.57% after 11 days, there is nothing to trim and no reason to chase; I wait, keep the position modest, and keep cash for something better."
+  },
+  {
+    "ticker": "ICFI",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 31.0%",
+      "5yr avg FCF $125,675,000",
+      "D/E 0.39"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 2028101099.0,
+      "intrinsic_value_per_share": 113.09,
+      "margin_of_safety_pct": 30.96,
+      "avg_fcf_usd": 125675000.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.39,
+      "net_income": 91588000.0,
+      "market_cap": 1400277695.5579224,
+      "price": 78.08000183105469
+    },
+    "market_conditions": {},
+    "confidence": 0.35,
+    "entry_price": 78.08000183105469,
+    "target_price": 113.08766686909183,
+    "exit_trigger": "Free cash flow turns negative or falls materially below the 5-year average, so the DCF can no longer be supported; Book equity turns non-positive or debt-to-equity rises above 0.7; Price falls to about $68 or lower with the thesis intact, which would move this from WATCH to a buy candidate; A concrete catalyst is identified and documented (announced asset sale, activist, or restructuring)",
+    "rationale": "I do not own this, and I am not going to start on this evidence. The model shows a 30.96% discount to a DCF value of $113.09, which clears my 30% floor for public equities by under one point. That is not a margin of safety, it is a rounding error, especially when the value rests on a 5% growth rate and an 8% discount rate applied to a 5-year average free cash flow of about $125.7M. I see no identifiable catalyst in the data, and the filings detail needed to test what could go wrong (revenue quality, contract concentration, debt maturities) is not in front of me. I would rather hold cash and wait for a price near $68, or for evidence of a catalyst, than pay near fair value for an estimate I cannot yet stress."
+  },
+  {
+    "ticker": "HCC",
+    "decision": "BUY",
+    "agent": "seth_klarman",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "MoS 30.4%",
+      "5yr avg FCF $367,752,400",
+      "D/E 0.07"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {
+      "intrinsic_value_usd": 5934665182.0,
+      "intrinsic_value_per_share": 112.39,
+      "margin_of_safety_pct": 30.44,
+      "avg_fcf_usd": 367752400.0,
+      "growth_rate_pct": 5.0,
+      "discount_rate_pct": 8.0,
+      "debt_to_equity": 0.07,
+      "net_income": 56998000.0,
+      "market_cap": 4128331043.183655,
+      "price": 78.18499755859375
+    },
+    "market_conditions": {},
+    "confidence": 0.4,
+    "entry_price": 78.18499755859375,
+    "target_price": 112.39451921988343,
+    "exit_trigger": "Latest-year free cash flow turns negative or falls well below the five-year average, so the DCF base case no longer holds; Book equity is no longer positive or debt-to-equity rises above 0.7; Free cash flow shrinking faster than 20% a year across multiple filings; Price reaches 110% of intrinsic value ($123.63) if a position were ever opened",
+    "rationale": "I do not own this, and I am not going to start on this evidence. The first question is what could go wrong, and the answer is that the whole valuation rests on a five-year average free cash flow of $367.8M. I cannot see whether that average is normal or flattered by unusually good years, and the snapshot does not describe the business at all. The 30.4% margin of safety clears my 30% minimum by a hair, and that minimum assumes a simple, well-understood business with no cyclical question mark; if this is a complex or cyclical situation I would want 40% or more. Low leverage at 0.0675 debt-to-equity is a real comfort, but it is not a catalyst. I would rather hold cash and wait for a lower price or proof that the cash flows are durable."
+  }
+]

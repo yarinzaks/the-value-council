@@ -1,0 +1,742 @@
+[
+  {
+    "ticker": "ABM",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 21.01 is 89.7% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.509 against the market's 0.223; held 15 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 55.575,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 21.01 is 89.7% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.509 against the market's 0.223; held 15 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "ALV",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 12.31 is 52.5% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.674 against the market's 0.223; held 105 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 122.2817,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 12.31 is 52.5% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.674 against the market's 0.223; held 105 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "AOS",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 16.86 is 71.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 0.503 against the market's 0.223; held 197 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 61.21,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 16.86 is 71.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 0.503 against the market's 0.223; held 197 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "CALM",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 10.76 is 45.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 2.965 against the market's 0.223; held 18 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 64.47,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 10.76 is 45.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 2.965 against the market's 0.223; held 18 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "CASH",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 9.20 is 39.3% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.749 against the market's 0.223; held 105 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 87.68,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 9.20 is 39.3% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.749 against the market's 0.223; held 105 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "CBT",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "fundamental deterioration: sales growth turned negative, revenue $3,713,000,000 in the year to 2025-09-30 against $3,994,000,000 the year before (-7.0%)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 83.0925,
+    "target_price": null,
+    "exit_trigger": "fundamental deterioration: sales growth turned negative, revenue $3,713,000,000 in the year to 2025-09-30 against $3,994,000,000 the year before (-7.0%)",
+    "rationale": "Doctrine said sell (fundamental deterioration: sales growth turned negative, revenue $3,713,000,000 in the year to 2025-09-30 against $3,994,000,000 the year before (-7.0%)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "CF",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 13.21 is 56.4% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.695 against the market's 0.223; held 105 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 113.585,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 13.21 is 56.4% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.695 against the market's 0.223; held 105 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "DRI",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 22.26 is 95.0% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.517 against the market's 0.223; held 18 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 222.715,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 22.26 is 95.0% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.517 against the market's 0.223; held 18 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "DVN",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "Total-Return/PE 0.053 fell below 1x the market's 0.223 (EPS growth -0.1% + yield 0.7%, over P/E 10.15)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 41.96,
+    "target_price": null,
+    "exit_trigger": "Total-Return/PE 0.053 fell below 1x the market's 0.223 (EPS growth -0.1% + yield 0.7%, over P/E 10.15)",
+    "rationale": "Doctrine said sell (Total-Return/PE 0.053 fell below 1x the market's 0.223 (EPS growth -0.1% + yield 0.7%, over P/E 10.15)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "EBF",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "fundamental deterioration: sales growth turned negative, revenue $394,618,000 in the year to 2025-02-28 against $420,109,000 the year before (-6.1%)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 22.4998,
+    "target_price": null,
+    "exit_trigger": "fundamental deterioration: sales growth turned negative, revenue $394,618,000 in the year to 2025-02-28 against $420,109,000 the year before (-6.1%)",
+    "rationale": "Doctrine said sell (fundamental deterioration: sales growth turned negative, revenue $394,618,000 in the year to 2025-02-28 against $420,109,000 the year before (-6.1%)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "FHI",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 11.69 is 49.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.643 against the market's 0.223; held 197 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 55.3,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 11.69 is 49.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.643 against the market's 0.223; held 197 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "GGG",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 23.03 is 98.3% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.291 against the market's 0.223; held 18 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 69.15,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 23.03 is 98.3% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.291 against the market's 0.223; held 18 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "GIS",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "fundamental deterioration: sales growth turned negative, revenue $18,424,600,000 in the year to 2026-05-31 against $19,486,600,000 the year before (-5.4%)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 34.29,
+    "target_price": null,
+    "exit_trigger": "fundamental deterioration: sales growth turned negative, revenue $18,424,600,000 in the year to 2026-05-31 against $19,486,600,000 the year before (-5.4%)",
+    "rationale": "Doctrine said sell (fundamental deterioration: sales growth turned negative, revenue $18,424,600,000 in the year to 2026-05-31 against $19,486,600,000 the year before (-5.4%)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "GNTX",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 11.20 is 47.8% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 0.576 against the market's 0.223; held 178 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 22.6047,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 11.20 is 47.8% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 0.576 against the market's 0.223; held 178 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "INTU",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 21.85 is 93.3% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.847 against the market's 0.223; held 11 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 335.955,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 21.85 is 93.3% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.847 against the market's 0.223; held 11 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "KRT",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 19.46 is 83.0% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.750 against the market's 0.223; held 4 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 32.42,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 19.46 is 83.0% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.750 against the market's 0.223; held 4 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "LEA",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "fundamental deterioration: sales growth turned negative, revenue $23,259,100,000 in the year to 2025-12-31 against $23,306,000,000 the year before (-0.2%)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 134.6201,
+    "target_price": null,
+    "exit_trigger": "fundamental deterioration: sales growth turned negative, revenue $23,259,100,000 in the year to 2025-12-31 against $23,306,000,000 the year before (-0.2%)",
+    "rationale": "Doctrine said sell (fundamental deterioration: sales growth turned negative, revenue $23,259,100,000 in the year to 2025-12-31 against $23,306,000,000 the year before (-0.2%)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "LII",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "fundamental deterioration: sales growth turned negative, revenue $5,195,300,000 in the year to 2025-12-31 against $5,341,300,000 the year before (-2.7%)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 351.595,
+    "target_price": null,
+    "exit_trigger": "fundamental deterioration: sales growth turned negative, revenue $5,195,300,000 in the year to 2025-12-31 against $5,341,300,000 the year before (-2.7%)",
+    "rationale": "Doctrine said sell (fundamental deterioration: sales growth turned negative, revenue $5,195,300,000 in the year to 2025-12-31 against $5,341,300,000 the year before (-2.7%)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "LTC",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 17.09 is 72.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.174 against the market's 0.223; held 197 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 38.24,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 17.09 is 72.9% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.174 against the market's 0.223; held 197 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "LYTS",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 21.01 is 89.7% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.323 against the market's 0.223; held 14 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 17.53,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 21.01 is 89.7% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.323 against the market's 0.223; held 14 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "MTDR",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 8.11 is 34.6% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.011 against the market's 0.223; held 197 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 54.55,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 8.11 is 34.6% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.011 against the market's 0.223; held 197 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "NGVC",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 13.15 is 56.1% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.793 against the market's 0.223; held 105 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 28.235,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 13.15 is 56.1% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.793 against the market's 0.223; held 105 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "NHI",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 20.61 is 88.0% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.539 against the market's 0.223; held 4 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 63.08,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 20.61 is 88.0% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.539 against the market's 0.223; held 4 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "NNN",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 19.75 is 84.3% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.698 against the market's 0.223; held 105 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 46.96,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 19.75 is 84.3% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.698 against the market's 0.223; held 105 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "OLED",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 16.31 is 69.6% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 0.566 against the market's 0.223; held 197 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 91.0533,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 16.31 is 69.6% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 0.566 against the market's 0.223; held 197 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "OTTR",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "fundamental deterioration: sales growth turned negative, revenue $1,299,640,000 in the year to 2025-12-31 against $1,329,973,000 the year before (-2.3%)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 90.5,
+    "target_price": null,
+    "exit_trigger": "fundamental deterioration: sales growth turned negative, revenue $1,299,640,000 in the year to 2025-12-31 against $1,329,973,000 the year before (-2.3%)",
+    "rationale": "Doctrine said sell (fundamental deterioration: sales growth turned negative, revenue $1,299,640,000 in the year to 2025-12-31 against $1,329,973,000 the year before (-2.3%)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "PRIM",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 11.42 is 48.7% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 2.094 against the market's 0.223; held 2 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 66.73,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 11.42 is 48.7% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 2.094 against the market's 0.223; held 2 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "PYPL",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 10.17 is 43.4% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.143 against the market's 0.223; held 121 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 55.315,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 10.17 is 43.4% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.143 against the market's 0.223; held 121 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "RMD",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "P/E expanded to the market average: P/E 25.40 is 108.4% of the market's 23.43 (median of the day's screen), at or past the 100% line where the exit is complete"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 229.99,
+    "target_price": null,
+    "exit_trigger": "P/E expanded to the market average: P/E 25.40 is 108.4% of the market's 23.43 (median of the day's screen), at or past the 100% line where the exit is complete",
+    "rationale": "Doctrine said sell (P/E expanded to the market average: P/E 25.40 is 108.4% of the market's 23.43 (median of the day's screen), at or past the 100% line where the exit is complete); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "SFD",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 7.67 is 32.7% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 3.135 against the market's 0.223; held 105 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 24.109,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 7.67 is 32.7% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 3.135 against the market's 0.223; held 105 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "SWX",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 14.82 is 63.2% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.246 against the market's 0.223; held 1 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 90.04,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 14.82 is 63.2% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.246 against the market's 0.223; held 1 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "TGLS",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 13.86 is 59.1% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.854 against the market's 0.223; held 29 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 38.4,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 13.86 is 59.1% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.854 against the market's 0.223; held 29 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "UHS",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 7.76 is 33.1% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 2.411 against the market's 0.223; held 15 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 203.95,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 7.76 is 33.1% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 2.411 against the market's 0.223; held 15 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "UVV",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "fundamental deterioration: sales growth turned negative, revenue $2,885,078,000 in the year to 2026-03-31 against $2,922,924,000 the year before (-1.3%)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 41.44,
+    "target_price": null,
+    "exit_trigger": "fundamental deterioration: sales growth turned negative, revenue $2,885,078,000 in the year to 2026-03-31 against $2,922,924,000 the year before (-1.3%)",
+    "rationale": "Doctrine said sell (fundamental deterioration: sales growth turned negative, revenue $2,885,078,000 in the year to 2026-03-31 against $2,922,924,000 the year before (-1.3%)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "VICI",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "framework still applies: P/E 9.47 is 40.4% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.812 against the market's 0.223; held 197 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 28.0004,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (framework still applies: P/E 9.47 is 40.4% of the market's 23.43 (median of the day's screen), under the 80% line where trimming begins; Total-Return/PE 1.812 against the market's 0.223; held 197 days of an expected 2-4 years); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "XYL",
+    "decision": "SELL",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "P/E expanded to the market average: P/E 24.67 is 105.3% of the market's 23.43 (median of the day's screen), at or past the 100% line where the exit is complete"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 89.035,
+    "target_price": null,
+    "exit_trigger": "P/E expanded to the market average: P/E 24.67 is 105.3% of the market's 23.43 (median of the day's screen), at or past the 100% line where the exit is complete",
+    "rationale": "Doctrine said sell (P/E expanded to the market average: P/E 24.67 is 105.3% of the market's 23.43 (median of the day's screen), at or past the 100% line where the exit is complete); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "YUMC",
+    "decision": "HOLD",
+    "agent": "john_neff",
+    "timestamp": "2026-11-20T00:00:00+00:00",
+    "criteria_met": [
+      "trim zone: P/E 20.06 is 85.6% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.223 against the market's 0.223; held 1 days of an expected 2-4 years"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 50.21,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (trim zone: P/E 20.06 is 85.6% of the market's 23.43 (median of the day's screen), between the 80% line where trimming begins and the 100% line where the exit is complete; the trim is not executed (a verdict is keep or sell), the position is kept; Total-Return/PE 0.223 against the market's 0.223; held 1 days of an expected 2-4 years); the engine kept it [shadow]"
+  }
+]
