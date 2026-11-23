@@ -1,0 +1,493 @@
+[
+  {
+    "agent": "warren_buffett",
+    "ticker": "ACN",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:54:29.323604+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "ACN",
+      "decision": "HOLD",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "INSIDE",
+      "moat_type": "Switching",
+      "moat_durability_years_estimated": 10,
+      "confidence": 0.55,
+      "intrinsic_value_estimate_usd_per_share": 437.57,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 9259338069.93,
+      "current_price_usd": 223.36,
+      "margin_of_safety_pct": 49.86,
+      "thesis_en": "I own these shares, bought a week ago at $251.845 and now marked down about 11%. A price decline with no change in the business is not a sell trigger. It is the market offering me the same company for less. The numbers I can see are good: five-year average ROE of 26.9%, debt-to-equity of 0.32, and owner earnings averaging about $9.26 billion against a $134 billion market cap. But I would not lean on the 49.86% margin of safety. It rests on an 8% growth rate and a 5% discount rate, which is a generous setup, and the snapshot says nothing about ten years of earnings, CEO tenure or moat metrics. So I keep what I have, add nothing until I can confirm those gaps, and watch whether technology change erodes the consulting franchise.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d5\u05ea \u05d4\u05d0\u05dc\u05d4. \u05e7\u05e0\u05d9\u05ea\u05d9 \u05dc\u05e4\u05e0\u05d9 \u05e9\u05d1\u05d5\u05e2 \u05d1-251.845 \u05d3\u05d5\u05dc\u05e8, \u05d5\u05d4\u05df \u05de\u05e1\u05d5\u05de\u05e0\u05d5\u05ea \u05db\u05e2\u05ea \u05db-11% \u05de\u05ea\u05d7\u05ea \u05dc\u05de\u05d7\u05d9\u05e8 \u05d4\u05e7\u05e0\u05d9\u05d9\u05d4. \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d1\u05dc\u05d9 \u05e9\u05d9\u05e0\u05d5\u05d9 \u05d1\u05e2\u05e1\u05e7 \u05d0\u05d9\u05e0\u05e0\u05d4 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8, \u05d0\u05dc\u05d0 \u05d4\u05e9\u05d5\u05e7 \u05e9\u05de\u05e6\u05d9\u05e2 \u05dc\u05d9 \u05d0\u05ea \u05d0\u05d5\u05ea\u05d4 \u05d7\u05d1\u05e8\u05d4 \u05d1\u05d6\u05d5\u05dc \u05d9\u05d5\u05ea\u05e8. \u05d4\u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e9\u05d0\u05e0\u05d9 \u05e8\u05d5\u05d0\u05d4 \u05d8\u05d5\u05d1\u05d9\u05dd: \u05ea\u05e9\u05d5\u05d0\u05d4 \u05de\u05de\u05d5\u05e6\u05e2\u05ea \u05e2\u05dc \u05d4\u05d4\u05d5\u05df \u05e9\u05dc 26.9% \u05d1-5 \u05e9\u05e0\u05d9\u05dd, \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.32 \u05d5\u05e8\u05d5\u05d5\u05d7\u05d9 \u05d1\u05e2\u05dc\u05d9\u05dd \u05de\u05de\u05d5\u05e6\u05e2\u05d9\u05dd \u05e9\u05dc \u05db-9.26 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05e9\u05d5\u05e7 \u05e9\u05dc 134 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3. \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 49.86%, \u05db\u05d9 \u05d4\u05d5\u05d0 \u05d1\u05e0\u05d5\u05d9 \u05e2\u05dc \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 8% \u05d5\u05e8\u05d9\u05d1\u05d9\u05ea \u05d4\u05d9\u05d5\u05d5\u05df \u05e9\u05dc 5%, \u05d4\u05e0\u05d7\u05d5\u05ea \u05e0\u05d3\u05d9\u05d1\u05d5\u05ea. \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d2\u05dd \u05dc\u05d0 \u05de\u05e8\u05d0\u05d9\u05dd \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d5\u05ea \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd, \u05db\u05d4\u05d5\u05e0\u05ea \u05de\u05e0\u05db\"\u05dc \u05d0\u05d5 \u05de\u05d3\u05d3\u05d9 \u05d7\u05e4\u05d9\u05e8. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05d4 \u05e9\u05d9\u05e9, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d0\u05de\u05ea \u05d0\u05ea \u05d4\u05d7\u05e1\u05e8, \u05d5\u05e2\u05d5\u05e7\u05d1 \u05d0\u05d7\u05e8\u05d9 \u05d4\u05e9\u05d0\u05dc\u05d4 \u05d0\u05dd \u05e9\u05d9\u05e0\u05d5\u05d9 \u05d8\u05db\u05e0\u05d5\u05dc\u05d5\u05d2\u05d9 \u05e9\u05d5\u05d7\u05e7 \u05d0\u05ea \u05d6\u05d9\u05db\u05d9\u05d5\u05df \u05d4\u05d9\u05d9\u05e2\u05d5\u05e5.",
+      "criteria_passed": [
+        "Berkshire Criterion 1: Size, market cap ~$134.4B \u2713",
+        "Berkshire Criterion 3: 5-yr average ROE 26.9% (\u226515%) \u2713",
+        "Berkshire Criterion 3: Debt-to-equity 0.32 (\u22640.5) \u2713",
+        "Berkshire Criterion 5: Business describable in two paragraphs \u2713",
+        "Berkshire Criterion 6: Price $223.36 vs model intrinsic value $437.57 (well under 0.85x), but the model uses generous assumptions \u2713"
+      ],
+      "criteria_failed": [
+        "Criterion 2: ten years of positive earnings with no significant 3-year decline cannot be checked; annual earnings history is not in the snapshot",
+        "Criterion 4: CEO tenure, succession plan and capital allocation record are not in the snapshot",
+        "Moat durability: no retention, pricing-power or margin data in the snapshot, so the moat is a qualitative judgment only",
+        "Valuation: the 5% discount rate and 8% growth rate (trailing CAGR 10.6% capped at 8%) flatter the intrinsic value; the margin of safety is likely overstated",
+        "Cross-reference signals (13F holders, insider activity) not researched"
+      ],
+      "management_assessment": "The snapshot has no data on CEO tenure, insider ownership, compensation or shareholder letters, so I cannot grade management and my confidence is lowered accordingly. The only indirect evidence is a high five-year average ROE of 26.9% with moderate leverage (D/E 0.32), which is consistent with competent capital allocation but does not prove it.",
+      "moat_analysis": "I read the moat as switching costs and client relationships. Large clients embed the firm in their operations, and moving away carries real risk and cost. The 26.9% average ROE with D/E of 0.32 is consistent with franchise economics. But the snapshot gives no retention, margin or pricing data. A consulting and technology-services moat is also exposed to rapid technological change, and a moat that must be continuously rebuilt is no moat at all. I give it roughly a decade, not forever.",
+      "two_paragraph_business_description": "Accenture sells professional services to large corporations and governments: consulting, technology implementation, systems integration and outsourced operations. Clients hire it to redesign processes, build and run software systems, and manage large transformation programs. Its people-based model earns fees by billing for skilled labor, project work and multi-year managed-services contracts.\n\nThe business needs little capital, so owner earnings run high relative to book value, and the snapshot shows about $9.26 billion averaged over five years. The risks are cyclical corporate spending on discretionary projects and technology shifts, such as automation, that could shrink demand for labor-based services. Those make it a business I can understand but cannot forecast with the certainty I want.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 5.0,
+      "expected_holding_period_years": 10,
+      "exit_triggers": [
+        "Five-year ROE falls persistently below 15%, signalling moat erosion",
+        "Negative annual operating cash flow, which I would take as a sign of management failure",
+        "Price above 1.5x intrinsic value on a persistent basis",
+        "Evidence that automation is structurally eroding pricing power or client retention",
+        "Evidence of accounting problems or management dishonesty"
+      ],
+      "buffett_quote_relevant": "Be fearful when others are greedy, and greedy when others are fearful."
+    },
+    "input_tokens": 491,
+    "output_tokens": 2935,
+    "cache_write_tokens": 18405,
+    "cache_read_tokens": 0,
+    "prompt_chars": 966,
+    "prompt_sha256": "ca601af84f001ce8b9ab6d3101a3d48d9c54c688c84d5e192d49d7d4340cb840"
+  },
+  {
+    "agent": "warren_buffett",
+    "ticker": "G",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:54:50.327871+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "G",
+      "decision": "REJECT",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "OUTSIDE",
+      "moat_type": "None",
+      "moat_durability_years_estimated": 0,
+      "confidence": 0.55,
+      "intrinsic_value_estimate_usd_per_share": 75.93610357327901,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 513780158.38040936,
+      "current_price_usd": 41.56999969482422,
+      "margin_of_safety_pct": 45.25660688567093,
+      "thesis_en": "The screen numbers look good: a 45% margin of safety, a 22% five-year average ROE and debt-to-equity of 0.43. But I don't own this name, and a cheap price alone doesn't get me to buy. The snapshot gives me only a ticker, with no business description, no moat evidence and no earnings history. I can't write the two-paragraph explanation with the confidence I demand, and I can't confirm a moat that will last ten years. Services businesses that sell labor and process work are exposed to technological change that could make their moat something that has to be rebuilt every year, and I have always said a moat that must be continuously rebuilt is no moat at all. A low price on a business I can't predict is exactly the trap I try to avoid. I'll pass and wait for a pitch squarely in my sweet spot.",
+      "thesis_he": "\u05d4\u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e2\u05dc \u05d4\u05e0\u05d9\u05d9\u05e8 \u05e0\u05e8\u05d0\u05d9\u05dd \u05d8\u05d5\u05d1: \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 45%, \u05ea\u05e9\u05d5\u05d0\u05d4 \u05de\u05de\u05d5\u05e6\u05e2\u05ea \u05e2\u05dc \u05d4\u05d4\u05d5\u05df \u05e9\u05dc 22% \u05d1\u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.43. \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05de\u05d7\u05d9\u05e8 \u05d6\u05d5\u05dc \u05dc\u05d1\u05d3\u05d5 \u05dc\u05d0 \u05de\u05e1\u05e4\u05d9\u05e7 \u05db\u05d3\u05d9 \u05e9\u05d0\u05e7\u05e0\u05d4. \u05de\u05d4 \u05e9\u05d9\u05e9 \u05dc\u05e4\u05e0\u05d9\u05d9 \u05d4\u05d5\u05d0 \u05e1\u05d9\u05de\u05d5\u05dc \u05d1\u05dc\u05d1\u05d3, \u05d1\u05dc\u05d9 \u05ea\u05d9\u05d0\u05d5\u05e8 \u05e9\u05dc \u05d4\u05e2\u05e1\u05e7, \u05d1\u05dc\u05d9 \u05d4\u05d5\u05db\u05d7\u05d4 \u05dc\u05d7\u05e4\u05d9\u05e8 \u05d5\u05d1\u05dc\u05d9 \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d9\u05ea \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd. \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05e1\u05d5\u05d2\u05dc \u05dc\u05d4\u05e1\u05d1\u05d9\u05e8 \u05d0\u05ea \u05d4\u05e2\u05e1\u05e7 \u05d1\u05e9\u05ea\u05d9 \u05e4\u05e1\u05e7\u05d0\u05d5\u05ea \u05d1\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05d0\u05e0\u05d9 \u05d3\u05d5\u05e8\u05e9 \u05de\u05e2\u05e6\u05de\u05d9, \u05d5\u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d5\u05d5\u05d3\u05d0 \u05d7\u05e4\u05d9\u05e8 \u05e9\u05d9\u05d7\u05d6\u05d9\u05e7 \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d9\u05dd. \u05e2\u05e1\u05e7\u05d9 \u05e9\u05d9\u05e8\u05d5\u05ea\u05d9\u05dd \u05e9\u05de\u05d5\u05db\u05e8\u05d9\u05dd \u05e2\u05d1\u05d5\u05d3\u05d4 \u05d5\u05ea\u05d4\u05dc\u05d9\u05db\u05d9\u05dd \u05d7\u05e9\u05d5\u05e4\u05d9\u05dd \u05dc\u05e9\u05d9\u05e0\u05d5\u05d9 \u05d8\u05db\u05e0\u05d5\u05dc\u05d5\u05d2\u05d9 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e4\u05d5\u05da \u05d0\u05ea \u05d4\u05d7\u05e4\u05d9\u05e8 \u05dc\u05de\u05e9\u05d4\u05d5 \u05e9\u05e6\u05e8\u05d9\u05da \u05dc\u05d1\u05e0\u05d5\u05ea \u05de\u05d7\u05d3\u05e9 \u05db\u05dc \u05e9\u05e0\u05d4, \u05d5\u05db\u05d1\u05e8 \u05d0\u05de\u05e8\u05ea\u05d9 \u05e9\u05d7\u05e4\u05d9\u05e8 \u05e9\u05e6\u05e8\u05d9\u05da \u05dc\u05d1\u05e0\u05d5\u05ea \u05db\u05dc \u05d4\u05d6\u05de\u05df \u05d4\u05d5\u05d0 \u05dc\u05d0 \u05d7\u05e4\u05d9\u05e8. \u05de\u05d7\u05d9\u05e8 \u05e0\u05de\u05d5\u05da \u05e2\u05dc \u05e2\u05e1\u05e7 \u05e9\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d7\u05d6\u05d5\u05ea \u05d4\u05d5\u05d0 \u05d1\u05d3\u05d9\u05d5\u05e7 \u05d4\u05de\u05dc\u05db\u05d5\u05d3\u05ea \u05e9\u05d0\u05e0\u05d9 \u05de\u05e0\u05e1\u05d4 \u05dc\u05d4\u05d9\u05de\u05e0\u05e2 \u05de\u05de\u05e0\u05d4. \u05d0\u05e0\u05d9 \u05de\u05d5\u05d5\u05ea\u05e8 \u05d5\u05de\u05de\u05ea\u05d9\u05df \u05dc\u05d4\u05d8\u05dc\u05d4 \u05e9\u05e0\u05d5\u05d7\u05ea\u05ea \u05d1\u05d3\u05d9\u05d5\u05e7 \u05d1\u05e0\u05e7\u05d5\u05d3\u05d4 \u05d4\u05de\u05ea\u05d5\u05e7\u05d4 \u05e9\u05dc\u05d9.",
+      "criteria_passed": [
+        "Berkshire Criterion 1: Market cap about $6.95B (at least $5B) \u2713",
+        "Berkshire Criterion 3: 5-year average ROE 22.0% (at least 15%) \u2713",
+        "Berkshire Criterion 3: Debt-to-equity 0.43 (at most 0.5) \u2713",
+        "Berkshire Criterion 6: Margin of safety 45.3% (at least 15%) \u2713"
+      ],
+      "criteria_failed": [
+        "Circle of competence: the snapshot has no business description, so I cannot meet the two-paragraph test",
+        "Moat: no evidence of a durable moat in the snapshot; the industry appears exposed to rapid technological change",
+        "Berkshire Criterion 2: 10-year earnings history is not in the snapshot, so it cannot be verified",
+        "Berkshire Criterion 4: CEO tenure, succession and capital allocation record are not in the snapshot, so they cannot be verified",
+        "ROIC check: ROIC is not reported in the snapshot, so it cannot be verified",
+        "Owner earnings yield check: the 10-year Treasury yield is not provided, so the check cannot be completed"
+      ],
+      "management_assessment": "Cannot be assessed. The snapshot contains no information on CEO tenure, insider ownership, compensation or candor in shareholder letters. Missing data lowers my confidence; it does not raise it.",
+      "moat_analysis": "The snapshot offers no quantified evidence of brand, cost, network, switching or regulatory advantage. The high ROE is a number, not an explanation of why returns would persist. In a labor- and process-driven services business exposed to technological change, I cannot assume the moat endures, so I assign none.",
+      "two_paragraph_business_description": "The snapshot gives only the ticker 'G' and valuation figures, with no description of the business or how it earns its money. I will not fill that gap from memory or guess at what the company does. Without a clear account of the product, the customers and the competitive position, I cannot write the two-paragraph explanation that my circle of competence requires. That is itself the reason to walk away.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 0.0,
+      "expected_holding_period_years": 0,
+      "exit_triggers": [],
+      "buffett_quote_relevant": "Risk comes from not knowing what you're doing."
+    },
+    "input_tokens": 385,
+    "output_tokens": 2205,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18405,
+    "prompt_chars": 767,
+    "prompt_sha256": "074a3d03704227d6ee028ebc5e2fdee8027c2b8f5d7b0c0fc368c391b70ec8a0"
+  },
+  {
+    "agent": "warren_buffett",
+    "ticker": "BBY",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:54:51.059766+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "BBY",
+      "decision": "REJECT",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "INSIDE",
+      "moat_type": "None",
+      "moat_durability_years_estimated": 0,
+      "confidence": 0.7,
+      "intrinsic_value_estimate_usd_per_share": 117.52,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 1569666364.65,
+      "current_price_usd": 97.14,
+      "margin_of_safety_pct": 17.35,
+      "thesis_en": "I understand this business: it sells other people's consumer electronics and appliances out of big boxes and online. The price looks fair, at $97.14 against a computed value of $117.52, and the numbers clear the screen on size, leverage and a 17% discount. But I can't find a moat. The products are made by someone else, shoppers can compare prices with a phone, and the brand gives no pricing power I can see. A business like that has to earn its return again every year, and the high ROE of 48% looks to me more like a small equity base than a franchise. A cheap price on a retailer with no durable advantage is the cigar-butt thinking I left behind after See's. I'll pass and wait for a better pitch.",
+      "thesis_he": "\u05d0\u05ea \u05d4\u05e2\u05e1\u05e7 \u05d4\u05d6\u05d4 \u05d0\u05e0\u05d9 \u05de\u05d1\u05d9\u05df: \u05d4\u05d5\u05d0 \u05de\u05d5\u05db\u05e8 \u05de\u05d5\u05e6\u05e8\u05d9 \u05d7\u05e9\u05de\u05dc \u05d5\u05d0\u05dc\u05e7\u05d8\u05e8\u05d5\u05e0\u05d9\u05e7\u05d4 \u05e9\u05dc \u05d0\u05d7\u05e8\u05d9\u05dd, \u05d1\u05d7\u05e0\u05d5\u05d9\u05d5\u05ea \u05e2\u05e0\u05e7 \u05d5\u05d1\u05d0\u05d9\u05e0\u05d8\u05e8\u05e0\u05d8. \u05d4\u05de\u05d7\u05d9\u05e8 \u05e0\u05e8\u05d0\u05d4 \u05d4\u05d5\u05d2\u05df, 97.14 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05de\u05d7\u05d5\u05e9\u05d1 \u05e9\u05dc 117.52, \u05d5\u05d4\u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e2\u05d5\u05d1\u05e8\u05d9\u05dd \u05d0\u05ea \u05d4\u05e1\u05d9\u05e0\u05d5\u05df \u05d1\u05d2\u05d5\u05d3\u05dc, \u05d1\u05de\u05d9\u05e0\u05d5\u05e3 \u05d5\u05d1\u05d4\u05e0\u05d7\u05d4 \u05e9\u05dc \u05db-17%. \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d5\u05e6\u05d0 \u05d7\u05e4\u05d9\u05e8. \u05d0\u05ea \u05d4\u05de\u05d5\u05e6\u05e8\u05d9\u05dd \u05de\u05d9\u05d9\u05e6\u05e8 \u05de\u05d9\u05e9\u05d4\u05d5 \u05d0\u05d7\u05e8, \u05d4\u05dc\u05e7\u05d5\u05d7 \u05de\u05e9\u05d5\u05d5\u05d4 \u05de\u05d7\u05d9\u05e8\u05d9\u05dd \u05d1\u05d8\u05dc\u05e4\u05d5\u05df, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e8\u05d5\u05d0\u05d4 \u05de\u05d5\u05ea\u05d2 \u05e9\u05e0\u05d5\u05ea\u05df \u05db\u05d5\u05d7 \u05ea\u05de\u05d7\u05d5\u05e8. \u05e2\u05e1\u05e7 \u05db\u05d6\u05d4 \u05e6\u05e8\u05d9\u05da \u05dc\u05d4\u05e8\u05d5\u05d5\u05d9\u05d7 \u05d0\u05ea \u05d4\u05ea\u05e9\u05d5\u05d0\u05d4 \u05e9\u05dc\u05d5 \u05de\u05d7\u05d3\u05e9 \u05d1\u05db\u05dc \u05e9\u05e0\u05d4, \u05d5\u05d0\u05ea \u05d4-ROE \u05d4\u05d2\u05d1\u05d5\u05d4 \u05e9\u05dc 48% \u05d0\u05e0\u05d9 \u05e7\u05d5\u05e8\u05d0 \u05db\u05d4\u05d5\u05df \u05e2\u05e6\u05de\u05d9 \u05e7\u05d8\u05df \u05d5\u05dc\u05d0 \u05db\u05d6\u05d9\u05db\u05d9\u05d5\u05df \u05d0\u05de\u05d9\u05ea\u05d9. \u05de\u05d7\u05d9\u05e8 \u05d6\u05d5\u05dc \u05e2\u05dc \u05e7\u05de\u05e2\u05d5\u05e0\u05d0\u05d9 \u05d1\u05dc\u05d9 \u05d9\u05ea\u05e8\u05d5\u05df \u05de\u05ea\u05de\u05e9\u05da \u05d4\u05d5\u05d0 \u05d7\u05e9\u05d9\u05d1\u05d4 \u05e9\u05dc '\u05d1\u05d3\u05dc \u05e1\u05d9\u05d2\u05e8', \u05d5\u05d0\u05d5\u05ea\u05d4 \u05d4\u05e9\u05d0\u05e8\u05ea\u05d9 \u05de\u05d0\u05d7\u05d5\u05e8 \u05d0\u05d7\u05e8\u05d9 See's. \u05d0\u05e0\u05d9 \u05de\u05d5\u05d5\u05ea\u05e8 \u05d5\u05de\u05d7\u05db\u05d4 \u05dc\u05d4\u05d2\u05e9\u05d4 \u05d8\u05d5\u05d1\u05d4 \u05d9\u05d5\u05ea\u05e8.",
+      "criteria_passed": [
+        "Berkshire Criterion 1: Size $20.4B market cap \u2265 $5B \u2713",
+        "Berkshire Criterion 3 (leverage): Debt-to-equity 0.367 \u2264 0.5 \u2713",
+        "Berkshire Criterion 3 (ROE): 5-year average ROE 48.35% \u2265 15% \u2713 (likely inflated by a small equity base; see failed list)",
+        "Berkshire Criterion 6: Price $97.14 \u2264 0.85 \u00d7 intrinsic value $117.52 (margin of safety 17.35%) \u2713",
+        "Berkshire Criterion 5: Business can be explained in two paragraphs \u2713"
+      ],
+      "criteria_failed": [
+        "Step 3 / Anti-Pattern #2: no demonstrable moat; commodity electronics retail with no brand, cost, network, switching or regulatory advantage that I can document",
+        "Anti-Pattern #10: retailer of third-party products without evident scale or cost advantage that rivals cannot match",
+        "Berkshire Criterion 2: 10-year earnings history is not in the snapshot, so consistent earning power could not be verified",
+        "Berkshire Criterion 4: CEO tenure, succession and capital allocation record are not in the snapshot, so they could not be verified",
+        "ROIC 5-year average is not reported in the snapshot; ROIC check not performed",
+        "Earnings-yield sanity check not performed: the 10-year Treasury yield is not given in the snapshot",
+        "Valuation uses a 0% growth assumption and a 5% discount rate; I cannot tell from the snapshot whether the owner-earnings base is durable"
+      ],
+      "management_assessment": "The snapshot has no information on CEO tenure, insider ownership, compensation or shareholder communications, so I can't give management a passing grade. Missing data lowers my confidence. The 48% average ROE is something I'd want explained, because it may reflect buybacks shrinking the equity base rather than operating excellence.",
+      "moat_analysis": "I see no durable moat. Consumer electronics retail sells products made by others, price comparison is easy, and I see no evidence of pricing power or customer lock-in. The snapshot has no margin, retention or market-share data to support a moat. I treat moat as None.",
+      "two_paragraph_business_description": "Best Buy is a retailer of consumer electronics, appliances and related services. It sells through large stores and online, buying products from manufacturers and reselling them at a markup.\n\nIt earns money from the spread between purchase and sale prices, plus some services and attached sales. The economics depend on volume, inventory turns and cost control rather than a proprietary product. The snapshot reports average owner earnings of about $1.57 billion over five years.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 0.0,
+      "expected_holding_period_years": 0,
+      "exit_triggers": [
+        "Not applicable; no position is proposed",
+        "Would revisit only if documented evidence of durable pricing power or a structural cost advantage emerged"
+      ],
+      "buffett_quote_relevant": "Time is the friend of the wonderful company, the enemy of the mediocre."
+    },
+    "input_tokens": 383,
+    "output_tokens": 2676,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18405,
+    "prompt_chars": 754,
+    "prompt_sha256": "c4d609cd0ccf15c19b787b904d29c8845a4e45109775441ebd4155b812210bd2"
+  },
+  {
+    "agent": "warren_buffett",
+    "ticker": "NEU",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:54:54.028254+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "NEU",
+      "decision": "WATCH",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "INSIDE",
+      "moat_type": "Switching",
+      "moat_durability_years_estimated": 12,
+      "confidence": 0.45,
+      "intrinsic_value_estimate_usd_per_share": 1299.45,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 412894902.68,
+      "current_price_usd": 715.4,
+      "margin_of_safety_pct": 44.95,
+      "thesis_en": "I don't own NEU, and the numbers in front of me are attractive: a 30.6% five-year average ROE, debt-to-equity of 0.43, a $6.58 billion market cap and a 44.9% margin of safety against the model's intrinsic value. But I'm not going to buy on the fields that happen to be present. The snapshot doesn't show ten years of earnings, management tenure or capital allocation history, and I can't test the long-term threat to the franchise from changing demand for the products behind these additives. The DCF also leans on 8% growth (the trailing 13.9% CAGR was capped) and a 5% discount rate, which makes it sensitive, so I treat that margin of safety with suspicion until I've checked the rest. A good business at a cheap-looking price isn't enough; I'll wait until I can confirm the earnings record and the durability of the moat. Until then, I sit on my hands.",
+      "thesis_he": "\u05d0\u05d9\u05df \u05dc\u05d9 \u05de\u05e0\u05d9\u05d5\u05ea NEU, \u05d5\u05d4\u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9 \u05d0\u05db\u05df \u05de\u05d5\u05e9\u05db\u05d9\u05dd: ROE \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 30.6% \u05dc-5 \u05e9\u05e0\u05d9\u05dd, \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.43, \u05e9\u05d5\u05d5\u05d9 \u05e9\u05d5\u05e7 \u05e9\u05dc 6.58 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3 \u05d3\u05d5\u05dc\u05e8 \u05d5\u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 44.9% \u05de\u05d5\u05dc \u05d4\u05e2\u05e8\u05db\u05ea \u05d4\u05e9\u05d5\u05d5\u05d9 \u05e9\u05dc \u05d4\u05de\u05d5\u05d3\u05dc. \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e7\u05d5\u05e0\u05d4 \u05e8\u05e7 \u05e2\u05dc \u05e1\u05de\u05da \u05d4\u05e9\u05d3\u05d5\u05ea \u05e9\u05de\u05d5\u05e4\u05d9\u05e2\u05d9\u05dd \u05d1\u05de\u05e7\u05e8\u05d4. \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d0\u05d9\u05df \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d5\u05ea \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd, \u05d0\u05d9\u05df \u05d5\u05ea\u05e7 \u05e9\u05dc \u05d4\u05d4\u05e0\u05d4\u05dc\u05d4 \u05d5\u05d0\u05d9\u05df \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d9\u05ea \u05d4\u05e7\u05e6\u05d0\u05ea \u05d4\u05d5\u05df, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d1\u05d7\u05d5\u05df \u05d0\u05ea \u05d4\u05d0\u05d9\u05d5\u05dd \u05d0\u05e8\u05d5\u05da \u05d4\u05d8\u05d5\u05d5\u05d7 \u05e2\u05dc \u05d4\u05d6\u05d9\u05db\u05d9\u05d5\u05df \u05de\u05e6\u05d3 \u05e9\u05d9\u05e0\u05d5\u05d9 \u05d1\u05d1\u05d9\u05e7\u05d5\u05e9 \u05dc\u05de\u05d5\u05e6\u05e8\u05d9\u05dd \u05e9\u05d4\u05ea\u05d5\u05e1\u05e4\u05d9\u05dd \u05d4\u05d0\u05dc\u05d4 \u05de\u05e9\u05e8\u05ea\u05d9\u05dd. \u05d1\u05e0\u05d5\u05e1\u05e3, \u05d4-DCF \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 8% (\u05d4-CAGR \u05d4\u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9 \u05e9\u05dc 13.9% \u05e0\u05d7\u05ea\u05da) \u05d5\u05e2\u05dc \u05e9\u05d9\u05e2\u05d5\u05e8 \u05d4\u05d9\u05d5\u05d5\u05df \u05e9\u05dc 5%, \u05db\u05da \u05e9\u05d4\u05d5\u05d0 \u05e8\u05d2\u05d9\u05e9 \u05de\u05d0\u05d5\u05d3, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05ea\u05d9\u05d9\u05d7\u05e1 \u05dc\u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05d1\u05d7\u05e9\u05d3\u05e0\u05d5\u05ea \u05e2\u05d3 \u05e9\u05d0\u05d1\u05d3\u05d5\u05e7 \u05d0\u05ea \u05d4\u05e9\u05d0\u05e8. \u05e2\u05e1\u05e7 \u05d8\u05d5\u05d1 \u05d1\u05de\u05d7\u05d9\u05e8 \u05e9\u05e0\u05e8\u05d0\u05d4 \u05d6\u05d5\u05dc \u05d4\u05d5\u05d0 \u05dc\u05d0 \u05de\u05e1\u05e4\u05d9\u05e7; \u05d0\u05e0\u05d9 \u05d0\u05d7\u05db\u05d4 \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d0\u05e9\u05e8 \u05d0\u05ea \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d9\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d5\u05d0\u05ea \u05e2\u05de\u05d9\u05d3\u05d5\u05ea \u05d4\u05d7\u05e4\u05d9\u05e8. \u05e2\u05d3 \u05d0\u05d6, \u05d0\u05e0\u05d9 \u05d9\u05d5\u05e9\u05d1 \u05e2\u05dc \u05d4\u05d9\u05d3\u05d9\u05d9\u05dd.",
+      "criteria_passed": [
+        "Berkshire Criterion 1: Size $6.58B market cap \u2713",
+        "Berkshire Criterion 3: 5-yr avg ROE 30.6% (\u226515%) and Debt/Equity 0.43 (\u22640.5) \u2713",
+        "Berkshire Criterion 5: Business describable in two paragraphs \u2713",
+        "Berkshire Criterion 6: Margin of safety 44.9% vs 15% minimum \u2713 (model-dependent)"
+      ],
+      "criteria_failed": [
+        "Berkshire Criterion 2: Ten years of positive earnings and no significant 3-year decline cannot be checked; the snapshot has no earnings history",
+        "Berkshire Criterion 4: CEO tenure, succession, restatement record and capital allocation are not in the snapshot, so management cannot be verified",
+        "ROIC 5-yr average is not reported, so the ROIC check could not be performed",
+        "Earnings yield check against the 10-year Treasury yield plus 4% could not be performed; the Treasury yield is not in the snapshot",
+        "Moat durability: no data on customer retention, market share or the long-term demand risk; 10-year endurance test not verified",
+        "Valuation relies on a growth rate capped at 8.0% and a 5.0% discount rate; sensitivity to these inputs not tested"
+      ],
+      "management_assessment": "Not assessable from this snapshot. It has no CEO tenure, insider ownership, compensation or shareholder-letter data, and I will not guess. That check has not been met.",
+      "moat_analysis": "My qualitative read is a switching-cost moat. Specialty additive formulations are typically qualified by customers and have to perform reliably, which makes replacement costly and risky. The snapshot offers no retention, margin or share data to prove it, though the 30.6% five-year average ROE is consistent with franchise economics. The main question is durability: whether end-demand for the products these additives go into holds up for the next 10-20 years. I can't resolve that from the provided data, so I haircut the durability estimate and my confidence.",
+      "two_paragraph_business_description": "As I understand it, NEU is a specialty chemicals company that develops and sells performance additives, the chemical packages blended into fuels and lubricants to improve how they protect, clean and perform inside engines and drivetrains. Customers are oil companies and lubricant marketers, who buy these formulations because they have to work reliably in demanding equipment.\n\nThe company makes money by selling these formulated products, usually repeatedly, at prices reflecting the performance and testing behind them rather than raw commodity cost. The economic appeal is high returns on equity with modest capital needs. The risk is that demand depends on the long-term mix of engines and machinery in use, which I can't judge from the numbers I was given.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 0.0,
+      "expected_holding_period_years": 10,
+      "exit_triggers": [
+        "Five-year average ROE falling below 15% (moat erosion)",
+        "Negative operating cash flow in the recent fiscal years (management failure proxy)",
+        "Price rising above 1.5x intrinsic value with the gap persisting",
+        "Evidence that customers can switch additive suppliers without performance risk or price concessions",
+        "Structural decline in end-demand for the products these additives serve"
+      ],
+      "buffett_quote_relevant": "Risk comes from not knowing what you're doing."
+    },
+    "input_tokens": 411,
+    "output_tokens": 2943,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18405,
+    "prompt_chars": 796,
+    "prompt_sha256": "931ed57e550b2910210824afac2f1ee127db21824dd19440315dadeb3f82ad92"
+  },
+  {
+    "agent": "warren_buffett",
+    "ticker": "LULU",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:54:58.658931+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "LULU",
+      "decision": "HOLD",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "INSIDE",
+      "moat_type": "Brand",
+      "moat_durability_years_estimated": 10,
+      "confidence": 0.5,
+      "intrinsic_value_estimate_usd_per_share": 363.03,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 1324407235.62,
+      "current_price_usd": 103.61,
+      "margin_of_safety_pct": 71.46,
+      "thesis_en": "We own ten shares, bought at $128.38 and now marked at $103.61, down 19.3% after 108 days, and the question is whether to keep them. The numbers in front of me are the kind I like: a 34.6% average ROE over five years, a debt-to-equity of 0.0, and owner earnings of about $1.32 billion against a market cap of about $10.9 billion. The model says $363 a share, but that rests on an 8% growth rate and a 5% discount rate, and I would not bet the farm on a 71% margin of safety from a spreadsheet, so I haircut it heavily. My real worry is that this is a brand tied to apparel fashion, and fashion is a moat that must be rebuilt each season, which is no moat at all if it fails. A lower price does not make me sell, and nothing in this snapshot shows the moat has eroded, so I keep what we own, I do not add until I can confirm ten years of earnings and pricing power, and I stay ready to sell if the brand's economics crack.",
+      "thesis_he": "\u05d0\u05e0\u05d7\u05e0\u05d5 \u05de\u05d7\u05d6\u05d9\u05e7\u05d9\u05dd \u05e2\u05e9\u05e8 \u05de\u05e0\u05d9\u05d5\u05ea, \u05e9\u05e0\u05e7\u05e0\u05d5 \u05d1-128.38 \u05d3\u05d5\u05dc\u05e8 \u05d5\u05db\u05e2\u05ea \u05de\u05d5\u05e2\u05e8\u05db\u05d5\u05ea \u05d1-103.61 \u05d3\u05d5\u05dc\u05e8, \u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc 19.3% \u05d0\u05d7\u05e8\u05d9 108 \u05d9\u05de\u05d9\u05dd, \u05d5\u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05d9\u05d0 \u05d0\u05dd \u05dc\u05d4\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7. \u05d4\u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9 \u05d4\u05dd \u05de\u05d4\u05e1\u05d5\u05d2 \u05e9\u05d0\u05e0\u05d9 \u05d0\u05d5\u05d4\u05d1: ROE \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 34.6% \u05dc\u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd, \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc \u05d0\u05e4\u05e1, \u05d5\u05e8\u05d5\u05d5\u05d7\u05d9 \u05d1\u05e2\u05dc\u05d9\u05dd \u05e9\u05dc \u05db-1.32 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05e9\u05d5\u05e7 \u05e9\u05dc \u05db-10.9 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3. \u05d4\u05de\u05d5\u05d3\u05dc \u05de\u05d3\u05d1\u05e8 \u05e2\u05dc 363 \u05d3\u05d5\u05dc\u05e8 \u05dc\u05de\u05e0\u05d9\u05d4, \u05d0\u05d1\u05dc \u05d4\u05d5\u05d0 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 8% \u05d5\u05e9\u05d9\u05e2\u05d5\u05e8 \u05d4\u05d9\u05d5\u05d5\u05df \u05e9\u05dc 5%, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d4\u05de\u05e8 \u05d0\u05ea \u05d4\u05d7\u05d5\u05d5\u05d4 \u05e2\u05dc \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 71% \u05de\u05ea\u05d5\u05da \u05d2\u05d9\u05dc\u05d9\u05d5\u05df \u05d0\u05dc\u05e7\u05d8\u05e8\u05d5\u05e0\u05d9, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05e7\u05d6\u05d6 \u05de\u05de\u05e0\u05d5 \u05d1\u05d7\u05d5\u05d6\u05e7\u05d4. \u05d4\u05d3\u05d0\u05d2\u05d4 \u05d4\u05d0\u05de\u05d9\u05ea\u05d9\u05ea \u05e9\u05dc\u05d9 \u05d4\u05d9\u05d0 \u05e9\u05d6\u05d4 \u05de\u05d5\u05ea\u05d2 \u05e9\u05e7\u05e9\u05d5\u05e8 \u05dc\u05d0\u05d5\u05e4\u05e0\u05ea \u05d1\u05d9\u05d2\u05d5\u05d3, \u05d5\u05d0\u05d5\u05e4\u05e0\u05d4 \u05d4\u05d9\u05d0 \u05d7\u05e4\u05d9\u05e8 \u05e9\u05e6\u05e8\u05d9\u05da \u05dc\u05d1\u05e0\u05d5\u05ea \u05de\u05d7\u05d3\u05e9 \u05d1\u05db\u05dc \u05e2\u05d5\u05e0\u05d4, \u05d5\u05d7\u05e4\u05d9\u05e8 \u05db\u05d6\u05d4 \u05d0\u05d9\u05e0\u05d5 \u05d7\u05e4\u05d9\u05e8 \u05d0\u05dd \u05d4\u05d5\u05d0 \u05e0\u05db\u05e9\u05dc. \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05dc\u05d0 \u05d2\u05d5\u05e8\u05de\u05ea \u05dc\u05d9 \u05dc\u05de\u05db\u05d5\u05e8, \u05d5\u05e9\u05d5\u05dd \u05d3\u05d1\u05e8 \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05d0 \u05de\u05e8\u05d0\u05d4 \u05e9\u05d4\u05d7\u05e4\u05d9\u05e8 \u05e0\u05e9\u05d7\u05e7, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05d4 \u05e9\u05d9\u05e9 \u05dc\u05e0\u05d5. \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d0\u05de\u05ea \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d5\u05ea \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05d5\u05db\u05d5\u05d7 \u05ea\u05de\u05d7\u05d5\u05e8, \u05d5\u05de\u05d5\u05db\u05df \u05dc\u05de\u05db\u05d5\u05e8 \u05d0\u05dd \u05d4\u05db\u05dc\u05db\u05dc\u05d4 \u05e9\u05dc \u05d4\u05de\u05d5\u05ea\u05d2 \u05ea\u05d9\u05e1\u05d3\u05e7.",
+      "criteria_passed": [
+        "Berkshire Criterion 1: Size, market cap about $10.9B vs $5B minimum \u2713",
+        "Berkshire Criterion 3: 5-year average ROE 34.6% vs 15% minimum \u2713",
+        "Berkshire Criterion 3: Debt-to-equity 0.0 vs 0.5 maximum \u2713",
+        "Berkshire Criterion 6: Model margin of safety 71.5% vs 15% minimum \u2713, though I discount it for assumption sensitivity",
+        "Owner earnings yield: about $1.32B on a $10.9B market cap, well above the 5% discount rate used"
+      ],
+      "criteria_failed": [
+        "Berkshire Criterion 2: 10 years of positive earnings not in the snapshot, so I cannot confirm it",
+        "Berkshire Criterion 4: CEO tenure, succession plan and capital allocation record not reported, so management cannot be verified",
+        "Moat durability: no data in the snapshot on pricing power, retention, or market share trend",
+        "Anti-Pattern 5 risk: fashion-driven apparel may need constant moat rebuilding; unresolved",
+        "Owner earnings inputs (maintenance capex, working capital) not broken out, so the $1.32B cannot be checked",
+        "Intrinsic value depends on a 5% discount rate and 8% growth, and no Treasury yield is given to test the 5%"
+      ],
+      "management_assessment": "The snapshot says nothing about the CEO, tenure, succession, insider ownership or compensation, so I cannot give management a pass. The zero debt-to-equity and high ROE suggest disciplined capital use, but that is an inference, not a verified track record. Until I read the shareholder letters, this check stays open and my confidence stays modest.",
+      "moat_analysis": "The moat I see is a brand and pricing-power moat. The 34.6% five-year average ROE with no leverage fits a franchise earning high returns on its own capital. The snapshot does not show pricing power, customer retention or market share, and apparel fashion is exactly where moats get rebuilt every season. The 19.3% drop since purchase may reflect doubts about the brand, or it may simply be Mr. Market's mood. I cannot tell from these figures, so I assign a ten-year durability estimate with low confidence.",
+      "two_paragraph_business_description": "Lululemon designs and sells premium athletic and lifestyle apparel, mostly under its own brand. It makes money by selling those products at premium prices to customers who value the brand, and it keeps the margin between what the goods cost and what it charges. The snapshot gives no breakdown of channels, geography or product lines, so I describe the model only in general terms.\n\nThe economics that matter to an owner are that the business earns about $1.32 billion a year in owner earnings on average over five years, carries no debt per the snapshot, and has earned a 34.6% average ROE. The risk is that apparel is a taste business, and tastes change. If the brand holds its premium pricing, this compounds. If it has to discount to sell, the returns revert toward the average.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 10.0,
+      "expected_holding_period_years": 10,
+      "exit_triggers": [
+        "ROE falls below 15% in a sustained way, showing the franchise economics are gone",
+        "Evidence of brand erosion: forced discounting, falling premium pricing, or loss of customer loyalty",
+        "Operating cash flow turns negative or management is shown to be dishonest or to destroy value through acquisitions",
+        "Price rises above 1.5x a defensible intrinsic value and stays there",
+        "A far better opportunity at much higher conviction"
+      ],
+      "buffett_quote_relevant": "Time is the friend of the wonderful company, the enemy of the mediocre."
+    },
+    "input_tokens": 486,
+    "output_tokens": 3249,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18405,
+    "prompt_chars": 946,
+    "prompt_sha256": "01ee81064d9b86cf1b263ab456eda80792055ff6a1f561d578c3de45132f7da8"
+  },
+  {
+    "agent": "warren_buffett",
+    "ticker": "PAG",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:55:06.912436+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "PAG",
+      "decision": "HOLD",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "INSIDE",
+      "moat_type": "Low-Cost",
+      "moat_durability_years_estimated": 10,
+      "confidence": 0.55,
+      "intrinsic_value_estimate_usd_per_share": 260.01,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 1087261993.61,
+      "current_price_usd": 212.6,
+      "margin_of_safety_pct": 18.23,
+      "thesis_en": "I own six shares of Penske Automotive at a basis of $216.77, and they now trade at $212.60, down about 1.9% \u2014 noise, not a reason to act. The snapshot shows a five-year average ROE of 23.8%, debt-to-equity of 0.40, and a margin of safety of 18.2% against an owner-earnings value of $260 per share. That clears my 15% threshold, but it rests on zero assumed growth at a 5% discount rate, and the snapshot gives me nothing on earnings consistency, ten-year history, or CEO tenure, so I cannot say every criterion is met. Auto retail is a decent business, not a See's Candies; the moat is scale and service, and I hold it with modest conviction. I keep what I own, add only if the price falls or I learn more, and I sell only if the franchise erodes.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05e9\u05d9\u05e9\u05d4 \u05de\u05e0\u05d9\u05d5\u05ea \u05e9\u05dc \u05e4\u05e0\u05e1\u05e7\u05d4 \u05d0\u05d5\u05d8\u05d5\u05de\u05d5\u05d8\u05d9\u05d1 \u05d1\u05de\u05d7\u05d9\u05e8 \u05e2\u05dc\u05d5\u05ea \u05e9\u05dc 216.77 \u05d3\u05d5\u05dc\u05e8, \u05d5\u05d4\u05d9\u05d5\u05dd \u05d4\u05df \u05e0\u05e1\u05d7\u05e8\u05d5\u05ea \u05d1-212.60 \u2014 \u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc \u05db-1.9%, \u05e8\u05e2\u05e9 \u05d5\u05dc\u05d0 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05e4\u05e2\u05d5\u05dc. \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05e8\u05d0\u05d9\u05dd ROE \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 23.8% \u05d1\u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd, \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.40 \u05d5\u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 18.2% \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05e9\u05dc 260 \u05d3\u05d5\u05dc\u05e8 \u05dc\u05de\u05e0\u05d9\u05d4 \u05e2\u05dc \u05d1\u05e1\u05d9\u05e1 \u05e8\u05d5\u05d5\u05d7\u05d9 \u05d1\u05e2\u05dc\u05d9\u05dd. \u05d6\u05d4 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05e1\u05e3 \u05d4-15% \u05e9\u05dc\u05d9, \u05d0\u05d1\u05dc \u05d4\u05d7\u05d9\u05e9\u05d5\u05d1 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05d4\u05e0\u05d7\u05ea \u05e6\u05de\u05d9\u05d7\u05d4 \u05d0\u05e4\u05e1\u05d9\u05ea \u05d5\u05e8\u05d9\u05d1\u05d9\u05ea \u05d4\u05d9\u05d5\u05d5\u05df \u05e9\u05dc 5%, \u05d5\u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d0\u05d9\u05df \u05dc\u05d9 \u05de\u05d9\u05d3\u05e2 \u05e2\u05dc \u05e2\u05e7\u05d1\u05d9\u05d5\u05ea \u05d4\u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05dc\u05d0\u05d5\u05e8\u05da \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d9\u05dd \u05d0\u05d5 \u05e2\u05dc \u05db\u05d4\u05d5\u05e0\u05ea \u05d4\u05de\u05e0\u05db\"\u05dc, \u05d5\u05dc\u05db\u05df \u05d0\u05d9\u05e0\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05d5\u05de\u05e8 \u05e9\u05db\u05dc \u05d4\u05e7\u05e8\u05d9\u05d8\u05e8\u05d9\u05d5\u05e0\u05d9\u05dd \u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5. \u05e7\u05de\u05e2\u05d5\u05e0\u05d0\u05d5\u05ea \u05e8\u05db\u05d1 \u05d4\u05d9\u05d0 \u05e2\u05e1\u05e7 \u05e1\u05d1\u05d9\u05e8, \u05dc\u05d0 See's Candies; \u05d4\u05d7\u05e4\u05d9\u05e8 \u05d4\u05d5\u05d0 \u05e7\u05e0\u05d4 \u05de\u05d9\u05d3\u05d4 \u05d5\u05e9\u05d9\u05e8\u05d5\u05ea, \u05d5\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05de\u05ea\u05d5\u05df. \u05d0\u05e0\u05d9 \u05de\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7, \u05d0\u05d5\u05e1\u05d9\u05e3 \u05e8\u05e7 \u05d0\u05dd \u05d4\u05de\u05d7\u05d9\u05e8 \u05d9\u05d9\u05e8\u05d3 \u05d0\u05d5 \u05d0\u05dd \u05d0\u05dc\u05de\u05d3 \u05e2\u05d5\u05d3, \u05d5\u05d0\u05de\u05db\u05d5\u05e8 \u05e8\u05e7 \u05d0\u05dd \u05d4\u05d6\u05d9\u05db\u05d9\u05d5\u05df \u05e0\u05e9\u05d7\u05e7.",
+      "criteria_passed": [
+        "Criterion 3: 5-yr average ROE 23.8% \u2265 15% \u2713",
+        "Criterion 3: Debt-to-equity 0.40 \u2264 0.5 \u2713",
+        "Criterion 1: Market cap about $14.0B \u2265 $5B \u2713",
+        "Criterion 6: Margin of safety 18.2% \u2265 15% \u2713 (price $212.60 vs. intrinsic value $260.01)",
+        "Criterion 5: Simple business, buys and sells vehicles and services them \u2713"
+      ],
+      "criteria_failed": [
+        "Criterion 2: Ten years of positive earnings cannot be checked, since the snapshot has no earnings history",
+        "Criterion 4: CEO tenure, succession and capital allocation record are not in the snapshot",
+        "Moat durability test: no gross margin, share data or customer retention in the snapshot to quantify the moat",
+        "Valuation caveat: growth is 0.0% and the discount rate is 5.0%; sensitivity to a higher rate was not tested",
+        "Cross-reference data (Berkshire holdings, insider activity) not provided"
+      ],
+      "management_assessment": "The snapshot says nothing about CEO tenure, compensation, shareholder letters or the capital allocation record, so I cannot verify this criterion. I have not seen evidence of problems, but absence of evidence is not evidence of quality. This lowers my confidence.",
+      "moat_analysis": "The moat is modest: scale in dealer purchasing, brand relationships with manufacturers, and a recurring service and parts business. These advantages are real but not comparable to a Coca-Cola brand. The 5-yr average ROE of 23.8% at a debt-to-equity of 0.40 is consistent with decent economics, though ROE can be flattered by buybacks and leverage. No margin or market share data in the snapshot to test pricing power.",
+      "two_paragraph_business_description": "Penske Automotive Group operates automotive retail dealerships, selling new and used vehicles and earning from financing and insurance products. It also earns recurring revenue from service and parts, which are typically the more stable profit sources.\n\nIt makes money on volume and on margins in vehicle sales, with service and parts adding steady income through the cycle. Its profits depend on manufacturer relationships, consumer credit conditions and the auto cycle. The snapshot does not break out segments or geographic mix, so I describe the model only in general terms.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 1.0,
+      "expected_holding_period_years": 5,
+      "exit_triggers": [
+        "5-year ROE falls so that ROE \u2265 15% fails in more than 20% of fiscal years",
+        "Negative annual operating cash flow reported",
+        "Price rises above 1.5x owner-earnings intrinsic value",
+        "Manufacturer relationships or service profit streams erode materially",
+        "Evidence of management dishonesty or value-destroying acquisitions"
+      ],
+      "buffett_quote_relevant": "It's far better to buy a wonderful company at a fair price than a fair company at a wonderful price."
+    },
+    "input_tokens": 464,
+    "output_tokens": 1968,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18405,
+    "prompt_chars": 923,
+    "prompt_sha256": "ee5cdc1b1a10c423d6a6833806d6f94fc19733308c157965c98edb8194483553"
+  },
+  {
+    "agent": "warren_buffett",
+    "ticker": "GD",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:55:11.963347+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "GD",
+      "decision": "HOLD",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "INSIDE",
+      "moat_type": "Regulatory",
+      "moat_durability_years_estimated": 15,
+      "confidence": 0.6,
+      "intrinsic_value_estimate_usd_per_share": 417.44,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 3897231401.92,
+      "current_price_usd": 344.62,
+      "margin_of_safety_pct": 17.44,
+      "thesis_en": "I own General Dynamics, so the question is whether to keep it, and I keep it. The snapshot shows a 5-year average ROE of 17.2% and debt-to-equity of 0.30, both inside my thresholds, and the owner-earnings DCF gives about $417 a share against a $344.62 price, a 17.4% margin of safety. That clears my 15% bar, though not by a wide margin, and the valuation leans on an 8% growth rate that was capped from a trailing 8.7%. The moat is the kind of position that comes from being an incumbent supplier of submarines and other defense platforms to one dominant customer, a franchise that is hard to dislodge, but I cannot verify the backlog, contract structure or management record from this snapshot. We are down 2.43% after 26 days, which tells me nothing; a price decline with the franchise intact is no reason to sell. I would hold the one share and not add until I could check the data I am missing.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d2'\u05e0\u05e8\u05dc \u05d3\u05d9\u05d9\u05e0\u05de\u05d9\u05e7\u05e1, \u05d5\u05dc\u05db\u05df \u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05d9\u05d0 \u05d0\u05dd \u05dc\u05d4\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7, \u05d5\u05d0\u05e0\u05d9 \u05de\u05de\u05e9\u05d9\u05da. \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05e8\u05d0\u05d9\u05dd ROE \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 17.2% \u05dc-5 \u05e9\u05e0\u05d9\u05dd \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.30, \u05e9\u05e0\u05d9\u05d4\u05dd \u05d1\u05ea\u05d5\u05da \u05d4\u05e1\u05e4\u05d9\u05dd \u05e9\u05dc\u05d9, \u05d5\u05e9\u05d5\u05d5\u05d9 \u05e4\u05e0\u05d9\u05de\u05d9 \u05e9\u05dc \u05db-417 \u05d3\u05d5\u05dc\u05e8 \u05dc\u05de\u05e0\u05d9\u05d4 \u05de\u05d5\u05dc \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 344.62 \u05d3\u05d5\u05dc\u05e8, \u05db\u05dc\u05d5\u05de\u05e8 margin of safety \u05e9\u05dc 17.4%. \u05d6\u05d4 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05d4\u05e8\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 15%, \u05d0\u05d1\u05dc \u05dc\u05d0 \u05d1\u05e8\u05d5\u05d5\u05d7 \u05d2\u05d3\u05d5\u05dc, \u05d5\u05d4\u05d4\u05e2\u05e8\u05db\u05d4 \u05e0\u05e9\u05e2\u05e0\u05ea \u05e2\u05dc \u05e7\u05e6\u05d1 \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 8% \u05e9\u05e0\u05d7\u05ea\u05da \u05de-8.7% \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9. \u05d4\u05d7\u05e4\u05d9\u05e8 \u05e0\u05d5\u05d1\u05e2 \u05de\u05de\u05e2\u05de\u05d3 \u05e9\u05dc \u05e1\u05e4\u05e7 \u05d5\u05ea\u05d9\u05e7 \u05e9\u05dc \u05e6\u05d5\u05dc\u05dc\u05d5\u05ea \u05d5\u05db\u05dc\u05d9 \u05dc\u05d7\u05d9\u05de\u05d4 \u05dc\u05dc\u05e7\u05d5\u05d7 \u05d3\u05d5\u05de\u05d9\u05e0\u05e0\u05d8\u05d9 \u05d0\u05d7\u05d3, \u05de\u05e2\u05de\u05d3 \u05e9\u05e7\u05e9\u05d4 \u05dc\u05e2\u05e7\u05d5\u05e8, \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d0\u05de\u05ea \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9 \u05d0\u05ea \u05e6\u05d1\u05e8 \u05d4\u05d4\u05d6\u05de\u05e0\u05d5\u05ea, \u05de\u05d1\u05e0\u05d4 \u05d4\u05d7\u05d5\u05d6\u05d9\u05dd \u05d0\u05d5 \u05e8\u05e7\u05d5\u05e8\u05d3 \u05d4\u05d4\u05e0\u05d4\u05dc\u05d4. \u05d0\u05e0\u05d7\u05e0\u05d5 \u05d1\u05de\u05d9\u05e0\u05d5\u05e1 2.43% \u05d0\u05d7\u05e8\u05d9 26 \u05d9\u05d5\u05dd, \u05d5\u05d6\u05d4 \u05dc\u05d0 \u05d0\u05d5\u05de\u05e8 \u05d3\u05d1\u05e8; \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05db\u05e9\u05d4\u05d6\u05d9\u05db\u05d9\u05d5\u05df \u05e9\u05dc\u05dd \u05d0\u05d9\u05e0\u05e0\u05d4 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d0\u05ea \u05d4\u05de\u05e0\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d1\u05d3\u05d5\u05e7 \u05d0\u05ea \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d7\u05e1\u05e8\u05d9\u05dd \u05dc\u05d9.",
+      "criteria_passed": [
+        "Criterion 3: 5-yr average ROE 17.2% (>=15%) \u2713",
+        "Criterion 3: Debt-to-equity 0.30 (<=0.5) \u2713",
+        "Criterion 1: Market cap about $93.1B (>=$5B) \u2713",
+        "Criterion 6: Margin of safety 17.4% (>=15%) \u2713",
+        "Circle of competence: business describable in two paragraphs \u2713"
+      ],
+      "criteria_failed": [
+        "Criterion 2: 10-year earnings history is not provided in the snapshot, so it cannot be verified",
+        "Criterion 4: CEO tenure, succession and capital allocation record are not in the snapshot",
+        "ROIC 5-year average is not reported, so the ROIC check could not be performed",
+        "Earnings yield check against the 10-year Treasury yield could not be performed, since the Treasury yield is not given",
+        "Cross-reference data (13F holders, insider activity) was not researched"
+      ],
+      "management_assessment": "The snapshot does not include CEO tenure, insider ownership, compensation or capital allocation history, so I cannot give management a verified pass. The conservative leverage (D/E 0.30) is a mildly encouraging sign, and nothing in the data suggests a problem. My confidence is capped until I have read the shareholder letters.",
+      "moat_analysis": "My view is a regulatory and intangible-asset moat: entrenched incumbency on long-lived defense programs with a single dominant customer, high barriers to entry and high switching costs for that customer. The numerical support in the snapshot is a 17.2% 5-year average ROE, which is consistent with franchise economics. Backlog, margins and market share are not in the snapshot, so the moat rests on qualitative judgment, not verified figures. Risk: dependence on government budgets and political cycles.",
+      "two_paragraph_business_description": "General Dynamics is a defense and aerospace contractor. It builds submarines and surface ships, combat vehicles and munitions, and also makes business jets and provides IT and mission-support services. Much of its revenue comes from long-term government contracts.\n\nIt makes money by winning multi-year programs, executing them on cost, and collecting contract payments, with a large backlog supporting visibility. The segment breakdown is not in the snapshot, so this description rests on general knowledge of the business and not on the data provided.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 1.0,
+      "expected_holding_period_years": 10,
+      "exit_triggers": [
+        "5-year average ROE falls so that ROE >= 15% holds in fewer than 80% of fiscal years",
+        "Negative annual operating cash flow, signaling management or execution failure",
+        "Price above 1.5x owner-earnings intrinsic value on a persistent basis",
+        "Evidence of dishonest or value-destroying capital allocation, such as large acquisitions at peak prices",
+        "Structural loss of incumbency on core programs"
+      ],
+      "buffett_quote_relevant": "It's far better to buy a wonderful company at a fair price than a fair company at a wonderful price."
+    },
+    "input_tokens": 491,
+    "output_tokens": 2029,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18405,
+    "prompt_chars": 963,
+    "prompt_sha256": "53e3f79abb8677bd917fc7485d5fdd6c24c87463d6f1929c79d5544f8b666eb0"
+  },
+  {
+    "agent": "warren_buffett",
+    "ticker": "ADBE",
+    "schema": "BuffettMemo",
+    "timestamp": "2026-11-23T15:55:15.096272+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "ADBE",
+      "decision": "WATCH",
+      "phase_applied": "Phase 2 (Quality + Moats)",
+      "circle_of_competence": "INSIDE",
+      "moat_type": "Switching",
+      "moat_durability_years_estimated": 10,
+      "confidence": 0.4,
+      "intrinsic_value_estimate_usd_per_share": 467.5,
+      "valuation_method_used": "Owner Earnings DCF",
+      "owner_earnings_5yr_avg_usd": 6286297857.21,
+      "current_price_usd": 221.4,
+      "margin_of_safety_pct": 52.64,
+      "thesis_en": "I don't own Adobe, and the numbers in front of me are the kind that make an old man sit up: a 5-year average ROE of 40.0%, debt-to-equity of 0.41, and a price of $221.40 against a computed value of $467.50. But I'd be careful with that margin of safety. It rests on a 5% discount rate and 8% growth, and a small change in those inputs moves it a lot. The bigger question is whether a business built on creative software will still have its pricing power ten years out, now that machines can make images and documents on their own. I can't answer that with the confidence I'd want, and the snapshot doesn't give me the ten-year earnings record or the management history to lean on. So I keep it on the list and wait. If I can't tell where the moat stands in ten years, I'd rather pass than guess.",
+      "thesis_he": "\u05d0\u05d3\u05d5\u05d1\u05d9 \u05d0\u05d9\u05e0\u05d4 \u05d1\u05d1\u05e2\u05dc\u05d5\u05ea\u05d9, \u05d5\u05d4\u05de\u05e1\u05e4\u05e8\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9 \u05d4\u05dd \u05de\u05d4\u05e1\u05d5\u05d2 \u05e9\u05d2\u05d5\u05e8\u05dd \u05dc\u05d6\u05e7\u05df \u05dc\u05d4\u05d6\u05d3\u05e7\u05e3 \u05d1\u05db\u05d9\u05e1\u05d0\u05d5: ROE \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 40.0% \u05d1-5 \u05e9\u05e0\u05d9\u05dd, \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.41, \u05d5\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 221.40 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05de\u05d7\u05d5\u05e9\u05d1 \u05e9\u05dc 467.50 \u05d3\u05d5\u05dc\u05e8. \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05d6\u05d4\u05d9\u05e8 \u05e2\u05dd \u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05d4\u05d6\u05d4. \u05d4\u05d5\u05d0 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05e9\u05d9\u05e2\u05d5\u05e8 \u05d4\u05d9\u05d5\u05d5\u05df \u05e9\u05dc 5% \u05d5\u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 8%, \u05d5\u05e9\u05d9\u05e0\u05d5\u05d9 \u05e7\u05d8\u05df \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d4\u05d0\u05dc\u05d4 \u05de\u05d6\u05d9\u05d6 \u05d0\u05d5\u05ea\u05d5 \u05de\u05d0\u05d5\u05d3. \u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05d2\u05d3\u05d5\u05dc\u05d4 \u05d9\u05d5\u05ea\u05e8 \u05d4\u05d9\u05d0 \u05d0\u05dd \u05dc\u05e2\u05e1\u05e7 \u05e9\u05dc \u05ea\u05d5\u05db\u05e0\u05d5\u05ea \u05d9\u05e6\u05d9\u05e8\u05d4 \u05e2\u05d3\u05d9\u05d9\u05df \u05d9\u05d4\u05d9\u05d4 \u05db\u05d5\u05d7 \u05ea\u05de\u05d7\u05d5\u05e8 \u05d1\u05e2\u05d5\u05d3 \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d9\u05dd, \u05db\u05e9\u05de\u05db\u05d5\u05e0\u05d5\u05ea \u05d9\u05d5\u05d3\u05e2\u05d5\u05ea \u05dc\u05d9\u05e6\u05d5\u05e8 \u05ea\u05de\u05d5\u05e0\u05d5\u05ea \u05d5\u05de\u05e1\u05de\u05db\u05d9\u05dd \u05d1\u05e2\u05e6\u05de\u05df. \u05d0\u05d9\u05df \u05dc\u05d9 \u05ea\u05e9\u05d5\u05d1\u05d4 \u05d1\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05d4\u05d9\u05d9\u05ea\u05d9 \u05e8\u05d5\u05e6\u05d4, \u05d5\u05d2\u05dd \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9 \u05dc\u05d0 \u05db\u05d5\u05dc\u05dc\u05d9\u05dd \u05e8\u05e7\u05d5\u05e8\u05d3 \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd \u05e9\u05dc \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d9\u05dd \u05d0\u05d5 \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d9\u05ea \u05d4\u05e0\u05d4\u05dc\u05d4 \u05e9\u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05d9\u05e9\u05e2\u05df \u05e2\u05dc\u05d9\u05d4\u05dd. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05e9\u05d0\u05d9\u05e8 \u05d0\u05ea \u05d4\u05de\u05e0\u05d9\u05d4 \u05d1\u05e8\u05e9\u05d9\u05de\u05d4 \u05d5\u05de\u05de\u05ea\u05d9\u05df. \u05d0\u05dd \u05d0\u05d9\u05e0\u05e0\u05d9 \u05d9\u05d5\u05d3\u05e2 \u05d0\u05d9\u05e4\u05d4 \u05d9\u05e2\u05de\u05d5\u05d3 \u05d4\u05d7\u05e4\u05d9\u05e8 \u05d1\u05e2\u05d5\u05d3 \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d9\u05dd, \u05d0\u05e2\u05d3\u05d9\u05e3 \u05dc\u05d5\u05d5\u05ea\u05e8 \u05de\u05d0\u05e9\u05e8 \u05dc\u05e0\u05d7\u05e9.",
+      "criteria_passed": [
+        "Berkshire Criterion 1: Size $86.2B market cap (\u2265$5B) \u2713",
+        "Berkshire Criterion 3: 5-year average ROE 40.0% (\u226515%) \u2713",
+        "Berkshire Criterion 3: Debt-to-equity 0.41 (\u22640.5) \u2713",
+        "Berkshire Criterion 6: Price $221.40 vs intrinsic value $467.50, margin of safety 52.6% (\u226515%) \u2713 (but sensitive to the 5% discount rate and 8% growth cap)",
+        "Two-paragraph test: business can be described plainly \u2713"
+      ],
+      "criteria_failed": [
+        "Criterion 2: 10 years of positive earnings and no significant 3-year decline cannot be verified, because annual earnings history is not in the snapshot",
+        "Criterion 4: CEO tenure, succession plan, restatement history and capital allocation record are not in the snapshot, so not checked",
+        "Earnings yield sanity check: owner earnings of $6.29B on a $86.2B market cap is about 7.3%, but the 10-year Treasury yield is not provided, so I cannot test it against Treasury + 4%",
+        "ROIC 5-year average is not reported in the snapshot, so the 15% ROIC check was not performed",
+        "Moat durability against rapid technological change (generative AI) cannot be confirmed; this is a possible Anti-Pattern #5 concern",
+        "The terminal multiple and the full DCF inputs are not disclosed beyond growth 8% and discount 5%",
+        "13F and insider signals not researched"
+      ],
+      "management_assessment": "The snapshot gives no data on CEO tenure, compensation, buyback pricing or acquisition history, so I cannot assess management. A 40.0% average ROE with debt-to-equity of 0.41 is consistent with competent capital allocation, but that is an inference from results, not a review of 5 years of shareholder letters. Absence of evidence lowers my confidence.",
+      "moat_analysis": "The moat I'd attribute to Adobe is switching costs: professionals and enterprises build workflows, file formats and training around its tools, and leaving is costly. The 40.0% 5-year average ROE is consistent with that kind of franchise economics. What I cannot verify from this snapshot is customer retention, pricing-power history, or how well the franchise holds up as AI lowers the cost of creating content. A moat that has to be rebuilt every few years is not a moat, and I can't yet tell which side of that line this falls on.",
+      "two_paragraph_business_description": "Adobe sells software that creative professionals, marketers and businesses use to make, edit and manage images, video, documents and digital content. Customers mostly pay recurring subscriptions, so revenue arrives steadily rather than in one-time purchases. The tools are embedded in daily work, and file formats and trained users make switching painful.\n\nThe business makes money by charging a subscription fee for access to the software and related cloud services, with very little physical capital required. The profit per dollar of revenue can be high because software is cheap to copy once built. The risk is that new technology, especially AI-generated content, could change who needs these tools and how much they will pay.",
+      "cross_reference_signals": {
+        "berkshire_holds_position": false,
+        "other_quality_investors_holding": [],
+        "insider_buying_90d_count": 0,
+        "insider_selling_90d_count": 0
+      },
+      "position_size_pct": 0.0,
+      "expected_holding_period_years": 10,
+      "exit_triggers": [
+        "Franchise test fails: ROE falls below 15% in more than 20% of fiscal years",
+        "Reported negative annual operating cash flow in any of the newest five fiscal years",
+        "Evidence of pricing power eroding as AI-based competitors take customers",
+        "Price above 1.5x intrinsic value on a persistent basis"
+      ],
+      "buffett_quote_relevant": "I try to invest in businesses that are so wonderful that an idiot can run them. Because sooner or later, one will."
+    },
+    "input_tokens": 412,
+    "output_tokens": 3110,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18405,
+    "prompt_chars": 800,
+    "prompt_sha256": "40841e026ccd30671b58e29c6fefb38ba0226551cdaf957669b25df79e62a042"
+  }
+]

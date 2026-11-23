@@ -1,0 +1,62 @@
+[
+  {
+    "ticker": "CRI",
+    "decision": "HOLD",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-11-23T00:00:00+00:00",
+    "criteria_met": [
+      "Defensive: price $35.69 below the Graham Number $40.44 (12% margin); fundamentals intact"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 35.8429,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (Defensive: price $35.69 below the Graham Number $40.44 (12% margin); fundamentals intact); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "INGR",
+    "decision": "HOLD",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-11-23T00:00:00+00:00",
+    "criteria_met": [
+      "Defensive: price $87.77 below the Graham Number $135.60 (35% margin); fundamentals intact"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 100.1067,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (Defensive: price $87.77 below the Graham Number $135.60 (35% margin); fundamentals intact); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "SFD",
+    "decision": "HOLD",
+    "agent": "benjamin_graham",
+    "timestamp": "2026-11-23T00:00:00+00:00",
+    "criteria_met": [
+      "Defensive: price $18.78 below the Graham Number $31.72 (41% margin); fundamentals intact"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 23.4209,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (Defensive: price $18.78 below the Graham Number $31.72 (41% margin); fundamentals intact); the engine kept it [shadow]"
+  }
+]

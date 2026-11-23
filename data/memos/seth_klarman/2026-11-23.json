@@ -1,0 +1,1432 @@
+[
+  {
+    "agent": "seth_klarman",
+    "ticker": "YELP",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:10:46.895039+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "YELP",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 70.85,
+      "current_price_usd": 17.995,
+      "margin_of_safety_pct": 74.6,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Search and AI-driven discovery keep diverting local-advertiser spend, so free cash flow falls well below the five-year average of $239.3M that the DCF leans on",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "The quant model overstates value. It capitalises an average cash flow, and the snapshot does not show whether the latest-year trend supports it",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The decline since our August entry reflects a deterioration I cannot see here, such as advertiser churn or margin compression. The snapshot gives no revenue, earnings or filing detail",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "No catalyst emerges and the stock stays cheap for years, so we absorb the time cost without a permanent loss",
+          "probability_pct": 40.0,
+          "estimated_price_impact_pct": 0.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 30.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. Any rerating would depend on sustained free cash flow and capital return, and neither is documented in the data I was given. The catalyst is therefore weak, not strong.",
+        "expected_timeline_months": 24,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this stock, down 22.95% from my entry of $23.3544 after 108 days, and I start with what could go wrong. Advertising-dependent platforms can see cash flow erode faster than any trailing average admits, and I cannot see revenue or earnings detail in this snapshot. The quant value of $70.85 against $17.995 shows a 74.6% margin of safety, with growth capped at 5% against a trailing 15.1% CAGR and debt-to-equity of 0.11. I treat that figure with suspicion, because a gap that wide is as likely to mean I am missing something as that the market is wrong. A price decline alone is not a reason to sell, and the thesis has not been broken on the evidence I have. I will hold and not add until I can confirm the latest-year free cash flow and identify a real catalyst.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05d4\u05d9\u05d0 \u05e0\u05de\u05e6\u05d0\u05ea 22.95% \u05de\u05ea\u05d7\u05ea \u05dc\u05de\u05d7\u05d9\u05e8 \u05d4\u05db\u05e0\u05d9\u05e1\u05d4 \u05e9\u05dc\u05d9, 23.3544 \u05d3\u05d5\u05dc\u05e8, \u05d0\u05d7\u05e8\u05d9 108 \u05d9\u05de\u05d9\u05dd. \u05db\u05d4\u05e8\u05d2\u05dc\u05d9 \u05d0\u05e0\u05d9 \u05e4\u05d5\u05ea\u05d7 \u05d1\u05e9\u05d0\u05dc\u05d4 \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9. \u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d5\u05ea \u05e9\u05ea\u05dc\u05d5\u05d9\u05d5\u05ea \u05d1\u05e4\u05e8\u05e1\u05d5\u05dd \u05d9\u05db\u05d5\u05dc\u05d5\u05ea \u05dc\u05e8\u05d0\u05d5\u05ea \u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05e9\u05dc\u05d4\u05df \u05e0\u05e9\u05d7\u05e7 \u05de\u05d4\u05e8 \u05d9\u05d5\u05ea\u05e8 \u05de\u05de\u05d4 \u05e9\u05db\u05dc \u05de\u05de\u05d5\u05e6\u05e2 \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9 \u05de\u05d5\u05d3\u05d4, \u05d5\u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05d0\u05d9\u05df \u05e4\u05d9\u05e8\u05d5\u05d8 \u05e9\u05dc \u05d4\u05db\u05e0\u05e1\u05d5\u05ea \u05d0\u05d5 \u05e8\u05d5\u05d5\u05d7\u05d9\u05dd. \u05d4\u05e9\u05d5\u05d5\u05d9 \u05d4\u05db\u05de\u05d5\u05ea\u05d9 \u05e9\u05dc 70.85 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 17.995 \u05d3\u05d5\u05dc\u05e8 \u05de\u05e6\u05d1\u05d9\u05e2 \u05e2\u05dc \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 74.6%, \u05db\u05e9\u05d4\u05e6\u05de\u05d9\u05d7\u05d4 \u05de\u05d5\u05d2\u05d1\u05dc\u05ea \u05dc-5% \u05dc\u05e2\u05d5\u05de\u05ea \u05e7\u05e6\u05d1 \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9 \u05e9\u05dc 15.1% \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.11. \u05d0\u05d1\u05dc \u05e4\u05e2\u05e8 \u05db\u05dc \u05db\u05da \u05d2\u05d3\u05d5\u05dc \u05de\u05e2\u05d5\u05e8\u05e8 \u05d1\u05d9 \u05d7\u05e9\u05d3, \u05db\u05d9 \u05e1\u05d1\u05d9\u05e8 \u05d1\u05d0\u05d5\u05ea\u05d4 \u05de\u05d9\u05d3\u05d4 \u05e9\u05d0\u05e0\u05d9 \u05de\u05d7\u05de\u05d9\u05e5 \u05de\u05e9\u05d4\u05d5 \u05db\u05de\u05d5 \u05e9\u05d4\u05e9\u05d5\u05e7 \u05d8\u05d5\u05e2\u05d4. \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05db\u05e9\u05dc\u05e2\u05e6\u05de\u05d4 \u05d0\u05d9\u05e0\u05d4 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8, \u05d5\u05d4\u05ea\u05d6\u05d4 \u05dc\u05d0 \u05e0\u05e9\u05d1\u05e8\u05d4 \u05dc\u05e4\u05d9 \u05d4\u05e2\u05d5\u05d1\u05d3\u05d5\u05ea \u05e9\u05d1\u05d9\u05d3\u05d9. \u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d5\u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3, \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d0\u05de\u05ea \u05d0\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05d1\u05e9\u05e0\u05d4 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d4 \u05d5\u05dc\u05d6\u05d4\u05d5\u05ea \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05de\u05de\u05e9\u05d9.",
+      "criteria_passed": [
+        "Margin of safety 74.6% versus the 30-40% minimum for public equities, on the quant DCF",
+        "Debt-to-equity 0.11, below the 0.7 screen ceiling",
+        "Five-year average free cash flow of $239,256,000 is positive",
+        "Cumulative permanent-loss estimate of 30% is below the 40% reject threshold"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot (weak at best)",
+        "Latest-year free cash flow and its trend are not reported in this snapshot, so I could not check that the DCF input still holds",
+        "The cause of the 22.95% unrealised loss is not visible in the data, so I cannot confirm the thesis is intact",
+        "Revenue, earnings and book equity are not in the snapshot, so I could not verify them"
+      ],
+      "diversification_dimension": "Time horizon",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 56.68,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 67.31,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 77.94
+      },
+      "reverse_triggers": [
+        "Free cash flow turns negative in the latest year, or shrinks faster than 20% a year, so the DCF can no longer be projected",
+        "Book equity turns non-positive or debt-to-equity rises above the 0.7 ceiling",
+        "Filings show structural advertiser attrition or margin compression that undermines the 5% growth cap",
+        "A better opportunity with a wider margin of safety needs the capital",
+        "Price reaches 110% of intrinsic value (about $77.94) and any catalyst has played out: exit fully"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 468,
+    "output_tokens": 2762,
+    "cache_write_tokens": 18679,
+    "cache_read_tokens": 0,
+    "prompt_chars": 917,
+    "prompt_sha256": "8cb8587b97313aa5b297fde266d077149c72796fdb76b055b49dba83fd0543b0"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "HRMY",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:10.819526+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "HRMY",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 56.98,
+      "current_price_usd": 33.25,
+      "margin_of_safety_pct": 41.65,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow falls well below the 5-year average of $205.6M, so the DCF base is overstated. The snapshot gives only the average, not the year-by-year trend, so I cannot rule this out.",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The trailing 37.2% growth rate that the model capped at 5% turns out to be a one-time surge. Earnings power normalizes lower and the market rerates the stock down.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "No identifiable catalyst emerges, and the stock stays cheap for years while the position drifts. This is dead money more than permanent loss, but it carries an opportunity cost.",
+          "probability_pct": 35.0,
+          "estimated_price_impact_pct": -10.0
+        },
+        {
+          "scenario": "Balance-sheet or capital-allocation deterioration. Debt-to-equity is 0.154 today, but a debt-funded acquisition or large buyback could change that.",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -20.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 25.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. The only path to value is the market rerating cash flow against a conservative DCF, which is weak on its own.",
+        "expected_timeline_months": 36,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this, and I start with what could go wrong. The intrinsic value of $56.98 rests on a 5-year average free cash flow of $205.6M, and I cannot check the trend behind that average from this snapshot. I also cannot check the current ratio, the business mix, or any announced catalyst. With debt-to-equity at 0.154 and a price of $33.25, about 41.65% below my conservative DCF, the margin of safety clears my threshold even after I cap growth at 5%. The 13.09% unrealised loss since entry on 2026-09-29 is Mr. Market's opinion, not new evidence, and nothing here breaks the thesis, so I hold and do not add without a clearer catalyst. I keep the position modest because the catalyst is weak and the data gaps lower my confidence.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05e4\u05d5\u05ea\u05d7 \u05d1\u05e9\u05d0\u05dc\u05d4 \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9. \u05e9\u05d5\u05d5\u05d9 \u05d4\u05e4\u05e0\u05d9\u05de\u05d9 \u05e9\u05dc 56.98 \u05d3\u05d5\u05dc\u05e8 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 205.6 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8 \u05dc-5 \u05e9\u05e0\u05d9\u05dd, \u05d5\u05d0\u05ea \u05d4\u05de\u05d2\u05de\u05d4 \u05e9\u05de\u05d0\u05d7\u05d5\u05e8\u05d9 \u05d4\u05de\u05de\u05d5\u05e6\u05e2 \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d1\u05d3\u05d5\u05e7 \u05de\u05ea\u05d5\u05da \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9. \u05d2\u05dd \u05d0\u05ea \u05d9\u05d7\u05e1 \u05d4\u05e0\u05d6\u05d9\u05dc\u05d5\u05ea, \u05d4\u05e8\u05db\u05d1 \u05d4\u05e2\u05e1\u05e7\u05d9\u05dd \u05d5\u05d0\u05ea \u05e7\u05d9\u05d5\u05de\u05d5 \u05e9\u05dc \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d1\u05d3\u05d5\u05e7. \u05e2\u05dd \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.154 \u05d5\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 33.25 \u05d3\u05d5\u05dc\u05e8, \u05db-41.65% \u05de\u05ea\u05d7\u05ea \u05dc\u05d4\u05e2\u05e8\u05db\u05d4 \u05d4\u05e9\u05de\u05e8\u05e0\u05d9\u05ea \u05e9\u05dc\u05d9, \u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05d4\u05e1\u05e3 \u05d2\u05dd \u05d0\u05d7\u05e8\u05d9 \u05d4\u05d2\u05d1\u05dc\u05ea \u05d4\u05e6\u05de\u05d9\u05d7\u05d4 \u05dc-5%. \u05d4\u05d4\u05e4\u05e1\u05d3 \u05d4\u05dc\u05d0 \u05de\u05de\u05d5\u05de\u05e9 \u05e9\u05dc 13.09% \u05de\u05d0\u05d6 \u05d4\u05db\u05e0\u05d9\u05e1\u05d4 \u05d1-29 \u05d1\u05e1\u05e4\u05d8\u05de\u05d1\u05e8 2026 \u05d4\u05d5\u05d0 \u05d3\u05e2\u05ea\u05d5 \u05e9\u05dc \u05de\u05e8 \u05e9\u05d5\u05e7, \u05dc\u05d0 \u05e8\u05d0\u05d9\u05d4 \u05d7\u05d3\u05e9\u05d4, \u05d5\u05e9\u05d5\u05dd \u05d3\u05d1\u05e8 \u05db\u05d0\u05df \u05dc\u05d0 \u05e9\u05d5\u05d1\u05e8 \u05d0\u05ea \u05d4\u05ea\u05d6\u05d4, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d5\u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05d1\u05dc\u05d9 \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d1\u05e8\u05d5\u05e8 \u05d9\u05d5\u05ea\u05e8. \u05d0\u05e0\u05d9 \u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e6\u05e0\u05d5\u05e2\u05d4 \u05db\u05d9 \u05d4\u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d7\u05dc\u05e9 \u05d5\u05d7\u05d5\u05e1\u05e8\u05d9 \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05d5\u05e8\u05d9\u05d3\u05d9\u05dd \u05d0\u05ea \u05e8\u05de\u05ea \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9.",
+      "criteria_passed": [
+        "Margin of safety 41.65% vs 30% minimum for public equities and 40% for small-cap or complex names",
+        "Debt-to-equity 0.154 is below the 0.7 screen ceiling",
+        "5-year average free cash flow is positive at $205.6M",
+        "Valuation is conservative: trailing CAGR of 37.2% capped at 5% growth with an 8% discount rate",
+        "Cumulative permanent-loss probability of 25% is below the 40% reject threshold"
+      ],
+      "criteria_failed": [
+        "No clear catalyst is identified in the snapshot",
+        "Year-by-year free cash flow trend not provided, so the stability of the 5-year average cannot be verified",
+        "Current ratio, business description and book equity are not reported in the snapshot, so those checks could not be performed"
+      ],
+      "diversification_dimension": "Catalyst type",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 45.59,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 54.13,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 62.68
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above the 0.7 ceiling",
+        "Free cash flow turns negative in the latest year or shrinks faster than 20% a year over three or more years",
+        "Evidence emerges that the 5-year average free cash flow was inflated by one-time items",
+        "Price reaches 110% of intrinsic value (about $62.68): exit the remainder",
+        "A better opportunity appears with a larger margin of safety: rotate capital"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 465,
+    "output_tokens": 2648,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 904,
+    "prompt_sha256": "77968c2c242ba9097a0203e5109a4d3fd2e23fa0c0554de2e0353339a394b088"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "GOLD",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:11.734607+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "GOLD",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 99.45,
+      "current_price_usd": 37.68,
+      "margin_of_safety_pct": 62.11,
+      "what_could_go_wrong": [
+        {
+          "scenario": "The five-year average free cash flow of $255,654,400 overstates what the business earns now, because the average includes unusually strong years that do not recur. The snapshot gives neither the latest-year figure nor the trend.",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -40.0
+        },
+        {
+          "scenario": "Liabilities or claims not captured in the reported debt-to-equity of 0.00023 surface, such as untagged obligations, legal or environmental claims, or off-balance-sheet commitments.",
+          "probability_pct": 8.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "Management misallocates the cash it generates through a value-destroying acquisition or buyback at a poor price, so the free cash flow I am capitalising is not available to shareholders.",
+          "probability_pct": 12.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "The market continues to disregard the gap between price and value for years, and the zero-growth assumption proves too generous if cash flows decline.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -15.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 28.0,
+      "catalyst": {
+        "description": "No specific event is identified in the snapshot. Value realisation would have to come from sustained free cash flow, capital returns, or the market rerating the stock. I will not invent a catalyst.",
+        "expected_timeline_months": 36,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this position, 17 shares at $38.76 against $37.68 today, down 2.79% after 21 days, which tells me nothing about value. The risk comes first: a 62.11% margin of safety on a DCF that rests on a five-year average free cash flow and an assumed 0% growth rate is exactly what I distrust. I cannot tell from this snapshot whether the latest year, or the trend, still supports that average. What I can see is a reported debt-to-equity of 0.00023, positive average free cash flow, and a wide gap between price and estimated value, and that is enough to keep the position but not to add to it. I will hold at a modest size, demand evidence on recent cash flow, and sell if the thesis breaks, whatever the price.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d4\u05d6\u05d5: 17 \u05de\u05e0\u05d9\u05d5\u05ea \u05d1\u05de\u05d7\u05d9\u05e8 38.76 \u05d3\u05d5\u05dc\u05e8, \u05de\u05d5\u05dc 37.68 \u05d4\u05d9\u05d5\u05dd, \u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc 2.79% \u05d0\u05d7\u05e8\u05d9 21 \u05d9\u05de\u05d9\u05dd \u05d1\u05dc\u05d1\u05d3, \u05d5\u05d6\u05d4 \u05dc\u05d0 \u05d0\u05d5\u05de\u05e8 \u05d3\u05d1\u05e8 \u05e2\u05dc \u05d4\u05e2\u05e8\u05da. \u05d4\u05e1\u05d9\u05db\u05d5\u05df \u05e7\u05d5\u05d3\u05dd \u05dc\u05db\u05d5\u05dc: \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 62.11% \u05e9\u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05de\u05de\u05d5\u05e6\u05e2 \u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd \u05e9\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05d5\u05e2\u05dc \u05d4\u05e0\u05d7\u05ea \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 0% \u05d4\u05d5\u05d0 \u05d1\u05d3\u05d9\u05d5\u05e7 \u05de\u05d4 \u05e9\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e1\u05d5\u05de\u05da \u05e2\u05dc\u05d9\u05d5. \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05d0\u05d9\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05d3\u05e2\u05ea \u05d0\u05dd \u05d4\u05e9\u05e0\u05d4 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d4 \u05d5\u05d4\u05de\u05d2\u05de\u05d4 \u05e2\u05d3\u05d9\u05d9\u05df \u05de\u05e6\u05d3\u05d9\u05e7\u05d5\u05ea \u05d0\u05ea \u05d4\u05de\u05de\u05d5\u05e6\u05e2. \u05de\u05d4 \u05e9\u05db\u05df \u05e8\u05d5\u05d0\u05d9\u05dd \u05d4\u05d5\u05d0 \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.00023, \u05ea\u05d6\u05e8\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05de\u05d5\u05e6\u05e2 \u05d7\u05d9\u05d5\u05d1\u05d9 \u05d5\u05e4\u05e2\u05e8 \u05e8\u05d7\u05d1 \u05d1\u05d9\u05df \u05d4\u05de\u05d7\u05d9\u05e8 \u05dc\u05e9\u05d5\u05d5\u05d9 \u05d4\u05de\u05d5\u05e2\u05e8\u05da, \u05d5\u05d6\u05d4 \u05de\u05e1\u05e4\u05d9\u05e7 \u05db\u05d3\u05d9 \u05dc\u05d4\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7 \u05d0\u05da \u05dc\u05d0 \u05db\u05d3\u05d9 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3. \u05d0\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d2\u05d5\u05d3\u05dc \u05de\u05ea\u05d5\u05df, \u05d0\u05d3\u05e8\u05d5\u05e9 \u05e8\u05d0\u05d9\u05d5\u05ea \u05e2\u05dc \u05d4\u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05e2\u05d3\u05db\u05e0\u05d9, \u05d5\u05d0\u05de\u05db\u05d5\u05e8 \u05d0\u05dd \u05d4\u05ea\u05d6\u05d4 \u05e0\u05e9\u05d1\u05e8\u05ea, \u05d1\u05db\u05dc \u05de\u05d7\u05d9\u05e8.",
+      "criteria_passed": [
+        "Margin of safety 62.11% versus the 30% minimum for public equities",
+        "Debt-to-equity 0.00023 versus the screen's 0.7 ceiling",
+        "Average five-year free cash flow positive at $255,654,400",
+        "Cumulative permanent-loss probability of 28% is below the 40% reject line"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot",
+        "Latest-year free cash flow and its trend are not in the snapshot, so I could not check for shrinkage",
+        "Growth rate undefined and assumed at 0%, so the valuation has a weak input",
+        "Business description, cash, current ratio and other capital structure detail are not reported in the snapshot"
+      ],
+      "diversification_dimension": "Asset class",
+      "position_size_pct": 4.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 79.56,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 94.48,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 109.39
+      },
+      "reverse_triggers": [
+        "Book equity is no longer positive",
+        "Debt-to-equity rises above the screen's 0.7 ceiling",
+        "Free cash flow turns negative in the latest year, is negative on average, or shrinks faster than 20% a year",
+        "Undisclosed liabilities or claims emerge that materially change the capital structure",
+        "Management deploys cash into large acquisitions with no margin of safety",
+        "Price reaches 110% of intrinsic value (about $109.39), which means full exit"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 465,
+    "output_tokens": 3049,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 919,
+    "prompt_sha256": "1c52affc4c1d04c12b3e50af877b6891c43bc2dfa365eccad62c2610dd0de7b7"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "CALM",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:12.589067+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "CALM",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 171.12,
+      "current_price_usd": 71.23,
+      "margin_of_safety_pct": 58.37,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Cash flow reverts toward a normal level well below the 5-year average. The snapshot shows a trailing CAGR of 57.2%, which tells me the average may include a cyclical surge. If it does, the quant intrinsic value is overstated.",
+          "probability_pct": 40.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "Operating or regulatory shock (supply disruption, legal or pricing action) cuts output or margins for several years. The snapshot does not describe the business, so I cannot size this precisely.",
+          "probability_pct": 15.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "Management deploys the balance sheet (debt-to-equity is 0.0 in the snapshot) into poor-return acquisitions or expansion near a cycle peak.",
+          "probability_pct": 15.0,
+          "estimated_price_impact_pct": -15.0
+        },
+        {
+          "scenario": "Multiple compression as earnings normalise, with the market refusing to capitalise the cash flows at the DCF's 8% discount rate.",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -20.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 28.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. Value realisation would come from continued free cash flow generation and the market recognising it. This is a weak, unspecific path, so I size the position accordingly.",
+        "expected_timeline_months": 36,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this, and I start with what could go wrong. A 57.2% trailing CAGR capped at 5.0% tells me the 5-year average free cash flow of $495.3 million may reflect a cyclical high, and the DCF leans on that average. Against that, the screen shows a 58.37% margin of safety on a $171.12 per-share estimate, with debt-to-equity of 0.0. The balance sheet is why a mistake in the cash flow estimate would not be fatal. I am down 9.09% on a position held 105 days, but price alone is not a reason to sell. I hold, I do not add until I can verify what normal cash flow looks like, and I hold my confidence down because several checks are missing from this snapshot.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05d4\u05e9\u05d0\u05dc\u05d4 \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9. \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05e0\u05ea\u05d9\u05ea \u05de\u05e6\u05d8\u05d1\u05e8\u05ea \u05e9\u05dc 57.2% \u05e9\u05e0\u05e7\u05d1\u05e2\u05d4 \u05d1\u05ea\u05e7\u05e8\u05d4 \u05e9\u05dc 5.0% \u05de\u05dc\u05de\u05d3\u05ea \u05d0\u05d5\u05ea\u05d9 \u05e9\u05de\u05de\u05d5\u05e6\u05e2 \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05dc-5 \u05e9\u05e0\u05d9\u05dd, 495.3 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8, \u05d0\u05d5\u05dc\u05d9 \u05de\u05e9\u05e7\u05e3 \u05e9\u05d9\u05d0 \u05de\u05d7\u05d6\u05d5\u05e8\u05d9, \u05d5\u05d4-DCF \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05d4\u05de\u05de\u05d5\u05e6\u05e2 \u05d4\u05d6\u05d4. \u05de\u05e0\u05d2\u05d3, \u05d4\u05e1\u05d9\u05e0\u05d5\u05df \u05de\u05e8\u05d0\u05d4 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 58.37% \u05e2\u05dc \u05d4\u05e2\u05e8\u05db\u05d4 \u05e9\u05dc 171.12 \u05d3\u05d5\u05dc\u05e8 \u05dc\u05de\u05e0\u05d9\u05d4, \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.0. \u05d4\u05de\u05d0\u05d6\u05df \u05d4\u05d5\u05d0 \u05d4\u05e1\u05d9\u05d1\u05d4 \u05e9\u05d8\u05e2\u05d5\u05ea \u05d1\u05d4\u05e2\u05e8\u05db\u05ea \u05d4\u05ea\u05d6\u05e8\u05d9\u05dd \u05dc\u05d0 \u05ea\u05d4\u05d9\u05d4 \u05e7\u05d8\u05dc\u05e0\u05d9\u05ea. \u05d0\u05e0\u05d9 \u05d1\u05d4\u05e4\u05e1\u05d3 \u05e9\u05dc 9.09% \u05e2\u05dc \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e9\u05de\u05d5\u05d7\u05d6\u05e7\u05ea 105 \u05d9\u05de\u05d9\u05dd, \u05d0\u05d1\u05dc \u05de\u05d7\u05d9\u05e8 \u05dc\u05d1\u05d3\u05d5 \u05d0\u05d9\u05e0\u05d5 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d0\u05de\u05ea \u05de\u05d4\u05d5 \u05ea\u05d6\u05e8\u05d9\u05dd \u05e0\u05d5\u05e8\u05de\u05dc\u05d9, \u05d5\u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05e8\u05de\u05ea \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e0\u05de\u05d5\u05db\u05d4 \u05db\u05d9 \u05d7\u05e1\u05e8\u05d5\u05ea \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05db\u05de\u05d4 \u05d1\u05d3\u05d9\u05e7\u05d5\u05ea.",
+      "criteria_passed": [
+        "Margin of safety 58.37% versus the 30% minimum for public equities",
+        "Debt-to-equity 0.0 versus the screen's 0.7 ceiling",
+        "5-year average free cash flow positive at $495.3 million",
+        "Cumulative permanent-loss probability about 28%, below the 40% reject threshold"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst with a timeline; the snapshot names none",
+        "Normalised free cash flow could not be verified because the 57.2% trailing CAGR suggests a cyclical surge",
+        "Book equity, the latest-year free cash flow trend and the business description are not in this snapshot, so those checks were not performed"
+      ],
+      "diversification_dimension": "Asset class",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 136.9,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 162.56,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 188.23
+      },
+      "reverse_triggers": [
+        "Free cash flow turns negative in the latest year, or is negative on average over the record",
+        "Free cash flow shrinks faster than 20% per year",
+        "Debt-to-equity rises above the screen's 0.7 ceiling",
+        "Book equity is no longer positive",
+        "Evidence that the 5-year average free cash flow reflects a one-time cyclical peak rather than a repeatable level, so the margin of safety disappears on normalised cash flow",
+        "Price at or above 110% of intrinsic value, which means full exit"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 463,
+    "output_tokens": 3154,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 901,
+    "prompt_sha256": "63b1778433275f62c09e465cb5c35b27ffc04949999804be0b85a2a0dd2df10a"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "VISN",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:13.776921+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "VISN",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 9.09881507022779,
+      "current_price_usd": 3.96,
+      "margin_of_safety_pct": 56.477848955250465,
+      "what_could_go_wrong": [
+        {
+          "scenario": "The five-year average free cash flow of 163.32 million dollars overstates what the business earns going forward. The snapshot gives no year-by-year trend, and the DCF assumes 0% growth only because growth was undefined, so a deteriorating cash flow stream would not show up in my number.",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "Leverage is hidden or untagged. Debt to equity is reported as 0.0, but I cannot verify from this snapshot that no debt, lease or contingent obligation sits ahead of the equity, so the capital structure could be worse than it looks.",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -40.0
+        },
+        {
+          "scenario": "There is no catalyst, and the discount persists or widens. The market keeps ignoring the cash flow, and the stock is dead money while the intrinsic value estimate drifts lower on weaker assumptions.",
+          "probability_pct": 35.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "The discount rate of 8% is too low for this business, or the cash flows are cyclical. The intrinsic value of 9.10 per share would shrink materially under a more conservative rate.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -25.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 25.0,
+      "catalyst": {
+        "description": "No specific catalyst is identifiable from the snapshot. There is no announced asset sale, activist, restructuring or litigation resolution in the data. The case rests on the gap between price and cash-flow value closing over time, which is the weakest kind of catalyst.",
+        "expected_timeline_months": 36,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this, and I own it for the discount, not for a story. Before the upside, I asked what could go wrong. The snapshot does not tell me what the business is, whether the 163.32 million dollar five-year average free cash flow is stable or shrinking, or whether any debt is hiding behind a reported debt-to-equity of 0.0. Even so, a price of 3.96 against a conservative DCF value of 9.10 is a 56.5% margin of safety, well above my 30% minimum for public equities, and my estimate of permanent loss is about 25%. I have no catalyst, so I will not add and I will be patient, but there is no reason to sell a position only 7 days old and 1.25% below cost. I will trim as price approaches value and exit if the cash flow or balance sheet breaks.",
+      "thesis_he": "\u05d4\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5 \u05d1\u05d1\u05e2\u05dc\u05d5\u05ea\u05d9, \u05d5\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d4 \u05d1\u05d2\u05dc\u05dc \u05d4\u05d4\u05e0\u05d7\u05d4 \u05d1\u05de\u05d7\u05d9\u05e8 \u05d5\u05dc\u05d0 \u05d1\u05d2\u05dc\u05dc \u05e1\u05d9\u05e4\u05d5\u05e8. \u05dc\u05e4\u05e0\u05d9 \u05e9\u05d0\u05e0\u05d9 \u05de\u05e1\u05ea\u05db\u05dc \u05e2\u05dc \u05d4\u05e6\u05d3 \u05d4\u05d7\u05d9\u05d5\u05d1\u05d9 \u05e9\u05d0\u05dc\u05ea\u05d9 \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9. \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05dc\u05d0 \u05de\u05d2\u05dc\u05d9\u05dd \u05dc\u05d9 \u05de\u05d4\u05d5 \u05d4\u05e2\u05e1\u05e7, \u05d0\u05dd \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05d4\u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 163.32 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8 \u05d1-5 \u05e9\u05e0\u05d9\u05dd \u05d9\u05e6\u05d9\u05d1 \u05d0\u05d5 \u05d1\u05d9\u05e8\u05d9\u05d3\u05d4, \u05d5\u05d0\u05dd \u05de\u05e1\u05ea\u05ea\u05e8 \u05d7\u05d5\u05d1 \u05de\u05d0\u05d7\u05d5\u05e8\u05d9 \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.0 \u05e9\u05d3\u05d5\u05d5\u05d7. \u05d5\u05e2\u05d3\u05d9\u05d9\u05df, \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 3.96 \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 DCF \u05e9\u05de\u05e8\u05e0\u05d9 \u05e9\u05dc 9.10 \u05d4\u05d5\u05d0 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 56.5%, \u05d4\u05e8\u05d1\u05d4 \u05de\u05e2\u05dc \u05d4\u05e8\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 30% \u05dc\u05de\u05e0\u05d9\u05d5\u05ea \u05e6\u05d9\u05d1\u05d5\u05e8\u05d9\u05d5\u05ea, \u05d5\u05d4\u05e2\u05e8\u05db\u05ea\u05d9 \u05dc\u05e1\u05d9\u05db\u05d5\u05d9 \u05dc\u05d4\u05e4\u05e1\u05d3 \u05e7\u05d1\u05d5\u05e2 \u05d4\u05d9\u05d0 \u05db-25%. \u05d0\u05d9\u05df \u05dc\u05d9 \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d5\u05dc\u05db\u05df \u05dc\u05d0 \u05d0\u05d5\u05e1\u05d9\u05e3, \u05d0\u05dc\u05d0 \u05d0\u05d7\u05db\u05d4 \u05d1\u05e1\u05d1\u05dc\u05e0\u05d5\u05ea, \u05d0\u05d1\u05dc \u05d0\u05d9\u05df \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8 \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05ea \u05e9\u05d1\u05e2\u05d4 \u05d9\u05de\u05d9\u05dd \u05e9\u05e0\u05de\u05e6\u05d0\u05ea 1.25% \u05de\u05ea\u05d7\u05ea \u05dc\u05e2\u05dc\u05d5\u05ea. \u05d0\u05d2\u05d6\u05d5\u05e8 \u05d0\u05d5\u05ea\u05d4 \u05db\u05db\u05dc \u05e9\u05d4\u05de\u05d7\u05d9\u05e8 \u05d9\u05ea\u05e7\u05e8\u05d1 \u05dc\u05e9\u05d5\u05d5\u05d9, \u05d5\u05d0\u05e6\u05d0 \u05d0\u05dd \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d0\u05d5 \u05d4\u05de\u05d0\u05d6\u05df \u05d9\u05ea\u05e2\u05e8\u05e2\u05e8\u05d5.",
+      "criteria_passed": [
+        "Margin of safety 56.5% versus 30% minimum for public equities",
+        "Reported debt to equity of 0.0, below the 0.7 screen ceiling (reported value only, not independently verified)",
+        "Cumulative permanent-loss probability of about 25%, below the 40% reject threshold",
+        "Price of 3.96 is far below 80% of intrinsic value, so no scale-out is triggered"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot",
+        "Business description and sector not provided, so qualitative checks could not be performed",
+        "Free cash flow trend not provided, only the five-year average; trend check could not be performed",
+        "Current ratio and detailed capital structure not reported in the snapshot",
+        "Growth rate undefined and assumed 0%, which lowers confidence in the DCF"
+      ],
+      "diversification_dimension": "Time horizon",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 7.28,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 8.64,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 10.01
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Reported debt to equity rises above the screen ceiling of 0.7, or previously untagged debt is discovered",
+        "Free cash flow turns negative, or falls on average more than 20% per year, so the DCF can no longer be projected",
+        "Price reaches 110% of intrinsic value (about 10.01) and the thesis is complete",
+        "A better opportunity appears with a greater margin of safety, in which case I rotate capital"
+      ],
+      "klarman_quote_relevant": "Avoiding loss should be the primary goal of every investor."
+    },
+    "input_tokens": 457,
+    "output_tokens": 3042,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 897,
+    "prompt_sha256": "807962f9d0a15a8a2fffa3101e21337c02927279759eae736f7bb252f1c2f4e3"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "SWKS",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:32.831699+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "SWKS",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 132.34,
+      "current_price_usd": 78.31,
+      "margin_of_safety_pct": 40.83,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow proves cyclical and normalizes well below the five-year average of about $1.23 billion, so the DCF base is overstated",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The 5% growth rate and 8% discount rate are too generous, and a more conservative set of inputs cuts intrinsic value sharply",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "Competitive or customer-driven pricing pressure permanently erodes margins; the snapshot gives no customer-concentration data, so I cannot size this precisely",
+          "probability_pct": 15.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "Capital allocation error, such as an overpriced acquisition, destroys part of the value that the DCF assumes",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -20.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 28.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. The thesis rests on the market price converging toward cash-flow value over time, which is a weak catalyst. I am not inventing events the data does not show.",
+        "expected_timeline_months": 36,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this, and I start with what can go wrong: the DCF leans on a five-year average free cash flow of about $1.23 billion, and I cannot see the latest-year figure or the trend in this snapshot. So I cannot confirm the thesis-break test on cash flow. The quant model puts value at $132.34 against a price of $78.31, a 40.8% margin of safety that clears my 30% bar for a mid-cap and narrowly clears 40% if I treat it as complex. Debt to equity of 0.087 means the balance sheet is not where I would lose money. The position is down 10.96% after seven days, which tells me nothing about value, and I do not sell because of a price decline. But with no identifiable catalyst, I keep the position modest, make no add until I can verify the cash-flow trend, and accept a multi-year wait.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05d1\u05de\u05d4 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05d4-DCF \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc \u05db-1.23 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3 \u05d3\u05d5\u05dc\u05e8 \u05dc\u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd, \u05d5\u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05d0\u05d9\u05df \u05dc\u05d9 \u05d0\u05ea \u05d4\u05e0\u05ea\u05d5\u05df \u05d4\u05e9\u05e0\u05ea\u05d9 \u05d4\u05d0\u05d7\u05e8\u05d5\u05df \u05d5\u05d0\u05ea \u05d4\u05de\u05d2\u05de\u05d4, \u05d5\u05dc\u05db\u05df \u05d0\u05d9\u05e0\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05d0\u05e9\u05e8 \u05e9\u05d4\u05ea\u05d6\u05d4 \u05dc\u05d0 \u05e0\u05e9\u05d1\u05e8\u05d4. \u05d4\u05de\u05d5\u05d3\u05dc \u05d4\u05db\u05de\u05d5\u05ea\u05d9 \u05de\u05e2\u05e8\u05d9\u05da \u05e9\u05d5\u05d5\u05d9 \u05e9\u05dc 132.34 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 78.31, \u05db\u05dc\u05d5\u05de\u05e8 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 40.8%, \u05de\u05e2\u05dc \u05d4\u05e8\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 30% \u05dc\u05de\u05e0\u05d9\u05d4 \u05d1\u05d9\u05e0\u05d5\u05e0\u05d9\u05ea, \u05d5\u05d1\u05e7\u05d5\u05e9\u05d9 \u05de\u05e2\u05dc 40% \u05d0\u05dd \u05d0\u05e1\u05d5\u05d5\u05d2 \u05d0\u05d5\u05ea\u05d4 \u05db\u05de\u05d5\u05e8\u05db\u05d1\u05ea. \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.087 \u05d0\u05d5\u05de\u05e8 \u05e9\u05d4\u05de\u05d0\u05d6\u05df \u05d0\u05d9\u05e0\u05d5 \u05d4\u05de\u05e7\u05d5\u05dd \u05e9\u05d1\u05d5 \u05d0\u05e4\u05e1\u05d9\u05d3. \u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc 10.96% \u05d0\u05d7\u05e8\u05d9 \u05e9\u05d1\u05e2\u05d4 \u05d9\u05de\u05d9\u05dd \u05d0\u05d9\u05e0\u05d4 \u05d0\u05d5\u05de\u05e8\u05ea \u05d3\u05d1\u05e8 \u05e2\u05dc \u05d4\u05e9\u05d5\u05d5\u05d9, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d5\u05db\u05e8 \u05d1\u05d2\u05dc\u05dc \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8. \u05d0\u05d1\u05dc \u05d1\u05dc\u05d9 \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d1\u05e8\u05d5\u05e8, \u05d0\u05e0\u05d9 \u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e6\u05e0\u05d5\u05e2\u05d4, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d0\u05d5\u05db\u05dc \u05dc\u05d0\u05de\u05ea \u05d0\u05ea \u05de\u05d2\u05de\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd, \u05d5\u05de\u05d5\u05db\u05df \u05dc\u05d4\u05de\u05ea\u05d9\u05df \u05e9\u05e0\u05d9\u05dd.",
+      "criteria_passed": [
+        "Margin of safety 40.83% vs 30% minimum for mid-cap public equity",
+        "Debt to equity 0.087, low leverage",
+        "Cumulative permanent-loss probability 28%, below the 40% reject threshold",
+        "Quant DCF uses a capped 5% growth rate (trailing CAGR 6.3%) and an 8% discount rate"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot; rated Weak",
+        "Latest-year free cash flow and its trend are not reported in the snapshot, so the cash-flow thesis-break check could not be performed",
+        "Position weight relative to the whole book cannot be verified because total portfolio value is not in the snapshot"
+      ],
+      "diversification_dimension": "Time horizon",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 105.87,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 125.72,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 145.57
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt to equity rises above 0.7",
+        "Free cash flow turns negative in the latest year, negative on average, or shrinks faster than 20% a year over a record of three or more 10-Ks",
+        "A confirmed disclosure shows free cash flow structurally well below the $1.23 billion five-year average, eliminating the margin of safety",
+        "Price reaches 110% of intrinsic value (about $145.57), which triggers a full exit"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 469,
+    "output_tokens": 2750,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 916,
+    "prompt_sha256": "04a0e5e6f126ccfaa83254c9899e6b40feb82f897179364368da8027df9eca95"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "CTVA",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:33.532507+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "CTVA",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 13.44,
+      "current_price_usd": 7.985,
+      "margin_of_safety_pct": 40.59,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow proves lower than the 5-year average of about $790.7 million the DCF relies on, so the zero-growth steady-state assumption is too generous",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "Discount rate of 8% is too low for the risk actually being carried, so a higher required return compresses intrinsic value",
+          "probability_pct": 15.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "Balance sheet is weaker than the single debt-to-equity figure of 0.067 suggests, since current ratio and other liquidity measures are not reported in this snapshot",
+          "probability_pct": 8.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "No catalyst emerges and the discount to value persists for years, tying up capital with no return while the market keeps marking the position down",
+          "probability_pct": 45.0,
+          "estimated_price_impact_pct": -10.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 28.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. Value realisation depends on the market re-rating free cash flow, which is a weak, unscheduled path.",
+        "expected_timeline_months": 36,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.4,
+      "thesis_en": "I own this, and the first question is what could go wrong: my DCF assumes zero growth because growth was undefined, it leans on a 5-year average free cash flow of about $790.7 million, and I have no identified catalyst. Against that, the stock at $7.985 sits about 40.6% below my $13.44 estimate, and debt to equity of 0.067 means the capital structure is not what could hurt me. I am down 11.18% after six days, but a price decline is Mr. Market's opinion, not a broken thesis, and I do not sell on a few days of noise. I could not check the current ratio, the latest-year free cash flow trend or book equity from this snapshot, so my confidence is modest and I will not add until those are confirmed. I hold the small position I have, trim as price approaches value, and sell if the facts change.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4, \u05d5\u05ea\u05de\u05d9\u05d3 \u05d0\u05e0\u05d9 \u05e9\u05d5\u05d0\u05dc \u05e7\u05d5\u05d3\u05dd \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05d4-DCF \u05e9\u05dc\u05d9 \u05de\u05e0\u05d9\u05d7 \u05e6\u05de\u05d9\u05d7\u05d4 \u05d0\u05e4\u05e1 \u05db\u05d9 \u05e7\u05e6\u05d1 \u05d4\u05e6\u05de\u05d9\u05d7\u05d4 \u05dc\u05d0 \u05d4\u05d5\u05d2\u05d3\u05e8, \u05d4\u05d5\u05d0 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05de\u05de\u05d5\u05e6\u05e2 \u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd \u05e9\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05d1\u05e1\u05da \u05db-790.7 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8, \u05d5\u05d0\u05d9\u05df \u05dc\u05d9 \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05de\u05d6\u05d5\u05d4\u05d4. \u05de\u05e0\u05d2\u05d3, \u05d4\u05de\u05e0\u05d9\u05d4 \u05d1-7.985 \u05d3\u05d5\u05dc\u05e8 \u05e0\u05e1\u05d7\u05e8\u05ea \u05db-40.6% \u05de\u05ea\u05d7\u05ea \u05dc\u05d4\u05e2\u05e8\u05db\u05d4 \u05e9\u05dc\u05d9 \u05e9\u05dc 13.44 \u05d3\u05d5\u05dc\u05e8, \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.067 \u05d0\u05d5\u05de\u05e8 \u05e9\u05de\u05d1\u05e0\u05d4 \u05d4\u05d4\u05d5\u05df \u05d0\u05d9\u05e0\u05d5 \u05de\u05d4 \u05e9\u05d9\u05e4\u05d2\u05e2 \u05d1\u05d9. \u05d0\u05e0\u05d9 \u05d1\u05d4\u05e4\u05e1\u05d3 \u05e9\u05dc 11.18% \u05d0\u05d7\u05e8\u05d9 \u05e9\u05d9\u05e9\u05d4 \u05d9\u05de\u05d9\u05dd, \u05d0\u05d1\u05dc \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d4\u05d9\u05d0 \u05d3\u05e2\u05ea\u05d5 \u05e9\u05dc \u05de\u05e8 \u05e9\u05d5\u05e7 \u05d5\u05dc\u05d0 \u05d4\u05d5\u05db\u05d7\u05d4 \u05e9\u05d4\u05ea\u05d6\u05d4 \u05e0\u05e9\u05d1\u05e8\u05d4, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d5\u05db\u05e8 \u05d1\u05d2\u05dc\u05dc \u05e8\u05e2\u05e9 \u05e9\u05dc \u05db\u05de\u05d4 \u05d9\u05de\u05d9\u05dd. \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc\u05ea\u05d9 \u05dc\u05d1\u05d3\u05d5\u05e7 \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05e7\u05d9\u05d1\u05dc\u05ea\u05d9 \u05d0\u05ea \u05d9\u05d7\u05e1 \u05d4\u05e0\u05d6\u05d9\u05dc\u05d5\u05ea, \u05d0\u05ea \u05de\u05d2\u05de\u05ea \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d1\u05e9\u05e0\u05d4 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d4 \u05d5\u05d0\u05ea \u05d4\u05d4\u05d5\u05df \u05d4\u05e2\u05e6\u05de\u05d9, \u05d5\u05dc\u05db\u05df \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9 \u05de\u05ea\u05d5\u05df \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d9\u05d9\u05d1\u05d3\u05e7\u05d5. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d0\u05ea \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d4\u05e7\u05d8\u05e0\u05d4, \u05de\u05e7\u05e6\u05e5 \u05db\u05db\u05dc \u05e9\u05d4\u05de\u05d7\u05d9\u05e8 \u05de\u05ea\u05e7\u05e8\u05d1 \u05dc\u05e9\u05d5\u05d5\u05d9, \u05d5\u05de\u05d5\u05db\u05e8 \u05d0\u05dd \u05d4\u05e2\u05d5\u05d1\u05d3\u05d5\u05ea \u05de\u05e9\u05ea\u05e0\u05d5\u05ea.",
+      "criteria_passed": [
+        "Margin of safety 40.59% exceeds the 30% minimum for public equities",
+        "Debt to equity 0.0669 is below the 0.7 ceiling",
+        "5-year average free cash flow is positive at about $790.7 million",
+        "Cumulative permanent-loss probability of 28% is below the 40% reject threshold"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot",
+        "Growth rate undefined and assumed at 0%, so the DCF rests on an unverified assumption",
+        "Current ratio, book equity and the latest-year free cash flow trend are not reported, so those checks were not performed"
+      ],
+      "diversification_dimension": "Time horizon",
+      "position_size_pct": 1.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 10.75,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 12.77,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 14.78
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt to equity rises above the 0.7 ceiling",
+        "Free cash flow turns negative in the latest year, negative on average, or shrinks faster than 20% a year across the filing record",
+        "Evidence that the 5-year average free cash flow of about $790.7 million is not sustainable",
+        "Price reaches 110% of intrinsic value, at which point I exit in full"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 465,
+    "output_tokens": 2819,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 919,
+    "prompt_sha256": "7ade8783abee1373348b22fd97345f8c4286312cf7caf93f02f34a4cae0bc15a"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "APOG",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:33.817705+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "APOG",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 73.82,
+      "current_price_usd": 44.4,
+      "margin_of_safety_pct": 39.85,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow falls well below the 5-year average of about $96.4M because of a cyclical downturn, so the DCF base is overstated",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The 4.88% growth assumption and 8% discount rate are too generous; a lower growth rate and higher discount rate cut intrinsic value materially",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "Leverage rises or equity erodes so that debt-to-equity (0.44 today) moves above the 0.7 ceiling, breaking the balance-sheet gate",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "No catalyst emerges and the discount persists for years, tying up capital with no re-rating",
+          "probability_pct": 40.0,
+          "estimated_price_impact_pct": -5.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 25.0,
+      "catalyst": {
+        "description": "The snapshot names no specific catalyst such as an asset sale, activist or restructuring. The thesis rests on cash flow compounding and the discount to value narrowing gradually. Absence of a catalyst is a weakness I am accepting with a modest position and a long horizon.",
+        "expected_timeline_months": 36,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this, and I own it for the margin, not for a story. The first thing I ask is what goes wrong: a cash-flow base that proves cyclical, a growth input of 4.88% that is too kind, or leverage drifting above my 0.7 ceiling. I put the cumulative chance of permanent impairment near 25%, which is tolerable, and the debt-to-equity of 0.44 gives me some comfort. The price of $44.40 is roughly 40% below the $73.82 DCF value, right at the edge of what I demand for a smaller company. That is thin, and the snapshot gives me no catalyst and no business detail, so I will not add. After 108 days we are up 1.78%, so the thesis is untested, and neither noise nor a price dip is a reason to sell. I hold, I scale out only as price approaches value, and I leave the rest of the capital in cash.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d4 \u05d1\u05d2\u05dc\u05dc \u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05d5\u05dc\u05d0 \u05d1\u05d2\u05dc\u05dc \u05e1\u05d9\u05e4\u05d5\u05e8. \u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05e8\u05d0\u05e9\u05d5\u05e0\u05d4 \u05e9\u05dc\u05d9 \u05d4\u05d9\u05d0 \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05d1\u05e1\u05d9\u05e1 \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05e9\u05de\u05ea\u05d1\u05e8\u05e8 \u05db\u05e6\u05d9\u05e7\u05dc\u05d9, \u05d4\u05e0\u05d7\u05ea \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 4.88% \u05e9\u05e0\u05d3\u05d9\u05d1\u05d4 \u05de\u05d3\u05d9, \u05d0\u05d5 \u05de\u05d9\u05e0\u05d5\u05e3 \u05e9\u05d2\u05d5\u05dc\u05e9 \u05de\u05e2\u05dc \u05d4\u05ea\u05e7\u05e8\u05d4 \u05e9\u05dc\u05d9 \u05e9\u05dc 0.7. \u05d0\u05e0\u05d9 \u05de\u05e2\u05e8\u05d9\u05da \u05d0\u05ea \u05d4\u05d4\u05e1\u05ea\u05d1\u05e8\u05d5\u05ea \u05d4\u05de\u05e6\u05d8\u05d1\u05e8\u05ea \u05dc\u05e0\u05d6\u05e7 \u05e7\u05d1\u05d5\u05e2 \u05d1\u05db-25%, \u05e8\u05de\u05d4 \u05e0\u05e1\u05d1\u05dc\u05ea, \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.44 \u05e0\u05d5\u05ea\u05df \u05dc\u05d9 \u05de\u05e2\u05d8 \u05e0\u05d7\u05de\u05d4. \u05d4\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 44.40 \u05d3\u05d5\u05dc\u05e8 \u05e0\u05de\u05d5\u05da \u05d1\u05db-40% \u05de\u05e9\u05d5\u05d5\u05d9 \u05d4-DCF \u05e9\u05dc 73.82 \u05d3\u05d5\u05dc\u05e8, \u05d1\u05d3\u05d9\u05d5\u05e7 \u05d1\u05e7\u05e6\u05d4 \u05de\u05d4 \u05e9\u05d0\u05e0\u05d9 \u05d3\u05d5\u05e8\u05e9 \u05de\u05d7\u05d1\u05e8\u05d4 \u05e7\u05d8\u05e0\u05d4 \u05d9\u05d5\u05ea\u05e8. \u05d6\u05d4 \u05d3\u05e7, \u05d5\u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d0\u05d9\u05df \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d5\u05d0\u05d9\u05df \u05e4\u05d9\u05e8\u05d5\u05d8 \u05e2\u05dc \u05d4\u05e2\u05e1\u05e7, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3. \u05d0\u05d7\u05e8\u05d9 108 \u05d9\u05de\u05d9\u05dd \u05d0\u05e0\u05d7\u05e0\u05d5 \u05d1\u05e8\u05d5\u05d5\u05d7 \u05e9\u05dc 1.78% \u05d1\u05dc\u05d1\u05d3, \u05db\u05da \u05e9\u05d4\u05ea\u05d6\u05d4 \u05e2\u05d3\u05d9\u05d9\u05df \u05dc\u05d0 \u05e0\u05d1\u05d7\u05e0\u05d4, \u05d5\u05e8\u05e2\u05e9 \u05d0\u05d5 \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d0\u05d9\u05e0\u05dd \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05de\u05e6\u05de\u05e6\u05dd \u05e8\u05e7 \u05db\u05e9\u05d4\u05de\u05d7\u05d9\u05e8 \u05de\u05ea\u05e7\u05e8\u05d1 \u05dc\u05e9\u05d5\u05d5\u05d9, \u05d5\u05d0\u05ea \u05e9\u05d0\u05e8 \u05d4\u05d4\u05d5\u05df \u05de\u05e9\u05d0\u05d9\u05e8 \u05d1\u05de\u05d6\u05d5\u05de\u05df.",
+      "criteria_passed": [
+        "Margin of safety 39.85% vs. quant DCF; clears the 30% bar for well-understood mid-caps",
+        "Debt-to-equity 0.44, below the 0.7 screen ceiling",
+        "5-year average FCF is positive at about $96.4M",
+        "Cumulative permanent-loss probability about 25%, below the 40% reject threshold"
+      ],
+      "criteria_failed": [
+        "Margin of safety 39.85% is just under the 40% bar for small-cap or complex names (market cap about $928M)",
+        "No identifiable catalyst in the snapshot",
+        "Business segments, current ratio, and FCF trend are not reported in the snapshot, so those checks could not be performed",
+        "Intrinsic value depends on a 4.88% growth input and an 8% discount rate that I could not independently verify"
+      ],
+      "diversification_dimension": "Time horizon",
+      "position_size_pct": 4.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 59.06,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 70.13,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 81.2
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above 0.7 (unreported debt does not count as a breach)",
+        "Free cash flow turns negative in the latest year, negative on average, or shrinks faster than 20% a year across three or more 10-Ks",
+        "Price reaches 110% of intrinsic value (about $81.20), then exit in full",
+        "A better opportunity appears with a clearly larger margin of safety, which would justify capital rotation"
+      ],
+      "klarman_quote_relevant": "Avoiding loss should be the primary goal of every investor."
+    },
+    "input_tokens": 445,
+    "output_tokens": 2629,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 887,
+    "prompt_sha256": "61b942f844acb11c1f138a669f373ef00f73b0d94a902010abc3394c7b8bfb62"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "CRC",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:37.020102+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "CRC",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 72.44,
+      "current_price_usd": 43.89,
+      "margin_of_safety_pct": 39.41,
+      "what_could_go_wrong": [
+        {
+          "scenario": "The five-year average free cash flow of $428.6M overstates what the business earns in a normal year. The DCF rests on that average, and the snapshot does not show the year-by-year path.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "The earnings stream is cyclical or commodity-linked, and a prolonged downturn cuts free cash flow below the projected path. The snapshot does not describe the business, so I cannot rule this out.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "A 3.9% growth rate and an 8.0% discount rate are slightly too generous. A modest change in either takes a large bite out of intrinsic value.",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -15.0
+        },
+        {
+          "scenario": "Debt-to-equity of 0.46 is fine today, but a weak cash-flow year could push it toward the 0.7 ceiling and squeeze the equity.",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -20.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 30.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. I am relying on the discount between price and cash-flow value to close over time. I could not check for an asset sale, buyback, activist or other event, so I treat the catalyst as weak.",
+        "expected_timeline_months": 30,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.45,
+      "thesis_en": "I own this, and the question is whether to keep it. I started with what could go wrong: an average free cash flow that flatters a bad year, cyclicality I cannot verify from this snapshot, and assumptions that are too generous. I put the chance of permanent loss near 30%, below my 40% rejection line but not trivial. The quant margin of safety is 39.4% against intrinsic value of $72.44, and debt-to-equity of 0.46 is inside my 0.7 ceiling. That clears the 30% bar for a mid-sized public equity but misses the 40% bar for a complex one, and I have no clear catalyst. The 12.55% decline in 19 days is not a reason to sell, because volatility is not risk, and it is also not a reason to add. I hold at a modest size and wait. I will act on the facts, not on Mr. Market's mood.",
+      "thesis_he": "\u05d4\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5 \u05d1\u05d1\u05e2\u05dc\u05d5\u05ea\u05d9, \u05d5\u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05d9\u05d0 \u05d0\u05dd \u05dc\u05d4\u05de\u05e9\u05d9\u05da \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d4. \u05d4\u05ea\u05d7\u05dc\u05ea\u05d9, \u05db\u05d4\u05e8\u05d2\u05dc\u05d9, \u05de\u05de\u05d4 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05de\u05d9\u05d9\u05e4\u05d4 \u05e9\u05e0\u05d4 \u05d2\u05e8\u05d5\u05e2\u05d4, \u05de\u05d7\u05d6\u05d5\u05e8\u05d9\u05d5\u05ea \u05e9\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d0\u05de\u05ea \u05de\u05ea\u05d5\u05da \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9, \u05d5\u05d4\u05e0\u05d7\u05d5\u05ea \u05e0\u05d3\u05d9\u05d1\u05d5\u05ea \u05de\u05d3\u05d9. \u05d0\u05ea \u05d4\u05e1\u05d9\u05db\u05d5\u05d9 \u05dc\u05d4\u05e4\u05e1\u05d3 \u05e7\u05d1\u05d5\u05e2 \u05d0\u05e0\u05d9 \u05de\u05e2\u05e8\u05d9\u05da \u05d1\u05db\u05be30%, \u05de\u05ea\u05d7\u05ea \u05dc\u05e7\u05d5 \u05d4\u05d3\u05d7\u05d9\u05d9\u05d4 \u05e9\u05dc\u05d9 \u05e9\u05dc 40%, \u05d0\u05d1\u05dc \u05dc\u05d0 \u05d6\u05e0\u05d9\u05d7. \u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05dc\u05e4\u05d9 \u05d4\u05de\u05d5\u05d3\u05dc \u05d4\u05db\u05de\u05d5\u05ea\u05d9 \u05d4\u05d5\u05d0 39.4% \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05e4\u05e0\u05d9\u05de\u05d9 \u05e9\u05dc 72.44 \u05d3\u05d5\u05dc\u05e8, \u05d5\u05d9\u05d7\u05e1 \u05d4\u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.46 \u05e0\u05de\u05e6\u05d0 \u05d1\u05ea\u05d5\u05da \u05d4\u05ea\u05e7\u05e8\u05d4 \u05e9\u05dc\u05d9 \u05e9\u05dc 0.7. \u05d6\u05d4 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05e8\u05e3 30% \u05dc\u05de\u05e0\u05d9\u05d4 \u05e6\u05d9\u05d1\u05d5\u05e8\u05d9\u05ea \u05d1\u05d9\u05e0\u05d5\u05e0\u05d9\u05ea, \u05d0\u05d1\u05dc \u05de\u05d7\u05de\u05d9\u05e5 \u05d0\u05ea \u05e8\u05e3 40% \u05dc\u05de\u05e7\u05e8\u05d4 \u05de\u05d5\u05e8\u05db\u05d1, \u05d5\u05d0\u05d9\u05df \u05dc\u05d9 \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d1\u05e8\u05d5\u05e8. \u05d4\u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc 12.55% \u05ea\u05d5\u05da 19 \u05d9\u05d5\u05dd \u05d0\u05d9\u05e0\u05d4 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8, \u05db\u05d9 \u05ea\u05e0\u05d5\u05d3\u05ea\u05d9\u05d5\u05ea \u05d0\u05d9\u05e0\u05d4 \u05e1\u05d9\u05db\u05d5\u05df, \u05d5\u05d2\u05dd \u05d0\u05d9\u05e0\u05d4 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3. \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d2\u05d5\u05d3\u05dc \u05e6\u05e0\u05d5\u05e2 \u05d5\u05de\u05de\u05ea\u05d9\u05df, \u05d5\u05e4\u05d5\u05e2\u05dc \u05dc\u05e4\u05d9 \u05d4\u05e2\u05d5\u05d1\u05d3\u05d5\u05ea \u05d5\u05dc\u05d0 \u05dc\u05e4\u05d9 \u05de\u05e6\u05d1 \u05d4\u05e8\u05d5\u05d7 \u05e9\u05dc \u05de\u05e8 \u05e9\u05d5\u05e7.",
+      "criteria_passed": [
+        "Margin of safety 39.4% vs. the 30% minimum for a large/mid-cap public equity",
+        "Debt-to-equity 0.46, below the 0.7 screen ceiling",
+        "Cumulative permanent-loss probability about 30%, below the 40% rejection line",
+        "Five-year average free cash flow of $428.6M is positive",
+        "Price of $43.89 is well below intrinsic value per share of $72.44"
+      ],
+      "criteria_failed": [
+        "Margin of safety of 39.4% falls just short of the 40% bar if the business is complex or cyclical",
+        "No identifiable catalyst in the snapshot",
+        "Could not check whether five-year average free cash flow is normalized: the yearly series and the business description are not provided",
+        "Portfolio value is not given, so I cannot state the position's weight as a percent of the book",
+        "Valuation notes in the snapshot are empty, so I could not check the DCF assumptions beyond the 3.9% growth and 8.0% discount rate"
+      ],
+      "diversification_dimension": "Asset class",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 57.95,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 68.82,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 79.69
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above 0.7",
+        "Free cash flow turns negative, or shrinks faster than 20% a year across the annual filings",
+        "Filings show the five-year average free cash flow was materially inflated by one unusually strong year",
+        "A better opportunity with a larger margin of safety needs the capital",
+        "Price reaches 110% of intrinsic value (about $79.69): exit the remainder"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 443,
+    "output_tokens": 3024,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 884,
+    "prompt_sha256": "07a580a6ef4d35b80a8086052e2eb22d2dbf3ae565f0d610fdd4207b0f4cafb3"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "LKQ",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:52.613225+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "LKQ",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 28.86,
+      "current_price_usd": 18.44,
+      "margin_of_safety_pct": 36.1,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow keeps shrinking faster than the 5.8%/yr the DCF already projects, so the intrinsic value of $28.86 proves too high",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "The cash-flow decline is structural rather than cyclical, and the market keeps the stock at a depressed multiple for years",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "Leverage becomes a constraint if cash flow weakens further. Debt to equity is 0.59 today, below my 0.7 ceiling, but the debt composition and maturities are not in this snapshot",
+          "probability_pct": 15.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "I have no identified catalyst, so the discount persists for 3+ years and the return is eroded by time",
+          "probability_pct": 50.0,
+          "estimated_price_impact_pct": -5.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 30.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. Value realization depends on cash flow stabilizing and the market rediscovering it, which is the 'eventually the market will notice' category I treat with caution.",
+        "expected_timeline_months": 36,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.45,
+      "thesis_en": "I own this, and the position is seven days old and down 6.56%. That is noise, not a thesis break; I own it for the discount, not the tape. I started with what could go wrong: free cash flow is shrinking 5.8% a year, the model already projects that decline, and there is no identifiable catalyst. The price of $18.44 against a conservative DCF value of $28.86 leaves a 36.1% margin of safety, above my 30% threshold for a well-understood company, and debt to equity of 0.59 is inside my 0.7 ceiling. I keep the position small and will not add until I see the cash flow stabilize, because the shrinking cash flow is the one thing that could turn a cheap stock into a permanent loss. I could not verify the debt maturities, the cash balance or the drivers of the decline from this snapshot, so my confidence is modest.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05ea \u05e9\u05d1\u05e2\u05d4 \u05d9\u05de\u05d9\u05dd \u05d1\u05dc\u05d1\u05d3 \u05d5\u05d1\u05d4\u05e4\u05e1\u05d3 \u05e9\u05dc 6.56%. \u05d6\u05d4 \u05e8\u05e2\u05e9 \u05d5\u05dc\u05d0 \u05e9\u05d1\u05d9\u05e8\u05ea \u05ea\u05d6\u05d4; \u05e7\u05e0\u05d9\u05ea\u05d9 \u05d1\u05d2\u05dc\u05dc \u05d4\u05d4\u05e0\u05d7\u05d4 \u05d1\u05de\u05d7\u05d9\u05e8, \u05dc\u05d0 \u05d1\u05d2\u05dc\u05dc \u05d4\u05d2\u05e8\u05e3. \u05db\u05e8\u05d2\u05d9\u05dc \u05d4\u05ea\u05d7\u05dc\u05ea\u05d9 \u05de\u05d4\u05e9\u05d0\u05dc\u05d4 \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05ea\u05db\u05d5\u05d5\u05e5 \u05d1\u05db-5.8% \u05d1\u05e9\u05e0\u05d4, \u05d4\u05de\u05d5\u05d3\u05dc \u05db\u05d1\u05e8 \u05de\u05d2\u05dc\u05dd \u05d6\u05d0\u05ea, \u05d5\u05d0\u05d9\u05df \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d1\u05e8\u05d5\u05e8. \u05d4\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 18.44 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05d3\u05d5-\u05e9\u05de\u05e8\u05e0\u05d9 \u05e9\u05dc 28.86 \u05d3\u05d5\u05dc\u05e8 \u05de\u05e9\u05d0\u05d9\u05e8 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 36.1%, \u05de\u05e2\u05dc \u05d4\u05e1\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 30% \u05dc\u05d7\u05d1\u05e8\u05d4 \u05de\u05d5\u05d1\u05e0\u05ea, \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.59 \u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea \u05dc\u05ea\u05e7\u05e8\u05d4 \u05e9\u05dc 0.7. \u05d0\u05e0\u05d9 \u05e9\u05d5\u05de\u05e8 \u05e2\u05dc \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e7\u05d8\u05e0\u05d4 \u05d5\u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05d3 \u05e9\u05d0\u05e8\u05d0\u05d4 \u05e9\u05d4\u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05ea\u05d9\u05d9\u05e6\u05d1, \u05db\u05d9 \u05d4\u05e6\u05d8\u05de\u05e7\u05d5\u05ea \u05d4\u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05d9\u05d0 \u05d4\u05d3\u05d1\u05e8 \u05d4\u05d9\u05d7\u05d9\u05d3 \u05e9\u05d9\u05db\u05d5\u05dc \u05dc\u05d4\u05e4\u05d5\u05da \u05de\u05e0\u05d9\u05d4 \u05d6\u05d5\u05dc\u05d4 \u05dc\u05d4\u05e4\u05e1\u05d3 \u05e7\u05d1\u05d5\u05e2. \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc\u05ea\u05d9 \u05dc\u05d0\u05de\u05ea \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d0\u05ea \u05de\u05d5\u05e2\u05d3\u05d9 \u05e4\u05d9\u05e8\u05e2\u05d5\u05df \u05d4\u05d7\u05d5\u05d1, \u05d9\u05ea\u05e8\u05ea \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d0\u05d5 \u05d4\u05e1\u05d9\u05d1\u05d5\u05ea \u05dc\u05d9\u05e8\u05d9\u05d3\u05d4 \u05d1\u05ea\u05d6\u05e8\u05d9\u05dd, \u05d5\u05dc\u05db\u05df \u05e8\u05de\u05ea \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9 \u05de\u05ea\u05d5\u05e0\u05d4.",
+      "criteria_passed": [
+        "Margin of safety 36.1% vs 30% minimum for a large/mid-cap public equity",
+        "Debt to equity 0.59 below the 0.7 screen ceiling",
+        "Free cash flow decline of 5.75%/yr is well short of the 20%/yr thesis-break threshold",
+        "Price 18.44 is below 80% of intrinsic value (23.09), so no scale-out trigger is active"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot (Weak)",
+        "Free cash flow is shrinking, so the cash generator is not stable",
+        "Debt maturities, cash balance and drivers of the cash-flow decline are not reported in this snapshot, so those checks could not be performed"
+      ],
+      "diversification_dimension": "Catalyst type",
+      "position_size_pct": 2.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 23.09,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 27.42,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 31.75
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt to equity rises above 0.7",
+        "Free cash flow turns negative or shrinks faster than 20% a year",
+        "Free cash flow decline proves structural and my intrinsic value falls to near the current price, eliminating the margin of safety",
+        "A better opportunity with a larger margin of safety needs the capital"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 473,
+    "output_tokens": 2465,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 937,
+    "prompt_sha256": "c5478a3ce196439da49d6f0dd2f0db3c3486410e76b8a240805a2c554ec5bcb0"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "LRN",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:56.466243+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "LRN",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 117.96,
+      "current_price_usd": 76.17,
+      "margin_of_safety_pct": 35.42,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow falls well below the 5-year average of $307.3M that the DCF leans on, because the recent record is not representative of normal earning power",
+          "probability_pct": 15.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The 5% growth assumption fails. The trailing 21.8% CAGR was capped at 5%, so the cap is conservative, but a shrinking cash-flow base would still cut intrinsic value sharply",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "A regulatory, funding or enrollment shock hits the core business. The snapshot gives no business detail, so I cannot size this one with confidence",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "Debt-to-equity drifts above the 0.7 ceiling (0.50 today) through buybacks, acquisitions or weaker equity, which erodes the balance-sheet cushion",
+          "probability_pct": 8.0,
+          "estimated_price_impact_pct": -20.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 25.0,
+      "catalyst": {
+        "description": "The snapshot names no specific event. The case rests on the market recognizing cash flow through reported results. I treat that as a weak catalyst and size accordingly.",
+        "expected_timeline_months": 36,
+        "strength": "Weak"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.45,
+      "thesis_en": "I start with what could go wrong: the valuation depends on a 5-year average free cash flow of $307.3M, and if that figure is not durable, the margin of safety is smaller than it looks. We own this stock, with a small unrealised loss of 3.94% after 21 days, which tells me nothing about value. Against a conservative DCF of $117.96 per share (growth capped at 5%, 8% discount rate), the $76.17 price leaves a 35.4% margin of safety. That clears my 30% threshold for a mid-cap, but not by a wide margin. Debt-to-equity of 0.50 is inside my 0.7 ceiling. The catalyst is weak, so I hold at a modest size, add nothing without a wider discount, and let the exit rules, not price noise, decide. Several checks cannot be done on this snapshot: current ratio, interest coverage and business-specific risks are not provided.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05de\u05de\u05d4 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05d4\u05d4\u05e2\u05e8\u05db\u05d4 \u05e0\u05e9\u05e2\u05e0\u05ea \u05e2\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 307.3 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8 \u05d1\u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd, \u05d5\u05d0\u05dd \u05d4\u05e0\u05ea\u05d5\u05df \u05d4\u05d6\u05d4 \u05d0\u05d9\u05e0\u05d5 \u05d1\u05e8-\u05e7\u05d9\u05d9\u05de\u05d0, \u05de\u05e8\u05d5\u05d5\u05d7 \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e7\u05d8\u05df \u05de\u05de\u05d4 \u05e9\u05e0\u05e8\u05d0\u05d4. \u05d0\u05e0\u05d7\u05e0\u05d5 \u05de\u05d7\u05d6\u05d9\u05e7\u05d9\u05dd \u05d1\u05de\u05e0\u05d9\u05d4, \u05e2\u05dd \u05d4\u05e4\u05e1\u05d3 \u05dc\u05d0 \u05de\u05de\u05d5\u05de\u05e9 \u05e7\u05d8\u05df \u05e9\u05dc 3.94% \u05d0\u05d7\u05e8\u05d9 21 \u05d9\u05d5\u05dd, \u05d5\u05d6\u05d4 \u05dc\u05d0 \u05d0\u05d5\u05de\u05e8 \u05d3\u05d1\u05e8 \u05e2\u05dc \u05d4\u05e9\u05d5\u05d5\u05d9. \u05de\u05d5\u05dc DCF \u05e9\u05de\u05e8\u05e0\u05d9 \u05e9\u05dc 117.96 \u05d3\u05d5\u05dc\u05e8 \u05dc\u05de\u05e0\u05d9\u05d4 (\u05e6\u05de\u05d9\u05d7\u05d4 \u05de\u05d5\u05d2\u05d1\u05dc\u05ea \u05dc-5% \u05d5\u05e9\u05d9\u05e2\u05d5\u05e8 \u05d4\u05d9\u05d5\u05d5\u05df \u05e9\u05dc 8%), \u05d4\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 76.17 \u05d3\u05d5\u05dc\u05e8 \u05de\u05e9\u05d0\u05d9\u05e8 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 35.4%. \u05d6\u05d4 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05d4\u05e1\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 30% \u05dc\u05de\u05e0\u05d9\u05d4 \u05d1\u05d9\u05e0\u05d5\u05e0\u05d9\u05ea, \u05d0\u05d1\u05dc \u05dc\u05d0 \u05d1\u05e4\u05e2\u05e8 \u05d2\u05d3\u05d5\u05dc. \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.50 \u05e0\u05de\u05e6\u05d0 \u05d1\u05ea\u05d5\u05da \u05d4\u05ea\u05e7\u05e8\u05d4 \u05e9\u05dc\u05d9, 0.7. \u05d4\u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d7\u05dc\u05e9, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d2\u05d5\u05d3\u05dc \u05e6\u05e0\u05d5\u05e2, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05d1\u05dc\u05d9 \u05d4\u05e0\u05d7\u05d4 \u05e2\u05de\u05d5\u05e7\u05d4 \u05d9\u05d5\u05ea\u05e8, \u05d5\u05e0\u05d5\u05ea\u05df \u05dc\u05db\u05dc\u05dc\u05d9 \u05d4\u05d9\u05e6\u05d9\u05d0\u05d4, \u05d5\u05dc\u05d0 \u05dc\u05e8\u05e2\u05e9\u05d9 \u05d4\u05de\u05d7\u05d9\u05e8, \u05dc\u05d4\u05db\u05e8\u05d9\u05e2. \u05db\u05de\u05d4 \u05d1\u05d3\u05d9\u05e7\u05d5\u05ea \u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d1\u05e6\u05e2 \u05e2\u05dc \u05d1\u05e1\u05d9\u05e1 \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d4\u05e7\u05d9\u05d9\u05de\u05d9\u05dd: \u05d9\u05d7\u05e1 \u05e9\u05d5\u05d8\u05e3, \u05db\u05d9\u05e1\u05d5\u05d9 \u05e8\u05d9\u05d1\u05d9\u05ea \u05d5\u05e1\u05d9\u05db\u05d5\u05e0\u05d9\u05dd \u05e1\u05e4\u05e6\u05d9\u05e4\u05d9\u05d9\u05dd \u05dc\u05e2\u05e1\u05e7 \u05dc\u05d0 \u05e1\u05d5\u05e4\u05e7\u05d5.",
+      "criteria_passed": [
+        "Margin of safety 35.42% vs 30% minimum for a mid-cap public equity",
+        "Debt-to-equity 0.50 below the 0.7 ceiling",
+        "5-year average FCF positive at $307.3M",
+        "Growth assumption capped conservatively at 5% against a trailing 21.8% CAGR",
+        "Cumulative permanent-loss probability about 25%, below the 40% reject line"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot, so strength is Weak",
+        "Current ratio, interest coverage and business-specific risk data not reported, so those checks could not be performed",
+        "Margin of safety is only modestly above the minimum, not the 50%+ I prefer"
+      ],
+      "diversification_dimension": "Time horizon",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 94.36,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 112.06,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 129.75
+      },
+      "reverse_triggers": [
+        "Book equity is no longer positive",
+        "Debt-to-equity rises above the 0.7 ceiling",
+        "Free cash flow turns negative in the latest year or on average, or shrinks faster than 20% per year",
+        "Price reaches 110% of intrinsic value (about $129.75) with no remaining upside elements",
+        "Filings show the 5-year average FCF of $307.3M was not representative of normal earning power"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 468,
+    "output_tokens": 2810,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 915,
+    "prompt_sha256": "047de47182a08c0d2f1b923b58ab11e6119b46554eec939fdcdcc4ba0f2dabdc"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "STRA",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:57.397062+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "STRA",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 79.8,
+      "current_price_usd": 51.07,
+      "margin_of_safety_pct": 36.0,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow falls well below the 5-year average of about $115.4 million, so the DCF base is too high. The snapshot gives only the average, not the year-by-year trend.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The 4.1% growth rate and 8.0% discount rate are too generous, and a more conservative DCF puts value close to the current price.",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "No catalyst appears. The stock stays cheap for years while capital is tied up and a better opportunity is missed.",
+          "probability_pct": 35.0,
+          "estimated_price_impact_pct": -10.0
+        },
+        {
+          "scenario": "Items I cannot check in this snapshot (book equity, off-balance-sheet obligations, the quality of reported free cash flow) turn out to impair the thesis.",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -35.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 25.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the data provided. The case rests on the market narrowing the gap between price and a conservative DCF value over time. That is a weak path to value realization and calls for a small position and patience.",
+        "expected_timeline_months": 36,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.5,
+      "thesis_en": "I own this, a small position bought 14 days ago at $51.59 and now marked at $51.07, down 1.01%. I start with what could go wrong: the free cash flow base could be weaker than the 5-year average suggests, and my DCF assumptions could be too kind. Even so, I put the permanent-loss risk near 25%, below my 40% rejection line. The conservative DCF gives $79.80 against a $51.07 price, a 36% margin of safety, and debt-to-equity is reported at 0.0. That clears my 30% hurdle for a mid-cap, but it falls short of the 40% I want if this is a small or complex name, and there is no identifiable catalyst. I will hold the small position, not add to it, and let the price tell me more. A price 64% of intrinsic value is nowhere near my 80% scale-out zone, and a 1% loss on a two-week-old position is noise, not a reason to sell.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05e0\u05d9\u05d9\u05e8 \u05d4\u05d6\u05d4. \u05d6\u05d5 \u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05e7\u05d8\u05e0\u05d4 \u05e9\u05e0\u05e7\u05e0\u05ea\u05d4 \u05dc\u05e4\u05e0\u05d9 14 \u05d9\u05d5\u05dd \u05d1-51.59 \u05d3\u05d5\u05dc\u05e8, \u05d5\u05d4\u05d9\u05d0 \u05de\u05e1\u05d5\u05de\u05e0\u05ea \u05db\u05e2\u05ea \u05d1-51.07, \u05d9\u05e8\u05d9\u05d3\u05d4 \u05e9\u05dc 1.01%. \u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05d1\u05de\u05d4 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05d1\u05e1\u05d9\u05e1 \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05e2\u05e9\u05d5\u05d9 \u05dc\u05d4\u05d9\u05d5\u05ea \u05d7\u05dc\u05e9 \u05de\u05d4\u05de\u05de\u05d5\u05e6\u05e2 \u05dc-5 \u05e9\u05e0\u05d9\u05dd, \u05d5\u05d4\u05e0\u05d7\u05d5\u05ea \u05d4-DCF \u05e9\u05dc\u05d9 \u05e2\u05e9\u05d5\u05d9\u05d5\u05ea \u05dc\u05d4\u05d9\u05d5\u05ea \u05e0\u05d3\u05d9\u05d1\u05d5\u05ea \u05de\u05d3\u05d9. \u05d5\u05e2\u05d3\u05d9\u05d9\u05df, \u05d0\u05e0\u05d9 \u05de\u05e2\u05e8\u05d9\u05da \u05d0\u05ea \u05d4\u05e1\u05d9\u05db\u05d5\u05d9 \u05dc\u05d4\u05e4\u05e1\u05d3 \u05e7\u05d1\u05d5\u05e2 \u05d1\u05db-25%, \u05de\u05ea\u05d7\u05ea \u05dc\u05e7\u05d5 \u05d4\u05d3\u05d7\u05d9\u05d9\u05d4 \u05e9\u05dc\u05d9 \u05e9\u05dc 40%. \u05d4-DCF \u05d4\u05e9\u05de\u05e8\u05e0\u05d9 \u05e0\u05d5\u05ea\u05df 79.80 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 51.07, \u05db\u05dc\u05d5\u05de\u05e8 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 36%, \u05d5\u05d4\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05de\u05d3\u05d5\u05d5\u05d7 \u05db-0.0. \u05d6\u05d4 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05d4\u05e1\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 30% \u05dc\u05d7\u05d1\u05e8\u05d4 \u05d1\u05d9\u05e0\u05d5\u05e0\u05d9\u05ea, \u05d0\u05d1\u05dc \u05e0\u05d5\u05e4\u05dc \u05de\u05d4-40% \u05e9\u05d0\u05e0\u05d9 \u05d3\u05d5\u05e8\u05e9 \u05d0\u05dd \u05de\u05d3\u05d5\u05d1\u05e8 \u05d1\u05d7\u05d1\u05e8\u05d4 \u05e7\u05d8\u05e0\u05d4 \u05d0\u05d5 \u05de\u05d5\u05e8\u05db\u05d1\u05ea, \u05d5\u05d0\u05d9\u05df \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d1\u05e8\u05d5\u05e8. \u05dc\u05db\u05df \u05d0\u05d7\u05d6\u05d9\u05e7 \u05d0\u05ea \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d4\u05e7\u05d8\u05e0\u05d4 \u05d1\u05dc\u05d9 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3, \u05d5\u05d0\u05ea\u05df \u05dc\u05de\u05d7\u05d9\u05e8 \u05dc\u05dc\u05de\u05d3 \u05d0\u05d5\u05ea\u05d9 \u05e2\u05d5\u05d3. \u05de\u05d7\u05d9\u05e8 \u05e9\u05d4\u05d5\u05d0 64% \u05de\u05d4\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e4\u05e0\u05d9\u05de\u05d9 \u05e8\u05d7\u05d5\u05e7 \u05de\u05d0\u05d6\u05d5\u05e8 \u05d4\u05de\u05d9\u05de\u05d5\u05e9 \u05d4\u05d4\u05d3\u05e8\u05d2\u05ea\u05d9 \u05e9\u05dc\u05d9 \u05d1-80%, \u05d5\u05d4\u05e4\u05e1\u05d3 \u05e9\u05dc \u05d0\u05d7\u05d5\u05d6 \u05d0\u05d7\u05d3 \u05d1\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05ea \u05e9\u05d1\u05d5\u05e2\u05d9\u05d9\u05dd \u05d4\u05d5\u05d0 \u05e8\u05e2\u05e9 \u05d5\u05dc\u05d0 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8.",
+      "criteria_passed": [
+        "Margin of safety 36.0% vs the 30% minimum for a public equity",
+        "Debt-to-equity reported at 0.0, within the 0.7 ceiling",
+        "5-year average free cash flow positive at about $115.4 million",
+        "Price is about 64% of intrinsic value, well below the 80% scale-out zone",
+        "Cumulative permanent-loss probability about 25%, below the 40% reject line"
+      ],
+      "criteria_failed": [
+        "Margin of safety of 36.0% is below the 40% required if this is a small-cap or complex name (market cap about $1.12 billion)",
+        "No identifiable catalyst in the data provided",
+        "Free cash flow trend, book equity and current ratio are not in this snapshot, so those checks could not be performed"
+      ],
+      "diversification_dimension": "Asset class",
+      "position_size_pct": 1.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 63.84,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 75.81,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 87.78
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above 0.7",
+        "Free cash flow turns negative in the latest year or shrinks faster than 20% a year across 10-Ks",
+        "The DCF can no longer be projected because of deteriorating cash flow",
+        "A better opportunity with a larger margin of safety needs the capital",
+        "Price reaches 110% of intrinsic value, about $87.78"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 440,
+    "output_tokens": 2885,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 870,
+    "prompt_sha256": "c0b1444aa73e0d36ca6f4653e45bda16948de56e5b8e06c95b2bfa29d30424b3"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "OPLN",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:11:59.505239+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "OPLN",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 52.31,
+      "current_price_usd": 34.31,
+      "margin_of_safety_pct": 34.4,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Five-year average free cash flow of about $398 million proves unrepresentative and normalizes lower, so the DCF overstates value",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The discount rate or growth assumption (8% and 5%) proves too generous and intrinsic value is revised down materially",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "Leverage, with debt-to-equity at 0.34, becomes a problem if cash flow weakens and refinancing conditions tighten",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "No catalyst emerges and the discount persists for years, tying up capital and leaving the stock range-bound",
+          "probability_pct": 40.0,
+          "estimated_price_impact_pct": -10.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 22.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. The case rests on the price-to-value gap closing over time, and nothing in the data shows what will close it.",
+        "expected_timeline_months": 36,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.45,
+      "thesis_en": "I own this, and I start with what could go wrong. My cumulative permanent-loss estimate is about 22%, which is acceptable but not comfortable. The main risk is that the five-year average free cash flow of roughly $398 million is not durable. The snapshot also shows trailing growth of 63.8% that my model capped at 5%, which means I am leaning on the conservative end of the range. At $34.31 against a conservative intrinsic value of $52.31, the margin of safety is 34.4%, which clears my 30% bar for a mid-cap, and debt-to-equity of 0.34 is under my 0.7 ceiling. I could not check the current ratio, cash, business description or any identifiable catalyst because they are not in this snapshot, so my confidence is only moderate. My position is down 9.5% since August, but a price decline is not a broken thesis. The facts I can see have not changed, so I hold, I do not add on thin evidence, and I scale out as the price approaches value.",
+      "thesis_he": "\u05d4\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5 \u05d1\u05d9\u05d3\u05d9\u05d9\u05dd \u05e9\u05dc\u05d9, \u05d5\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05ea\u05de\u05d9\u05d3 \u05de\u05de\u05d4 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9. \u05d4\u05d4\u05e2\u05e8\u05db\u05d4 \u05e9\u05dc\u05d9 \u05dc\u05d4\u05e1\u05ea\u05d1\u05e8\u05d5\u05ea \u05dc\u05d4\u05e4\u05e1\u05d3 \u05e7\u05d1\u05d5\u05e2 \u05de\u05e6\u05d8\u05d1\u05e8 \u05d4\u05d9\u05d0 \u05db-22% \u2013 \u05e1\u05d1\u05d9\u05e8\u05d4, \u05d0\u05d1\u05dc \u05dc\u05d0 \u05e0\u05d5\u05d7\u05d4. \u05d4\u05e1\u05d9\u05db\u05d5\u05df \u05d4\u05de\u05e8\u05db\u05d6\u05d9 \u05d4\u05d5\u05d0 \u05e9\u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05d4\u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc \u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd, \u05db-398 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8, \u05d0\u05d9\u05e0\u05d5 \u05d1\u05e8-\u05e7\u05d9\u05d9\u05de\u05d0. \u05d1\u05e0\u05d5\u05e1\u05e3, \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05e8\u05d0\u05d9\u05dd \u05e6\u05de\u05d9\u05d7\u05d4 \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05ea \u05e9\u05dc 63.8% \u05e9\u05d4\u05de\u05d5\u05d3\u05dc \u05e9\u05dc\u05d9 \u05d4\u05d2\u05d1\u05d9\u05dc \u05dc-5%, \u05db\u05dc\u05d5\u05de\u05e8 \u05d0\u05e0\u05d9 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05d4\u05e7\u05e6\u05d4 \u05d4\u05e9\u05de\u05e8\u05e0\u05d9 \u05e9\u05dc \u05d4\u05d8\u05d5\u05d5\u05d7. \u05d1\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 34.31 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05e9\u05d5\u05d5\u05d9 \u05e4\u05e0\u05d9\u05de\u05d9 \u05e9\u05de\u05e8\u05e0\u05d9 \u05e9\u05dc 52.31 \u05d3\u05d5\u05dc\u05e8, margin of safety \u05d4\u05d5\u05d0 34.4%, \u05de\u05e2\u05dc \u05d4\u05e8\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 30% \u05dc\u05d7\u05d1\u05e8\u05d4 \u05d1\u05d9\u05e0\u05d5\u05e0\u05d9\u05ea, \u05d5\u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.34 \u05e0\u05de\u05d5\u05da \u05de\u05d4\u05ea\u05e7\u05e8\u05d4 \u05e9\u05dc\u05d9 \u05e9\u05dc 0.7. \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc\u05ea\u05d9 \u05dc\u05d1\u05d3\u05d5\u05e7 \u05d9\u05d7\u05e1 \u05e9\u05d5\u05d8\u05e3, \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd, \u05ea\u05d9\u05d0\u05d5\u05e8 \u05d4\u05e2\u05e1\u05e7 \u05d0\u05d5 \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d1\u05e8\u05d5\u05e8 \u05db\u05d9 \u05d0\u05dc\u05d4 \u05d0\u05d9\u05e0\u05dd \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05e4\u05e0\u05d9\u05d9, \u05d5\u05dc\u05db\u05df \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9 \u05d1\u05d9\u05e0\u05d5\u05e0\u05d9 \u05d1\u05dc\u05d1\u05d3. \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d1\u05d4\u05e4\u05e1\u05d3 \u05e9\u05dc 9.5% \u05de\u05d0\u05d6 \u05d0\u05d5\u05d2\u05d5\u05e1\u05d8, \u05d0\u05d1\u05dc \u05d9\u05e8\u05d9\u05d3\u05ea \u05de\u05d7\u05d9\u05e8 \u05d0\u05d9\u05e0\u05e0\u05d4 \u05ea\u05d6\u05d4 \u05e9\u05d1\u05d5\u05e8\u05d4. \u05d4\u05e2\u05d5\u05d1\u05d3\u05d5\u05ea \u05e9\u05d0\u05e0\u05d9 \u05e8\u05d5\u05d0\u05d4 \u05dc\u05d0 \u05d4\u05e9\u05ea\u05e0\u05d5 \u2013 \u05d0\u05d6 \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7, \u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3 \u05e2\u05dc \u05d1\u05e1\u05d9\u05e1 \u05e8\u05d0\u05d9\u05d5\u05ea \u05d3\u05dc\u05d5\u05ea, \u05d5\u05de\u05e7\u05d8\u05d9\u05df \u05d1\u05d4\u05d3\u05e8\u05d2\u05d4 \u05db\u05e9\u05d4\u05de\u05d7\u05d9\u05e8 \u05de\u05ea\u05e7\u05e8\u05d1 \u05dc\u05e9\u05d5\u05d5\u05d9.",
+      "criteria_passed": [
+        "Margin of safety 34.4% vs 30% minimum for mid-cap public equity",
+        "Debt-to-equity 0.34, below the 0.7 screen ceiling",
+        "Five-year average free cash flow positive at about $398 million",
+        "Conservative DCF: growth capped at 5% against a 63.8% trailing CAGR, 8% discount rate",
+        "Price is below 80% of intrinsic value, so the scale-out zone has not been reached and no exit trigger is active"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot, so position size is held moderate and the horizon is long",
+        "Current ratio, cash, segment detail and business description are not reported in the snapshot, so those checks could not be performed",
+        "Book equity and the trend in free cash flow could not be verified from the data provided"
+      ],
+      "diversification_dimension": "Catalyst type",
+      "position_size_pct": 5.1,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 41.85,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 49.69,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 57.54
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above 0.7",
+        "Free cash flow turns negative in the latest year or shrinks faster than 20% a year across the filing record",
+        "Evidence that the five-year average free cash flow was driven by one-off items rather than recurring earnings",
+        "A better opportunity appears with a larger margin of safety (capital rotation)"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 471,
+    "output_tokens": 2876,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 924,
+    "prompt_sha256": "57be3683b375d19c323a50069665574e029d2048eb115730c6a18edad1729c5d"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "AD",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:12:14.947416+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "AD",
+      "decision": "HOLD",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 40.52,
+      "current_price_usd": 27.77,
+      "margin_of_safety_pct": 31.45,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow comes in below the 5-year average of about $217 million, so the DCF base is overstated. The snapshot gives only the average, not the latest-year figure or the trend.",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "Leverage rises from the current debt-to-equity of 0.50 toward or past the 0.7 ceiling, through new borrowing or weaker equity, and squeezes the equity holders. Debt maturities are not reported in the snapshot.",
+          "probability_pct": 15.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "The model is too generous. The trailing 22.1% CAGR was capped at 5% and discounted at 8%, but if true growth is lower or the required return higher, intrinsic value falls well short of $40.52.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "No catalyst emerges and the gap between price and value persists for years. This is dead money rather than a permanent loss, but it is a real cost.",
+          "probability_pct": 40.0,
+          "estimated_price_impact_pct": -10.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 25.0,
+      "catalyst": {
+        "description": "None identifiable from the snapshot. No asset sale, restructuring, activist or litigation event is disclosed in the data I was given, so I cannot name one.",
+        "expected_timeline_months": 36,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.4,
+      "thesis_en": "I own 22 shares, bought a week ago at $27.58 and up 0.71%, so the question is whether to keep them, not whether to open the position. Before looking at upside I asked what could go wrong: cash flow below its 5-year average, leverage drifting above the 0.7 ceiling, or a growth and discount-rate assumption that proves too kind. I put the chance of permanent loss at roughly 25%, which is tolerable. The DCF value of $40.52 against a $27.77 price gives a 31.4% margin, only 1.4 points above my 30% minimum. That is a thin buffer, and I cannot name a catalyst, so I hold at modest size and add nothing. Latest-year free cash flow, its trend, the current ratio and the debt maturities are not in this snapshot, which is why my confidence is low. Nothing here justifies adding, and nothing justifies selling.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1-22 \u05de\u05e0\u05d9\u05d5\u05ea \u05e9\u05e0\u05e8\u05db\u05e9\u05d5 \u05dc\u05e4\u05e0\u05d9 \u05e9\u05d1\u05d5\u05e2 \u05d1-27.58 \u05d3\u05d5\u05dc\u05e8, \u05e2\u05dd \u05ea\u05e9\u05d5\u05d0\u05d4 \u05e9\u05dc 0.71%, \u05d5\u05dc\u05db\u05df \u05d4\u05e9\u05d0\u05dc\u05d4 \u05d4\u05d9\u05d0 \u05d0\u05dd \u05dc\u05d4\u05e9\u05d0\u05d9\u05e8 \u05d0\u05ea \u05d4\u05e4\u05d5\u05d6\u05d9\u05e6\u05d9\u05d4 \u05d5\u05dc\u05d0 \u05d0\u05dd \u05dc\u05e4\u05ea\u05d5\u05d7 \u05d0\u05d5\u05ea\u05d4. \u05dc\u05e4\u05e0\u05d9 \u05e9\u05d4\u05e1\u05ea\u05db\u05dc\u05ea\u05d9 \u05e2\u05dc \u05d4\u05e6\u05d3 \u05d4\u05d7\u05d9\u05d5\u05d1\u05d9 \u05e9\u05d0\u05dc\u05ea\u05d9 \u05de\u05d4 \u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05e0\u05de\u05d5\u05da \u05de\u05de\u05de\u05d5\u05e6\u05e2 \u05d7\u05de\u05e9 \u05d4\u05e9\u05e0\u05d9\u05dd, \u05de\u05d9\u05e0\u05d5\u05e3 \u05e9\u05d2\u05d5\u05dc\u05e9 \u05de\u05e2\u05dc \u05ea\u05e7\u05e8\u05ea \u05d4-0.7, \u05d0\u05d5 \u05d4\u05e0\u05d7\u05d5\u05ea \u05e6\u05de\u05d9\u05d7\u05d4 \u05d5\u05e0\u05d9\u05db\u05d9\u05d5\u05df \u05e9\u05d4\u05ea\u05d1\u05e8\u05e8\u05d5 \u05db\u05e0\u05d3\u05d9\u05d1\u05d5\u05ea \u05de\u05d3\u05d9. \u05d0\u05e0\u05d9 \u05de\u05e2\u05e8\u05d9\u05da \u05d0\u05ea \u05d4\u05e1\u05d9\u05db\u05d5\u05d9 \u05dc\u05d4\u05e4\u05e1\u05d3 \u05e7\u05d1\u05d5\u05e2 \u05d1\u05db-25%, \u05d5\u05d6\u05d4 \u05e1\u05d1\u05d9\u05e8. \u05e9\u05d5\u05d5\u05d9 \u05d4-DCF \u05e9\u05dc 40.52 \u05d3\u05d5\u05dc\u05e8 \u05de\u05d5\u05dc \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 27.77 \u05de\u05d5\u05ea\u05d9\u05e8 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 31.4%, \u05e8\u05e7 1.4 \u05e0\u05e7\u05d5\u05d3\u05d5\u05ea \u05de\u05e2\u05dc \u05d4\u05de\u05d9\u05e0\u05d9\u05de\u05d5\u05dd \u05e9\u05dc\u05d9 \u05e9\u05dc 30%. \u05d6\u05d4 \u05db\u05e8\u05d9\u05ea \u05d3\u05e7\u05d4, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05e6\u05dc\u05d9\u05d7 \u05dc\u05d6\u05d4\u05d5\u05ea \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05d2\u05d5\u05d3\u05dc \u05e6\u05e0\u05d5\u05e2 \u05d5\u05dc\u05d0 \u05de\u05d5\u05e1\u05d9\u05e3. \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05dc \u05d4\u05e9\u05e0\u05d4 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d4, \u05de\u05d2\u05de\u05ea\u05d5, \u05d9\u05d7\u05e1 \u05d4\u05e0\u05d6\u05d9\u05dc\u05d5\u05ea \u05d5\u05dc\u05d5\u05d7\u05d5\u05ea \u05d4\u05e1\u05d9\u05dc\u05d5\u05e7\u05d9\u05df \u05e9\u05dc \u05d4\u05d7\u05d5\u05d1 \u05d0\u05d9\u05e0\u05dd \u05d1\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05e7\u05d9\u05d1\u05dc\u05ea\u05d9, \u05d5\u05d6\u05d5 \u05d4\u05e1\u05d9\u05d1\u05d4 \u05e9\u05e8\u05de\u05ea \u05d4\u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc\u05d9 \u05e0\u05de\u05d5\u05db\u05d4. \u05d0\u05d9\u05df \u05db\u05d0\u05df \u05e1\u05d9\u05d1\u05d4 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3, \u05d5\u05d0\u05d9\u05df \u05db\u05d0\u05df \u05e1\u05d9\u05d1\u05d4 \u05dc\u05de\u05db\u05d5\u05e8.",
+      "criteria_passed": [
+        "Margin of safety 31.4% vs 30% minimum for a mid-cap public equity (thin pass)",
+        "Debt-to-equity 0.504 is below the 0.7 screen ceiling",
+        "Average 5-year free cash flow is positive at about $217.1 million",
+        "Price of $27.77 is well below the DCF value of $40.52, so it is outside the scale-out zone (80% of value is about $32.41)"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst in the snapshot, so the 3-year catalyst test is not met",
+        "Latest-year FCF and its trend are not reported, so the thesis-broken check could not be performed",
+        "Current ratio, debt maturities and the business description are not in the snapshot, so those checks could not be performed",
+        "Margin of safety exceeds the 30% minimum by only 1.4 points, with no cushion for model error"
+      ],
+      "diversification_dimension": "Asset class",
+      "position_size_pct": 3.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 32.41,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 38.49,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 44.57
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above the 0.7 ceiling",
+        "Free cash flow turns negative in the latest year, or shrinks faster than 20% a year over three or more 10-Ks, so the DCF can no longer be projected",
+        "Price reaches 110% of intrinsic value (about $44.57): exit the remainder",
+        "A materially better opportunity appears with a larger margin of safety: rotate capital"
+      ],
+      "klarman_quote_relevant": "Avoiding loss should be the primary goal of every investor."
+    },
+    "input_tokens": 466,
+    "output_tokens": 2930,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 912,
+    "prompt_sha256": "20c853ea21e64661d806dacd982a677a12c48c5b9ec96262e4bfafd483c1ad18"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "ICFI",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:12:16.519867+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "ICFI",
+      "decision": "WATCH",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 113.09,
+      "current_price_usd": 77.91,
+      "margin_of_safety_pct": 31.1,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow falls short of the 5% growth assumption, or the 5-year average FCF of $125.7M proves to be a peak rather than a base. The DCF is sensitive to that single input.",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "Discount rate or terminal assumptions prove too generous. The model uses 8%, and a higher required return would cut intrinsic value materially.",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "Loss or non-renewal of major customer contracts, or a budget shock in a concentrated customer base. Customer concentration is not in the snapshot, so this is a judgement-based risk I cannot verify.",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "Leverage becomes a constraint if earnings weaken. Debt-to-equity of 0.39 is moderate, but the maturity schedule and covenants are not reported in the snapshot.",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -20.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 25.0,
+      "catalyst": {
+        "description": "No identifiable catalyst in the data provided. There is no announced asset sale, activist, restructuring or litigation resolution. The thesis is 'it is cheap-ish', which I treat as weak.",
+        "expected_timeline_months": 0,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.4,
+      "thesis_en": "I do not own this, and I am not going to start at a 31% discount. The business is a $1.4B market-cap company, so I require a 40% margin of safety, not 30%, and the DCF gives me 31.1% on a single method that leans on a 5-year average FCF of $125.7M and 5% growth. That is not a buffer I would trust against my own errors. I also see no catalyst, and the snapshot does not report the current ratio, interest coverage, customer concentration or the debt maturity schedule, so I cannot verify those checks. Debt-to-equity of 0.39 is acceptable, but I would rather hold cash than pay a price that leaves no room for the failure scenarios above. At about $67.85, which is 40% below my $113.09 estimate, and with a visible catalyst, I would revisit it.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d0\u05ea \u05d4\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05de\u05ea\u05db\u05d5\u05d5\u05df \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc \u05dc\u05e7\u05e0\u05d5\u05ea \u05d0\u05d5\u05ea\u05d4 \u05d1\u05d4\u05e0\u05d7\u05d4 \u05e9\u05dc 31%. \u05d6\u05d5 \u05d7\u05d1\u05e8\u05d4 \u05d1\u05e9\u05d5\u05d5\u05d9 \u05e9\u05d5\u05e7 \u05e9\u05dc 1.4 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3 \u05d3\u05d5\u05dc\u05e8, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05d3\u05d5\u05e8\u05e9 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 40% \u05d5\u05dc\u05d0 30%. \u05de\u05d5\u05d3\u05dc \u05d4-DCF \u05e0\u05d5\u05ea\u05df \u05dc\u05d9 31.1% \u05d1\u05e9\u05d9\u05d8\u05d4 \u05d0\u05d7\u05ea \u05d1\u05dc\u05d1\u05d3, \u05d5\u05d4\u05d5\u05d0 \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 125.7 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8 \u05d1-5 \u05e9\u05e0\u05d9\u05dd \u05d5\u05e2\u05dc \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 5%. \u05d6\u05d4 \u05dc\u05d0 \u05db\u05e8\u05d9\u05ea \u05e9\u05d0\u05e0\u05d9 \u05de\u05d5\u05db\u05df \u05dc\u05e1\u05de\u05d5\u05da \u05e2\u05dc\u05d9\u05d4 \u05de\u05d5\u05dc \u05d4\u05d8\u05e2\u05d5\u05d9\u05d5\u05ea \u05e9\u05dc\u05d9. \u05d0\u05d9\u05df \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d1\u05e8\u05d5\u05e8, \u05d5\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05d0 \u05db\u05d5\u05dc\u05dc\u05d9\u05dd \u05d9\u05d7\u05e1 \u05e9\u05d5\u05d8\u05e3, \u05db\u05d9\u05e1\u05d5\u05d9 \u05e8\u05d9\u05d1\u05d9\u05ea, \u05e8\u05d9\u05db\u05d5\u05d6\u05d9\u05d5\u05ea \u05dc\u05e7\u05d5\u05d7\u05d5\u05ea \u05d0\u05d5 \u05dc\u05d5\u05d7 \u05e4\u05d9\u05e8\u05e2\u05d5\u05df \u05d7\u05d5\u05d1\u05d5\u05ea, \u05d5\u05dc\u05db\u05df \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc\u05ea\u05d9 \u05dc\u05d1\u05d3\u05d5\u05e7 \u05d0\u05d5\u05ea\u05dd. \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.39 \u05e1\u05d1\u05d9\u05e8, \u05d0\u05d1\u05dc \u05d0\u05e0\u05d9 \u05de\u05e2\u05d3\u05d9\u05e3 \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7 \u05de\u05d6\u05d5\u05de\u05df \u05de\u05d0\u05e9\u05e8 \u05dc\u05e9\u05dc\u05dd \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc\u05d0 \u05de\u05e9\u05d0\u05d9\u05e8 \u05de\u05e7\u05d5\u05dd \u05dc\u05ea\u05e8\u05d7\u05d9\u05e9\u05d9 \u05d4\u05db\u05d9\u05e9\u05dc\u05d5\u05df. \u05e1\u05d1\u05d9\u05d1 67.85 \u05d3\u05d5\u05dc\u05e8, \u05d4\u05e0\u05d7\u05d4 \u05e9\u05dc 40% \u05de\u05d4\u05d4\u05e2\u05e8\u05db\u05d4 \u05e9\u05dc\u05d9 \u05e9\u05dc 113.09, \u05d5\u05e2\u05dd \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05d2\u05dc\u05d5\u05d9, \u05d0\u05d7\u05d6\u05d5\u05e8 \u05dc\u05d1\u05d7\u05d5\u05df \u05d0\u05d5\u05ea\u05d4.",
+      "criteria_passed": [
+        "Margin of safety 31.1% clears the 30% large/mid-cap bar",
+        "Debt-to-equity 0.39 is below the 0.7 ceiling",
+        "Cumulative permanent-loss probability about 25%, below the 40% reject line",
+        "Valuation method (DCF on free cash flow) is appropriate for a cash generator"
+      ],
+      "criteria_failed": [
+        "Margin of safety 31.1% is below the 40% bar for a small-cap or complex name at a $1.4B market cap",
+        "No identifiable catalyst within 3 years",
+        "Current ratio, interest coverage, customer concentration and debt maturities not reported in the snapshot, so those checks could not be performed",
+        "Intrinsic value rests on one DCF with a capped 5% growth rate and no cross-check"
+      ],
+      "diversification_dimension": "Catalyst type",
+      "position_size_pct": 0.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 90.47,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 107.43,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 124.4
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above 0.7",
+        "Free cash flow turns negative or shrinks faster than 20% a year",
+        "Loss of a material customer or contract that cuts the FCF base the DCF relies on",
+        "Price falls to about $67.85 or below with the thesis intact and a catalyst emerges (upgrade to a BUY review)"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 388,
+    "output_tokens": 2482,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 753,
+    "prompt_sha256": "d36b5f92460b888e58bfc275f0691e72c77bc8fd740c307ca417345f20dad373"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "ADBE",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:12:18.895617+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "ADBE",
+      "decision": "WATCH",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 322.96,
+      "current_price_usd": 221.4,
+      "margin_of_safety_pct": 31.45,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Generative AI erodes the core franchise and pricing power, so the five-year average free cash flow of $7.789 billion overstates what the business earns going forward",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "The discount rate the market demands rises above the 8% assumed in the valuation, or growth falls short of the 5% assumed, compressing the multiple",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -20.0
+        },
+        {
+          "scenario": "Latest-year free cash flow is below the five-year average. The snapshot does not show the annual trend, so I cannot rule this out, and the DCF would then be too generous",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -15.0
+        },
+        {
+          "scenario": "Capital is diverted into large, expensive acquisitions or buybacks at poor prices, and leverage rises from the reported debt-to-equity of 0.41",
+          "probability_pct": 10.0,
+          "estimated_price_impact_pct": -15.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 28.0,
+      "catalyst": {
+        "description": "No specific catalyst is identified in the snapshot. Value realisation would depend on the market re-rating the shares as fears about the business recede, and I cannot point to a dated event.",
+        "expected_timeline_months": 36,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.4,
+      "thesis_en": "I start with what could go wrong: a software franchise facing technological disruption, valued on a five-year average free cash flow that may not reflect today's earning power. The quant work shows $322.96 per share of intrinsic value against a price of $221.40, a margin of safety of 31.4%. That clears my 30% hurdle for a large, well-understood equity by only about a point, and the result rests on 5% growth and an 8% discount rate, so the buffer is thin. I also see no identifiable catalyst, and the snapshot does not give me the latest-year free cash flow trend or other balance-sheet detail. I do not own it, and I will not pay for a thin cushion when cash costs me nothing. I would rather wait for a price closer to a 40% discount, or for evidence that the cash flows are durable.",
+      "thesis_he": "\u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05d1\u05de\u05d4 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05d7\u05d1\u05e8\u05ea \u05ea\u05d5\u05db\u05e0\u05d4 \u05e9\u05e2\u05d5\u05de\u05d3\u05ea \u05de\u05d5\u05dc \u05e9\u05d9\u05e0\u05d5\u05d9 \u05d8\u05db\u05e0\u05d5\u05dc\u05d5\u05d2\u05d9 \u05de\u05e2\u05e8\u05e2\u05e8\u05d9, \u05e9\u05de\u05d5\u05e2\u05e8\u05db\u05ea \u05e2\u05dc \u05d1\u05e1\u05d9\u05e1 \u05de\u05de\u05d5\u05e6\u05e2 \u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd \u05e9\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05e9\u05d0\u05d5\u05dc\u05d9 \u05d0\u05d9\u05e0\u05d5 \u05de\u05e9\u05e7\u05e3 \u05d0\u05ea \u05db\u05d5\u05e9\u05e8 \u05d4\u05d4\u05e9\u05ea\u05db\u05e8\u05d5\u05ea \u05e9\u05dc \u05d4\u05d9\u05d5\u05dd. \u05de\u05d5\u05d3\u05dc \u05d4\u05e2\u05e8\u05db\u05ea \u05d4\u05e9\u05d5\u05d5\u05d9 \u05de\u05e8\u05d0\u05d4 \u05e9\u05d5\u05d5\u05d9 \u05e4\u05e0\u05d9\u05de\u05d9 \u05e9\u05dc 322.96 \u05d3\u05d5\u05dc\u05e8 \u05dc\u05de\u05e0\u05d9\u05d4 \u05de\u05d5\u05dc \u05de\u05d7\u05d9\u05e8 \u05e9\u05dc 221.40 \u05d3\u05d5\u05dc\u05e8, \u05db\u05dc\u05d5\u05de\u05e8 \u05de\u05e8\u05d5\u05d5\u05d7 \u05d1\u05d9\u05d8\u05d7\u05d5\u05df \u05e9\u05dc 31.4%. \u05d6\u05d4 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05d4\u05e1\u05e3 \u05e9\u05dc\u05d9 \u05e9\u05dc 30% \u05d1\u05e7\u05d5\u05e9\u05d9, \u05d5\u05d4\u05ea\u05d5\u05e6\u05d0\u05d4 \u05e0\u05e9\u05e2\u05e0\u05ea \u05e2\u05dc \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05dc 5% \u05d5\u05e2\u05dc \u05e9\u05d9\u05e2\u05d5\u05e8 \u05d4\u05d9\u05d5\u05d5\u05df \u05e9\u05dc 8%, \u05db\u05da \u05e9\u05d4\u05db\u05e8\u05d9\u05ea \u05d3\u05e7\u05d4. \u05d0\u05e0\u05d9 \u05d2\u05dd \u05dc\u05d0 \u05e8\u05d5\u05d0\u05d4 \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8 \u05de\u05d6\u05d5\u05d4\u05d4, \u05d5\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d9\u05d3\u05d9 \u05dc\u05d0 \u05db\u05d5\u05dc\u05dc\u05d9\u05dd \u05d0\u05ea \u05de\u05d2\u05de\u05ea \u05d4\u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9 \u05d1\u05e9\u05e0\u05d4 \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d4 \u05d0\u05d5 \u05e4\u05d9\u05e8\u05d5\u05d8 \u05e0\u05d5\u05e1\u05e3 \u05e9\u05dc \u05d4\u05de\u05d0\u05d6\u05df. \u05d0\u05d9\u05e0\u05d9 \u05de\u05d7\u05d6\u05d9\u05e7 \u05d1\u05de\u05e0\u05d9\u05d4, \u05d5\u05d0\u05d9\u05e0\u05d9 \u05de\u05e9\u05dc\u05dd \u05e2\u05dc \u05db\u05e8\u05d9\u05ea \u05d3\u05e7\u05d4 \u05db\u05e9\u05de\u05d6\u05d5\u05de\u05df \u05dc\u05d0 \u05e2\u05d5\u05dc\u05d4 \u05dc\u05d9 \u05d3\u05d1\u05e8. \u05d0\u05e0\u05d9 \u05de\u05e2\u05d3\u05d9\u05e3 \u05dc\u05d7\u05db\u05d5\u05ea \u05dc\u05de\u05d7\u05d9\u05e8 \u05e7\u05e8\u05d5\u05d1 \u05dc\u05d4\u05e0\u05d7\u05d4 \u05e9\u05dc 40%, \u05d0\u05d5 \u05dc\u05d4\u05d5\u05db\u05d7\u05d4 \u05e9\u05d4\u05ea\u05d6\u05e8\u05d9\u05de\u05d9\u05dd \u05d9\u05e6\u05d9\u05d1\u05d9\u05dd.",
+      "criteria_passed": [
+        "Margin of safety 31.4% versus 30% minimum for a large or mid-cap public equity (marginal pass)",
+        "Debt-to-equity 0.41 is below the 0.7 ceiling",
+        "Valuation method (DCF on free cash flow) fits a cash-generating business",
+        "Growth assumption is conservative: trailing CAGR of 9.4% capped at 5.0%"
+      ],
+      "criteria_failed": [
+        "No identifiable catalyst to close the gap between price and value",
+        "Latest-year free cash flow trend and book equity are not in the snapshot, so these checks could not be performed",
+        "Margin of safety is not the 40% or more I prefer when the thesis rests on average cash flow and disruption risk is unquantified"
+      ],
+      "diversification_dimension": "Catalyst type",
+      "position_size_pct": 0.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 258.37,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 306.81,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 355.26
+      },
+      "reverse_triggers": [
+        "Free cash flow turns negative or declines by more than 20% a year across recent 10-Ks",
+        "Book equity is no longer positive, or debt-to-equity rises above 0.7",
+        "Evidence that AI-driven competition is permanently cutting the core franchise's revenue or pricing power",
+        "Price reaches 110% of intrinsic value, which is the full-exit level if a position is ever established"
+      ],
+      "klarman_quote_relevant": "Avoiding loss should be the primary goal of every investor."
+    },
+    "input_tokens": 389,
+    "output_tokens": 2727,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 755,
+    "prompt_sha256": "669cd4bf97d535bce17f096869f10209b9a8ac11c8eecd61a797610159afd9df"
+  },
+  {
+    "agent": "seth_klarman",
+    "ticker": "PCRX",
+    "schema": "KlarmanMemo",
+    "timestamp": "2026-11-23T16:12:20.925089+00:00",
+    "model": "claude-sonnet-5-5",
+    "memo": {
+      "ticker": "PCRX",
+      "decision": "WATCH",
+      "asset_type": "Public Equity",
+      "valuation_method_used": "DCF",
+      "intrinsic_value_estimate_usd": 52.32,
+      "current_price_usd": 36.48,
+      "margin_of_safety_pct": 30.27,
+      "what_could_go_wrong": [
+        {
+          "scenario": "Free cash flow falls back below the five-year average of $129.99M that the DCF leans on, because the average may not represent forward cash generation",
+          "probability_pct": 35.0,
+          "estimated_price_impact_pct": -25.0
+        },
+        {
+          "scenario": "The 5% growth assumption fails. The trailing CAGR of 14.4% was capped at 5%, but the underlying business could still shrink, and the snapshot gives me nothing on competition, pricing or product concentration",
+          "probability_pct": 25.0,
+          "estimated_price_impact_pct": -30.0
+        },
+        {
+          "scenario": "An unverified legal, regulatory or competitive event impairs the business. I cannot assess this from the snapshot, so I treat it as unknown risk",
+          "probability_pct": 20.0,
+          "estimated_price_impact_pct": -35.0
+        },
+        {
+          "scenario": "A discount rate above the 8% used in the model compresses intrinsic value, and the thin 30% cushion disappears",
+          "probability_pct": 30.0,
+          "estimated_price_impact_pct": -15.0
+        }
+      ],
+      "cumulative_permanent_loss_probability_pct": 30.0,
+      "catalyst": {
+        "description": "No identifiable catalyst appears in the snapshot. The gap between $36.48 and $52.32 rests on the market eventually recognizing value, which is not a catalyst.",
+        "expected_timeline_months": 0,
+        "strength": "None"
+      },
+      "capital_structure_position": "Equity",
+      "confidence": 0.35,
+      "thesis_en": "We do not own this, and I see no reason to start. Let me begin with what could go wrong: the value rests on a five-year average free cash flow of $129.99M and a growth rate that was capped from 14.4% to 5%. I cannot verify from this snapshot whether that cash flow is durable, and I have no information on the business, its legal exposures or its competitive position. The margin of safety is 30.27%, which barely clears my floor for a large, well-understood company. This is a roughly $1.46B market cap with unexamined risks, so I want 40% or more, and a price near $31.39 would deliver it. Debt-to-equity of 0.41 is tolerable, but there is no catalyst, and cheap without a path to realization is not enough. I will keep cash and wait for either a better price or proof of the cash flows.",
+      "thesis_he": "\u05d0\u05e0\u05d7\u05e0\u05d5 \u05dc\u05d0 \u05de\u05d7\u05d6\u05d9\u05e7\u05d9\u05dd \u05d1\u05de\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d5, \u05d5\u05d0\u05e0\u05d9 \u05dc\u05d0 \u05e8\u05d5\u05d0\u05d4 \u05e1\u05d9\u05d1\u05d4 \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc. \u05d0\u05e0\u05d9 \u05de\u05ea\u05d7\u05d9\u05dc \u05d1\u05de\u05d4 \u05e9\u05e2\u05dc\u05d5\u05dc \u05dc\u05d4\u05e9\u05ea\u05d1\u05e9: \u05d4\u05e2\u05e8\u05da \u05e0\u05e9\u05e2\u05df \u05e2\u05dc \u05ea\u05d6\u05e8\u05d9\u05dd \u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd \u05d7\u05d5\u05e4\u05e9\u05d9 \u05de\u05de\u05d5\u05e6\u05e2 \u05e9\u05dc 129.99 \u05de\u05d9\u05dc\u05d9\u05d5\u05df \u05d3\u05d5\u05dc\u05e8 \u05dc\u05d7\u05de\u05e9 \u05e9\u05e0\u05d9\u05dd \u05d5\u05e2\u05dc \u05e7\u05e6\u05d1 \u05e6\u05de\u05d9\u05d7\u05d4 \u05e9\u05d4\u05d5\u05d2\u05d1\u05dc \u05de-14.4% \u05dc-5%. \u05de\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05e4\u05e0\u05d9 \u05d0\u05d9\u05e0\u05e0\u05d9 \u05d9\u05db\u05d5\u05dc \u05dc\u05d5\u05d5\u05d3\u05d0 \u05e9\u05d4\u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05d6\u05d4 \u05d1\u05e8-\u05e7\u05d9\u05d9\u05de\u05d0, \u05d5\u05d0\u05d9\u05df \u05dc\u05d9 \u05de\u05d9\u05d3\u05e2 \u05e2\u05dc \u05d4\u05e2\u05e1\u05e7, \u05e2\u05dc \u05d4\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea \u05d4\u05de\u05e9\u05e4\u05d8\u05d9\u05d5\u05ea \u05d0\u05d5 \u05e2\u05dc \u05de\u05e2\u05de\u05d3\u05d5 \u05d4\u05ea\u05d7\u05e8\u05d5\u05ea\u05d9. margin of safety \u05e9\u05dc 30.27% \u05d1\u05e7\u05d5\u05e9\u05d9 \u05e2\u05d5\u05d1\u05e8 \u05d0\u05ea \u05d4\u05e8\u05e3 \u05e9\u05dc\u05d9 \u05dc\u05d7\u05d1\u05e8\u05d4 \u05d2\u05d3\u05d5\u05dc\u05d4 \u05d5\u05de\u05d5\u05d1\u05e0\u05ea. \u05db\u05d0\u05df \u05de\u05d3\u05d5\u05d1\u05e8 \u05d1\u05e9\u05d5\u05d5\u05d9 \u05e9\u05d5\u05e7 \u05e9\u05dc \u05db-1.46 \u05de\u05d9\u05dc\u05d9\u05d0\u05e8\u05d3 \u05d3\u05d5\u05dc\u05e8 \u05e2\u05dd \u05e1\u05d9\u05db\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05d0 \u05e0\u05d1\u05d3\u05e7\u05d5, \u05d5\u05dc\u05db\u05df \u05d0\u05e0\u05d9 \u05d3\u05d5\u05e8\u05e9 40% \u05d5\u05de\u05e2\u05dc\u05d4, \u05d5\u05de\u05d7\u05d9\u05e8 \u05e9\u05dc \u05db-31.39 \u05d3\u05d5\u05dc\u05e8 \u05d4\u05d9\u05d4 \u05de\u05e1\u05e4\u05e7 \u05d6\u05d0\u05ea. \u05d9\u05d7\u05e1 \u05d7\u05d5\u05d1 \u05dc\u05d4\u05d5\u05df \u05e9\u05dc 0.41 \u05e1\u05d1\u05d9\u05e8, \u05d0\u05d1\u05dc \u05d0\u05d9\u05df \u05e7\u05d8\u05dc\u05d9\u05d6\u05d8\u05d5\u05e8, \u05d5'\u05d6\u05d5\u05dc\u05d4' \u05d1\u05dc\u05d1\u05d3 \u05d0\u05d9\u05e0\u05d4 \u05de\u05e1\u05e4\u05d9\u05e7\u05d4. \u05d0\u05e0\u05d9 \u05de\u05e2\u05d3\u05d9\u05e3 \u05dc\u05d4\u05d7\u05d6\u05d9\u05e7 \u05de\u05d6\u05d5\u05de\u05df \u05d5\u05dc\u05d7\u05db\u05d5\u05ea \u05dc\u05de\u05d7\u05d9\u05e8 \u05d8\u05d5\u05d1 \u05d9\u05d5\u05ea\u05e8 \u05d0\u05d5 \u05dc\u05d4\u05d5\u05db\u05d7\u05d4 \u05dc\u05d2\u05d1\u05d9 \u05ea\u05d6\u05e8\u05d9\u05dd \u05d4\u05de\u05d6\u05d5\u05de\u05e0\u05d9\u05dd.",
+      "criteria_passed": [
+        "Margin of safety of 30.27% just clears the 30% floor for a well-understood mid/large-cap",
+        "Debt-to-equity of 0.41 is moderate",
+        "Five-year average free cash flow of $129.99M is positive",
+        "Cumulative permanent-loss estimate of 30% is below the 40% rejection line"
+      ],
+      "criteria_failed": [
+        "Margin of safety of 30.27% is below the 40% required for a small-cap or complex name",
+        "No identifiable catalyst within 3 years",
+        "Business quality, legal exposure and competitive position cannot be checked from the snapshot",
+        "Forward free cash flow durability cannot be verified; the DCF depends on a trailing 5-year average and a capped growth rate"
+      ],
+      "diversification_dimension": "Asset class",
+      "position_size_pct": 0.0,
+      "expected_holding_period_months": 36,
+      "scaling_out_plan": {
+        "first_trim_at_price": 41.86,
+        "first_trim_pct_of_position": 25.0,
+        "second_trim_at_price": 49.7,
+        "second_trim_pct_of_position": 25.0,
+        "full_exit_at_price": 57.55
+      },
+      "reverse_triggers": [
+        "Book equity turns non-positive",
+        "Debt-to-equity rises above 0.7",
+        "Free cash flow turns negative or shrinks faster than 20% a year",
+        "Diligence reveals the five-year average free cash flow is not representative of forward cash generation",
+        "A legal or competitive finding that impairs the core cash flows"
+      ],
+      "klarman_quote_relevant": "You don't reduce risk by buying 'safer' companies. You reduce risk by paying a 'safer' price."
+    },
+    "input_tokens": 389,
+    "output_tokens": 2693,
+    "cache_write_tokens": 0,
+    "cache_read_tokens": 18679,
+    "prompt_chars": 754,
+    "prompt_sha256": "68ba9b0d3e9c3e7d20cacd1ea5943c0d1057e7db7e06b4a876e9d3b0a3d98b96"
+  }
+]
