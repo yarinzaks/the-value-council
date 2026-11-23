@@ -1,11 +1,11 @@
 {
  "agent": "mohnish_pabrai",
- "all_clear": false,
+ "all_clear": null,
  "breaches": [],
  "cash": 6038.47,
- "cash_weight": 0.6192127647574562,
+ "cash_weight": 0.6198176174135528,
  "circuit_breaker": false,
- "drawdown_from_peak": -0.02481499999999992,
+ "drawdown_from_peak": null,
  "filings_flagged": [
   {
    "accession": "0000832988-26-000243",
@@ -41,214 +41,50 @@
    "used": 0
   }
  },
- "limits": [
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:UPBD",
-   "note": "",
-   "observed": 0.029632326174008003,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:ASO",
-   "note": "",
-   "observed": 0.028310525695124513,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:LRN",
-   "note": "",
-   "observed": 0.023432476914636707,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:COLM",
-   "note": "",
-   "observed": 0.023258663740726118,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:PLAB",
-   "note": "",
-   "observed": 0.021944554110245748,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:KSS",
-   "note": "",
-   "observed": 0.021800991606720777,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:UTMD",
-   "note": "",
-   "observed": 0.021377482221322103,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:TRN",
-   "note": "",
-   "observed": 0.020515081753718526,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:GCO",
-   "note": "",
-   "observed": 0.02048842014592103,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:HRMY",
-   "note": "",
-   "observed": 0.020457656752308536,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:PRDO",
-   "note": "",
-   "observed": 0.0197290770469193,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:SD",
-   "note": "",
-   "observed": 0.0190979147546363,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:STRT",
-   "note": "",
-   "observed": 0.0188302732302076,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:RMR",
-   "note": "",
-   "observed": 0.017968898209057768,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:NGVT",
-   "note": "",
-   "observed": 0.017362859354891635,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:POWL",
-   "note": "",
-   "observed": 0.016767074965263,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:REPX",
-   "note": "",
-   "observed": 0.016653250408896772,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:MHO",
-   "note": "",
-   "observed": 0.01270220522259879,
-   "state": "pass"
-  },
-  {
-   "cap": 0.35,
-   "forces_action": false,
-   "limit": "trim_above_35pct:SIG",
-   "note": "",
-   "observed": 0.010457502935340474,
-   "state": "pass"
-  },
-  {
-   "cap": 0.45,
-   "forces_action": false,
-   "limit": "correlated_cluster:unlabelled",
-   "note": "38.1% of the book carries no cluster label and cannot be checked against the 45% cap",
-   "observed": 0.38078723524254365,
-   "state": "unknown"
-  },
-  {
-   "cap": 0.2,
-   "forces_action": false,
-   "limit": "illiquid_aggregate",
-   "note": "",
-   "observed": 0.09776298856114479,
-   "state": "pass"
-  },
-  {
-   "cap": 0.05,
-   "forces_action": false,
-   "limit": "cash_floor",
-   "note": "",
-   "observed": 0.6192127647574562,
-   "state": "pass"
-  },
-  {
-   "cap": 1.0,
-   "forces_action": false,
-   "limit": "leverage",
-   "note": "",
-   "observed": 0.3807872352425437,
-   "state": "pass"
-  },
-  {
-   "cap": -0.25,
-   "forces_action": false,
-   "limit": "drawdown_circuit_breaker",
-   "note": "",
-   "observed": -0.02481499999999992,
-   "state": "pass"
-  }
- ],
- "nav": 9751.85,
+ "limits": [],
+ "nav": 9742.3336,
  "peak_nav": 10000.0,
  "positions": 19,
- "regime": null,
- "run": "heartbeat",
- "unknown_limits": [
-  {
-   "cap": 0.45,
-   "forces_action": false,
-   "limit": "correlated_cluster:unlabelled",
-   "note": "38.1% of the book carries no cluster label and cannot be checked against the 45% cap",
-   "observed": 0.38078723524254365,
-   "state": "unknown"
-  }
- ],
- "updated": "2026-11-23T16:31:26+00:00"
+ "regime": {
+  "as_of": "2026-11-23",
+  "risk_on_count": 0,
+  "signals": [
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "BAMLH0A0HYM2",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "T10Y3M",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "SP500",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "VIXCLS",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   }
+  ],
+  "unknown_count": 4
+ },
+ "run": "close",
+ "unknown_limits": [],
+ "updated": "2026-11-23T17:04:23+00:00"
 }
