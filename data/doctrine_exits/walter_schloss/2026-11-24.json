@@ -1,0 +1,62 @@
+[
+  {
+    "ticker": "CLSK",
+    "decision": "SELL",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-24T00:00:00+00:00",
+    "criteria_met": [
+      "fundamentals: debt rose above 100% of equity (D/E 2.34)"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 5.7899,
+    "target_price": null,
+    "exit_trigger": "fundamentals: debt rose above 100% of equity (D/E 2.34)",
+    "rationale": "Doctrine said sell (fundamentals: debt rose above 100% of equity (D/E 2.34)); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "FOR",
+    "decision": "HOLD",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-24T00:00:00+00:00",
+    "criteria_met": [
+      "down 9% from cost $24.82; 0.60x tangible book $37.52/share; balance sheet intact"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 24.8214,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (down 9% from cost $24.82; 0.60x tangible book $37.52/share; balance sheet intact); the engine kept it [shadow]"
+  },
+  {
+    "ticker": "GNW",
+    "decision": "HOLD",
+    "agent": "walter_schloss",
+    "timestamp": "2026-11-24T00:00:00+00:00",
+    "criteria_met": [
+      "down 7% from cost $8.65; 0.35x tangible book $23.10/share; balance sheet intact"
+    ],
+    "criteria_failed": [],
+    "criteria_values": {},
+    "market_conditions": {
+      "exit_mode": "shadow",
+      "engine_action": "kept"
+    },
+    "confidence": 0.0,
+    "entry_price": 8.6509,
+    "target_price": null,
+    "exit_trigger": null,
+    "rationale": "Doctrine said keep (down 7% from cost $8.65; 0.35x tangible book $23.10/share; balance sheet intact); the engine kept it [shadow]"
+  }
+]
