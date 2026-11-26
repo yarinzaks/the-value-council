@@ -1,0 +1,82 @@
+{
+ "at": "2026-11-26T17:03:10+00:00",
+ "cash_weight": 0.610908491250363,
+ "filings_flagged": [
+  {
+   "accession": "0001193125-26-473133",
+   "code": "2.02",
+   "filed": "2026-11-24",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "KSS"
+  },
+  {
+   "accession": "0000832988-26-000243",
+   "code": "5.02",
+   "filed": "2026-11-17",
+   "form": "8-K",
+   "meaning": "officer or director departure",
+   "severity": "note",
+   "ticker": "SIG"
+  },
+  {
+   "accession": "0000080420-26-000139",
+   "code": "2.02",
+   "filed": "2026-11-16",
+   "form": "8-K",
+   "meaning": "results of operations \u2014 PEAD window opens",
+   "severity": "note",
+   "ticker": "POWL"
+  }
+ ],
+ "grounds_triggered": [],
+ "nav": 9884.41,
+ "open_theses": 0,
+ "positions": 19,
+ "punch_card": {
+  "remaining": 20,
+  "used": 0
+ },
+ "queued_for_reading": [],
+ "regime": {
+  "as_of": "2026-11-26",
+  "risk_on_count": 0,
+  "signals": [
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "BAMLH0A0HYM2",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "T10Y3M",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "SP500",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   },
+   {
+    "as_of": null,
+    "reason": "series could not be fetched",
+    "series": "VIXCLS",
+    "stance": "unknown",
+    "threshold": null,
+    "value": null
+   }
+  ],
+  "unknown_count": 4
+ },
+ "run": "close"
+}
